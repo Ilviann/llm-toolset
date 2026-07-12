@@ -19,6 +19,26 @@ The integration has two local parts:
 
 No protocol data is written to the MCP process's stdout except JSON-RPC.
 
+## Python package layout
+
+The dependency-free Python package separates stable responsibilities so changes
+to one boundary do not require editing the entire server:
+
+- `server.py` validates MCP requests and preserves the package's public server API.
+- `tool_catalog.py` contains the static tool schemas, protocol versions, and mode policy.
+- `tool_dispatch.py` routes tool calls, performs project-path preflight checks,
+  and coordinates imports, scans, capabilities, and editor launch.
+- `stdio.py` owns newline-delimited JSON-RPC input/output and stderr diagnostics.
+- `cli.py` parses arguments and composes the bridge, asset manager, launcher,
+  and MCP server.
+- `assets.py`, `bridge.py`, and `launcher.py` remain focused adapters for their
+  filesystem, localhost transport, and process responsibilities.
+
+This organization keeps the model-facing schemas easy to audit, makes service
+dependencies replaceable in unit tests through small structural interfaces, and
+retains the existing `MCPServer`, mode/catalog constants, `run`, and `main`
+imports from `godot_editor_mcp.server` for compatibility.
+
 ## Tool modes
 
 Choose the exposed toolset at startup with `--mode tiny|small|large`. The
@@ -374,10 +394,11 @@ Set-Location "C:\path\to\godot-editor-mcp"
 py -3 -m unittest discover -s tests -v
 ```
 
-The Python suite tests MCP initialization, per-mode tool listing and dispatch,
-capability augmentation, public scan routing, authentication, bounded transport
-behavior, staged imports, traversal and symlink denial, size limits,
-no-overwrite behavior, and safe errors. A live check in Godot is still required
+The Python suite tests MCP initialization, end-to-end stdio initialization,
+tool listing and calls, per-mode dispatch, capability augmentation, public scan
+routing, authentication, bounded transport behavior, staged imports, traversal
+and symlink denial, size limits, no-overwrite behavior, and safe stdout/stderr
+error separation. A live check in Godot is still required
 when claiming compatibility because editor plugin APIs are only available inside
 the editor. Symbolic-link tests are skipped when the current account cannot
 create links; enable Windows Developer Mode or use the required privilege to run

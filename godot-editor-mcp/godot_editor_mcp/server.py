@@ -1,236 +1,49 @@
-"""Dependency-free newline-delimited JSON-RPC MCP server."""
+"""MCP request handling for the Godot editor bridge.
+
+The public imports in this module are retained for compatibility. Static tool
+schemas live in :mod:`tool_catalog`, execution in :mod:`tool_dispatch`, stdio
+transport in :mod:`stdio`, and command-line setup in :mod:`cli`.
+"""
 
 from __future__ import annotations
 
-import argparse
-import json
-import os
-import sys
-from typing import Any, Literal
+from typing import Any
 
 from . import __version__
-from .assets import AssetError, ProjectAssets
-from .bridge import BridgeError, GodotBridge
-from .launcher import EditorLauncher, LauncherError
-
-
-LATEST_PROTOCOL = "2025-11-25"
-SUPPORTED_PROTOCOLS = {LATEST_PROTOCOL, "2025-06-18", "2025-03-26", "2024-11-05"}
-
-PATH_PROPERTY = {"path": {"type": "string", "description": "Scene-relative node path; . is root"}}
-RESOURCE_PATH = {"type": "string", "description": "Project-relative path without res://"}
-Mode = Literal["tiny", "small", "large"]
-MODES: tuple[Mode, ...] = ("tiny", "small", "large")
-
-TOOLS = [
-    {
-        "name": "capabilities",
-        "description": "Get bridge versions, commands, features, and limits.",
-        "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
-    },
-    {
-        "name": "editor_state",
-        "description": "Get Godot version, current scene, selection, and play state.",
-        "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
-    },
-    {
-        "name": "list_assets",
-        "description": "List project assets, limited to 100 results.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "folder": {**RESOURCE_PATH, "default": "."},
-                "type": {
-                    "type": "string",
-                    "enum": ["all", "scene", "script", "image", "model", "audio", "font", "material", "resource"],
-                    "default": "all",
-                },
-                "limit": {"type": "integer", "minimum": 1, "maximum": 100, "default": 50},
-            },
-            "additionalProperties": False,
-        },
-    },
-    {
-        "name": "asset_info",
-        "description": "Get one asset's type, size, import state, and dependencies.",
-        "inputSchema": {
-            "type": "object", "properties": {"path": RESOURCE_PATH},
-            "required": ["path"], "additionalProperties": False,
-        },
-    },
-    {
-        "name": "scan_asset",
-        "description": "Queue a Godot filesystem scan for one project asset.",
-        "inputSchema": {
-            "type": "object", "properties": {"path": RESOURCE_PATH},
-            "required": ["path"], "additionalProperties": False,
-        },
-    },
-    {
-        "name": "import_asset",
-        "description": "Copy one staged file into the project and queue Godot import.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "source": {"type": "string", "description": "Path relative to configured import root"},
-                "destination": RESOURCE_PATH,
-            },
-            "required": ["source", "destination"], "additionalProperties": False,
-        },
-    },
-    {
-        "name": "create_folder",
-        "description": "Create a folder inside the Godot project.",
-        "inputSchema": {
-            "type": "object", "properties": {"path": RESOURCE_PATH},
-            "required": ["path"], "additionalProperties": False,
-        },
-    },
-    {
-        "name": "create_resource",
-        "description": "Create a whitelisted built-in resource as a text .tres file.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "path": RESOURCE_PATH,
-                "type": {
-                    "type": "string",
-                    "enum": [
-                        "StandardMaterial3D", "ORMMaterial3D", "ShaderMaterial",
-                        "Environment", "Gradient", "Curve", "StyleBoxFlat",
-                        "AudioStreamRandomizer",
-                    ],
-                },
-                "properties": {"type": "object", "default": {}},
-            },
-            "required": ["path", "type"], "additionalProperties": False,
-        },
-    },
-    {
-        "name": "create_scene",
-        "description": "Create a scene with one built-in root node.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "path": RESOURCE_PATH,
-                "root_type": {"type": "string", "description": "Built-in Node class, e.g. Node2D"},
-                "root_name": {"type": "string"},
-            },
-            "required": ["path", "root_type", "root_name"], "additionalProperties": False,
-        },
-    },
-    {
-        "name": "open_scene",
-        "description": "Open a project scene in the Godot editor.",
-        "inputSchema": {
-            "type": "object", "properties": {"path": RESOURCE_PATH},
-            "required": ["path"], "additionalProperties": False,
-        },
-    },
-    {
-        "name": "scene_tree",
-        "description": "List the edited scene tree, limited to 200 nodes.",
-        "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
-    },
-    {
-        "name": "add_node",
-        "description": "Add a built-in node to the edited scene through undo history.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "parent": {"type": "string", "description": "Scene-relative node path; . is root"},
-                "type": {"type": "string", "description": "Built-in Node class, e.g. Sprite2D"},
-                "name": {"type": "string"},
-            },
-            "required": ["parent", "type", "name"], "additionalProperties": False,
-        },
-    },
-    {
-        "name": "instantiate_scene",
-        "description": "Instantiate a PackedScene under a node through undo history.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "scene": RESOURCE_PATH,
-                "parent": {"type": "string", "description": "Scene-relative node path; . is root"},
-                "name": {"type": "string"},
-            },
-            "required": ["scene", "parent", "name"], "additionalProperties": False,
-        },
-    },
-    {
-        "name": "node_info",
-        "description": "Get editable properties of one scene node.",
-        "inputSchema": {
-            "type": "object", "properties": PATH_PROPERTY, "required": ["path"],
-            "additionalProperties": False,
-        },
-    },
-    {
-        "name": "set_property",
-        "description": "Set one node property through Godot undo history.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                **PATH_PROPERTY,
-                "property": {"type": "string"},
-                "value": {"description": "JSON value; vectors and colors use number arrays"},
-            },
-            "required": ["path", "property", "value"],
-            "additionalProperties": False,
-        },
-    },
-    {
-        "name": "select_node",
-        "description": "Select one node in the Godot editor.",
-        "inputSchema": {
-            "type": "object", "properties": PATH_PROPERTY, "required": ["path"],
-            "additionalProperties": False,
-        },
-    },
-    {
-        "name": "scene_control",
-        "description": "Save, run, or stop the current scene.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {"action": {"type": "string", "enum": ["save", "run", "stop"]}},
-            "required": ["action"], "additionalProperties": False,
-        },
-    },
-    {
-        "name": "start_editor",
-        "description": "Start the configured Godot editor for this project.",
-        "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
-    },
-]
-
-TOOL_BY_NAME = {tool["name"]: tool for tool in TOOLS}
-
-# Keep the smallest mode centered on short, supervised scene edits. The larger
-# modes are strict supersets so a client can change mode without losing tools.
-TINY_TOOLS = (
-    "capabilities", "editor_state", "create_scene", "open_scene", "scene_tree",
-    "add_node", "instantiate_scene", "node_info", "set_property", "scene_control",
+from .stdio import error, result, tool_result
+from .tool_catalog import (
+    LATEST_PROTOCOL,
+    MODES,
+    MODE_TOOL_NAMES,
+    PATH_PROPERTY,
+    RESOURCE_PATH,
+    SMALL_TOOLS,
+    SUPPORTED_PROTOCOLS,
+    TINY_TOOLS,
+    TOOL_BY_NAME,
+    TOOLS,
+    Mode,
+    tools_for_mode,
 )
-SMALL_TOOLS = TINY_TOOLS + (
-    "list_assets", "asset_info", "scan_asset", "import_asset", "create_folder",
-    "create_resource",
+from .tool_dispatch import (
+    AssetManager,
+    BridgeClient,
+    EditorStarter,
+    TOOL_ERRORS,
+    ToolDispatcher,
 )
-MODE_TOOL_NAMES: dict[Mode, tuple[str, ...]] = {
-    "tiny": TINY_TOOLS,
-    "small": SMALL_TOOLS,
-    "large": SMALL_TOOLS + ("select_node", "start_editor"),
-}
 
 
 class MCPServer:
+    """Validate MCP requests and delegate permitted tool calls."""
+
     def __init__(
         self,
-        bridge: GodotBridge,
-        assets: ProjectAssets | None = None,
+        bridge: BridgeClient,
+        assets: AssetManager | None = None,
         *,
         mode: Mode = "tiny",
-        launcher: EditorLauncher | None = None,
+        launcher: EditorStarter | None = None,
     ) -> None:
         if mode not in MODES:
             raise ValueError(f"Mode must be one of: {', '.join(MODES)}")
@@ -239,25 +52,15 @@ class MCPServer:
         self.mode = mode
         self.launcher = launcher
         self.tool_names = MODE_TOOL_NAMES[mode]
-        self.tools = [TOOL_BY_NAME[name] for name in self.tool_names]
-
-    @staticmethod
-    def _result(request_id: Any, result: dict[str, Any]) -> dict[str, Any]:
-        return {"jsonrpc": "2.0", "id": request_id, "result": result}
-
-    @staticmethod
-    def _error(request_id: Any, code: int, message: str) -> dict[str, Any]:
-        return {"jsonrpc": "2.0", "id": request_id, "error": {"code": code, "message": message}}
-
-    @staticmethod
-    def _tool_result(value: Any, *, is_error: bool = False) -> dict[str, Any]:
-        text = value if isinstance(value, str) else json.dumps(
-            value, ensure_ascii=False, separators=(",", ":"), sort_keys=True
+        self.tools = tools_for_mode(mode)
+        self._dispatcher = ToolDispatcher(
+            bridge, assets, mode=mode, launcher=launcher
         )
-        result: dict[str, Any] = {"content": [{"type": "text", "text": text}]}
-        if is_error:
-            result["isError"] = True
-        return result
+
+    # Preserve these helpers for callers that used the earlier server module.
+    _result = staticmethod(result)
+    _error = staticmethod(error)
+    _tool_result = staticmethod(tool_result)
 
     def handle(self, message: dict[str, Any]) -> dict[str, Any] | None:
         request_id = message.get("id")
@@ -266,14 +69,14 @@ class MCPServer:
         if "id" not in message:
             return None
         if message.get("jsonrpc") != "2.0" or not isinstance(method, str):
-            return self._error(request_id, -32600, "Invalid Request")
+            return error(request_id, -32600, "Invalid Request")
         if not isinstance(params, dict):
-            return self._error(request_id, -32602, "Invalid params")
+            return error(request_id, -32602, "Invalid params")
 
         if method == "initialize":
             requested = params.get("protocolVersion")
             protocol = requested if requested in SUPPORTED_PROTOCOLS else LATEST_PROTOCOL
-            return self._result(request_id, {
+            return result(request_id, {
                 "protocolVersion": protocol,
                 "capabilities": {"tools": {}},
                 "serverInfo": {
@@ -281,137 +84,61 @@ class MCPServer:
                 },
             })
         if method == "ping":
-            return self._result(request_id, {})
+            return result(request_id, {})
         if method == "tools/list":
-            return self._result(request_id, {"tools": self.tools})
+            return result(request_id, {"tools": self.tools})
         if method == "tools/call":
             return self._call_tool(request_id, params)
-        return self._error(request_id, -32601, "Method not found")
+        return error(request_id, -32601, "Method not found")
 
     def _call_tool(self, request_id: Any, params: dict[str, Any]) -> dict[str, Any]:
         name = params.get("name")
         arguments = params.get("arguments") or {}
         if not isinstance(arguments, dict):
-            return self._error(request_id, -32602, "Invalid tool arguments")
+            return error(request_id, -32602, "Invalid tool arguments")
         if name not in self.tool_names:
-            return self._error(request_id, -32602, f"Tool is unavailable in {self.mode} mode")
-        commands = {
-            "capabilities": "capabilities", "editor_state": "state",
-            "list_assets": "assets", "asset_info": "asset_info", "scan_asset": "scan_asset",
-            "create_resource": "create_resource", "create_scene": "create_scene",
-            "open_scene": "open_scene",
-            "scene_tree": "tree", "node_info": "inspect", "add_node": "add_node",
-            "instantiate_scene": "instantiate_scene", "set_property": "set_property",
-            "select_node": "select", "scene_control": "control",
-        }
-        try:
-            if name == "start_editor":
-                if arguments:
-                    raise ValueError("start_editor does not accept arguments")
-                if self.launcher is None:
-                    raise LauncherError(
-                        "Godot executable is not configured; set GODOT_EXECUTABLE"
-                    )
-                output = self.launcher.start(self.bridge)
-            elif name == "import_asset":
-                if self.assets is None:
-                    raise AssetError("Asset import is unavailable")
-                output = self.assets.import_asset(
-                    arguments.get("source"), arguments.get("destination")
-                )
-                self._queue_scan(output, output["destination"])
-            elif name == "create_folder":
-                if self.assets is None:
-                    raise AssetError("Folder creation is unavailable")
-                output = self.assets.create_folder(arguments.get("path"))
-                self._queue_scan(output, output["path"])
-            else:
-                command = commands.get(name)
-                if command is None:
-                    return self._error(request_id, -32602, "Unknown tool")
-                if self.assets is not None:
-                    if name == "list_assets":
-                        self.assets.validate_folder(arguments.get("folder", "."))
-                    elif name == "asset_info":
-                        self.assets.validate_file(arguments.get("path"))
-                    elif name == "scan_asset":
-                        self.assets.validate_file(arguments.get("path"))
-                    elif name == "create_scene":
-                        self.assets.validate_new_file(arguments.get("path"), {".tscn"})
-                    elif name == "create_resource":
-                        self.assets.validate_new_file(arguments.get("path"), {".tres"})
-                    elif name == "open_scene":
-                        self.assets.validate_file(arguments.get("path"), {".tscn", ".scn"})
-                    elif name == "instantiate_scene":
-                        self.assets.validate_file(arguments.get("scene"), {".tscn", ".scn"})
-                output = self.bridge.call(command, arguments)
-                if name == "capabilities" and isinstance(output, dict):
-                    output = {
-                        **output,
-                        "mcp_server_version": __version__,
-                        "mode": self.mode,
-                        "tools": list(self.tool_names),
-                    }
-                    if self.mode == "large":
-                        output["editor_launcher"] = {
-                            "configured": bool(
-                                self.launcher is not None and self.launcher.configured
-                            )
-                        }
-            return self._result(request_id, self._tool_result(output))
-        except (AssetError, BridgeError, LauncherError, TypeError, ValueError) as exc:
-            return self._result(request_id, self._tool_result(str(exc), is_error=True))
-
-    def _queue_scan(self, output: dict[str, Any], path: str) -> None:
-        try:
-            scan = self.bridge.call(
-                "scan_asset", {"path": path.removeprefix("res://")}
+            return error(
+                request_id, -32602, f"Tool is unavailable in {self.mode} mode"
             )
-            output["scan"] = scan.get("scan", "queued") if isinstance(scan, dict) else "queued"
-        except BridgeError as exc:
-            output["scan"] = "pending"
-            output["warning"] = str(exc)
+        try:
+            output = self._dispatcher.call(name, arguments)
+            return result(request_id, tool_result(output))
+        except TOOL_ERRORS as exc:
+            return result(request_id, tool_result(str(exc), is_error=True))
 
 
 def run(
-    bridge: GodotBridge,
-    assets: ProjectAssets,
+    bridge: BridgeClient,
+    assets: AssetManager,
     *,
     mode: Mode = "tiny",
-    launcher: EditorLauncher | None = None,
+    launcher: EditorStarter | None = None,
 ) -> None:
-    server = MCPServer(bridge, assets, mode=mode, launcher=launcher)
-    for line in sys.stdin:
-        try:
-            message = json.loads(line)
-            response = server.handle(message) if isinstance(message, dict) else server._error(None, -32600, "Invalid Request")
-        except json.JSONDecodeError:
-            response = server._error(None, -32700, "Parse error")
-        except Exception as exc:
-            print(f"godot-editor-mcp: {exc}", file=sys.stderr)
-            response = server._error(None, -32603, "Internal error")
-        if response is not None:
-            print(json.dumps(response, ensure_ascii=False, separators=(",", ":")), flush=True)
+    """Compatibility wrapper for the original server module entry point."""
+    from .cli import run as run_cli
+
+    run_cli(bridge, assets, mode=mode, launcher=launcher)
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Small MCP bridge for the Godot 4 editor")
-    parser.add_argument("project", help="Godot project folder")
-    parser.add_argument(
-        "--mode", choices=MODES, default="tiny",
-        help="Available toolset: tiny (default), small, or large",
-    )
-    parser.add_argument("--port", type=int, default=6505, help="Plugin port (default: 6505)")
-    parser.add_argument("--import-root", help="Folder containing assets staged for import")
-    args = parser.parse_args()
-    try:
-        bridge = GodotBridge(args.project, port=args.port)
-        launcher = EditorLauncher(args.project, os.environ.get("GODOT_EXECUTABLE"))
-        run(
-            bridge,
-            ProjectAssets(args.project, args.import_root),
-            mode=args.mode,
-            launcher=launcher,
-        )
-    except (AssetError, BridgeError) as exc:
-        parser.error(str(exc))
+    """Compatibility wrapper for MCP hosts using ``server:main``."""
+    from .cli import main as cli_main
+
+    cli_main()
+
+
+__all__ = [
+    "LATEST_PROTOCOL",
+    "MODES",
+    "MODE_TOOL_NAMES",
+    "MCPServer",
+    "PATH_PROPERTY",
+    "RESOURCE_PATH",
+    "SMALL_TOOLS",
+    "SUPPORTED_PROTOCOLS",
+    "TINY_TOOLS",
+    "TOOL_BY_NAME",
+    "TOOLS",
+    "main",
+    "run",
+]

@@ -20,6 +20,13 @@ detached process group on Windows. Editor shutdown remains intentionally outside
 the toolset. Version 0.3.1 added the cross-platform launcher behavior and setup
 documentation. Native Linux and Windows validation is still pending.
 
+Version 0.3.2 added a Python organization refactor that separated the static
+tool catalog, tool execution, stdio transport, and CLI composition from MCP request handling.
+It preserved the public tool surface and `godot_editor_mcp.server` compatibility
+imports while adding end-to-end stdio coverage for initialization, `tools/list`,
+`tools/call`, parse errors, and stdout/stderr separation. This is an internal
+maintainability milestone and does not change bridge behavior or tool modes.
+
 Still outstanding from Priority 0 are diagnostics, dirty/reload-pending and diagnostic counts in `editor_state`, awaitable commands, and project reload. Runtime inspection, capture/input, broader authoring, project settings, pagination, structured errors, and operation IDs also remain planned. Capability flags explicitly report the unsupported runtime and diagnostic features so clients can degrade safely.
 
 The highest-value next step is better observability. During this work, editing was straightforward through the filesystem, but confirming project reloads, distinguishing stale diagnostics from current errors, and inspecting a procedurally generated running scene required other tools.
