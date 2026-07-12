@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rooted-files-mcp"
+version = "0.1.0"
+description = "Small, dependency-free MCP server for rooted text file access"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+
+[project.scripts]
+rooted-files-mcp = "rooted_files_mcp.server:main"
+
+[tool.setuptools.packages.find]
+include = ["rooted_files_mcp*"]
+
