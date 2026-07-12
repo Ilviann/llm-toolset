@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "godot-editor-mcp"
+version = "0.1.0"
+description = "Small offline MCP bridge for the Godot 4 editor"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+
+[project.scripts]
+godot-editor-mcp = "godot_editor_mcp.server:main"
+
+[tool.setuptools.packages.find]
+include = ["godot_editor_mcp*"]

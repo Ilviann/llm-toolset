@@ -1,0 +1,18 @@
+; Minimal project used to validate and demonstrate the bundled editor plugin.
+config_version=5
+
+[application]
+
+config/name="Godot MCP Plugin Check"
+
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/godot_mcp/plugin.cfg")
+
+[godot_mcp]
+
+port=6505
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
