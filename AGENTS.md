@@ -38,6 +38,7 @@ After completing implementation work, update every affected document, README, co
 
 - The plugin targets Godot 4 and is verified with Godot 4.7 stable. Re-run the headless plugin load and bridge checks when changing editor APIs or claiming compatibility with another version.
 - The Python server defaults to `--mode tiny`. Use `small` for asset/import workflows and `large` when the model also controls the Godot desktop. Tool calls outside the active mode are rejected as well as omitted from `tools/list`.
+- Large mode includes `start_editor`. It accepts no arguments and starts only the configured project using the absolute executable path in `GODOT_EXECUTABLE`; the plugin must already be installed and enabled. Tiny and small modes do not expose it.
 - Keep the Python package and installed Godot plugin on matching versions. The `capabilities` tool reports the MCP server version, bridge version, active mode, exposed tools, optional features, and effective limits.
 - Godot 4.7 headless editor mode activates scenes requested through `open_scene`, so headless mutation tests can create or open a scene through the bridge before editing it.
 - Source imports are asynchronous. `import_asset` and public `scan_asset` may report `queued` or `already_running`; `asset_info` can temporarily report an empty type until Godot finishes scanning. Check `editor_state.filesystem_scanning` and its generation counter before starting another full scan.

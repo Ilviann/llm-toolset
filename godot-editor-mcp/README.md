@@ -27,8 +27,8 @@ rejected even if a client retained an older `tools/list` response.
   bounded asset discovery, import scanning, staged imports, folders, and
   whitelisted resource creation. This is the appropriate mode when the agent
   must perform its own unit-test-oriented setup and verification.
-- **`large`:** all 17 tools. It adds `select_node`, which is useful when a large
-  model can also inspect and control the Godot desktop UI.
+- **`large`:** all 18 tools. It adds `select_node` and the opt-in
+  `start_editor` launcher for models that also control the Godot desktop UI.
 
 Example:
 
@@ -60,6 +60,7 @@ means `small` and `large`.
 | `create_folder` | Small+ | Create a project folder |
 | `create_resource` | Small+ | Create a whitelisted built-in resource as text `.tres` |
 | `select_node` | Large | Select one node in the editor for coordinated desktop inspection |
+| `start_editor` | Large | Start Godot for the configured project using `GODOT_EXECUTABLE` |
 
 Node paths are relative to the edited scene root. Use `.` for the root and, for
 example, `Player/Camera2D` for a child. Vector and color property values use JSON
@@ -73,6 +74,15 @@ type filter accepts `scene`, `script`, `image`, `model`, `audio`, `font`,
 The server creates folders, scenes, and staged asset copies, but it does not
 execute arbitrary code or provide general filesystem access. Pair it with
 `rooted-files-mcp` when the model needs to edit GDScript or project configuration.
+
+`start_editor` is deliberately not a general process runner. It accepts no
+arguments from the model and launches only `GODOT_EXECUTABLE --editor --path`
+for the project configured when the MCP server starts. The executable must be
+an absolute path to an executable file. If the project editor is already
+connected, the tool returns `already_running`; repeated calls while a process
+started by this MCP server is still launching return `starting`. The plugin
+must already be installed and enabled in the project. The MCP server does not
+provide a tool to close the editor.
 
 The fixed context cost now depends on the selected mode. `tiny` omits the six
 asset workflow schemas, while `small` omits the desktop-only selection helper.
@@ -247,6 +257,33 @@ Add this entry to LM Studio's `mcp.json`, replacing both example paths:
 }
 ```
 
+To enable the large-mode editor launcher, use `"mode", "large"` and configure
+the executable in the MCP server environment. On macOS, point to the binary
+inside the application bundle, not the `.app` directory:
+
+```json
+{
+  "mcpServers": {
+    "godot-editor": {
+      "command": "/opt/homebrew/bin/python3",
+      "args": [
+        "/path/to/godot-editor-mcp/server.py",
+        "/path/to/game",
+        "--mode",
+        "large"
+      ],
+      "env": {
+        "GODOT_EXECUTABLE": "/Applications/Godot.app/Contents/MacOS/Godot"
+      }
+    }
+  }
+}
+```
+
+The launcher is unavailable in `tiny` and `small` modes. In `large` mode,
+`capabilities.editor_launcher.configured` reports whether the environment
+variable was provided without exposing its machine-specific value.
+
 Create the import-inbox folder before starting the MCP server. Omit the two
 `--import-root` arguments if asset import is not needed; `import_asset` then
 returns a clear disabled error while all other tools continue to work.
@@ -257,7 +294,8 @@ For the default minimal configuration, use `"--mode", "tiny"` and omit
 folder/resource creation, staged imports, or explicit filesystem scans.
 
 In LM Studio, open the **Program** tab and choose **Install → Edit mcp.json**.
-Keep the Godot project open with the plugin enabled while using editor tools.
+Keep the Godot project open with the plugin enabled while using editor tools,
+or use `start_editor` after configuring large mode as shown above.
 
 ## Test
 

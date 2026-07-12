@@ -2,7 +2,7 @@
 extends EditorPlugin
 
 const HOST := "127.0.0.1"
-const BRIDGE_VERSION := "0.2.0"
+const BRIDGE_VERSION := "0.3.0"
 const DEFAULT_PORT := 6505
 const MAX_REQUEST_BYTES := 64 * 1024
 const MAX_TREE_NODES := 200

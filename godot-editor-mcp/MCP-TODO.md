@@ -12,6 +12,11 @@ Version 0.2.0 completed the mode-aware foundation and several observability and 
 - Partially expanded `editor_state` with project name/path, main scene, bridge version/port, filesystem scan state and generation, and current/last run metadata.
 - Added run IDs to `scene_control` run/stop results and transition tracking in `editor_state`.
 
+Version 0.3.0 added a large-mode-only `start_editor` tool. It reads the fixed
+Godot binary from `GODOT_EXECUTABLE`, accepts no model-provided arguments,
+launches only the configured MCP project, and reports its configuration through
+`capabilities`. Editor shutdown remains intentionally outside the toolset.
+
 Still outstanding from Priority 0 are diagnostics, dirty/reload-pending and diagnostic counts in `editor_state`, awaitable commands, and project reload. Runtime inspection, capture/input, broader authoring, project settings, pagination, structured errors, and operation IDs also remain planned. Capability flags explicitly report the unsupported runtime and diagnostic features so clients can degrade safely.
 
 The highest-value next step is better observability. During this work, editing was straightforward through the filesystem, but confirming project reloads, distinguishing stale diagnostics from current errors, and inspecting a procedurally generated running scene required other tools.

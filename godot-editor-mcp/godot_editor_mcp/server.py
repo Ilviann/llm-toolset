@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from typing import Any, Literal
 
 from . import __version__
 from .assets import AssetError, ProjectAssets
 from .bridge import BridgeError, GodotBridge
+from .launcher import EditorLauncher, LauncherError
 
 
 LATEST_PROTOCOL = "2025-11-25"
@@ -195,6 +197,11 @@ TOOLS = [
             "required": ["action"], "additionalProperties": False,
         },
     },
+    {
+        "name": "start_editor",
+        "description": "Start the configured Godot editor for this project.",
+        "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
+    },
 ]
 
 TOOL_BY_NAME = {tool["name"]: tool for tool in TOOLS}
@@ -212,7 +219,7 @@ SMALL_TOOLS = TINY_TOOLS + (
 MODE_TOOL_NAMES: dict[Mode, tuple[str, ...]] = {
     "tiny": TINY_TOOLS,
     "small": SMALL_TOOLS,
-    "large": SMALL_TOOLS + ("select_node",),
+    "large": SMALL_TOOLS + ("select_node", "start_editor"),
 }
 
 
@@ -223,12 +230,14 @@ class MCPServer:
         assets: ProjectAssets | None = None,
         *,
         mode: Mode = "tiny",
+        launcher: EditorLauncher | None = None,
     ) -> None:
         if mode not in MODES:
             raise ValueError(f"Mode must be one of: {', '.join(MODES)}")
         self.bridge = bridge
         self.assets = assets
         self.mode = mode
+        self.launcher = launcher
         self.tool_names = MODE_TOOL_NAMES[mode]
         self.tools = [TOOL_BY_NAME[name] for name in self.tool_names]
 
@@ -296,7 +305,15 @@ class MCPServer:
             "select_node": "select", "scene_control": "control",
         }
         try:
-            if name == "import_asset":
+            if name == "start_editor":
+                if arguments:
+                    raise ValueError("start_editor does not accept arguments")
+                if self.launcher is None:
+                    raise LauncherError(
+                        "Godot executable is not configured; set GODOT_EXECUTABLE"
+                    )
+                output = self.launcher.start(self.bridge)
+            elif name == "import_asset":
                 if self.assets is None:
                     raise AssetError("Asset import is unavailable")
                 output = self.assets.import_asset(
@@ -335,8 +352,14 @@ class MCPServer:
                         "mode": self.mode,
                         "tools": list(self.tool_names),
                     }
+                    if self.mode == "large":
+                        output["editor_launcher"] = {
+                            "configured": bool(
+                                self.launcher is not None and self.launcher.configured
+                            )
+                        }
             return self._result(request_id, self._tool_result(output))
-        except (AssetError, BridgeError, TypeError, ValueError) as exc:
+        except (AssetError, BridgeError, LauncherError, TypeError, ValueError) as exc:
             return self._result(request_id, self._tool_result(str(exc), is_error=True))
 
     def _queue_scan(self, output: dict[str, Any], path: str) -> None:
@@ -350,8 +373,14 @@ class MCPServer:
             output["warning"] = str(exc)
 
 
-def run(bridge: GodotBridge, assets: ProjectAssets, *, mode: Mode = "tiny") -> None:
-    server = MCPServer(bridge, assets, mode=mode)
+def run(
+    bridge: GodotBridge,
+    assets: ProjectAssets,
+    *,
+    mode: Mode = "tiny",
+    launcher: EditorLauncher | None = None,
+) -> None:
+    server = MCPServer(bridge, assets, mode=mode, launcher=launcher)
     for line in sys.stdin:
         try:
             message = json.loads(line)
@@ -377,6 +406,12 @@ def main() -> None:
     args = parser.parse_args()
     try:
         bridge = GodotBridge(args.project, port=args.port)
-        run(bridge, ProjectAssets(args.project, args.import_root), mode=args.mode)
+        launcher = EditorLauncher(args.project, os.environ.get("GODOT_EXECUTABLE"))
+        run(
+            bridge,
+            ProjectAssets(args.project, args.import_root),
+            mode=args.mode,
+            launcher=launcher,
+        )
     except (AssetError, BridgeError) as exc:
         parser.error(str(exc))
