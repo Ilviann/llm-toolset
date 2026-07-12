@@ -4,11 +4,16 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "godot-editor-mcp"
-version = "0.3.0"
+version = "0.3.1"
 description = "Small offline MCP bridge for the Godot 4 editor"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
+classifiers = [
+    "Operating System :: MacOS",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
+]
 
 [project.scripts]
 godot-editor-mcp = "godot_editor_mcp.server:main"

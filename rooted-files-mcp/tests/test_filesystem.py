@@ -49,7 +49,10 @@ class RootedFilesystemTests(unittest.TestCase):
     def test_symlink_escape_is_denied(self) -> None:
         outside = self.root.parent / "secret.txt"
         outside.write_text("secret")
-        os.symlink(outside, self.root / "link")
+        try:
+            os.symlink(outside, self.root / "link")
+        except OSError as exc:
+            self.skipTest(f"symbolic links are unavailable: {exc}")
         with self.assertRaises(FileAccessError):
             self.fs.read_text("link")
         with self.assertRaises(FileAccessError):

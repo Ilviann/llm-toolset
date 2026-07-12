@@ -38,12 +38,19 @@ class EditorLauncherTests(unittest.TestCase):
         with self.assertRaisesRegex(LauncherError, "absolute path"):
             launcher.start(UnavailableBridge())  # type: ignore[arg-type]
 
-    def test_launch_uses_fixed_arguments_and_detached_stdio(self) -> None:
+    def _executable(self) -> Path:
         executable = self.root / "Godot"
         executable.write_bytes(b"binary")
         executable.chmod(0o755)
+        return executable
+
+    def test_posix_launch_uses_new_session_and_detached_stdio(self) -> None:
+        executable = self._executable()
         launcher = EditorLauncher(self.root, str(executable))
-        with patch("godot_editor_mcp.launcher.subprocess.Popen") as popen:
+        with (
+            patch("godot_editor_mcp.launcher._is_windows", return_value=False),
+            patch("godot_editor_mcp.launcher.subprocess.Popen") as popen,
+        ):
             result = launcher.start(UnavailableBridge())  # type: ignore[arg-type]
 
         self.assertEqual(result, {"status": "started"})
@@ -56,6 +63,35 @@ class EditorLauncherTests(unittest.TestCase):
             close_fds=True,
             start_new_session=True,
         )
+
+    def test_windows_launch_uses_detached_process_group(self) -> None:
+        executable = self._executable()
+        launcher = EditorLauncher(self.root, str(executable))
+        with (
+            patch("godot_editor_mcp.launcher._is_windows", return_value=True),
+            patch("godot_editor_mcp.launcher.subprocess.Popen") as popen,
+        ):
+            result = launcher.start(UnavailableBridge())  # type: ignore[arg-type]
+
+        self.assertEqual(result, {"status": "started"})
+        popen.assert_called_once_with(
+            [str(executable.resolve()), "--editor", "--path", str(self.root.resolve())],
+            stdin=-3,
+            stdout=-3,
+            stderr=-3,
+            close_fds=True,
+            creationflags=0x00000208,
+        )
+
+    def test_invalid_launch_options_are_reported_safely(self) -> None:
+        executable = self._executable()
+        launcher = EditorLauncher(self.root, str(executable))
+        with patch(
+            "godot_editor_mcp.launcher.subprocess.Popen",
+            side_effect=ValueError("unsupported options"),
+        ):
+            with self.assertRaisesRegex(LauncherError, "could not be started"):
+                launcher.start(UnavailableBridge())  # type: ignore[arg-type]
 
     def test_connected_editor_is_not_started_again(self) -> None:
         launcher = EditorLauncher(self.root, None)

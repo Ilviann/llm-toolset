@@ -4,6 +4,14 @@ A small, offline MCP server for controlling an open Godot 4 editor. It is
 verified with Godot 4.7 stable, has no Python dependencies, and is designed for
 small local models in LM Studio.
 
+## Platform support
+
+The Python server and Godot plugin support macOS, Linux, and Windows with Python
+3.10 or newer. macOS with Godot 4.7 stable is currently verified; native Linux
+and Windows validation is pending. The bridge uses only localhost TCP, Godot
+APIs, and standard-library Python. `start_editor` creates a new session on
+macOS/Linux and a detached process group on Windows.
+
 The integration has two local parts:
 
 1. A Godot editor plugin listens only on `127.0.0.1:6505`.
@@ -34,6 +42,12 @@ Example:
 
 ```sh
 python3 server.py /path/to/game --mode small
+```
+
+On Windows PowerShell, use:
+
+```powershell
+py -3 server.py "C:\path\to\game" --mode small
 ```
 
 ## Tools
@@ -69,7 +83,8 @@ number arrays such as `[100, 200]` or `[1, 0.5, 0, 1]`.
 Asset paths are relative to the Godot project and omit `res://`. Asset results
 include `res://` so they can be used directly in Godot properties. The asset
 type filter accepts `scene`, `script`, `image`, `model`, `audio`, `font`,
-`material`, `resource`, or `all`.
+`material`, `resource`, or `all`. Model-facing asset and node paths always use
+forward slashes, including when the MCP server runs on Windows.
 
 The server creates folders, scenes, and staged asset copies, but it does not
 execute arbitrary code or provide general filesystem access. Pair it with
@@ -214,6 +229,12 @@ Copy the bundled `addons` folder into the Godot project:
 cp -R /path/to/godot-editor-mcp/plugin/addons /path/to/game/
 ```
 
+Windows PowerShell equivalent:
+
+```powershell
+Copy-Item -Recurse "C:\path\to\godot-editor-mcp\plugin\addons" "C:\path\to\game\"
+```
+
 Open the project in Godot 4.7, then enable **Project → Project Settings → Plugins
 → Godot MCP Bridge**. The plugin creates `.godot/godot_mcp_token`; it stays
 inside Godot's generated-data folder and should not be committed. Other Godot 4
@@ -237,13 +258,14 @@ port=6506
 
 ## Configure LM Studio
 
-Add this entry to LM Studio's `mcp.json`, replacing both example paths:
+Add this entry to LM Studio's `mcp.json`, replacing all example paths. This
+macOS/Linux example uses the absolute Python interpreter path:
 
 ```json
 {
   "mcpServers": {
     "godot-editor": {
-      "command": "/opt/homebrew/bin/python3",
+      "command": "/absolute/path/to/python3",
       "args": [
         "/path/to/godot-editor-mcp/server.py",
         "/path/to/game",
@@ -257,15 +279,45 @@ Add this entry to LM Studio's `mcp.json`, replacing both example paths:
 }
 ```
 
-To enable the large-mode editor launcher, use `"mode", "large"` and configure
-the executable in the MCP server environment. On macOS, point to the binary
-inside the application bundle, not the `.app` directory:
+On Windows, use the real `python.exe` path and double each backslash in JSON:
 
 ```json
 {
   "mcpServers": {
     "godot-editor": {
-      "command": "/opt/homebrew/bin/python3",
+      "command": "C:\\Path\\To\\Python\\python.exe",
+      "args": [
+        "C:\\path\\to\\godot-editor-mcp\\server.py",
+        "C:\\path\\to\\game",
+        "--mode",
+        "small",
+        "--import-root",
+        "C:\\path\\to\\import-inbox"
+      ]
+    }
+  }
+}
+```
+
+Find Python with `command -v python3` on macOS/Linux or
+`(Get-Command python).Source` in PowerShell. The interactive `py` launcher is
+convenient for commands, but LM Studio should receive the interpreter executable.
+
+To enable the large-mode editor launcher, use `"mode", "large"` and configure
+the executable in the MCP server environment. `GODOT_EXECUTABLE` must be the
+absolute executable file, not an application folder. Typical values are:
+
+- macOS: `/Applications/Godot.app/Contents/MacOS/Godot`
+- Linux: `/absolute/path/to/Godot`
+- Windows: `C:\\absolute\\path\\to\\Godot_v4.7-stable_win64.exe` in JSON
+
+Complete macOS example:
+
+```json
+{
+  "mcpServers": {
+    "godot-editor": {
+      "command": "/absolute/path/to/python3",
       "args": [
         "/path/to/godot-editor-mcp/server.py",
         "/path/to/game",
@@ -277,6 +329,15 @@ inside the application bundle, not the `.app` directory:
       }
     }
   }
+}
+```
+
+For Linux, use the same structure with the Linux Python and Godot paths. For
+Windows, use the Windows configuration above, change `small` to `large`, and add:
+
+```json
+"env": {
+  "GODOT_EXECUTABLE": "C:\\absolute\\path\\to\\Godot_v4.7-stable_win64.exe"
 }
 ```
 
@@ -306,17 +367,32 @@ cd /path/to/godot-editor-mcp
 python3 -m unittest discover -s tests -v
 ```
 
+Windows PowerShell:
+
+```powershell
+Set-Location "C:\path\to\godot-editor-mcp"
+py -3 -m unittest discover -s tests -v
+```
+
 The Python suite tests MCP initialization, per-mode tool listing and dispatch,
 capability augmentation, public scan routing, authentication, bounded transport
 behavior, staged imports, traversal and symlink denial, size limits,
 no-overwrite behavior, and safe errors. A live check in Godot is still required
 when claiming compatibility because editor plugin APIs are only available inside
-the editor.
+the editor. Symbolic-link tests are skipped when the current account cannot
+create links; enable Windows Developer Mode or use the required privilege to run
+those security checks.
 
 The `plugin` folder is also a minimal Godot project for plugin validation:
 
 ```sh
 /path/to/Godot --headless --editor --path plugin --quit-after 2
+```
+
+Windows PowerShell uses the same arguments:
+
+```powershell
+& "C:\path\to\Godot_v4.7-stable_win64.exe" --headless --editor --path plugin --quit-after 2
 ```
 
 With Godot 4.7 stable, this check must print the bridge listening message without

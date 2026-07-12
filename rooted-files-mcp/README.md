@@ -3,6 +3,15 @@
 A small, dependency-free MCP server that exposes one folder as `root`. It uses
 relative paths, accepts text only, and communicates over stdio.
 
+## Platform support
+
+The server supports Python 3.10 or newer on macOS, Linux, and Windows and has no
+third-party runtime dependencies. macOS is currently verified; native Linux and
+Windows validation is pending. Path confinement uses the host platform's native
+path rules, while paths exposed to the model remain relative to the configured
+root. Forward slashes are accepted on every supported platform and are the
+recommended model-facing form.
+
 ## Tools
 
 | Tool | Purpose |
@@ -53,17 +62,25 @@ instructions and tool history.
 
 No packages need to be downloaded:
 
+macOS or Linux:
+
 ```sh
 python3 /path/to/rooted-files-mcp/server.py /path/to/folder/to/expose
 ```
 
-Example LM Studio MCP configuration:
+Windows PowerShell:
+
+```powershell
+py -3 "C:\path\to\rooted-files-mcp\server.py" "C:\path\to\folder\to\expose"
+```
+
+Example LM Studio MCP configuration for macOS or Linux:
 
 ```json
 {
   "mcpServers": {
     "rooted-files": {
-      "command": "/opt/homebrew/bin/python3",
+      "command": "/absolute/path/to/python3",
       "args": [
         "/path/to/rooted-files-mcp/server.py",
         "/path/to/folder/to/expose"
@@ -73,8 +90,26 @@ Example LM Studio MCP configuration:
 }
 ```
 
-Replace both example paths. The shown Python command is the one detected on the
-current Mac. If it changes, run `command -v python3` and use that full path.
+Windows example:
+
+```json
+{
+  "mcpServers": {
+    "rooted-files": {
+      "command": "C:\\Path\\To\\Python\\python.exe",
+      "args": [
+        "C:\\path\\to\\rooted-files-mcp\\server.py",
+        "C:\\path\\to\\folder\\to\\expose"
+      ]
+    }
+  }
+}
+```
+
+Replace all example paths. On macOS or Linux, locate Python with
+`command -v python3`. In Windows PowerShell, use `(Get-Command python).Source`.
+LM Studio needs the real interpreter path rather than the `py` launcher used in
+interactive PowerShell commands. Backslashes in JSON strings must be doubled.
 
 In LM Studio, open the **Program** tab, choose **Install → Edit mcp.json**, add
 the server entry, and save. LM Studio reloads saved MCP servers automatically.
@@ -84,3 +119,7 @@ the server entry, and save. LM Studio reloads saved MCP servers automatically.
 ```sh
 python3 -m unittest discover -s tests -v
 ```
+
+On Windows, run `py -3 -m unittest discover -s tests -v`. Symbolic-link security
+tests are skipped when the account cannot create symbolic links; enable Windows
+Developer Mode or run with the required privilege to exercise them.

@@ -49,7 +49,10 @@ class ProjectAssetsTests(unittest.TestCase):
     def test_traversal_symlink_and_protected_destinations_are_denied(self) -> None:
         outside = self.base / "outside.png"
         outside.write_bytes(b"outside")
-        os.symlink(outside, self.inbox / "link.png")
+        try:
+            os.symlink(outside, self.inbox / "link.png")
+        except OSError as exc:
+            self.skipTest(f"symbolic links are unavailable: {exc}")
         with self.assertRaisesRegex(AssetError, "outside"):
             self.assets.import_asset("link.png", "assets/link.png")
         with self.assertRaisesRegex(AssetError, "relative"):
@@ -68,7 +71,10 @@ class ProjectAssetsTests(unittest.TestCase):
     def test_scene_paths_are_validated_without_following_escape_links(self) -> None:
         outside = self.base / "outside"
         outside.mkdir()
-        os.symlink(outside, self.project / "linked")
+        try:
+            os.symlink(outside, self.project / "linked")
+        except OSError as exc:
+            self.skipTest(f"symbolic links are unavailable: {exc}")
         with self.assertRaisesRegex(AssetError, "outside"):
             self.assets.validate_new_file("linked/test.tscn", {".tscn"})
         scene = self.project / "assets" / "existing.tscn"

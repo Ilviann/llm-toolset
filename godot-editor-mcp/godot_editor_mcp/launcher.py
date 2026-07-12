@@ -5,8 +5,13 @@ from __future__ import annotations
 import os
 from pathlib import Path
 import subprocess
+from typing import Any
 
 from .bridge import BridgeError, GodotBridge
+
+
+def _is_windows() -> bool:
+    return os.name == "nt"
 
 
 class LauncherError(Exception):
@@ -35,16 +40,28 @@ class EditorLauncher:
             return {"status": "starting"}
 
         executable = self._validated_executable()
+        popen_options: dict[str, Any] = {
+            "stdin": subprocess.DEVNULL,
+            "stdout": subprocess.DEVNULL,
+            "stderr": subprocess.DEVNULL,
+            "close_fds": True,
+        }
+        if _is_windows():
+            # These stable Win32 values are defined by subprocess on Windows.
+            # Numeric fallbacks keep this module testable on POSIX hosts.
+            detached_process = getattr(subprocess, "DETACHED_PROCESS", 0x00000008)
+            new_process_group = getattr(
+                subprocess, "CREATE_NEW_PROCESS_GROUP", 0x00000200
+            )
+            popen_options["creationflags"] = detached_process | new_process_group
+        else:
+            popen_options["start_new_session"] = True
         try:
             self._process = subprocess.Popen(
                 [str(executable), "--editor", "--path", str(self.project)],
-                stdin=subprocess.DEVNULL,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                close_fds=True,
-                start_new_session=True,
+                **popen_options,
             )
-        except OSError as exc:
+        except (OSError, ValueError) as exc:
             raise LauncherError(f"Godot editor could not be started: {exc}") from None
         return {"status": "started"}
 

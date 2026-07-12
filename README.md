@@ -1,7 +1,7 @@
 # LLM Toolset
 
 A collection of lightweight, offline-first tools for local LLM workflows on
-macOS, primarily MCP servers for LM Studio. The workspace favors small,
+macOS, Linux, and Windows, primarily MCP servers for LM Studio. The workspace favors small,
 dependency-free processes, bounded output, and simple tool interfaces that work
 well with local models and limited context windows.
 
@@ -15,3 +15,7 @@ well with local models and limited context windows.
 Each project contains its own setup, usage, and test instructions. The tools are
 designed to run locally without cloud services, telemetry, accounts, or runtime
 downloads.
+
+The implementations support Python 3.10 or newer. macOS is the currently
+verified development platform; native Linux and Windows validation is pending.
+Each project README includes platform-specific commands and LM Studio examples.

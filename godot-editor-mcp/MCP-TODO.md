@@ -15,7 +15,10 @@ Version 0.2.0 completed the mode-aware foundation and several observability and 
 Version 0.3.0 added a large-mode-only `start_editor` tool. It reads the fixed
 Godot binary from `GODOT_EXECUTABLE`, accepts no model-provided arguments,
 launches only the configured MCP project, and reports its configuration through
-`capabilities`. Editor shutdown remains intentionally outside the toolset.
+`capabilities`. The launcher uses a new POSIX session on macOS/Linux and a
+detached process group on Windows. Editor shutdown remains intentionally outside
+the toolset. Version 0.3.1 added the cross-platform launcher behavior and setup
+documentation. Native Linux and Windows validation is still pending.
 
 Still outstanding from Priority 0 are diagnostics, dirty/reload-pending and diagnostic counts in `editor_state`, awaitable commands, and project reload. Runtime inspection, capture/input, broader authoring, project settings, pagination, structured errors, and operation IDs also remain planned. Capability flags explicitly report the unsupported runtime and diagnostic features so clients can degrade safely.
 

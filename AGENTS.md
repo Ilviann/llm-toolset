@@ -2,7 +2,7 @@
 
 ## Purpose and Operating Environment
 
-This repository contains lightweight tools for local LLM workflows, primarily MCP servers for LM Studio. Development and normal operation must work without ChatGPT or internet access. The target is a 16 GB MacBook Pro running small local models, so minimize memory use, startup time, dependencies, and context consumption.
+This repository contains lightweight tools for local LLM workflows, primarily MCP servers for LM Studio. Development and normal operation must work without ChatGPT or internet access. The supported desktop platforms are macOS, Linux, and Windows. The primary development target is a 16 GB MacBook Pro running small local models, so minimize memory use, startup time, dependencies, and context consumption.
 
 ## Core Design Constraints
 
@@ -10,7 +10,7 @@ This repository contains lightweight tools for local LLM workflows, primarily MC
 - Do not require cloud services, telemetry, accounts, or runtime downloads.
 - Keep processes small enough to run alongside LM Studio.
 - Avoid background services when a short-lived or stdio process is sufficient.
-- Prioritize reliable macOS behavior while using portable code where practical.
+- Keep runtime behavior and documented setup portable across macOS, Linux, and Windows. Isolate unavoidable platform-specific process behavior and test each branch without adding runtime dependencies.
 - Pin unavoidable dependencies and document how to prepare them before going offline.
 
 ## MCP Design for Small Models
@@ -38,7 +38,8 @@ After completing implementation work, update every affected document, README, co
 
 - The plugin targets Godot 4 and is verified with Godot 4.7 stable. Re-run the headless plugin load and bridge checks when changing editor APIs or claiming compatibility with another version.
 - The Python server defaults to `--mode tiny`. Use `small` for asset/import workflows and `large` when the model also controls the Godot desktop. Tool calls outside the active mode are rejected as well as omitted from `tools/list`.
-- Large mode includes `start_editor`. It accepts no arguments and starts only the configured project using the absolute executable path in `GODOT_EXECUTABLE`; the plugin must already be installed and enabled. Tiny and small modes do not expose it.
+- Large mode includes `start_editor`. It accepts no arguments and starts only the configured project using the absolute executable path in `GODOT_EXECUTABLE`; the plugin must already be installed and enabled. It creates a new session on POSIX and a detached process group on Windows. Tiny and small modes do not expose it.
+- macOS is the currently verified development platform. Linux and Windows are supported by implementation and documentation, but native runtime validation remains pending; record results and platform-specific issues when those checks are performed.
 - Keep the Python package and installed Godot plugin on matching versions. The `capabilities` tool reports the MCP server version, bridge version, active mode, exposed tools, optional features, and effective limits.
 - Godot 4.7 headless editor mode activates scenes requested through `open_scene`, so headless mutation tests can create or open a scene through the bridge before editing it.
 - Source imports are asynchronous. `import_asset` and public `scan_asset` may report `queued` or `already_running`; `asset_info` can temporarily report an empty type until Godot finishes scanning. Check `editor_state.filesystem_scanning` and its generation counter before starting another full scan.
