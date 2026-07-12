@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from typing import Any
+from typing import Any, Literal
 
 from . import __version__
 from .assets import AssetError, ProjectAssets
@@ -17,8 +17,15 @@ SUPPORTED_PROTOCOLS = {LATEST_PROTOCOL, "2025-06-18", "2025-03-26", "2024-11-05"
 
 PATH_PROPERTY = {"path": {"type": "string", "description": "Scene-relative node path; . is root"}}
 RESOURCE_PATH = {"type": "string", "description": "Project-relative path without res://"}
+Mode = Literal["tiny", "small", "large"]
+MODES: tuple[Mode, ...] = ("tiny", "small", "large")
 
 TOOLS = [
+    {
+        "name": "capabilities",
+        "description": "Get bridge versions, commands, features, and limits.",
+        "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
+    },
     {
         "name": "editor_state",
         "description": "Get Godot version, current scene, selection, and play state.",
@@ -44,6 +51,14 @@ TOOLS = [
     {
         "name": "asset_info",
         "description": "Get one asset's type, size, import state, and dependencies.",
+        "inputSchema": {
+            "type": "object", "properties": {"path": RESOURCE_PATH},
+            "required": ["path"], "additionalProperties": False,
+        },
+    },
+    {
+        "name": "scan_asset",
+        "description": "Queue a Godot filesystem scan for one project asset.",
         "inputSchema": {
             "type": "object", "properties": {"path": RESOURCE_PATH},
             "required": ["path"], "additionalProperties": False,
@@ -182,11 +197,40 @@ TOOLS = [
     },
 ]
 
+TOOL_BY_NAME = {tool["name"]: tool for tool in TOOLS}
+
+# Keep the smallest mode centered on short, supervised scene edits. The larger
+# modes are strict supersets so a client can change mode without losing tools.
+TINY_TOOLS = (
+    "capabilities", "editor_state", "create_scene", "open_scene", "scene_tree",
+    "add_node", "instantiate_scene", "node_info", "set_property", "scene_control",
+)
+SMALL_TOOLS = TINY_TOOLS + (
+    "list_assets", "asset_info", "scan_asset", "import_asset", "create_folder",
+    "create_resource",
+)
+MODE_TOOL_NAMES: dict[Mode, tuple[str, ...]] = {
+    "tiny": TINY_TOOLS,
+    "small": SMALL_TOOLS,
+    "large": SMALL_TOOLS + ("select_node",),
+}
+
 
 class MCPServer:
-    def __init__(self, bridge: GodotBridge, assets: ProjectAssets | None = None) -> None:
+    def __init__(
+        self,
+        bridge: GodotBridge,
+        assets: ProjectAssets | None = None,
+        *,
+        mode: Mode = "tiny",
+    ) -> None:
+        if mode not in MODES:
+            raise ValueError(f"Mode must be one of: {', '.join(MODES)}")
         self.bridge = bridge
         self.assets = assets
+        self.mode = mode
+        self.tool_names = MODE_TOOL_NAMES[mode]
+        self.tools = [TOOL_BY_NAME[name] for name in self.tool_names]
 
     @staticmethod
     def _result(request_id: Any, result: dict[str, Any]) -> dict[str, Any]:
@@ -223,12 +267,14 @@ class MCPServer:
             return self._result(request_id, {
                 "protocolVersion": protocol,
                 "capabilities": {"tools": {}},
-                "serverInfo": {"name": "godot-editor", "version": __version__},
+                "serverInfo": {
+                    "name": "godot-editor", "version": __version__, "mode": self.mode,
+                },
             })
         if method == "ping":
             return self._result(request_id, {})
         if method == "tools/list":
-            return self._result(request_id, {"tools": TOOLS})
+            return self._result(request_id, {"tools": self.tools})
         if method == "tools/call":
             return self._call_tool(request_id, params)
         return self._error(request_id, -32601, "Method not found")
@@ -238,8 +284,11 @@ class MCPServer:
         arguments = params.get("arguments") or {}
         if not isinstance(arguments, dict):
             return self._error(request_id, -32602, "Invalid tool arguments")
+        if name not in self.tool_names:
+            return self._error(request_id, -32602, f"Tool is unavailable in {self.mode} mode")
         commands = {
-            "editor_state": "state", "list_assets": "assets", "asset_info": "asset_info",
+            "capabilities": "capabilities", "editor_state": "state",
+            "list_assets": "assets", "asset_info": "asset_info", "scan_asset": "scan_asset",
             "create_resource": "create_resource", "create_scene": "create_scene",
             "open_scene": "open_scene",
             "scene_tree": "tree", "node_info": "inspect", "add_node": "add_node",
@@ -268,6 +317,8 @@ class MCPServer:
                         self.assets.validate_folder(arguments.get("folder", "."))
                     elif name == "asset_info":
                         self.assets.validate_file(arguments.get("path"))
+                    elif name == "scan_asset":
+                        self.assets.validate_file(arguments.get("path"))
                     elif name == "create_scene":
                         self.assets.validate_new_file(arguments.get("path"), {".tscn"})
                     elif name == "create_resource":
@@ -277,6 +328,13 @@ class MCPServer:
                     elif name == "instantiate_scene":
                         self.assets.validate_file(arguments.get("scene"), {".tscn", ".scn"})
                 output = self.bridge.call(command, arguments)
+                if name == "capabilities" and isinstance(output, dict):
+                    output = {
+                        **output,
+                        "mcp_server_version": __version__,
+                        "mode": self.mode,
+                        "tools": list(self.tool_names),
+                    }
             return self._result(request_id, self._tool_result(output))
         except (AssetError, BridgeError, TypeError, ValueError) as exc:
             return self._result(request_id, self._tool_result(str(exc), is_error=True))
@@ -292,8 +350,8 @@ class MCPServer:
             output["warning"] = str(exc)
 
 
-def run(bridge: GodotBridge, assets: ProjectAssets) -> None:
-    server = MCPServer(bridge, assets)
+def run(bridge: GodotBridge, assets: ProjectAssets, *, mode: Mode = "tiny") -> None:
+    server = MCPServer(bridge, assets, mode=mode)
     for line in sys.stdin:
         try:
             message = json.loads(line)
@@ -310,11 +368,15 @@ def run(bridge: GodotBridge, assets: ProjectAssets) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Small MCP bridge for the Godot 4 editor")
     parser.add_argument("project", help="Godot project folder")
+    parser.add_argument(
+        "--mode", choices=MODES, default="tiny",
+        help="Available toolset: tiny (default), small, or large",
+    )
     parser.add_argument("--port", type=int, default=6505, help="Plugin port (default: 6505)")
     parser.add_argument("--import-root", help="Folder containing assets staged for import")
     args = parser.parse_args()
     try:
         bridge = GodotBridge(args.project, port=args.port)
-        run(bridge, ProjectAssets(args.project, args.import_root))
+        run(bridge, ProjectAssets(args.project, args.import_root), mode=args.mode)
     except (AssetError, BridgeError) as exc:
         parser.error(str(exc))

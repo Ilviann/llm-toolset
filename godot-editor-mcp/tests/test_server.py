@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import json
 import unittest
 
 from godot_editor_mcp.bridge import BridgeError
-from godot_editor_mcp.server import MCPServer
+from godot_editor_mcp.server import MCPServer, MODE_TOOL_NAMES
 
 
 class FakeBridge:
@@ -57,15 +58,34 @@ class MCPServerTests(unittest.TestCase):
     def test_initialize_and_list_tools(self) -> None:
         initialized = self.request("initialize", {"protocolVersion": "2025-06-18"})
         self.assertEqual(initialized["result"]["protocolVersion"], "2025-06-18")
+        self.assertEqual(initialized["result"]["serverInfo"]["mode"], "tiny")
         names = [tool["name"] for tool in self.request("tools/list")["result"]["tools"]]
-        self.assertEqual(names, [
-            "editor_state", "list_assets", "asset_info", "import_asset",
-            "create_folder", "create_resource", "create_scene", "open_scene", "scene_tree",
-            "add_node", "instantiate_scene", "node_info", "set_property",
-            "select_node", "scene_control",
-        ])
+        self.assertEqual(names, list(MODE_TOOL_NAMES["tiny"]))
+
+    def test_modes_have_separate_nested_toolsets(self) -> None:
+        tiny = set(MODE_TOOL_NAMES["tiny"])
+        small = set(MODE_TOOL_NAMES["small"])
+        large = set(MODE_TOOL_NAMES["large"])
+        self.assertLess(tiny, small)
+        self.assertLess(small, large)
+        self.assertNotIn("list_assets", tiny)
+        self.assertIn("list_assets", small)
+        self.assertNotIn("select_node", small)
+        self.assertIn("select_node", large)
+
+    def test_tool_outside_mode_is_rejected_without_bridge_call(self) -> None:
+        response = self.request("tools/call", {
+            "name": "import_asset", "arguments": {
+                "source": "hero.png", "destination": "assets/hero.png",
+            },
+        })
+        self.assertEqual(response["error"]["code"], -32602)
+        self.assertIn("tiny mode", response["error"]["message"])
+        self.assertEqual(self.bridge.calls, [])
+        self.assertEqual(self.assets.calls, [])
 
     def test_tool_maps_to_short_plugin_command(self) -> None:
+        self.server = MCPServer(self.bridge, self.assets, mode="large")  # type: ignore[arg-type]
         response = self.request("tools/call", {
             "name": "select_node", "arguments": {"path": "Player"}
         })
@@ -73,6 +93,7 @@ class MCPServerTests(unittest.TestCase):
         self.assertEqual(self.bridge.calls, [("select", {"path": "Player"})])
 
     def test_import_copies_then_queues_editor_scan(self) -> None:
+        self.server = MCPServer(self.bridge, self.assets, mode="small")  # type: ignore[arg-type]
         response = self.request("tools/call", {
             "name": "import_asset",
             "arguments": {"source": "hero.png", "destination": "assets/hero.png"},
@@ -95,6 +116,7 @@ class MCPServerTests(unittest.TestCase):
         self.assertEqual(self.bridge.calls, [("create_scene", arguments)])
 
     def test_create_resource_is_validated_then_sent_to_editor(self) -> None:
+        self.server = MCPServer(self.bridge, self.assets, mode="small")  # type: ignore[arg-type]
         arguments = {
             "path": "materials/red.tres", "type": "StandardMaterial3D",
             "properties": {"metallic": 0.4},
@@ -107,6 +129,26 @@ class MCPServerTests(unittest.TestCase):
             ("validate_new", ("materials/red.tres", {".tres"}))
         ])
         self.assertEqual(self.bridge.calls, [("create_resource", arguments)])
+
+    def test_public_scan_is_validated_then_sent_to_editor(self) -> None:
+        self.server = MCPServer(self.bridge, self.assets, mode="small")  # type: ignore[arg-type]
+        arguments = {"path": "scripts/player.gd"}
+        response = self.request("tools/call", {
+            "name": "scan_asset", "arguments": arguments,
+        })
+        self.assertNotIn("isError", response["result"])
+        self.assertEqual(self.assets.calls, [
+            ("validate_file", ("scripts/player.gd", None))
+        ])
+        self.assertEqual(self.bridge.calls, [("scan_asset", arguments)])
+
+    def test_capabilities_include_mode_and_exposed_tools(self) -> None:
+        self.server = MCPServer(self.bridge, self.assets, mode="small")  # type: ignore[arg-type]
+        response = self.request("tools/call", {"name": "capabilities"})
+        payload = response["result"]["content"][0]["text"]
+        capabilities = json.loads(payload)
+        self.assertEqual(capabilities["mode"], "small")
+        self.assertEqual(capabilities["tools"], list(MODE_TOOL_NAMES["small"]))
 
     def test_bridge_error_is_tool_error(self) -> None:
         response = self.request("tools/call", {

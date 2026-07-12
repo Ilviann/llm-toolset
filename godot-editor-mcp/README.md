@@ -11,25 +11,55 @@ The integration has two local parts:
 
 No protocol data is written to the MCP process's stdout except JSON-RPC.
 
+## Tool modes
+
+Choose the exposed toolset at startup with `--mode tiny|small|large`. The
+default is `tiny`. Modes are nested: every tool in a smaller mode is also
+available in the larger modes. Calls to tools outside the active mode are
+rejected even if a client retained an older `tools/list` response.
+
+- **`tiny` (default):** 10 focused tools for supervised GDScript-adjacent scene
+  work, including compact scene inspection, UI/node construction, property
+  edits, and save/run controls. It is intended for models with context windows
+  below 8k. Pair it with a confined text-file MCP when GDScript itself must be
+  edited; this server never exposes arbitrary file writes.
+- **`small`:** 16 tools for autonomous local agents around 16k context. It adds
+  bounded asset discovery, import scanning, staged imports, folders, and
+  whitelisted resource creation. This is the appropriate mode when the agent
+  must perform its own unit-test-oriented setup and verification.
+- **`large`:** all 17 tools. It adds `select_node`, which is useful when a large
+  model can also inspect and control the Godot desktop UI.
+
+Example:
+
+```sh
+python3 server.py /path/to/game --mode small
+```
+
 ## Tools
 
-| Tool | Purpose |
-|---|---|
-| `editor_state` | Current scene, selection, play state, and Godot version |
-| `list_assets` | Filtered project assets, limited to 100 results |
-| `asset_info` | Type, category, size, import state, and dependencies |
-| `import_asset` | Copy one staged source file into the project and queue import |
-| `create_folder` | Create a project folder |
-| `create_resource` | Create a whitelisted built-in resource as text `.tres` |
-| `create_scene` | Create a scene with one built-in root node |
-| `open_scene` | Open an existing project scene |
-| `scene_tree` | Scene-relative node list, limited to 200 nodes |
-| `add_node` | Add a built-in node through Godot's undo history |
-| `instantiate_scene` | Add a PackedScene instance through undo history |
-| `node_info` | Editable properties for one node, limited to 64 |
-| `set_property` | Change one property through Godot's undo history |
-| `select_node` | Select one node in the editor |
-| `scene_control` | Save, run, or stop the current scene |
+“All” means `tiny`, `small`, and `large`. Because modes are nested, “Small+”
+means `small` and `large`.
+
+| Tool | Modes | Purpose |
+|---|---|---|
+| `capabilities` | All | Active mode plus MCP/bridge versions, commands, exposed tools, optional features, and limits |
+| `editor_state` | All | Project, bridge, edited scene, selection, filesystem scan, and run state |
+| `create_scene` | All | Create a scene with one built-in root node |
+| `open_scene` | All | Open an existing project scene |
+| `scene_tree` | All | Scene-relative node list, limited to 200 nodes |
+| `add_node` | All | Add a built-in node through Godot's undo history |
+| `instantiate_scene` | All | Add a PackedScene instance through undo history |
+| `node_info` | All | Editable properties for one node, limited to 64 |
+| `set_property` | All | Change one property through Godot's undo history |
+| `scene_control` | All | Save, run, or stop the current scene |
+| `list_assets` | Small+ | Filtered project assets, limited to 100 results |
+| `asset_info` | Small+ | Type, category, size, import state, and dependencies |
+| `scan_asset` | Small+ | Queue a Godot filesystem scan for an existing project asset |
+| `import_asset` | Small+ | Copy one staged source file into the project and queue import |
+| `create_folder` | Small+ | Create a project folder |
+| `create_resource` | Small+ | Create a whitelisted built-in resource as text `.tres` |
+| `select_node` | Large | Select one node in the editor for coordinated desktop inspection |
 
 Node paths are relative to the edited scene root. Use `.` for the root and, for
 example, `Player/Camera2D` for a child. Vector and color property values use JSON
@@ -44,13 +74,24 @@ The server creates folders, scenes, and staged asset copies, but it does not
 execute arbitrary code or provide general filesystem access. Pair it with
 `rooted-files-mcp` when the model needs to edit GDScript or project configuration.
 
-The complete `tools/list` result, including all 15 descriptions and input
-schemas, is about 4,760 characters of compact JSON, or roughly 1,200–1,600
-tokens for common model tokenizers. This is the fixed context cost before system
-prompts, the conversation, tool calls, and Godot results. Exact usage varies by
-model and by how the MCP client represents tool definitions. Enabling
-`rooted-files-mcp` alongside it adds roughly another 200–300 tokens of tool
-definitions.
+The fixed context cost now depends on the selected mode. `tiny` omits the six
+asset workflow schemas, while `small` omits the desktop-only selection helper.
+Exact token usage varies by model and by how the MCP client represents tool
+definitions. Enabling `rooted-files-mcp` alongside this server adds its own tool
+definitions, so prefer `tiny` for tightly supervised GDScript and UI work.
+
+`capabilities` is the authoritative compatibility check. Its result combines
+the Python MCP server's version, active mode, and exposed MCP tool names with
+the plugin's version, supported bridge commands, optional-feature flags, Godot
+version, and effective limits. Optional features currently reported as
+unsupported are diagnostics, runtime inspection, game-view capture, and input
+injection.
+
+`editor_state` reports the project name and path, main scene, Godot and bridge
+versions, bridge port, edited scene and selection, filesystem scan status and
+generation, play state, current/last run ID, last run status, and stop reason.
+The project path is absolute for issue identification; scene and asset paths
+remain `res://` or project-relative.
 
 ## Agentic usage by context size
 
@@ -60,22 +101,18 @@ concrete scene-level goal, request small result sets, and save after each
 completed group of mutations. For long work, start a fresh session from the
 saved project state rather than carrying an ever-growing tool history.
 
-- **4k context:** Only narrowly scoped, short sequences are realistic, such as
+- **Below 8k (`tiny`):** Only narrowly scoped, short sequences are realistic, such as
   checking editor state, opening a known scene, changing one property, and
-  saving. Configure only this server, avoid `scene_tree` on large scenes and
-  `node_info` unless necessary, and use `list_assets` with a specific folder,
-  type, and small limit. Pairing the file server at this size is generally too
-  tight for reliable agentic work.
-- **8k context:** Suitable for small scene edits: inspect a compact tree, add or
-  configure a few nodes, verify, and save. Keep asset searches filtered and
-  inspect nodes individually. If scripts must also be edited, use the file
-  server sparingly and split scene construction from code editing when either
-  side needs several tool calls.
-- **16k context:** Suitable for a modest scene-building workflow involving
+  saving. Avoid `scene_tree` on large scenes and `node_info` unless necessary.
+  If GDScript editing requires a file server too, keep each session narrowly
+  scoped because the combined tool and result context is tight.
+- **16k (`small`):** Suitable for a modest scene-building workflow involving
   assets, several nodes, property changes, and script or configuration edits
   through the file server. Work scene by scene, use targeted asset queries, and
   checkpoint with `scene_control` after each logical unit; large trees and
   repeated property dumps can still exhaust the context.
+- **Large hosted models (`large`):** Exposes the full MCP surface. Desktop-aware
+  agents can use `select_node` to coordinate MCP edits with visual inspection.
 
 ## Asset imports
 
@@ -94,8 +131,10 @@ A `.gltf` file whose textures or buffers are separate must have those dependency
 files imported individually. Imports are limited to 100 MiB, stream-copy in
 1 MiB chunks, never overwrite existing files, and cannot target `.godot` or
 `addons`. Godot scans new files asynchronously, so `import_asset` reports
-`"scan":"queued"`; use `asset_info` after import if the model needs to confirm
-the final resource type.
+`"scan":"queued"` or `"scan":"already_running"`. Use
+`editor_state.filesystem_scanning` and `filesystem_generation` to observe the
+scan, then use `asset_info` if the model needs to confirm the final resource
+type. `scan_asset` can explicitly request a scan for an existing project file.
 
 Example:
 
@@ -152,7 +191,10 @@ Instantiate another scene in the edited scene:
 Added nodes receive the edited scene root as owner, so Godot includes them when
 the scene is saved. `add_node`, `instantiate_scene`, and `set_property` use the
 editor's undo history. Save explicitly with `scene_control` after a group of
-changes.
+changes. The `run` and `stop` actions return the associated run ID; subsequent
+`editor_state` calls report whether that run is active and why the last run
+stopped. Commands are not yet awaitable, so “started” still means the editor
+accepted the request rather than that a startup health window passed.
 
 ## Install the Godot plugin
 
@@ -166,6 +208,10 @@ Open the project in Godot 4.7, then enable **Project → Project Settings → Pl
 → Godot MCP Bridge**. The plugin creates `.godot/godot_mcp_token`; it stays
 inside Godot's generated-data folder and should not be committed. Other Godot 4
 releases may work, but 4.7 stable is the currently verified version.
+
+When updating, replace the installed `addons/godot_mcp` folder and restart the
+plugin or editor along with the Python MCP process. Keep their versions aligned;
+`capabilities` reports both versions for verification.
 
 If port 6505 is already in use, set `godot_mcp/port` to another port in the
 project's `project.godot`, then add the same port to the MCP arguments:
@@ -191,6 +237,8 @@ Add this entry to LM Studio's `mcp.json`, replacing both example paths:
       "args": [
         "/path/to/godot-editor-mcp/server.py",
         "/path/to/game",
+        "--mode",
+        "small",
         "--import-root",
         "/path/to/import-inbox"
       ]
@@ -202,6 +250,11 @@ Add this entry to LM Studio's `mcp.json`, replacing both example paths:
 Create the import-inbox folder before starting the MCP server. Omit the two
 `--import-root` arguments if asset import is not needed; `import_asset` then
 returns a clear disabled error while all other tools continue to work.
+`import_asset` is exposed only in `small` and `large` mode.
+
+For the default minimal configuration, use `"--mode", "tiny"` and omit
+`--import-root`. Use `small` as shown when the model needs asset discovery,
+folder/resource creation, staged imports, or explicit filesystem scans.
 
 In LM Studio, open the **Program** tab and choose **Install → Edit mcp.json**.
 Keep the Godot project open with the plugin enabled while using editor tools.
@@ -215,8 +268,9 @@ cd /path/to/godot-editor-mcp
 python3 -m unittest discover -s tests -v
 ```
 
-The Python suite tests MCP initialization, tool routing, authentication, bounded
-transport behavior, staged imports, traversal and symlink denial, size limits,
+The Python suite tests MCP initialization, per-mode tool listing and dispatch,
+capability augmentation, public scan routing, authentication, bounded transport
+behavior, staged imports, traversal and symlink denial, size limits,
 no-overwrite behavior, and safe errors. A live check in Godot is still required
 when claiming compatibility because editor plugin APIs are only available inside
 the editor.

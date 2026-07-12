@@ -2,6 +2,18 @@
 
 These recommendations are based on using the current Godot MCP bridge during the Skybound multi-scene refactor. The bridge already has a strong minimal foundation: localhost-only transport, token authentication, path validation, request limits, protected folders, whitelisted resource creation, and UndoRedo-backed scene edits.
 
+## Implementation status
+
+Version 0.2.0 completed the mode-aware foundation and several observability and protocol items from this roadmap:
+
+- Added nested `tiny`, `small`, and `large` MCP toolsets, with `tiny` as the startup default and dispatch-time enforcement for hidden tools.
+- Exposed `scan_asset` publicly in `small` and `large` modes.
+- Added `capabilities`, including MCP/bridge versions, active mode, exposed tools, supported bridge commands, Godot version, optional-feature flags, and effective limits.
+- Partially expanded `editor_state` with project name/path, main scene, bridge version/port, filesystem scan state and generation, and current/last run metadata.
+- Added run IDs to `scene_control` run/stop results and transition tracking in `editor_state`.
+
+Still outstanding from Priority 0 are diagnostics, dirty/reload-pending and diagnostic counts in `editor_state`, awaitable commands, and project reload. Runtime inspection, capture/input, broader authoring, project settings, pagination, structured errors, and operation IDs also remain planned. Capability flags explicitly report the unsupported runtime and diagnostic features so clients can degrade safely.
+
 The highest-value next step is better observability. During this work, editing was straightforward through the filesystem, but confirming project reloads, distinguishing stale diagnostics from current errors, and inspecting a procedurally generated running scene required other tools.
 
 ## Priority 0: diagnostics and reliable editor state
@@ -36,6 +48,10 @@ Acceptance criteria:
 - Reading diagnostics does not clear or mutate the editor panels.
 
 ### Expand `editor_state`
+
+**Status:** Partially implemented in 0.2.0. Project/bridge identity, main scene,
+filesystem scan/generation, and run metadata are available. Dirty state,
+reload-pending detection, import detail, and diagnostic counts remain.
 
 Add:
 
@@ -255,6 +271,10 @@ Why: the EventBus refactor required editing `project.godot`, after which the ope
 
 ### Make filesystem scanning observable
 
+**Status:** Partially implemented in 0.2.0. `scan_asset` is public and
+`editor_state` exposes scan activity plus a filesystem generation counter.
+Waiting, progress, and per-resource errors remain.
+
 Expose `scan_asset` as a public MCP tool if it is not already intended to be public, and add:
 
 - `wait_for_scan`
@@ -271,6 +291,11 @@ The current command queues a scan but does not let the caller know when the new 
 ## Priority 4: protocol quality and maintainability
 
 ### Add a capabilities/version command
+
+**Status:** Mostly implemented in 0.2.0. The MCP layer augments bridge
+capabilities with its server version, active mode, and exposed tool names. The
+negotiated MCP protocol version is available from `initialize` but is not yet
+repeated in this tool's result.
 
 Return:
 
@@ -302,6 +327,9 @@ Useful codes include unauthorized, invalid argument, protected path, not found, 
 
 ### Add operation and run IDs
 
+**Status:** Run IDs are partially implemented in 0.2.0 for scene run/stop and
+editor state. Operation IDs and run-scoped diagnostics/runtime results remain.
+
 Asynchronous editor operations should return operation IDs. Each debug session should have a run ID included in diagnostics, runtime-node results, captures, and input requests. This prevents results from a previous run being mistaken for current state.
 
 ### Improve port-conflict reporting and discovery
@@ -328,10 +356,10 @@ Recommended automated coverage:
 
 ## Small current-code cleanups
 
-- Remove the duplicate unreachable `return "font"` in `_asset_category`.
-- Keep the public MCP schemas synchronized with commands in `_handle_line`; the implementation contains `scan_asset`, while tool exposure should make its intended availability explicit.
-- Add the plugin/protocol version to every response or at least to `editor_state` for easier issue reports.
-- Include the effective configured limits in the capabilities response rather than requiring clients to infer `MAX_*` constants.
+- [x] Remove the duplicate unreachable `return "font"` in `_asset_category`.
+- [x] Expose the bridge's `scan_asset` command through a synchronized public MCP schema.
+- [ ] Add protocol-version discovery to `capabilities`; bridge and MCP server version discovery is complete.
+- [x] Include effective configured limits in the `capabilities` response.
 
 ## Suggested delivery order
 

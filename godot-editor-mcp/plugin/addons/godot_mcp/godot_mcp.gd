@@ -2,6 +2,7 @@
 extends EditorPlugin
 
 const HOST := "127.0.0.1"
+const BRIDGE_VERSION := "0.2.0"
 const DEFAULT_PORT := 6505
 const MAX_REQUEST_BYTES := 64 * 1024
 const MAX_TREE_NODES := 200
@@ -18,6 +19,11 @@ var _server := TCPServer.new()
 var _clients: Array[Dictionary] = []
 var _token := ""
 var _port := DEFAULT_PORT
+var _filesystem_generation := 0
+var _run_id := 0
+var _was_playing := false
+var _last_run_exit_status := "never_started"
+var _last_stop_reason := ""
 
 
 func _enter_tree() -> void:
@@ -31,6 +37,9 @@ func _enter_tree() -> void:
 		push_error("Godot MCP bridge could not listen on %s:%d (error %d)" % [HOST, _port, error])
 		return
 	set_process(true)
+	var filesystem := get_editor_interface().get_resource_filesystem()
+	if not filesystem.filesystem_changed.is_connected(_on_filesystem_changed):
+		filesystem.filesystem_changed.connect(_on_filesystem_changed)
 	print("Godot MCP bridge listening on %s:%d" % [HOST, _port])
 
 
@@ -43,6 +52,17 @@ func _exit_tree() -> void:
 
 
 func _process(_delta: float) -> void:
+	var playing := get_editor_interface().is_playing_scene()
+	if playing and not _was_playing:
+		_run_id += 1
+		_last_run_exit_status = "running"
+		_last_stop_reason = ""
+	elif not playing and _was_playing:
+		_last_run_exit_status = "stopped"
+		if _last_stop_reason.is_empty():
+			_last_stop_reason = "run_ended"
+	_was_playing = playing
+
 	while _server.is_connection_available():
 		var peer := _server.take_connection()
 		_clients.append({"peer": peer, "buffer": PackedByteArray()})
@@ -94,6 +114,8 @@ func _handle_line(line: String) -> Dictionary:
 		return _failure("Invalid request")
 
 	match command:
+		"capabilities":
+			return _success(_capabilities())
 		"state":
 			return _success(_editor_state())
 		"assets":
@@ -126,8 +148,35 @@ func _handle_line(line: String) -> Dictionary:
 			return _failure("Unknown command")
 
 
+func _capabilities() -> Dictionary:
+	return {
+		"bridge_version": BRIDGE_VERSION,
+		"godot_version": str(Engine.get_version_info().get("string", "Godot 4")),
+		"commands": [
+			"capabilities", "state", "assets", "asset_info", "scan_asset",
+			"create_resource", "create_scene", "open_scene", "tree", "inspect",
+			"add_node", "instantiate_scene", "set_property", "select", "control",
+		],
+		"features": {
+			"runtime_inspection": false,
+			"game_view_capture": false,
+			"input_injection": false,
+			"diagnostics": false,
+		},
+		"limits": {
+			"request_bytes": MAX_REQUEST_BYTES,
+			"tree_nodes": MAX_TREE_NODES,
+			"properties": MAX_PROPERTIES,
+			"assets": MAX_ASSETS,
+			"asset_scan": MAX_ASSET_SCAN,
+		},
+	}
+
+
 func _editor_state() -> Dictionary:
 	var root := get_editor_interface().get_edited_scene_root()
+	var filesystem := get_editor_interface().get_resource_filesystem()
+	var playing := get_editor_interface().is_playing_scene()
 	var selected: Array[String] = []
 	if root != null:
 		for node in get_editor_interface().get_selection().get_selected_nodes():
@@ -137,11 +186,26 @@ func _editor_state() -> Dictionary:
 				selected.append(str(root.get_path_to(node)))
 	return {
 		"godot": str(Engine.get_version_info().get("string", "Godot 4")),
+		"project_name": str(ProjectSettings.get_setting("application/config/name", "")),
+		"project_path": ProjectSettings.globalize_path("res://"),
+		"main_scene": str(ProjectSettings.get_setting("application/run/main_scene", "")),
+		"bridge_version": BRIDGE_VERSION,
+		"bridge_port": _port,
 		"scene": "" if root == null else root.scene_file_path,
 		"root": "" if root == null else root.name,
 		"selected": selected,
-		"playing": get_editor_interface().is_playing_scene(),
+		"playing": playing,
+		"filesystem_scanning": filesystem.is_scanning(),
+		"filesystem_generation": _filesystem_generation,
+		"run_id": _run_id if playing else null,
+		"last_run_id": _run_id if _run_id > 0 else null,
+		"last_run_exit_status": _last_run_exit_status,
+		"last_stop_reason": _last_stop_reason,
 	}
+
+
+func _on_filesystem_changed() -> void:
+	_filesystem_generation += 1
 
 
 func _list_assets(arguments: Dictionary) -> Dictionary:
@@ -546,10 +610,16 @@ func _scene_control(arguments: Dictionary) -> Dictionary:
 			if get_editor_interface().get_edited_scene_root() == null:
 				return _failure("No scene is open")
 			get_editor_interface().play_current_scene()
-			return _success("Scene started")
+			if not _was_playing:
+				_run_id += 1
+			_was_playing = true
+			_last_run_exit_status = "running"
+			_last_stop_reason = ""
+			return _success({"message": "Scene started", "run_id": _run_id})
 		"stop":
+			_last_stop_reason = "requested"
 			get_editor_interface().stop_playing_scene()
-			return _success("Scene stopped")
+			return _success({"message": "Scene stopped", "run_id": _run_id if _run_id > 0 else null})
 		_:
 			return _failure("Action must be save, run, or stop")
 

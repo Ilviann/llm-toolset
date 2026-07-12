@@ -22,6 +22,12 @@ common model tokenizers. This is the fixed context cost before system prompts,
 the conversation, tool calls, and file contents. Exact usage varies by model and
 by how the MCP client represents tool definitions.
 
+When pairing this server with `godot-editor-mcp` for GDScript work, prefer the
+Godot server's default `tiny` mode below 8k context. Use `small` only when the
+agent also needs Godot asset/import tools; `large` adds the desktop-oriented
+selection helper. Expose the closest useful script folder here to keep the
+combined schemas and file results bounded.
+
 ## Agentic usage by context size
 
 Agentic use is practical when the exposed root and task are kept narrow. The
