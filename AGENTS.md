@@ -24,7 +24,7 @@ MCP stdio servers must write only protocol messages to stdout. Send diagnostics 
 Each application belongs in its own top-level folder with its source, tests, README, and configuration examples. Current applications:
 
 - `rooted-files-mcp/`: root-confined, text-only filesystem MCP server.
-- `godot-editor-mcp/`: authenticated localhost bridge and Godot 4 editor plugin.
+- `godot-editor-mcp/`: authenticated localhost bridge and Godot 4.7 editor plugin.
 
 Keep shared documentation at the workspace root. Introduce shared libraries only when multiple applications need the same behavior.
 
@@ -34,8 +34,8 @@ Document run and test commands in each application's README. Prefer built-in tes
 
 ## Godot Editor MCP Known Issues
 
-- The plugin targets Godot 4 and is verified with Godot 4.3. Re-run the headless plugin load check when changing editor APIs or claiming compatibility with another version.
-- `open_scene` requests work through `EditorInterface` in the graphical editor, but Godot 4.3 headless mode accepts the request without activating the scene. For headless mutation tests, launch Godot with the scene path explicitly.
+- The plugin targets Godot 4 and is verified with Godot 4.7 stable. Re-run the headless plugin load and bridge checks when changing editor APIs or claiming compatibility with another version.
+- Godot 4.7 headless editor mode activates scenes requested through `open_scene`, so headless mutation tests can create or open a scene through the bridge before editing it.
 - Source imports are asynchronous. `import_asset` may return `queued` or `already_running`; `asset_info` can temporarily report an empty type until Godot finishes scanning. Do not start another full scan while one is active.
 - Imports copy one file at a time. A `.gltf` with external buffers or textures requires importing every dependency separately; prefer `.glb` for a self-contained 3D asset.
 - Imports never overwrite files. Destination folders must already exist or be created with `create_folder`. Move, rename, and delete operations are intentionally not exposed.

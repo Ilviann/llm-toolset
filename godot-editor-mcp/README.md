@@ -1,7 +1,8 @@
 # Godot Editor MCP
 
-A small, offline MCP server for controlling an open Godot 4 editor. It has no
-Python dependencies and is designed for small local models in LM Studio.
+A small, offline MCP server for controlling an open Godot 4 editor. It is
+verified with Godot 4.7 stable, has no Python dependencies, and is designed for
+small local models in LM Studio.
 
 The integration has two local parts:
 
@@ -128,9 +129,10 @@ Copy the bundled `addons` folder into the Godot project:
 cp -R /path/to/godot-editor-mcp/plugin/addons /path/to/game/
 ```
 
-Open the project in Godot 4, then enable **Project → Project Settings → Plugins →
-Godot MCP Bridge**. The plugin creates `.godot/godot_mcp_token`; it stays inside
-Godot's generated-data folder and should not be committed.
+Open the project in Godot 4.7, then enable **Project → Project Settings → Plugins
+→ Godot MCP Bridge**. The plugin creates `.godot/godot_mcp_token`; it stays
+inside Godot's generated-data folder and should not be committed. Other Godot 4
+releases may work, but 4.7 stable is the currently verified version.
 
 If port 6505 is already in use, set `godot_mcp/port` to another port in the
 project's `project.godot`, then add the same port to the MCP arguments:
@@ -182,11 +184,17 @@ python3 -m unittest discover -s tests -v
 
 The Python suite tests MCP initialization, tool routing, authentication, bounded
 transport behavior, staged imports, traversal and symlink denial, size limits,
-no-overwrite behavior, and safe errors. A live check in Godot is still
-recommended because editor plugin APIs are only available inside the editor.
+no-overwrite behavior, and safe errors. A live check in Godot is still required
+when claiming compatibility because editor plugin APIs are only available inside
+the editor.
 
 The `plugin` folder is also a minimal Godot project for plugin validation:
 
 ```sh
 /path/to/Godot --headless --editor --path plugin --quit-after 2
 ```
+
+With Godot 4.7 stable, this check must print the bridge listening message without
+GDScript or editor API errors. Headless mode also activates scenes requested by
+`open_scene`, so scene mutation checks no longer need to launch Godot with the
+scene path explicitly.
