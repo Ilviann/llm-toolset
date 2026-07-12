@@ -21,15 +21,29 @@ MCP stdio servers must write only protocol messages to stdout. Send diagnostics 
 
 ## Repository Organization
 
-Each application belongs in its own top-level folder with its source, tests, README, and configuration examples. Current application:
+Each application belongs in its own top-level folder with its source, tests, README, and configuration examples. Current applications:
 
 - `rooted-files-mcp/`: root-confined, text-only filesystem MCP server.
+- `godot-editor-mcp/`: authenticated localhost bridge and Godot 4 editor plugin.
 
 Keep shared documentation at the workspace root. Introduce shared libraries only when multiple applications need the same behavior.
 
 ## Development and Testing
 
 Document run and test commands in each application's README. Prefer built-in test frameworks and fast offline suites. Test normal behavior, invalid input, resource limits, and security boundaries. Run the complete suite after behavior changes.
+
+## Godot Editor MCP Known Issues
+
+- The plugin targets Godot 4 and is verified with Godot 4.3. Re-run the headless plugin load check when changing editor APIs or claiming compatibility with another version.
+- `open_scene` requests work through `EditorInterface` in the graphical editor, but Godot 4.3 headless mode accepts the request without activating the scene. For headless mutation tests, launch Godot with the scene path explicitly.
+- Source imports are asynchronous. `import_asset` may return `queued` or `already_running`; `asset_info` can temporarily report an empty type until Godot finishes scanning. Do not start another full scan while one is active.
+- Imports copy one file at a time. A `.gltf` with external buffers or textures requires importing every dependency separately; prefer `.glb` for a self-contained 3D asset.
+- Imports never overwrite files. Destination folders must already exist or be created with `create_folder`. Move, rename, and delete operations are intentionally not exposed.
+- Only one editor bridge can listen on a port. The `godot_mcp/port` project setting and MCP `--port` argument must match when changing the default port 6505.
+- `create_scene` and `add_node` accept built-in Node classes only, not project script classes. `create_resource` is limited to the whitelist documented in `godot-editor-mcp/README.md`.
+- Property conversion supports JSON primitives plus selected Godot types such as vectors, colors, `NodePath`, and `StringName`. Complex resource references, transforms, packed arrays, and arbitrary objects cannot currently be assigned through `set_property` or `create_resource`.
+- A root-level `list_assets` includes editor addon files and may include Godot-generated import resources. Prefer a project asset folder and type filter to reduce small-model context use.
+- A forced headless-editor shutdown can emit a dummy-renderer `Parameter "t" is null` diagnostic after resource preview work. Treat it as a headless shutdown artifact only when the plugin loaded successfully and no earlier script error is present.
 
 ## Security and Resource Limits
 
