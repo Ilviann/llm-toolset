@@ -44,6 +44,39 @@ The server creates folders, scenes, and staged asset copies, but it does not
 execute arbitrary code or provide general filesystem access. Pair it with
 `rooted-files-mcp` when the model needs to edit GDScript or project configuration.
 
+The complete `tools/list` result, including all 15 descriptions and input
+schemas, is about 4,760 characters of compact JSON, or roughly 1,200–1,600
+tokens for common model tokenizers. This is the fixed context cost before system
+prompts, the conversation, tool calls, and Godot results. Exact usage varies by
+model and by how the MCP client represents tool definitions. Enabling
+`rooted-files-mcp` alongside it adds roughly another 200–300 tokens of tool
+definitions.
+
+## Agentic usage by context size
+
+Agentic use is possible, but results such as `scene_tree`, `node_info`, and
+`list_assets` can be much larger than the tool definitions. Give the model one
+concrete scene-level goal, request small result sets, and save after each
+completed group of mutations. For long work, start a fresh session from the
+saved project state rather than carrying an ever-growing tool history.
+
+- **4k context:** Only narrowly scoped, short sequences are realistic, such as
+  checking editor state, opening a known scene, changing one property, and
+  saving. Configure only this server, avoid `scene_tree` on large scenes and
+  `node_info` unless necessary, and use `list_assets` with a specific folder,
+  type, and small limit. Pairing the file server at this size is generally too
+  tight for reliable agentic work.
+- **8k context:** Suitable for small scene edits: inspect a compact tree, add or
+  configure a few nodes, verify, and save. Keep asset searches filtered and
+  inspect nodes individually. If scripts must also be edited, use the file
+  server sparingly and split scene construction from code editing when either
+  side needs several tool calls.
+- **16k context:** Suitable for a modest scene-building workflow involving
+  assets, several nodes, property changes, and script or configuration edits
+  through the file server. Work scene by scene, use targeted asset queries, and
+  checkpoint with `scene_control` after each logical unit; large trees and
+  repeated property dumps can still exhaust the context.
+
 ## Asset imports
 
 Imports use a separate inbox configured with `--import-root`. Both the source
