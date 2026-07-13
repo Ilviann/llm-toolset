@@ -4,6 +4,9 @@ A small, offline MCP server for controlling an open Godot 4 editor. It is
 verified with Godot 4.7 stable, has no Python dependencies, and is designed for
 small local models in LM Studio.
 
+See [`HISTORY.md`](HISTORY.md) for released changes and [`TODO.md`](TODO.md)
+for features that are not yet implemented.
+
 ## Platform support
 
 The Python server and Godot plugin support macOS, Linux, and Windows with Python
