@@ -1,0 +1,10 @@
+extends RefCounted
+
+const MAX_REQUEST_BYTES := 64 * 1024
+const MAX_TREE_NODES := 200
+const MAX_PROPERTIES := 64
+const MAX_ASSETS := 100
+const MAX_ASSET_SCAN := 5000
+const MAX_SETTINGS := 100
+const MAX_SETTING_CHANGES := 32
+const MAX_INPUT_EVENTS := 32

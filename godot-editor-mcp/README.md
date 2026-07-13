@@ -42,6 +42,28 @@ dependencies replaceable in unit tests through small structural interfaces, and
 retains the existing `MCPServer`, mode/catalog constants, `run`, and `main`
 imports from `godot_editor_mcp.server` for compatibility.
 
+## Godot plugin layout
+
+The dependency-free editor plugin is split by responsibility under
+`plugin/addons/godot_mcp`:
+
+- `godot_mcp.gd` owns the `EditorPlugin` lifecycle, authenticated localhost
+  transport, command routing, capabilities, and editor run-state tracking.
+- `asset_commands.gd` handles asset discovery, resource creation, and scene
+  file creation or opening.
+- `scene_commands.gd` handles edited-scene inspection and UndoRedo-backed node
+  and property changes.
+- `project_settings_commands.gd` and `input_map_commands.gd` handle their
+  respective validated, atomic project configuration operations.
+- `command_base.gd` centralizes editor dependencies, project confinement,
+  shared validation, and bounded value encoding.
+- `command_limits.gd` is the single source for limits used by handlers and the
+  `capabilities` response.
+
+Keep command names and wire responses stable when changing these modules. New
+command families should remain focused and inherit the shared validation base
+rather than duplicating path or result handling.
+
 ## Tool modes
 
 Choose the exposed toolset at startup with `--mode tiny|small|large`. The

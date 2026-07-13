@@ -3,6 +3,12 @@
 This file records released changes. Planned work is tracked separately in
 [`TODO.md`](TODO.md).
 
+## 0.4.1 — 2026-07-13
+
+- Split the Godot editor plugin into focused asset, scene, Project Settings,
+  Input Map, shared-validation, and shared-limit modules while preserving the
+  authenticated bridge protocol and command behavior.
+
 ## 0.4.0 — 2026-07-13
 
 - Added `project_settings_get` and atomic, compare-and-swap
