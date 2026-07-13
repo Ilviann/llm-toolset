@@ -51,11 +51,12 @@ rejected even if a client retained an older `tools/list` response.
   edits, and save/run controls. It is intended for models with context windows
   below 8k. Pair it with a confined text-file MCP when GDScript itself must be
   edited; this server never exposes arbitrary file writes.
-- **`small`:** 16 tools for autonomous local agents around 16k context. It adds
+- **`small`:** 19 tools for autonomous local agents around 16k context. It adds
   bounded asset discovery, import scanning, staged imports, folders, and
-  whitelisted resource creation. This is the appropriate mode when the agent
-  must perform its own unit-test-oriented setup and verification.
-- **`large`:** all 18 tools. It adds `select_node` and the opt-in
+  whitelisted resource creation, plus atomic project-setting and Input Map
+  editing. This is the appropriate mode when the agent must perform its own
+  unit-test-oriented setup and verification.
+- **`large`:** all 21 tools. It adds `select_node` and the opt-in
   `start_editor` launcher for models that also control the Godot desktop UI.
 
 Example:
@@ -93,6 +94,9 @@ means `small` and `large`.
 | `import_asset` | Small+ | Copy one staged source file into the project and queue import |
 | `create_folder` | Small+ | Create a project folder |
 | `create_resource` | Small+ | Create a whitelisted built-in resource as text `.tres` |
+| `project_settings_get` | Small+ | Read one setting or up to 100 settings under a prefix |
+| `project_settings_patch` | Small+ | Atomically validate, compare, dry-run, and save up to 32 settings |
+| `input_map_patch` | Small+ | Add/remove key, mouse, and joypad bindings without duplicates |
 | `select_node` | Large | Select one node in the editor for coordinated desktop inspection |
 | `start_editor` | Large | Start Godot for the configured project using `GODOT_EXECUTABLE` |
 
@@ -119,8 +123,9 @@ started by this MCP server is still launching return `starting`. The plugin
 must already be installed and enabled in the project. The MCP server does not
 provide a tool to close the editor.
 
-The fixed context cost now depends on the selected mode. `tiny` omits the six
-asset workflow schemas, while `small` omits the desktop-only selection helper.
+The fixed context cost depends on the selected mode. `tiny` omits the nine
+asset and settings workflow schemas, while `small` omits the two desktop-only
+selection and launcher helpers.
 Exact token usage varies by model and by how the MCP client represents tool
 definitions. Enabling `rooted-files-mcp` alongside this server adds its own tool
 definitions, so prefer `tiny` for tightly supervised GDScript and UI work.
@@ -131,6 +136,62 @@ the plugin's version, supported bridge commands, optional-feature flags, Godot
 version, and effective limits. Optional features currently reported as
 unsupported are diagnostics, runtime inspection, game-view capture, and input
 injection.
+
+## Project settings and Input Map
+
+The three settings tools are available in `small` and `large` modes.
+`project_settings_get` reads an exact key by default; set `recursive` to `true`
+to list a prefix, bounded to 100 results. Results include the current value,
+Godot variant type, known default, whether the value differs, and the required
+reload level.
+
+`project_settings_patch` validates the entire batch before changing anything.
+Each change can include `expected` for compare-and-swap protection. A stale
+value rejects the complete transaction. `dry_run` returns the same normalized
+`diff` as a subsequent real patch, and `save` defaults to `true`. Failed saves
+restore all in-memory values. General Input Map keys must use
+`input_map_patch`; editor/internal and secret-bearing keys are rejected.
+
+```json
+{
+  "changes": [
+    {
+      "key": "display/window/stretch/mode",
+      "expected": "disabled",
+      "value": "canvas_items"
+    }
+  ],
+  "save": true,
+  "dry_run": false
+}
+```
+
+`input_map_patch` preserves unrelated events, detects exact normalized
+duplicates, and supports logical or physical keys, mouse buttons, joypad
+buttons, and signed joypad axes. Device `-1` means any controller. Changes are
+loaded into the live `InputMap` and saved through `ProjectSettings`, so they
+remain editable in Godot's Input Map UI and persist after a full reload.
+
+```json
+{
+  "action": "ui_accept",
+  "deadzone": 0.5,
+  "add_events": [
+    {"type": "joypad_button", "button": "a", "device": -1}
+  ],
+  "remove_events": [],
+  "save": true
+}
+```
+
+Key events use `"key":"Space"` (or a numeric Godot keycode) and optional
+`"physical":true` plus `shift`, `alt`, `ctrl`, and `meta`. Mouse button names
+include `left`, `right`, `middle`, wheel directions, and `xbutton1/2`. Joypad
+axes are `left_x`, `left_y`, `right_x`, `right_y`, `trigger_left`, and
+`trigger_right`, with `direction` equal to `-1` or `1`. Each response reports
+whether an editor refresh, project reload, or editor restart is required.
+
+## Editor state
 
 `editor_state` reports the project name and path, main scene, Godot and bridge
 versions, bridge port, edited scene and selection, filesystem scan status and
@@ -396,9 +457,9 @@ py -3 -m unittest discover -s tests -v
 
 The Python suite tests MCP initialization, end-to-end stdio initialization,
 tool listing and calls, per-mode dispatch, capability augmentation, public scan
-routing, authentication, bounded transport behavior, staged imports, traversal
-and symlink denial, size limits, no-overwrite behavior, and safe stdout/stderr
-error separation. A live check in Godot is still required
+routing, Project Settings command routing, authentication, bounded transport
+behavior, staged imports, traversal and symlink denial, size limits,
+no-overwrite behavior, and safe stdout/stderr error separation. A live check in Godot is still required
 when claiming compatibility because editor plugin APIs are only available inside
 the editor. Symbolic-link tests are skipped when the current account cannot
 create links; enable Windows Developer Mode or use the required privilege to run

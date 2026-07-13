@@ -27,7 +27,14 @@ imports while adding end-to-end stdio coverage for initialization, `tools/list`,
 `tools/call`, parse errors, and stdout/stderr separation. This is an internal
 maintainability milestone and does not change bridge behavior or tool modes.
 
-Still outstanding from Priority 0 are diagnostics, dirty/reload-pending and diagnostic counts in `editor_state`, awaitable commands, and project reload. Runtime inspection, capture/input, broader authoring, project settings, pagination, structured errors, and operation IDs also remain planned. Capability flags explicitly report the unsupported runtime and diagnostic features so clients can degrade safely.
+Version 0.4.0 added `project_settings_get`, atomic compare-and-swap
+`project_settings_patch`, and the higher-level `input_map_patch` in small and
+large modes. The bridge now advertises supported setting/event types, validates
+complete batches before mutation, supports dry runs, rolls back failed saves,
+reports reload requirements, and persists duplicate-free key, mouse, and
+joypad bindings through Godot's Project Settings API.
+
+Still outstanding from Priority 0 are diagnostics, dirty/reload-pending and diagnostic counts in `editor_state`, awaitable commands, and project reload. Runtime inspection, capture/input, broader authoring, autoload helpers, pagination, structured errors, and operation IDs also remain planned. Capability flags explicitly report the unsupported runtime and diagnostic features so clients can degrade safely.
 
 The highest-value next step is better observability. During this work, editing was straightforward through the filesystem, but confirming project reloads, distinguishing stale diagnostics from current errors, and inspecting a procedurally generated running scene required other tools.
 
@@ -268,6 +275,10 @@ The existing one-node scene creation is safe, but it does not substantially redu
 
 ### Add safe project-setting and autoload tools
 
+**Status:** Project-setting reads, atomic patches, and higher-level Input Map
+editing were implemented in 0.4.0. Scoped autoload and enabled-plugin helpers
+remain planned.
+
 Provide scoped tools for:
 
 - read project setting
@@ -383,6 +394,6 @@ Recommended automated coverage:
 3. Read-only runtime tree/property inspection and signal watches.
 4. Game viewport capture and bounded gameplay input.
 5. Structural scene-edit tools and batched UndoRedo transactions.
-6. Project settings/autoload helpers, pagination, structured errors, and protocol capability discovery.
+6. Autoload helpers, pagination, structured errors, and protocol capability discovery.
 
 This order improves validation reliability first, keeps early additions mostly read-only, and preserves the bridge's current narrow security posture while adding the capabilities most useful for real Godot development workflows.

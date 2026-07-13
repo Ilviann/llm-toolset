@@ -1,3 +1,3 @@
 """Small offline MCP bridge for the Godot 4 editor."""
 
-__version__ = "0.3.2"
+__version__ = "0.4.0"

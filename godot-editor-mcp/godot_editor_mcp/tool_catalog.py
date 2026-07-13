@@ -201,6 +201,86 @@ TOOLS = [
         },
     },
     {
+        "name": "project_settings_get",
+        "description": "Read one project setting or a bounded setting prefix.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "key": {"type": "string", "description": "Setting key or prefix"},
+                "recursive": {"type": "boolean", "default": False},
+            },
+            "required": ["key"], "additionalProperties": False,
+        },
+    },
+    {
+        "name": "project_settings_patch",
+        "description": "Atomically validate, compare, and patch project settings.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "changes": {
+                    "type": "array", "minItems": 1, "maxItems": 32,
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "key": {"type": "string"},
+                            "expected": {"description": "Optional compare-and-swap value"},
+                            "value": {"description": "JSON-safe project setting value"},
+                        },
+                        "required": ["key", "value"], "additionalProperties": False,
+                    },
+                },
+                "save": {"type": "boolean", "default": True},
+                "dry_run": {"type": "boolean", "default": False},
+            },
+            "required": ["changes"], "additionalProperties": False,
+        },
+    },
+    {
+        "name": "input_map_patch",
+        "description": "Add or remove normalized Input Map bindings without duplicates.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "action": {"type": "string"},
+                "deadzone": {"type": "number", "minimum": 0, "maximum": 1},
+                "add_events": {
+                    "type": "array", "maxItems": 32,
+                    "items": {"$ref": "#/$defs/event"}, "default": [],
+                },
+                "remove_events": {
+                    "type": "array", "maxItems": 32,
+                    "items": {"$ref": "#/$defs/event"}, "default": [],
+                },
+                "save": {"type": "boolean", "default": True},
+                "dry_run": {"type": "boolean", "default": False},
+            },
+            "required": ["action"], "additionalProperties": False,
+            "$defs": {
+                "event": {
+                    "type": "object",
+                    "description": "key, mouse_button, joypad_button, or joypad_motion event",
+                    "properties": {
+                        "type": {"type": "string", "enum": [
+                            "key", "mouse_button", "joypad_button", "joypad_motion"
+                        ]},
+                        "key": {"description": "Key name or numeric Godot keycode"},
+                        "physical": {"type": "boolean", "default": False},
+                        "button": {"description": "Button name or index"},
+                        "axis": {"description": "Axis name or index"},
+                        "direction": {"type": "number", "enum": [-1, 1]},
+                        "device": {"type": "integer", "minimum": -1, "maximum": 32, "default": -1},
+                        "shift": {"type": "boolean", "default": False},
+                        "alt": {"type": "boolean", "default": False},
+                        "ctrl": {"type": "boolean", "default": False},
+                        "meta": {"type": "boolean", "default": False},
+                    },
+                    "required": ["type"], "additionalProperties": False,
+                }
+            },
+        },
+    },
+    {
         "name": "start_editor",
         "description": "Start the configured Godot editor for this project.",
         "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
@@ -216,7 +296,8 @@ TINY_TOOLS = (
 )
 SMALL_TOOLS = TINY_TOOLS + (
     "list_assets", "asset_info", "scan_asset", "import_asset", "create_folder",
-    "create_resource",
+    "create_resource", "project_settings_get", "project_settings_patch",
+    "input_map_patch",
 )
 MODE_TOOL_NAMES: dict[Mode, tuple[str, ...]] = {
     "tiny": TINY_TOOLS,

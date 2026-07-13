@@ -48,6 +48,9 @@ BRIDGE_COMMANDS = {
     "set_property": "set_property",
     "select_node": "select",
     "scene_control": "control",
+    "project_settings_get": "project_settings_get",
+    "project_settings_patch": "project_settings_patch",
+    "input_map_patch": "input_map_patch",
 }
 
 

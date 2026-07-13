@@ -2,13 +2,16 @@
 extends EditorPlugin
 
 const HOST := "127.0.0.1"
-const BRIDGE_VERSION := "0.3.2"
+const BRIDGE_VERSION := "0.4.0"
 const DEFAULT_PORT := 6505
 const MAX_REQUEST_BYTES := 64 * 1024
 const MAX_TREE_NODES := 200
 const MAX_PROPERTIES := 64
 const MAX_ASSETS := 100
 const MAX_ASSET_SCAN := 5000
+const MAX_SETTINGS := 100
+const MAX_SETTING_CHANGES := 32
+const MAX_INPUT_EVENTS := 32
 const TOKEN_PATH := "res://.godot/godot_mcp_token"
 const CREATABLE_RESOURCE_TYPES := [
 	"StandardMaterial3D", "ORMMaterial3D", "ShaderMaterial", "Environment",
@@ -144,6 +147,12 @@ func _handle_line(line: String) -> Dictionary:
 			return _select_node(arguments)
 		"control":
 			return _scene_control(arguments)
+		"project_settings_get":
+			return _project_settings_get(arguments)
+		"project_settings_patch":
+			return _project_settings_patch(arguments)
+		"input_map_patch":
+			return _input_map_patch(arguments)
 		_:
 			return _failure("Unknown command")
 
@@ -156,12 +165,25 @@ func _capabilities() -> Dictionary:
 			"capabilities", "state", "assets", "asset_info", "scan_asset",
 			"create_resource", "create_scene", "open_scene", "tree", "inspect",
 			"add_node", "instantiate_scene", "set_property", "select", "control",
+			"project_settings_get", "project_settings_patch", "input_map_patch",
 		],
 		"features": {
 			"runtime_inspection": false,
 			"game_view_capture": false,
 			"input_injection": false,
 			"diagnostics": false,
+			"project_settings": true,
+			"input_map_editing": true,
+		},
+		"project_settings": {
+			"value_types": [
+				"null", "bool", "int", "float", "string", "string_name",
+				"node_path", "vector2", "vector2i", "vector3", "vector3i",
+				"color", "array", "dictionary", "packed_string_array",
+			],
+			"input_event_types": [
+				"key", "mouse_button", "joypad_button", "joypad_motion",
+			],
 		},
 		"limits": {
 			"request_bytes": MAX_REQUEST_BYTES,
@@ -169,6 +191,9 @@ func _capabilities() -> Dictionary:
 			"properties": MAX_PROPERTIES,
 			"assets": MAX_ASSETS,
 			"asset_scan": MAX_ASSET_SCAN,
+			"settings": MAX_SETTINGS,
+			"setting_changes": MAX_SETTING_CHANGES,
+			"input_events": MAX_INPUT_EVENTS,
 		},
 	}
 
@@ -622,6 +647,516 @@ func _scene_control(arguments: Dictionary) -> Dictionary:
 			return _success({"message": "Scene stopped", "run_id": _run_id if _run_id > 0 else null})
 		_:
 			return _failure("Action must be save, run, or stop")
+
+
+func _project_settings_get(arguments: Dictionary) -> Dictionary:
+	if not _only_keys(arguments, ["key", "recursive"]):
+		return _failure("project_settings_get contains an unsupported field")
+	var checked := _checked_setting_key(arguments.get("key"), false)
+	if not checked.ok:
+		return checked
+	var key := checked.result as String
+	var recursive = arguments.get("recursive", false)
+	if not recursive is bool:
+		return _failure("recursive must be a boolean")
+	if not recursive:
+		return _success(_setting_record(key))
+	var settings: Array[Dictionary] = []
+	var seen := {}
+	for info in ProjectSettings.get_property_list():
+		var candidate := str(info.get("name", ""))
+		if candidate in seen or not (candidate == key or candidate.begins_with(key + "/")):
+			continue
+		if not _checked_setting_key(candidate, false).ok:
+			continue
+		seen[candidate] = true
+		settings.append(_setting_record(candidate))
+		if settings.size() >= MAX_SETTINGS:
+			break
+	settings.sort_custom(func(left: Dictionary, right: Dictionary) -> bool: return left.key < right.key)
+	return _success({
+		"prefix": key,
+		"settings": settings,
+		"truncated": settings.size() >= MAX_SETTINGS,
+	})
+
+
+func _setting_record(key: String) -> Dictionary:
+	var exists := ProjectSettings.has_setting(key)
+	var value = ProjectSettings.get_setting(key) if exists else null
+	var has_default := exists and ProjectSettings.property_can_revert(key)
+	var default_value = ProjectSettings.property_get_revert(key) if has_default else null
+	return {
+		"key": key,
+		"exists": exists,
+		"value": _encode_setting_value(value),
+		"type": type_string(typeof(value)) if exists else "nil",
+		"has_default": has_default,
+		"default": _encode_setting_value(default_value) if has_default else null,
+		"differs_from_default": exists and has_default and value != default_value,
+		"reload": _setting_reload_requirement(key),
+	}
+
+
+func _project_settings_patch(arguments: Dictionary) -> Dictionary:
+	if not _only_keys(arguments, ["changes", "save", "dry_run"]):
+		return _failure("project_settings_patch contains an unsupported field")
+	var changes = arguments.get("changes")
+	if not changes is Array or changes.is_empty() or changes.size() > MAX_SETTING_CHANGES:
+		return _failure("changes must contain between 1 and 32 entries")
+	var save = arguments.get("save", true)
+	var dry_run = arguments.get("dry_run", false)
+	if not save is bool or not dry_run is bool:
+		return _failure("save and dry_run must be booleans")
+	var prepared: Array[Dictionary] = []
+	var keys := {}
+	for change in changes:
+		if not change is Dictionary:
+			return _failure("Each change must be an object")
+		if not _only_keys(change, ["key", "expected", "value"]):
+			return _failure("A change contains an unsupported field")
+		if not change.has("value"):
+			return _failure("Each change must include value")
+		var checked := _checked_setting_key(change.get("key"), true)
+		if not checked.ok:
+			return checked
+		var key := checked.result as String
+		if key in keys:
+			return _failure("Duplicate setting key: %s" % key)
+		keys[key] = true
+		var existed := ProjectSettings.has_setting(key)
+		var before = ProjectSettings.get_setting(key) if existed else null
+		if change.has("expected"):
+			if not existed:
+				if change.expected != null:
+					return _failure("Compare-and-swap failed for %s" % key)
+			else:
+				var expected := _decode_setting_value(change.expected, typeof(before))
+				if not expected.ok:
+					return _failure("Invalid expected value for %s: %s" % [key, expected.error])
+				if expected.result != before:
+					return _failure("Compare-and-swap failed for %s" % key)
+		var converted := _decode_setting_value(change.value, typeof(before) if existed else TYPE_NIL)
+		if not converted.ok:
+			return _failure("Invalid value for %s: %s" % [key, converted.error])
+		prepared.append({
+			"key": key, "existed": existed, "before_raw": before,
+			"after_raw": converted.result,
+			"diff": {
+				"key": key,
+				"before": _encode_setting_value(before) if existed else null,
+				"after": _encode_setting_value(converted.result),
+				"changed": not existed or before != converted.result,
+				"reload": _setting_reload_requirement(key),
+			},
+		})
+	var diffs: Array[Dictionary] = []
+	for item in prepared:
+		diffs.append(item.diff)
+	if not dry_run:
+		for item in prepared:
+			ProjectSettings.set_setting(item.key, item.after_raw)
+			if save:
+				var error := ProjectSettings.save()
+				if error != OK:
+					_restore_settings(prepared)
+					ProjectSettings.save()
+					return _failure("Could not save project settings (Godot error %d); transaction rolled back" % error)
+	return _success({
+		"diff": diffs,
+		"dry_run": dry_run,
+		"saved": save and not dry_run,
+		"requirements": _combined_reload_requirements(prepared),
+	})
+
+
+func _restore_settings(prepared: Array[Dictionary]) -> void:
+	for item in prepared:
+		if item.existed:
+			ProjectSettings.set_setting(item.key, item.before_raw)
+		else:
+			ProjectSettings.clear(item.key)
+
+
+func _combined_reload_requirements(prepared: Array[Dictionary]) -> Dictionary:
+	var reload := false
+	var restart := false
+	for item in prepared:
+		if not item.diff.changed:
+			continue
+		var requirement := item.diff.reload as String
+		reload = reload or requirement == "project_reload"
+		restart = restart or requirement == "editor_restart"
+	return {
+		"editor_refresh": false,
+		"project_reload": reload,
+		"editor_restart": restart,
+	}
+
+
+func _setting_reload_requirement(key: String) -> String:
+	if key.begins_with("godot_mcp/") or key.begins_with("rendering/renderer/") or key.begins_with("audio/driver/"):
+		return "editor_restart"
+	if key.begins_with("input/"):
+		return "none"
+	return "project_reload"
+
+
+func _checked_setting_key(value: Variant, writable: bool) -> Dictionary:
+	if not value is String or value.is_empty() or value.length() > 256:
+		return _failure("Setting key must be a non-empty string up to 256 characters")
+	if value.begins_with("/") or value.ends_with("/") or "//" in value or "\\" in value:
+		return _failure("Setting key is invalid")
+	for character in value:
+		if character.unicode_at(0) < 32:
+			return _failure("Setting key contains a control character")
+	var lowered: String = value.to_lower()
+	var secret_terms := ["password", "secret", "token", "credential", "api_key", "private_key"]
+	for term in secret_terms:
+		if term in lowered:
+			return _failure("Secret-bearing project settings are not exposed")
+	if writable and (lowered.begins_with("editor/") or lowered.begins_with("_")):
+		return _failure("Editor-only or internal project settings cannot be changed")
+	if writable and lowered.begins_with("input/"):
+		return _failure("Use input_map_patch for Input Map settings")
+	return _success(value)
+
+
+func _decode_setting_value(value: Variant, target_type: int, depth := 0) -> Dictionary:
+	if depth > 6:
+		return _failure("Value nesting is too deep")
+	if value is String and value.length() > 4096:
+		return _failure("String value is too long")
+	if target_type == TYPE_NIL:
+		if value == null or value is bool or value is int or value is float or value is String:
+			return _success(value)
+		if value is Array:
+			var new_array: Array = []
+			if value.size() > 100:
+				return _failure("Array has more than 100 entries")
+			for child in value:
+				var decoded := _decode_setting_value(child, TYPE_NIL, depth + 1)
+				if not decoded.ok:
+					return decoded
+				new_array.append(decoded.result)
+			return _success(new_array)
+		if value is Dictionary:
+			var new_dictionary := {}
+			if value.size() > 100:
+				return _failure("Dictionary has more than 100 entries")
+			for child_key in value:
+				if not child_key is String or child_key.length() > 256:
+					return _failure("Dictionary keys must be strings up to 256 characters")
+				var decoded := _decode_setting_value(value[child_key], TYPE_NIL, depth + 1)
+				if not decoded.ok:
+					return decoded
+				new_dictionary[child_key] = decoded.result
+			return _success(new_dictionary)
+		return _failure("Unsupported JSON value")
+	if target_type == TYPE_INT and (value is int or value is float):
+		return _success(int(value))
+	if target_type == TYPE_FLOAT and (value is int or value is float):
+		return _success(float(value))
+	if target_type == TYPE_STRING and value is String:
+		return _success(value)
+	if target_type == TYPE_STRING_NAME and value is String:
+		return _success(StringName(value))
+	if target_type == TYPE_NODE_PATH and value is String:
+		return _success(NodePath(value))
+	if target_type == TYPE_VECTOR2 and _number_array(value, 2):
+		return _success(Vector2(float(value[0]), float(value[1])))
+	if target_type == TYPE_VECTOR2I and _number_array(value, 2):
+		return _success(Vector2i(int(value[0]), int(value[1])))
+	if target_type == TYPE_VECTOR3 and _number_array(value, 3):
+		return _success(Vector3(float(value[0]), float(value[1]), float(value[2])))
+	if target_type == TYPE_VECTOR3I and _number_array(value, 3):
+		return _success(Vector3i(int(value[0]), int(value[1]), int(value[2])))
+	if target_type == TYPE_COLOR and _number_array(value, 4):
+		return _success(Color(float(value[0]), float(value[1]), float(value[2]), float(value[3])))
+	if target_type == TYPE_PACKED_STRING_ARRAY and value is Array:
+		var strings := PackedStringArray()
+		for item in value:
+			if not item is String:
+				return _failure("Packed string array entries must be strings")
+			strings.append(item)
+		return _success(strings)
+	if target_type in [TYPE_ARRAY, TYPE_DICTIONARY]:
+		var decoded := _decode_setting_value(value, TYPE_NIL, depth)
+		if decoded.ok and typeof(decoded.result) == target_type:
+			return decoded
+	if target_type == typeof(value):
+		return _success(value)
+	return _failure("Value does not match setting type %s" % type_string(target_type))
+
+
+func _number_array(value: Variant, size: int) -> bool:
+	if not value is Array or value.size() != size:
+		return false
+	for item in value:
+		if not item is int and not item is float:
+			return false
+	return true
+
+
+func _encode_setting_value(value: Variant, depth := 0) -> Variant:
+	if depth > 6:
+		return "..."
+	if value is InputEvent:
+		return _normalize_input_event(value)
+	match typeof(value):
+		TYPE_NIL, TYPE_BOOL, TYPE_INT, TYPE_FLOAT:
+			return value
+		TYPE_STRING, TYPE_STRING_NAME, TYPE_NODE_PATH:
+			return str(value).left(4096)
+		TYPE_VECTOR2, TYPE_VECTOR2I:
+			return [value.x, value.y]
+		TYPE_VECTOR3, TYPE_VECTOR3I:
+			return [value.x, value.y, value.z]
+		TYPE_COLOR:
+			return [value.r, value.g, value.b, value.a]
+		TYPE_ARRAY, TYPE_PACKED_STRING_ARRAY:
+			var output: Array = []
+			for item in value.slice(0, 100):
+				output.append(_encode_setting_value(item, depth + 1))
+			return output
+		TYPE_DICTIONARY:
+			var output := {}
+			for key in value.keys().slice(0, 100):
+				output[str(key)] = _encode_setting_value(value[key], depth + 1)
+			return output
+		_:
+			return "<unsupported:%s>" % type_string(typeof(value))
+
+
+func _input_map_patch(arguments: Dictionary) -> Dictionary:
+	if not _only_keys(arguments, ["action", "deadzone", "add_events", "remove_events", "save", "dry_run"]):
+		return _failure("input_map_patch contains an unsupported field")
+	var action = arguments.get("action")
+	if not action is String or action.is_empty() or action.length() > 128 or "/" in action:
+		return _failure("Action must be a non-empty name up to 128 characters")
+	var add_events = arguments.get("add_events", [])
+	var remove_events = arguments.get("remove_events", [])
+	var save = arguments.get("save", true)
+	var dry_run = arguments.get("dry_run", false)
+	if not add_events is Array or add_events.size() > MAX_INPUT_EVENTS:
+		return _failure("add_events must be an array with at most 32 entries")
+	if not remove_events is Array or remove_events.size() > MAX_INPUT_EVENTS:
+		return _failure("remove_events must be an array with at most 32 entries")
+	if not save is bool or not dry_run is bool:
+		return _failure("save and dry_run must be booleans")
+	var deadzone_value = arguments.get("deadzone", null)
+	if deadzone_value != null and (not (deadzone_value is int or deadzone_value is float) or float(deadzone_value) < 0.0 or float(deadzone_value) > 1.0):
+		return _failure("deadzone must be between 0 and 1")
+	var added: Array[InputEvent] = []
+	var removed: Array[Dictionary] = []
+	for raw_event in add_events:
+		var converted := _input_event_from_json(raw_event)
+		if not converted.ok:
+			return converted
+		added.append(converted.result)
+	for raw_event in remove_events:
+		var converted := _input_event_from_json(raw_event)
+		if not converted.ok:
+			return converted
+		removed.append(_normalize_input_event(converted.result))
+	var setting_key := "input/%s" % action
+	var existed := ProjectSettings.has_setting(setting_key)
+	var before_setting = ProjectSettings.get_setting(setting_key) if existed else {"deadzone": 0.5, "events": []}
+	if not before_setting is Dictionary or not before_setting.get("events", []) is Array:
+		return _failure("Existing Input Map action has an unsupported format")
+	var after_setting: Dictionary = before_setting.duplicate(true)
+	var after_events: Array = after_setting.get("events", []).duplicate()
+	var removed_count := 0
+	for index in range(after_events.size() - 1, -1, -1):
+		var normalized := _normalize_input_event(after_events[index])
+		if normalized in removed:
+			after_events.remove_at(index)
+			removed_count += 1
+	var added_count := 0
+	for event in added:
+		var normalized := _normalize_input_event(event)
+		var duplicate := false
+		for existing in after_events:
+			if _normalize_input_event(existing) == normalized:
+				duplicate = true
+				break
+		if not duplicate:
+			after_events.append(event)
+			added_count += 1
+	after_setting["events"] = after_events
+	if deadzone_value != null:
+		after_setting["deadzone"] = float(deadzone_value)
+	elif not after_setting.has("deadzone"):
+		after_setting["deadzone"] = 0.5
+	var before := _normalized_input_action(action, before_setting, existed)
+	var after := _normalized_input_action(action, after_setting, true)
+	if not dry_run:
+		ProjectSettings.set_setting(setting_key, after_setting)
+		InputMap.load_from_project_settings()
+		if save:
+			var error := ProjectSettings.save()
+			if error != OK:
+				if existed:
+					ProjectSettings.set_setting(setting_key, before_setting)
+				else:
+					ProjectSettings.clear(setting_key)
+				InputMap.load_from_project_settings()
+				ProjectSettings.save()
+				return _failure("Could not save Input Map (Godot error %d); transaction rolled back" % error)
+	return _success({
+		"diff": {"before": before, "after": after, "changed": before != after},
+		"added": added_count,
+		"removed": removed_count,
+		"dry_run": dry_run,
+		"saved": save and not dry_run,
+		"requirements": {
+			"editor_refresh": before != after,
+			"project_reload": false,
+			"editor_restart": false,
+		},
+	})
+
+
+func _normalized_input_action(action: String, setting: Dictionary, exists: bool) -> Dictionary:
+	var events: Array = []
+	for event in setting.get("events", []):
+		events.append(_normalize_input_event(event))
+	return {
+		"action": action,
+		"exists": exists,
+		"deadzone": float(setting.get("deadzone", 0.5)),
+		"events": events,
+	}
+
+
+func _input_event_from_json(value: Variant) -> Dictionary:
+	if not value is Dictionary:
+		return _failure("Input events must be objects")
+	if not _only_keys(value, ["type", "key", "physical", "button", "axis", "direction", "device", "shift", "alt", "ctrl", "meta"]):
+		return _failure("Input event contains an unsupported field")
+	var event_type = value.get("type")
+	var device := _bounded_device(value.get("device", -1))
+	if not device.ok:
+		return device
+	match event_type:
+		"key":
+			var code := _keycode(value.get("key"))
+			if not code.ok:
+				return code
+			var physical = value.get("physical", false)
+			if not physical is bool:
+				return _failure("physical must be a boolean")
+			var event := InputEventKey.new()
+			event.device = device.result
+			if physical:
+				event.physical_keycode = code.result
+			else:
+				event.keycode = code.result
+			for modifier in ["shift", "alt", "ctrl", "meta"]:
+				if not value.get(modifier, false) is bool:
+					return _failure("Key modifiers must be booleans")
+			event.shift_pressed = value.get("shift", false)
+			event.alt_pressed = value.get("alt", false)
+			event.ctrl_pressed = value.get("ctrl", false)
+			event.meta_pressed = value.get("meta", false)
+			return _success(event)
+		"mouse_button":
+			var button := _named_index(value.get("button"), {
+				"left": 1, "right": 2, "middle": 3, "wheel_up": 4,
+				"wheel_down": 5, "wheel_left": 6, "wheel_right": 7,
+				"xbutton1": 8, "xbutton2": 9,
+			})
+			if not button.ok or button.result < 1 or button.result > 9:
+				return _failure("Mouse button is invalid")
+			var event := InputEventMouseButton.new()
+			event.device = device.result
+			event.button_index = button.result
+			return _success(event)
+		"joypad_button":
+			var button := _named_index(value.get("button"), {
+				"a": 0, "b": 1, "x": 2, "y": 3, "back": 4, "guide": 5,
+				"start": 6, "left_stick": 7, "right_stick": 8,
+				"left_shoulder": 9, "right_shoulder": 10, "dpad_up": 11,
+				"dpad_down": 12, "dpad_left": 13, "dpad_right": 14,
+				"misc1": 15, "paddle1": 16, "paddle2": 17, "paddle3": 18,
+				"paddle4": 19, "touchpad": 20,
+			})
+			if not button.ok or button.result < 0 or button.result > 20:
+				return _failure("Joypad button is invalid")
+			var event := InputEventJoypadButton.new()
+			event.device = device.result
+			event.button_index = button.result
+			return _success(event)
+		"joypad_motion":
+			var axis := _named_index(value.get("axis"), {
+				"left_x": 0, "left_y": 1, "right_x": 2, "right_y": 3,
+				"trigger_left": 4, "trigger_right": 5,
+			})
+			var direction = value.get("direction")
+			if not axis.ok or axis.result < 0 or axis.result > 5:
+				return _failure("Joypad axis is invalid")
+			if not (direction is int or direction is float) or float(direction) not in [-1.0, 1.0]:
+				return _failure("Joypad motion direction must be -1 or 1")
+			var event := InputEventJoypadMotion.new()
+			event.device = device.result
+			event.axis = axis.result
+			event.axis_value = float(direction)
+			return _success(event)
+		_:
+			return _failure("Input event type must be key, mouse_button, joypad_button, or joypad_motion")
+
+
+func _normalize_input_event(event: Variant) -> Dictionary:
+	if event is InputEventKey:
+		var physical: bool = event.physical_keycode != 0
+		var code: int = event.physical_keycode if physical else event.keycode
+		return {
+			"type": "key", "key": OS.get_keycode_string(code),
+			"physical": physical, "device": event.device,
+			"shift": event.shift_pressed, "alt": event.alt_pressed,
+			"ctrl": event.ctrl_pressed, "meta": event.meta_pressed,
+		}
+	if event is InputEventMouseButton:
+		return {"type": "mouse_button", "button": int(event.button_index), "device": event.device}
+	if event is InputEventJoypadButton:
+		return {"type": "joypad_button", "button": int(event.button_index), "device": event.device}
+	if event is InputEventJoypadMotion:
+		return {
+			"type": "joypad_motion", "axis": int(event.axis),
+			"direction": -1 if event.axis_value < 0 else 1, "device": event.device,
+		}
+	return {"type": "unsupported", "class": event.get_class() if event is Object else type_string(typeof(event))}
+
+
+func _keycode(value: Variant) -> Dictionary:
+	if (value is int or value is float) and float(value) == floor(float(value)) and value > 0:
+		return _success(int(value))
+	if value is String and not value.is_empty() and value.length() <= 64:
+		var code := OS.find_keycode_from_string(value)
+		if code != 0:
+			return _success(code)
+	return _failure("Key must be a recognized name or positive Godot keycode")
+
+
+func _bounded_device(value: Variant) -> Dictionary:
+	if not (value is int or value is float) or float(value) != floor(float(value)) or value < -1 or value > 32:
+		return _failure("Input device must be an integer between -1 and 32")
+	return _success(int(value))
+
+
+func _named_index(value: Variant, names: Dictionary) -> Dictionary:
+	if (value is int or value is float) and float(value) == floor(float(value)):
+		return _success(int(value))
+	if value is String and value.to_lower() in names:
+		return _success(names[value.to_lower()])
+	return _failure("Named index is invalid")
+
+
+func _only_keys(dictionary: Dictionary, allowed: Array) -> bool:
+	for key in dictionary:
+		if key not in allowed:
+			return false
+	return true
 
 
 func _find_node(path_value: Variant) -> Dictionary:

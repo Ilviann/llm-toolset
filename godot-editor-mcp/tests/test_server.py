@@ -85,6 +85,10 @@ class MCPServerTests(unittest.TestCase):
         self.assertIn("select_node", large)
         self.assertNotIn("start_editor", small)
         self.assertIn("start_editor", large)
+        self.assertNotIn("project_settings_get", tiny)
+        self.assertIn("project_settings_get", small)
+        self.assertIn("project_settings_patch", small)
+        self.assertIn("input_map_patch", small)
 
     def test_tool_outside_mode_is_rejected_without_bridge_call(self) -> None:
         response = self.request("tools/call", {
@@ -154,6 +158,24 @@ class MCPServerTests(unittest.TestCase):
             ("validate_file", ("scripts/player.gd", None))
         ])
         self.assertEqual(self.bridge.calls, [("scan_asset", arguments)])
+
+    def test_project_settings_tools_route_to_distinct_bridge_commands(self) -> None:
+        self.server = MCPServer(self.bridge, self.assets, mode="small")  # type: ignore[arg-type]
+        calls = [
+            ("project_settings_get", {"key": "display/window/size"}),
+            ("project_settings_patch", {
+                "changes": [{"key": "display/window/stretch/mode", "value": "canvas_items"}],
+                "dry_run": True,
+            }),
+            ("input_map_patch", {
+                "action": "ui_accept",
+                "add_events": [{"type": "joypad_button", "button": "a"}],
+            }),
+        ]
+        for name, arguments in calls:
+            response = self.request("tools/call", {"name": name, "arguments": arguments})
+            self.assertNotIn("isError", response["result"])
+        self.assertEqual(self.bridge.calls, calls)
 
     def test_capabilities_include_mode_and_exposed_tools(self) -> None:
         self.server = MCPServer(self.bridge, self.assets, mode="small")  # type: ignore[arg-type]
