@@ -32,6 +32,12 @@ Keep shared documentation at the workspace root. Introduce shared libraries only
 
 Document run and test commands in each application's README. Prefer built-in test frameworks and fast offline suites. Test normal behavior, invalid input, resource limits, and security boundaries. Run the complete suite after behavior changes.
 
+Organize roadmaps as working feature increments. Every phase must deliver a complete, usable feature or cohesive feature set, including its implementation, relevant tests, and all affected documentation and examples. A phase may depend on completed earlier phases, but completing it must leave the project in a working, releasable state. Do not defer testing or documentation to a separate final phase.
+
+After implementing each roadmap phase, increase the application's version when that application uses versioning. Use a patch-version increase for bug-fix-only phases and a minor-version increase for phases that add features. Increase the major version only when the user explicitly requests it. Keep package metadata, runtime-reported versions, plugin manifests, documentation, examples, and history records consistent with the new version wherever they apply.
+
+When every roadmap phase has been implemented and the user asks to clean up the roadmap, keep the application's `ROADMAP.md` file instead of deleting it. Replace the completed implementation plan with a concise statement that there are currently no feature requests.
+
 After completing implementation work, update every affected document, README, configuration example, and roadmap before handing off the change. Update this `AGENTS.md` file too whenever the work changes repository-wide guidance, supported behavior, constraints, or known issues.
 
 When clarification is useful, ask questions one at a time and state the approximate number of additional questions expected after each one. Continue with reasonable assumptions when an answer is not required to make safe progress.

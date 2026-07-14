@@ -9,6 +9,16 @@ atomic writes, small tool catalog, or standard-library-only runtime.
 This roadmap is an implementation plan. Unchecked boxes describe work that has
 not yet been implemented.
 
+## Phase delivery contract
+
+Each phase must leave the server in a working, releasable state and deliver a
+complete feature or cohesive feature set. A phase may depend on completed
+earlier phases, but its implementation, security and failure-path tests,
+end-to-end MCP checks, and affected documentation and examples are all part of
+that phase. Testing and documentation must not be deferred to a separate final
+phase. A phase is complete only after the full existing test suite remains
+green and its completion gate is satisfied.
+
 ## Compatibility and scope decisions
 
 - Preserve the current `server.py <root>` and `rooted-files-mcp <root>` launch
@@ -130,6 +140,13 @@ Configuration behavior:
 - [x] Extend server tests to verify disabled tools are both omitted and rejected.
 - [x] Verify the legacy positional-root launch path behaves as it does today.
 
+### Documentation
+
+- [x] Document the INI schema, workspace and root discovery, precedence, CLI
+  overrides, startup behavior, and portable launch examples in `README.md`.
+- [x] Record the completed scope, tests, verified platform, and remaining
+  native-platform validation limits in this roadmap.
+
 ### Completion gate
 
 Completed on macOS on 2026-07-14. The full 30-test suite includes end-to-end
@@ -241,6 +258,14 @@ through a symlink. The error must not identify which component triggered it.
 - [x] Confirm `.mcp/rooted-files-mcp.ini` cannot be listed, read, or overwritten
   through MCP even when hidden visibility is enabled.
 
+### Documentation
+
+- [x] Document protected names, hidden detection, allowlist behavior, direct
+  access denial, platform-specific behavior, and security limits in
+  `README.md`.
+- [x] Record the completed scope, tests, verified platform, and remaining
+  native-platform validation limits in this roadmap.
+
 ### Completion gate
 
 Completed on macOS on 2026-07-14. The 45-test suite covers POSIX behavior,
@@ -336,6 +361,25 @@ write_lines(path, start_line, end_line, content)
 - [ ] Extend MCP tests for schemas, successful calls, missing arguments, disabled
   line access, and tool-result errors.
 
+### Documentation and release verification
+
+- [ ] Update `README.md` with the line tools, one-based inclusive indexing, Git
+  hunk mapping, newline behavior, permissions, limits, and examples.
+- [ ] Update the README tool table and context-cost estimate after measuring the
+  final compact `tools/list` response.
+- [ ] Review the existing macOS/Linux shell and Windows PowerShell setup
+  examples for the completed feature set and keep all paths portable.
+- [ ] Document safe offline preparation and confirm that the phase adds no
+  runtime dependency or download.
+- [ ] Update the root README if the project summary or launch behavior changes,
+  and update this roadmap and `AGENTS.md` when their documented guidance or
+  known issues are affected.
+- [ ] Run the complete offline test suite and record the verified platform.
+- [ ] Exercise JSON-RPC `initialize`, `tools/list`, successful `tools/call`, and
+  denied `tools/call` through the stdio launcher.
+- [ ] Record native Windows and Linux results when those environments are
+  tested; do not broaden verification claims from simulated branch coverage.
+
 ### Completion gate
 
 - Range operations have identical security and text classification behavior to
@@ -344,27 +388,9 @@ write_lines(path, start_line, end_line, content)
   strategy.
 - Tool results remain bounded and schemas remain concise enough for small local
   models.
-
-## Phase 4 — Documentation and release verification
-
-- [ ] Update `rooted-files-mcp/README.md` with the INI schema, discovery and
-  precedence rules, CLI examples, hidden-path semantics, permissions, line
-  indexing, newline behavior, and configuration-only startup.
-- [ ] Add macOS/Linux shell and Windows PowerShell examples using only portable
-  path rules and the standard library.
-- [ ] Update the README tool table and context-cost estimate after measuring the
-  final compact `tools/list` response.
-- [ ] Document safe offline preparation and confirm there are no new runtime
-  dependencies or downloads.
-- [ ] Update the root README if launch behavior or the project summary changes.
-- [ ] Update `AGENTS.md` only if implementation changes repository-wide guidance,
-  supported behavior, constraints, or known issues.
-- [ ] Run `python3 -m unittest discover -s tests -v` from
-  `rooted-files-mcp/` and record the verified platform.
-- [ ] Exercise JSON-RPC `initialize`, `tools/list`, successful `tools/call`, and
-  denied `tools/call` through the stdio launcher.
-- [ ] Perform native Windows and Linux validation when those environments are
-  available; do not claim them as verified based only on branch coverage.
+- The complete offline suite and stdio MCP smoke checks pass, affected
+  documentation matches the shipped behavior, and the recorded platform claims
+  match the validation actually performed.
 
 ## Planned file changes
 

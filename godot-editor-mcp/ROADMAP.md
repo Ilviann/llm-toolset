@@ -9,6 +9,7 @@
   - [x] Split bridge transport, routing, state, and feature services.
   - [x] Add project-scoped port discovery and heartbeat records.
   - [x] Preserve existing tool names, modes, and public Python imports.
+  - [x] Pass the phase completion gate and update affected documentation.
 - [ ] Phase 2 — Diagnostics, editor state, imports, and bounded waiting
   - [ ] Add bounded editor and runtime diagnostic stores.
   - [ ] Add `get_diagnostics` with scope, severity, cursor, limit, and run filters.
@@ -16,33 +17,56 @@
   - [ ] Add import progress, per-resource state, and import/load errors.
   - [ ] Detect external `project.godot` changes that require reload.
   - [ ] Add `wait` and `timeout_ms` to asynchronous tools.
+  - [ ] Pass the phase completion gate and update affected documentation.
 - [ ] Phase 3 — Safe project reload and reconnection
   - [ ] Add `reload_project` with active-run and dirty-scene safeguards.
   - [ ] Persist reload operation state across the editor restart.
   - [ ] Reconnect only to the same authenticated project bridge.
   - [ ] Report structured completion, timeout, and mismatch results.
+  - [ ] Pass the phase completion gate and update affected documentation.
 - [ ] Phase 4 — Read-only runtime inspection
   - [ ] Add the bounded debug-runtime probe and debugger handshake.
   - [ ] Extend `scene_tree` and `node_info` with `tree_scope`.
   - [ ] Add run-scoped runtime node identifiers and stale-ID rejection.
   - [ ] Detect and reject ambiguous multiple debug sessions initially.
+  - [ ] Pass the phase completion gate and update affected documentation.
 - [ ] Phase 5 — Gameplay validation
   - [ ] Add bounded game-view PNG capture and safe artifact staging.
   - [ ] Add bounded action and physical-key input injection.
   - [ ] Guarantee automatic release of injected input.
   - [ ] Add declarative runtime watches and assertions.
+  - [ ] Pass the phase completion gate and update affected documentation.
 - [ ] Phase 6 — Scene authoring transaction engine
   - [ ] Centralize bounded Variant conversion and compatibility checks.
   - [ ] Add structural scene-edit operations with ownership validation.
   - [ ] Add atomic, prevalidated UndoRedo transactions.
   - [ ] Add enum, bit-flag, resource, typed-container, and NodePath support.
   - [ ] Expand `create_scene` through the transaction engine.
+  - [ ] Pass the phase completion gate and update affected documentation.
 - [ ] Phase 7 — Project helpers, pagination, and final protocol coverage
   - [ ] Add autoload listing and mutation helpers.
   - [ ] Add enabled-editor-plugin discovery.
   - [ ] Add stable opaque cursors and filters.
   - [ ] Complete capability flags and effective-limit reporting.
   - [ ] Complete macOS validation and record native Linux/Windows results.
+  - [ ] Pass the phase completion gate and update affected documentation.
+
+## Phase delivery contract
+
+Each phase is a complete, releasable increment, not only a collection of code
+changes. A phase may use foundations delivered by preceding phases, but it is
+complete only when all of its scoped workflows work end to end, its failure and
+security boundaries are covered, the full existing suite and relevant focused
+integration checks pass, and every affected user or maintainer document is
+updated. Documentation includes the README, examples, limits, platform notes,
+TODO and history records, and this roadmap as applicable.
+
+The completion gates below are phase-specific additions to this shared
+contract. Testing, documentation, examples, and release verification must be
+completed in the same phase as the feature; they must not be postponed to a
+separate final phase. Experimental internals may be introduced for a later
+phase only when they do not break, partially expose, or misdocument the working
+feature set delivered by the current phase.
 
 ## Direction
 
@@ -183,7 +207,7 @@ Refactor without intentionally changing existing tool behavior.
 - Never automatically connect to a record whose project hash does not match the
   configured project.
 
-### Verification gate
+### Completion gate
 
 - All current Python tests remain green.
 - Old string-error bridge responses remain temporarily readable during an
@@ -269,7 +293,7 @@ survived a configurable startup health window. Diagnostics should be considered
 settled after the relevant generation or operation has completed and no newer
 record has appeared during a short bounded quiet period.
 
-### Verification gate
+### Completion gate
 
 - Parser errors, runtime errors, warnings, scene-load errors, and historical
   cursor separation are tested.
@@ -295,7 +319,7 @@ record has appeared during a short bounded quiet period.
 - During a waited reload, tolerate temporary connection refusal, then
   reauthenticate and verify the project hash, bridge version, and operation ID.
 
-### Verification gate
+### Completion gate
 
 - Reload completes after the expected disconnect and reconnect.
 - Active-run and dirty-scene safeguards work.
@@ -325,7 +349,7 @@ record has appeared during a short bounded quiet period.
   active, return an explicit unsupported or ambiguous-session error instead of
   choosing one silently.
 
-### Verification gate
+### Completion gate
 
 - Edited and runtime results cannot be confused.
 - Runtime paths and properties are bounded and encoded predictably.
@@ -380,7 +404,7 @@ Do not support scripts, expressions, method calls, regexes with uncontrolled
 cost, or arbitrary property traversal. Bound condition depth, clauses, watched
 signals, result size, and timeout.
 
-### Verification gate
+### Completion gate
 
 - Captures exclude editor chrome and cannot escape the staging directory.
 - Input is released after success, timeout, client termination, and run stop.
@@ -453,7 +477,7 @@ Implement root script, root groups, initial properties, and initial child trees
 by translating them into the same validated transaction representation used for
 normal scene edits. Do not maintain a second scene-construction engine.
 
-### Verification gate
+### Completion gate
 
 - Every mutation is tested through do, undo, redo, save, close, and reopen.
 - Ownership is verified for normal, instantiated, inherited, and editable-child
@@ -496,7 +520,7 @@ duplicating results.
 Add property-name and category filters to `node_info`. Preserve Godot's property
 category markers while scanning metadata so filtering remains predictable.
 
-### Verification gate
+### Completion gate
 
 - Pagination produces no duplicates or omissions for an unchanged snapshot.
 - Tree, property, filesystem, and run changes invalidate the correct cursors.
@@ -606,7 +630,8 @@ unit tests alone.
 
 ## Documentation and release requirements
 
-Each completed phase must update:
+These requirements are part of every phase's completion gate. Each completed
+phase must update:
 
 - `README.md` tool tables, setup, examples, limits, and platform notes.
 - `TODO.md` to remove or revise delivered requirements.
