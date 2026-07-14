@@ -25,7 +25,8 @@ All paths are relative to the root argument. Absolute paths, `..` escapes, and
 symlinks resolving outside root are denied. Known binary/media extensions,
 binary signatures, NUL bytes, invalid UTF-8, and files over 5 MiB are denied.
 Tools disabled by the effective permissions are omitted from `tools/list` and
-direct calls to them are rejected.
+direct calls to them are rejected. Hidden-path settings are enforced for every
+tool, not only directory output.
 
 The default `tools/list` result, including all four descriptions and input
 schemas, is about 840 characters of compact JSON, or roughly 200–300 tokens for
@@ -109,6 +110,9 @@ write = true
 
 [features]
 show_hidden = false
+hidden_allowlist =
+    .editorconfig
+    .github
 line_access = true
 ```
 
@@ -131,10 +135,30 @@ line overrides are paired so either value can override the INI:
 --line-access / --no-line-access
 ```
 
-Phase 1 enforces the read and write permissions. It loads and validates the
-hidden-visibility and line-access flags so their precedence is stable, but
-hidden-path filtering and the `read_lines`/`write_lines` tools are scheduled for
-Phases 2 and 3 and are not active yet.
+When `show_hidden = false`, every dot-prefixed path component is hidden on all
+platforms. On Windows, the native Hidden attribute also hides files, folders,
+and symbolic-link or reparse-point entries. Hidden entries are removed from
+`list_dir` and `tree`, do not consume the 100-entry tree limit, and cannot be
+read or written directly. The same checks apply to every requested component
+and its resolved in-root symbolic-link target.
+
+The built-in hidden allowlist contains `.gitignore` and `.env.template`.
+`hidden_allowlist` adds exact, single-component names; it does not replace the
+built-ins. Put one name on each indented continuation line. An allowlisted name
+may identify a file or folder, but each nested component is checked separately.
+Names are limited to 255 characters and 64 configured entries. Empty values,
+duplicates, `.`, `..`, path separators, NUL bytes, and protected-name
+collisions are rejected at startup.
+
+The root-relative component `.mcp` is always protected, including when
+`show_hidden = true`, and can never be allowlisted. This prevents the model from
+listing, reading, or changing `.mcp/rooted-files-mcp.ini` after the server loads
+it. Direct hidden or protected access returns the stable error `Hidden path
+access is denied` without identifying which component caused the denial.
+
+Line-access configuration is loaded and validated so its precedence is stable,
+but the `read_lines` and `write_lines` tools are scheduled for Phase 3 and are
+not active yet.
 
 The configuration must be a regular UTF-8 file no larger than 64 KiB. NUL
 bytes, malformed or duplicate INI entries, invalid booleans, unknown sections

@@ -7,7 +7,10 @@ from dataclasses import FrozenInstanceError
 from pathlib import Path
 
 from rooted_files_mcp.configuration import (
+    BUILTIN_HIDDEN_ALLOWLIST,
     MAX_CONFIG_BYTES,
+    MAX_HIDDEN_ALLOWLIST_ENTRIES,
+    MAX_HIDDEN_NAME_LENGTH,
     ConfigurationError,
     load_settings,
 )
@@ -94,6 +97,46 @@ class ConfigurationTests(unittest.TestCase):
         settings = load_settings(root=self.workspace)
         with self.assertRaises(FrozenInstanceError):
             settings.read = False  # type: ignore[misc]
+        with self.assertRaises(AttributeError):
+            settings.hidden_allowlist.add(".other")  # type: ignore[attr-defined]
+
+    def test_hidden_allowlist_is_additive_and_trimmed(self) -> None:
+        self.write_config(
+            "[paths]\nroot = .\n"
+            "[features]\nshow_hidden = false\nhidden_allowlist =\n"
+            "    .editorconfig\n"
+            "    .github  \n"
+        )
+        settings = load_settings(workspace=self.workspace)
+        self.assertEqual(
+            settings.hidden_allowlist,
+            BUILTIN_HIDDEN_ALLOWLIST | {".editorconfig", ".github"},
+        )
+
+    def test_invalid_hidden_allowlist_names_are_rejected(self) -> None:
+        cases = {
+            "empty": "",
+            "dot": ".",
+            "dot dot": "..",
+            "forward separator": ".hidden/name",
+            "back separator": ".hidden\\name",
+            "duplicate": ".extra\n    .extra",
+            "built-in duplicate": ".gitignore",
+            "protected": ".mcp",
+            "protected case alias": ".MCP",
+            "too long": "x" * (MAX_HIDDEN_NAME_LENGTH + 1),
+            "too many": "\n    ".join(
+                f".hidden-{index}" for index in range(MAX_HIDDEN_ALLOWLIST_ENTRIES + 1)
+            ),
+        }
+        for label, value in cases.items():
+            with self.subTest(label=label):
+                self.write_config(
+                    "[paths]\nroot = .\n[features]\nhidden_allowlist = "
+                    f"{value}\n"
+                )
+                with self.assertRaisesRegex(ConfigurationError, "Hidden allowlist"):
+                    load_settings(workspace=self.workspace)
 
     def test_configuration_only_startup_requires_root(self) -> None:
         self.write_config("[permissions]\nread = true\n")

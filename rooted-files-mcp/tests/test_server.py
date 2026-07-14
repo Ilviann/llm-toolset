@@ -168,6 +168,43 @@ class StdioStartupTests(unittest.TestCase):
         self.assertTrue(responses[1]["result"]["isError"])
         self.assertFalse((exposed / "new.txt").exists())
 
+    def test_mcp_configuration_is_never_exposed_by_file_tools(self) -> None:
+        workspace = self.base / "protected workspace"
+        config_dir = workspace / ".mcp"
+        config_dir.mkdir(parents=True)
+        (workspace / "hello.txt").write_text("hello", encoding="utf-8")
+        config_path = config_dir / "rooted-files-mcp.ini"
+        original = "[paths]\nroot = .\n[features]\nshow_hidden = true\n"
+        config_path.write_text(original, encoding="utf-8")
+
+        stdin = self.message("tools/call", {
+            "name": "list_dir", "arguments": {"path": "."}
+        })
+        stdin += self.message("tools/call", {
+            "name": "read_text",
+            "arguments": {"path": ".mcp/rooted-files-mcp.ini"},
+        }, request_id=2)
+        stdin += self.message("tools/call", {
+            "name": "write_text",
+            "arguments": {
+                "path": ".mcp/rooted-files-mcp.ini",
+                "content": "changed",
+            },
+        }, request_id=3)
+        result = self.launch("--workspace", str(workspace), stdin=stdin)
+
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(result.stderr, "")
+        responses = [json.loads(line) for line in result.stdout.splitlines()]
+        self.assertEqual(responses[0]["result"]["content"][0]["text"], "hello.txt")
+        for response in responses[1:]:
+            self.assertTrue(response["result"]["isError"])
+            self.assertEqual(
+                response["result"]["content"][0]["text"],
+                "Hidden path access is denied",
+            )
+        self.assertEqual(config_path.read_text(encoding="utf-8"), original)
+
     def test_startup_error_writes_only_to_stderr(self) -> None:
         workspace = self.base / "bad workspace"
         config_dir = workspace / ".mcp"

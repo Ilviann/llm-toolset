@@ -179,69 +179,75 @@ through a symlink. The error must not identify which component triggered it.
 
 ### Implementation
 
-- [ ] Add one centralized hidden-path policy used by resolution, listing,
+- [x] Add one centralized hidden-path policy used by resolution, listing,
   traversal, reads, and writes. Keep protected names, built-in allowed names,
   configured allowed names, hidden detection, and matching in this one policy.
-- [ ] Extend strict INI parsing for `features.hidden_allowlist`. Parse one
+- [x] Extend strict INI parsing for `features.hidden_allowlist`. Parse one
   component per continuation line, validate and bound the set, merge it with
   the built-in allowlist, and reject protected-name collisions at startup.
-- [ ] On Windows, detect `stat.FILE_ATTRIBUTE_HIDDEN` through standard-library
+- [x] On Windows, detect `stat.FILE_ATTRIBUTE_HIDDEN` through standard-library
   stat data for each existing lexical component and resolved target component.
   Isolate the platform-specific branch so POSIX does no extra attribute work
   and Windows behavior can be unit-tested without a Windows runtime.
-- [ ] When hidden access is disabled, reject a path if either the requested
+- [x] When hidden access is disabled, reject a path if either the requested
   normalized path or its resolved in-root target contains a denied hidden
   component. Check protected components regardless of `show_hidden`. This
   prevents a visible symlink from becoming an alias to hidden or protected
   content, and prevents a denied hidden symlink from aliasing visible content.
-- [ ] Filter denied entries from `list_dir` before sorting and formatting, while
+- [x] Filter denied entries from `list_dir` before sorting and formatting, while
   retaining allowlisted hidden entries.
-- [ ] Prune denied entries and folders from `tree` before counting against the
+- [x] Prune denied entries and folders from `tree` before counting against the
   100-entry limit. Descend into allowlisted hidden folders, evaluate all of
   their children normally, and do not reveal that filtered entries exist.
-- [ ] Apply name-based checks to non-existent write targets and attribute checks
+- [x] Apply name-based checks to non-existent write targets and attribute checks
   to every existing parent before creating temporary files. Recheck the target
   and parent chain immediately before replacement so a symlink, rename, or
   Windows attribute change cannot skip the policy.
-- [ ] Keep the configuration load separate from model-facing access. The server
+- [x] Keep the configuration load separate from model-facing access. The server
   may read its INI once at startup, while later MCP calls through a root-relative
   `.mcp` component are always denied.
-- [ ] Use the stable, non-revealing `Hidden path access is denied` error for all
+- [x] Use the stable, non-revealing `Hidden path access is denied` error for all
   direct, protected, attribute-based, and symlink-mediated policy failures.
 
 ### Tests
 
-- [ ] Cover the built-in `.gitignore` and `.env.template` allowances; denial of
+- [x] Cover the built-in `.gitignore` and `.env.template` allowances; denial of
   `.git`, `.env`, and `.env.template.local`; configured additions; and the
   additive rather than replacement merge behavior.
-- [ ] Cover allowlisted names used as both files and folders, nested allowlisted
+- [x] Cover allowlisted names used as both files and folders, nested allowlisted
   folders, a denied hidden component below an allowed folder, dot-prefixed
   write targets, and ordinary names containing dots.
-- [ ] Cover invalid allowlist configuration: empty entries where applicable,
+- [x] Cover invalid allowlist configuration: empty entries where applicable,
   `.`, `..`, both separator styles, NUL, duplicates, excessive entries or name
   length, and protected `.mcp` collisions.
-- [ ] Confirm `.mcp` is omitted and denied as a file, folder, nested component,
+- [x] Confirm `.mcp` is omitted and denied as a file, folder, nested component,
   direct target, and write target with both values of `show_hidden`, including
   when an allowlist entry attempts to differ only by case.
-- [ ] Cover `list_dir` and `tree`, including pruning, sorting, empty output, and
+- [x] Cover `list_dir` and `tree`, including pruning, sorting, empty output, and
   tree-limit accounting. Confirm allowlisted entries count normally and denied
   entries do not consume the limit.
-- [ ] Cover visible symlinks to denied and allowlisted hidden in-root targets;
+- [x] Cover visible symlinks to denied and allowlisted hidden in-root targets;
   denied and allowlisted hidden symlinks to visible targets; and symlinks into
   `.mcp` where symbolic links are available.
-- [ ] On Windows, cover attribute-hidden files, folders, and reparse-point
+- [x] On Windows, cover attribute-hidden files, folders, and reparse-point
   entries with and without dot-prefixed names; allowlisted attribute-hidden
   names; inherited traversal through attribute-hidden folders; and an attribute
   change before atomic replacement. On non-Windows hosts, unit-test attribute
   classification with injected or mocked stat metadata.
-- [ ] Cover casing of protected and allowed names on case-sensitive and
+- [x] Cover casing of protected and allowed names on case-sensitive and
   case-insensitive filesystems without weakening root confinement.
-- [ ] Confirm traversal and out-of-root symlink failures remain denied whether
+- [x] Confirm traversal and out-of-root symlink failures remain denied whether
   hidden visibility is enabled or disabled.
-- [ ] Confirm `.mcp/rooted-files-mcp.ini` cannot be listed, read, or overwritten
+- [x] Confirm `.mcp/rooted-files-mcp.ini` cannot be listed, read, or overwritten
   through MCP even when hidden visibility is enabled.
 
 ### Completion gate
+
+Completed on macOS on 2026-07-14. The 45-test suite covers POSIX behavior,
+simulated Windows Hidden-attribute metadata and attribute changes, native
+case-sensitivity policy branches, symlink aliases, tree-limit accounting, and
+end-to-end stdio protection of the workspace configuration. Native Linux and
+Windows validation remains pending.
 
 - Every filesystem operation enforces the same hidden policy.
 - Protected-name precedence, allowlist exceptions, and Windows Hidden

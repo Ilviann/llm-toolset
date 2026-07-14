@@ -5,17 +5,23 @@ from __future__ import annotations
 import configparser
 import os
 import stat
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
 
 CONFIG_PATH = Path(".mcp") / "rooted-files-mcp.ini"
 MAX_CONFIG_BYTES = 64 * 1024
+MAX_HIDDEN_ALLOWLIST_ENTRIES = 64
+MAX_HIDDEN_NAME_LENGTH = 255
+
+BUILTIN_HIDDEN_ALLOWLIST = frozenset({".gitignore", ".env.template"})
+PROTECTED_NAMES = frozenset({".mcp"})
 
 _ALLOWED_SETTINGS = {
     "paths": {"root"},
     "permissions": {"read", "write"},
-    "features": {"show_hidden", "line_access"},
+    "features": {"show_hidden", "hidden_allowlist", "line_access"},
 }
 
 
@@ -32,14 +38,20 @@ class Settings:
     read: bool = True
     write: bool = True
     show_hidden: bool = True
+    hidden_allowlist: frozenset[str] = BUILTIN_HIDDEN_ALLOWLIST
     line_access: bool = True
+    case_sensitive: bool = True
 
     @classmethod
     def for_root(cls, root: str | os.PathLike[str]) -> "Settings":
         """Create backward-compatible defaults for a trusted explicit root."""
 
         resolved = _resolve_folder(root, "Root")
-        return cls(workspace=resolved, root=resolved)
+        return cls(
+            workspace=resolved,
+            root=resolved,
+            case_sensitive=_filesystem_is_case_sensitive(resolved),
+        )
 
 
 @dataclass(frozen=True)
@@ -50,7 +62,29 @@ class IniSettings:
     read: bool | None = None
     write: bool | None = None
     show_hidden: bool | None = None
+    hidden_allowlist: tuple[str, ...] | None = None
     line_access: bool | None = None
+
+
+def _filesystem_is_case_sensitive(path: Path) -> bool:
+    """Detect native name matching without writing a probe file."""
+
+    if os.name == "nt":
+        return False
+    for candidate in (path, *path.parents):
+        name = candidate.name
+        alternate = "".join(
+            char.swapcase() if char.isalpha() else char for char in name
+        )
+        if not name or alternate == name:
+            continue
+        try:
+            if alternate and candidate.with_name(alternate).exists():
+                return not os.path.samefile(candidate, candidate.with_name(alternate))
+            return True
+        except OSError:
+            continue
+    return sys.platform != "darwin"
 
 
 def _resolve_folder(path: str | os.PathLike[str], label: str) -> Path:
@@ -123,6 +157,48 @@ def _optional_boolean(
         raise ConfigurationError(f"Invalid boolean: [{section}] {key}") from None
 
 
+def _hidden_allowlist(parser: configparser.ConfigParser) -> tuple[str, ...] | None:
+    if not parser.has_option("features", "hidden_allowlist"):
+        return None
+    raw_value = parser.get("features", "hidden_allowlist", raw=True)
+    names = tuple(line.strip() for line in raw_value.splitlines() if line.strip())
+    if not names:
+        raise ConfigurationError("Hidden allowlist must contain at least one name")
+    if len(names) > MAX_HIDDEN_ALLOWLIST_ENTRIES:
+        raise ConfigurationError(
+            f"Hidden allowlist exceeds {MAX_HIDDEN_ALLOWLIST_ENTRIES} entries"
+        )
+
+    seen: set[str] = set()
+    for name in names:
+        if len(name) > MAX_HIDDEN_NAME_LENGTH:
+            raise ConfigurationError(
+                f"Hidden allowlist name exceeds {MAX_HIDDEN_NAME_LENGTH} characters"
+            )
+        if name in {".", ".."} or "/" in name or "\\" in name or "\x00" in name:
+            raise ConfigurationError("Hidden allowlist contains an invalid name")
+        if name.casefold() in {protected.casefold() for protected in PROTECTED_NAMES}:
+            raise ConfigurationError("Hidden allowlist contains a protected name")
+        if name in seen:
+            raise ConfigurationError("Hidden allowlist contains a duplicate name")
+        seen.add(name)
+    return names
+
+
+def _effective_hidden_allowlist(
+    configured: tuple[str, ...] | None, *, case_sensitive: bool
+) -> frozenset[str]:
+    additions = configured or ()
+    comparison = (lambda value: value) if case_sensitive else str.casefold
+    seen = {comparison(name) for name in BUILTIN_HIDDEN_ALLOWLIST}
+    for name in additions:
+        key = comparison(name)
+        if key in seen:
+            raise ConfigurationError("Hidden allowlist contains a duplicate name")
+        seen.add(key)
+    return frozenset((*BUILTIN_HIDDEN_ALLOWLIST, *additions))
+
+
 def load_ini(workspace: Path) -> IniSettings | None:
     """Load and validate the fixed workspace configuration, if it exists."""
 
@@ -161,6 +237,7 @@ def load_ini(workspace: Path) -> IniSettings | None:
         read=_optional_boolean(parser, "permissions", "read"),
         write=_optional_boolean(parser, "permissions", "write"),
         show_hidden=_optional_boolean(parser, "features", "show_hidden"),
+        hidden_allowlist=_hidden_allowlist(parser),
         line_access=_optional_boolean(parser, "features", "line_access"),
     )
 
@@ -205,11 +282,16 @@ def load_settings(
         raise ConfigurationError("Configuration must define [paths] root")
 
     ini = ini or IniSettings()
+    case_sensitive = _filesystem_is_case_sensitive(resolved_root)
     return Settings(
         workspace=resolved_workspace,
         root=resolved_root,
         read=_merge(read, ini.read, True),
         write=_merge(write, ini.write, True),
         show_hidden=_merge(show_hidden, ini.show_hidden, True),
+        hidden_allowlist=_effective_hidden_allowlist(
+            ini.hidden_allowlist, case_sensitive=case_sensitive
+        ),
         line_access=_merge(line_access, ini.line_access, True),
+        case_sensitive=case_sensitive,
     )
