@@ -1,3 +1,5 @@
+> **Note:** All code and documentation in this repository were created with huge help from ChatGPT.
+
 # LLM Toolset
 
 A collection of lightweight, offline-first tools for local LLM workflows on
