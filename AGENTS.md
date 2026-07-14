@@ -40,9 +40,7 @@ After implementing each roadmap phase, increase the application's version when t
 
 When every roadmap phase has been implemented and the user asks to clean up the roadmap, keep the application's `ROADMAP.md` file instead of deleting it. Replace the completed implementation plan with a concise statement that there are currently no feature requests.
 
-After completing implementation work, update every affected document, README, configuration example, and roadmap before handing off the change. Update this `AGENTS.md` file too whenever the work changes repository-wide guidance, supported behavior, constraints, or known issues.
-
-When clarification is useful, ask questions one at a time and state the approximate number of additional questions expected after each one. Continue with reasonable assumptions when an answer is not required to make safe progress.
+After completing implementation work, update every affected document, README, configuration example, and roadmap before handing off the change.
 
 ## Godot Editor MCP Known Issues
 
