@@ -3,6 +3,21 @@
 This file records released changes. Planned work is tracked separately in
 [`ROADMAP.md`](ROADMAP.md).
 
+## 0.6.0 — 2026-07-15
+
+- Added a mutex-protected, 256-record diagnostic logger with stable event
+  cursors, bounded fields and stacks, scope/severity/run filters, and the
+  all-mode `get_diagnostics` tool.
+- Expanded editor state with scene dirty tracking, filesystem phase/progress,
+  per-resource import completion and errors, run diagnostic counts,
+  `project.godot` hash state, reload requirements, and active operations.
+- Added Python-side bounded waiting to scene open, scan/import, and run/stop
+  actions, including monotonic deadlines, diagnostic quiet periods, and a
+  configurable run startup health window.
+- Added import lifecycle and timeout tests, raised the offline suite to 44
+  tests, and verified plugin loading and the Phase 2 bridge surface in Godot
+  4.7 stable on macOS.
+
 ## 0.5.0 — 2026-07-14
 
 - Added bounded structured bridge errors, stable domain codes, and typed Python

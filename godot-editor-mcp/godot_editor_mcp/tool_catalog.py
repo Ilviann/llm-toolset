@@ -18,6 +18,12 @@ PATH_PROPERTY = {
     "path": {"type": "string", "description": "Scene-relative node path; . is root"}
 }
 RESOURCE_PATH = {"type": "string", "description": "Project-relative path without res://"}
+WAIT_PROPERTIES = {
+    "wait": {"type": "boolean", "default": False},
+    "timeout_ms": {
+        "type": "integer", "minimum": 1, "maximum": 120000, "default": 10000,
+    },
+}
 
 Mode = Literal["tiny", "small", "large"]
 MODES: tuple[Mode, ...] = ("tiny", "small", "large")
@@ -32,6 +38,27 @@ TOOLS = [
         "name": "editor_state",
         "description": "Get Godot version, current scene, selection, and play state.",
         "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
+    },
+    {
+        "name": "get_diagnostics",
+        "description": "Read bounded editor, parser, and runtime diagnostics.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "scope": {
+                    "type": "string", "enum": ["all", "parser", "runtime", "editor"],
+                    "default": "all",
+                },
+                "severity": {
+                    "type": "string", "enum": ["error", "warning", "all"],
+                    "default": "all",
+                },
+                "since": {"type": "integer", "minimum": 0, "default": 0},
+                "limit": {"type": "integer", "minimum": 1, "maximum": 100, "default": 50},
+                "run_id": {"type": "integer", "minimum": 1},
+            },
+            "additionalProperties": False,
+        },
     },
     {
         "name": "list_assets",
@@ -65,7 +92,7 @@ TOOLS = [
         "name": "scan_asset",
         "description": "Queue a Godot filesystem scan for one project asset.",
         "inputSchema": {
-            "type": "object", "properties": {"path": RESOURCE_PATH},
+            "type": "object", "properties": {"path": RESOURCE_PATH, **WAIT_PROPERTIES},
             "required": ["path"], "additionalProperties": False,
         },
     },
@@ -77,6 +104,7 @@ TOOLS = [
             "properties": {
                 "source": {"type": "string", "description": "Path relative to configured import root"},
                 "destination": RESOURCE_PATH,
+                **WAIT_PROPERTIES,
             },
             "required": ["source", "destination"], "additionalProperties": False,
         },
@@ -126,7 +154,7 @@ TOOLS = [
         "name": "open_scene",
         "description": "Open a project scene in the Godot editor.",
         "inputSchema": {
-            "type": "object", "properties": {"path": RESOURCE_PATH},
+            "type": "object", "properties": {"path": RESOURCE_PATH, **WAIT_PROPERTIES},
             "required": ["path"], "additionalProperties": False,
         },
     },
@@ -202,6 +230,11 @@ TOOLS = [
                     "type": "integer",
                     "minimum": 1,
                     "description": "Required for stop; use the ID returned by run.",
+                },
+                **WAIT_PROPERTIES,
+                "startup_window_ms": {
+                    "type": "integer", "minimum": 0, "maximum": 5000, "default": 250,
+                    "description": "Run health window; used only when action is run.",
                 },
             },
             "required": ["action"], "additionalProperties": False,
@@ -298,7 +331,7 @@ TOOL_BY_NAME = {tool["name"]: tool for tool in TOOLS}
 
 # Modes are strict supersets so clients can increase context without losing tools.
 TINY_TOOLS = (
-    "capabilities", "editor_state", "create_scene", "open_scene", "scene_tree",
+    "capabilities", "editor_state", "get_diagnostics", "create_scene", "open_scene", "scene_tree",
     "add_node", "instantiate_scene", "node_info", "set_property", "scene_control",
 )
 SMALL_TOOLS = TINY_TOOLS + (

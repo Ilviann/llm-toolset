@@ -3,7 +3,7 @@
 ## Phase checklist
 
 - [x] Phase 1 — Establish protocol, lifecycle, and discovery foundations.
-- [ ] Phase 2 — Add diagnostics, import state, and bounded waits.
+- [x] Phase 2 — Add diagnostics, import state, and bounded waits.
 - [ ] Phase 3 — Reload and reconnect without losing project identity.
 - [ ] Phase 4 — Inspect the running scene safely.
 - [ ] Phase 5 — Capture, drive, and validate gameplay.
@@ -54,7 +54,7 @@ The project already has a strong compact foundation:
   validation, and limit responsibilities.
 - Root confinement, traversal and symlink denial, request limits, tool modes,
   authentication, and basic UndoRedo integration are implemented.
-- The current Python suite contains 37 passing tests.
+- The current Python suite contains 44 passing tests.
 - The plugin is verified against Godot 4.7 stable on macOS.
 
 The main limitations affecting the roadmap are:
@@ -176,6 +176,11 @@ Refactor without intentionally changing existing tool behavior.
 - Discovery tests cover live, stale, malformed, and other-project records.
 
 ## Phase 2 — Diagnostics, editor state, imports, and bounded waiting
+
+Completed in version 0.6.0. Godot 4.7 provides complete GDScript, scene-load,
+editor, and engine/runtime logger coverage through the bounded store. Complete
+C# compiler diagnostic capture remains build-dependent and is reported as an
+unsupported language-specific capability.
 
 ### Diagnostics
 

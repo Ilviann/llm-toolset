@@ -128,6 +128,9 @@ func _project_settings_patch(arguments: Dictionary) -> Dictionary:
 					_restore_settings(prepared)
 					ProjectSettings.save()
 					return _failure("Could not save project settings (Godot error %d); transaction rolled back" % error)
+		if save and _state_monitor != null:
+			var requirements := _combined_reload_requirements(prepared)
+			_state_monitor.mark_project_settings_saved(requirements.project_reload or requirements.editor_restart)
 	return _success({
 		"diff": diffs,
 		"dry_run": dry_run,
@@ -292,5 +295,4 @@ func _encode_setting_value(value: Variant, depth := 0) -> Variant:
 			return output
 		_:
 			return "<unsupported:%s>" % type_string(typeof(value))
-
 

@@ -35,6 +35,8 @@ to one boundary do not require editing the entire server:
 - `cli.py` parses arguments and composes the bridge, asset manager, launcher,
   and MCP server.
 - `errors.py` defines bounded error envelopes and stable typed exceptions.
+- `waiting.py` owns monotonic deadlines, concise state polling, diagnostic
+  quiet periods, and run startup health windows.
 - `discovery.py` validates project-scoped bridge heartbeat records and selects a
   live matching port when `--port` is omitted.
 - `assets.py`, `bridge.py`, and `launcher.py` remain focused adapters for their
@@ -54,7 +56,8 @@ The dependency-free editor plugin is split by responsibility under
 - `bridge_server.gd` and `command_router.gd` own authenticated localhost
   transport and command dispatch.
 - `editor_state_monitor.gd`, `event_store.gd`, and `operation_registry.gd` own
-  observed editor state, monotonic event IDs, and asynchronous operation IDs.
+  observed editor/import state, monotonic event IDs, and asynchronous operation IDs.
+- `diagnostic_store.gd` is a thread-safe bounded Godot logger and read API.
 - `discovery_record.gd` atomically publishes the project-scoped bridge heartbeat.
 - `error_envelope.gd` centralizes bounded bridge success and failure envelopes.
 - `asset_commands.gd` handles asset discovery, resource creation, and scene
@@ -79,17 +82,17 @@ default is `tiny`. Modes are nested: every tool in a smaller mode is also
 available in the larger modes. Calls to tools outside the active mode are
 rejected even if a client retained an older `tools/list` response.
 
-- **`tiny` (default):** 10 focused tools for supervised GDScript-adjacent scene
+- **`tiny` (default):** 11 focused tools for supervised GDScript-adjacent scene
   work, including compact scene inspection, UI/node construction, property
   edits, and save/run controls. It is intended for models with context windows
   below 8k. Pair it with a confined text-file MCP when GDScript itself must be
   edited; this server never exposes arbitrary file writes.
-- **`small`:** 19 tools for autonomous local agents around 16k context. It adds
+- **`small`:** 20 tools for autonomous local agents around 16k context. It adds
   bounded asset discovery, import scanning, staged imports, folders, and
   whitelisted resource creation, plus atomic project-setting and Input Map
   editing. This is the appropriate mode when the agent must perform its own
   unit-test-oriented setup and verification.
-- **`large`:** all 21 tools. It adds `select_node` and the opt-in
+- **`large`:** all 22 tools. It adds `select_node` and the opt-in
   `start_editor` launcher for models that also control the Godot desktop UI.
 
 Example:
@@ -113,6 +116,7 @@ means `small` and `large`.
 |---|---|---|
 | `capabilities` | All | Active mode plus MCP/bridge versions, commands, exposed tools, optional features, and limits |
 | `editor_state` | All | Project, bridge, edited scene, selection, filesystem scan, and run state |
+| `get_diagnostics` | All | Bounded editor, parser, and runtime diagnostics with stable cursors |
 | `create_scene` | All | Create a scene with one built-in root node |
 | `open_scene` | All | Open an existing project scene |
 | `scene_tree` | All | Scene-relative node list, limited to 200 nodes |
@@ -168,8 +172,9 @@ initialization, its result includes the negotiated protocol version and combines
 the Python MCP server's version, active mode, and exposed MCP tool names with
 the plugin's version, supported bridge commands, optional-feature flags, Godot
 version, and effective limits. Optional features currently reported as
-unsupported are diagnostics, runtime inspection, game-view capture, and input
-injection.
+unsupported are runtime inspection, game-view capture, and input injection.
+Diagnostics report separate GDScript, C#, and runtime capability flags because
+complete C# compiler capture depends on the installed Godot build.
 
 Bridge failures have a stable JSON envelope with `code`, `message`, bounded
 `details`, and `retryable`. The Python client turns known codes into typed
@@ -234,11 +239,43 @@ whether an editor refresh, project reload, or editor restart is required.
 ## Editor state
 
 `editor_state` reports the project name and path, main scene, Godot and bridge
-versions, bridge port, edited scene and selection, filesystem scan status and
-generation, play state, current/last run ID, last run status, stop reason,
-latest observed event IDs, and concise accepted operations.
+versions, bridge port, edited scene, dirty state and selection; normalized
+filesystem phase/progress and generation; active/recent imports and bounded
+import failures; play state, current/last run ID and diagnostic counts; the
+`project.godot` content hash and reload requirement; latest event/diagnostic
+IDs; and concise accepted operations. Dirty state follows the active scene's
+UndoRedo history across edits, undo/redo, save, and scene changes.
 The project path is absolute for issue identification; scene and asset paths
 remain `res://` or project-relative.
+
+## Diagnostics
+
+`get_diagnostics` reads a snapshot of at most 100 records without clearing the
+store or changing Godot's Output and Debugger panels. The store retains 256
+records. Each has an event ID, timestamp, severity, category, bounded message,
+project-relative resource location and stack frames when Godot provides them,
+and the associated run ID for runtime records.
+
+Use `scope` (`all`, `parser`, `runtime`, or `editor`), `severity` (`all`,
+`error`, or `warning`), `since`, `limit`, and optional `run_id` to keep results
+small. Save the returned `latest_event_id` and pass it as `since` on the next
+read. A cursor older than retained history returns `stale_cursor`; reads never
+delete diagnostics. GDScript parser, scene-load, editor, and engine/runtime
+diagnostics are supported. `capabilities.features.csharp_diagnostics` reports
+whether complete C# compiler capture is available; it is `false` in the
+verified standard Godot 4.7 build.
+
+## Bounded waits
+
+`open_scene`, `scan_asset`, `import_asset`, and `scene_control` run/stop accept
+`"wait":true` and `timeout_ms` from 1 through 120000. Waiting happens only in
+the Python MCP process: it polls concise editor state with a monotonic deadline,
+so the Godot main loop stays responsive. The default timeout is 10 seconds.
+
+Waited run results include the new `run_id` and whether the process survived
+the startup health window. Set `startup_window_ms` from 0 through 5000 on the
+run action; it defaults to 250. Completed waits also allow a short diagnostic
+quiet period so immediate parser, import, or startup errors reach the store.
 
 ## Agentic usage by context size
 
@@ -279,17 +316,23 @@ files imported individually. Imports are limited to 100 MiB, stream-copy in
 1 MiB chunks, never overwrite existing files, and cannot target `.godot` or
 `addons`. Godot scans new files asynchronously, so `import_asset` reports
 `"scan":"queued"` or `"scan":"already_running"` and returns the scan
-operation ID when new work is accepted. Use
-`editor_state.filesystem_scanning` and `filesystem_generation` to observe the
-scan, then use `asset_info` if the model needs to confirm the final resource
-type. `scan_asset` can explicitly request a scan for an existing project file.
+operation ID when new work is accepted. Use `"wait":true` for a bounded result,
+or observe `editor_state.active_imports`, `recent_imports`,
+`filesystem_scanning`, and `filesystem_generation`, then use `asset_info` if
+the model needs to confirm the final resource type. Import completion requires
+the scan/reimport to end and the resource to become typed/loadable or produce a
+bounded per-resource failure. Another scan is never started while Godot reports
+one in progress. `scan_asset` can explicitly request a scan for an existing
+project file.
 
 Example:
 
 ```json
 {
   "source": "characters/robot.glb",
-  "destination": "assets/models/robot.glb"
+  "destination": "assets/models/robot.glb",
+  "wait": true,
+  "timeout_ms": 30000
 }
 ```
 
@@ -516,12 +559,13 @@ Set-Location "C:\path\to\godot-editor-mcp"
 py -3 -m unittest discover -s tests -v
 ```
 
-The 37-test Python suite tests MCP initialization, end-to-end stdio initialization,
+The 44-test Python suite tests MCP initialization, end-to-end stdio initialization,
 tool listing and calls, per-mode dispatch, capability augmentation, public scan
 route selection, Project Settings command routing, authentication, bounded transport
 behavior, staged imports, traversal and symlink denial, size limits,
 no-overwrite behavior, structured and legacy bridge errors, negotiated protocol
-reporting, discovery record validation, and safe stdout/stderr error separation.
+reporting, discovery record validation, safe stdout/stderr error separation,
+wait completion and timeout behavior, diagnostic settling, and run startup health.
 A live check in Godot is still required
 when claiming compatibility because editor plugin APIs are only available inside
 the editor. Symbolic-link tests are skipped when the current account cannot
@@ -532,6 +576,12 @@ The `plugin` folder is also a minimal Godot project for plugin validation:
 
 ```sh
 /path/to/Godot --headless --editor --path plugin --quit-after 2
+```
+
+Run the bounded diagnostic store checks with:
+
+```sh
+/path/to/Godot --headless --path plugin --script res://tests/phase2_diagnostics_test.gd
 ```
 
 Windows PowerShell uses the same arguments:

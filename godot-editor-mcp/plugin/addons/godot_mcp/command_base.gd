@@ -5,16 +5,19 @@ const ErrorEnvelope := preload("error_envelope.gd")
 var _editor_interface: EditorInterface
 var _undo_redo: EditorUndoRedoManager
 var _operations: RefCounted
+var _state_monitor: RefCounted
 
 
 func _init(
 	editor_interface: EditorInterface,
 	undo_redo: EditorUndoRedoManager,
 	operations: RefCounted = null,
+	state_monitor: RefCounted = null,
 ) -> void:
 	_editor_interface = editor_interface
 	_undo_redo = undo_redo
 	_operations = operations
+	_state_monitor = state_monitor
 
 
 func get_editor_interface() -> EditorInterface:

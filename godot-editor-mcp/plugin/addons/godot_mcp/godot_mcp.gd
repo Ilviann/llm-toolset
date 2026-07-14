@@ -5,6 +5,7 @@ const AssetCommands := preload("asset_commands.gd")
 const BridgeServer := preload("bridge_server.gd")
 const CommandRouter := preload("command_router.gd")
 const DiscoveryRecord := preload("discovery_record.gd")
+const DiagnosticStore := preload("diagnostic_store.gd")
 const EditorStateMonitor := preload("editor_state_monitor.gd")
 const ErrorEnvelope := preload("error_envelope.gd")
 const EventStore := preload("event_store.gd")
@@ -14,13 +15,14 @@ const OperationRegistry := preload("operation_registry.gd")
 const ProjectSettingsCommands := preload("project_settings_commands.gd")
 const SceneCommands := preload("scene_commands.gd")
 
-const BRIDGE_VERSION := "0.5.0"
+const BRIDGE_VERSION := "0.6.0"
 const BRIDGE_PROTOCOL_VERSION := "1"
 const DEFAULT_PORT := 6505
 const TOKEN_PATH := "res://.godot/godot_mcp_token"
 
 var _bridge_server
 var _discovery
+var _diagnostics
 var _events
 var _operations
 var _router
@@ -38,7 +40,13 @@ func _enter_tree() -> void:
 
 	_events = EventStore.new()
 	_operations = OperationRegistry.new()
-	_state_monitor = EditorStateMonitor.new(get_editor_interface(), _events, _operations)
+	_diagnostics = DiagnosticStore.new()
+	OS.add_logger(_diagnostics)
+	_state_monitor = EditorStateMonitor.new(
+		get_editor_interface(), get_undo_redo(), _events, _operations, _diagnostics,
+	)
+	if not scene_saved.is_connected(_on_scene_saved):
+		scene_saved.connect(_on_scene_saved)
 	_router = CommandRouter.new()
 	_register_commands()
 
@@ -79,14 +87,19 @@ func _process(_delta: float) -> void:
 func _register_commands() -> void:
 	_router.register_handler("capabilities", Callable(self, "_capabilities"))
 	_router.register_handler("state", Callable(self, "_editor_state"))
+	_router.register_handler("diagnostics", Callable(_diagnostics, "read"))
 	_router.register_handler("control", Callable(_state_monitor, "scene_control"))
 
-	var asset_commands = AssetCommands.new(get_editor_interface(), get_undo_redo(), _operations)
+	var asset_commands = AssetCommands.new(
+		get_editor_interface(), get_undo_redo(), _operations, _state_monitor,
+	)
 	var scene_commands = SceneCommands.new(get_editor_interface(), get_undo_redo(), _operations)
 	var settings_commands = ProjectSettingsCommands.new(
-		get_editor_interface(), get_undo_redo(), _operations,
+		get_editor_interface(), get_undo_redo(), _operations, _state_monitor,
 	)
-	var input_commands = InputMapCommands.new(get_editor_interface(), get_undo_redo(), _operations)
+	var input_commands = InputMapCommands.new(
+		get_editor_interface(), get_undo_redo(), _operations, _state_monitor,
+	)
 	_router.register_service(
 		["assets", "asset_info", "scan_asset", "create_resource", "create_scene", "open_scene"],
 		asset_commands,
@@ -111,7 +124,10 @@ func _capabilities(_arguments: Dictionary) -> Dictionary:
 			"runtime_inspection": false,
 			"game_view_capture": false,
 			"input_injection": false,
-			"diagnostics": false,
+			"diagnostics": true,
+			"gdscript_diagnostics": true,
+			"csharp_diagnostics": false,
+			"runtime_diagnostics": true,
 			"project_settings": true,
 			"input_map_editing": true,
 			"structured_errors": true,
@@ -153,6 +169,8 @@ func _capabilities(_arguments: Dictionary) -> Dictionary:
 			"settings": Limits.MAX_SETTINGS,
 			"setting_changes": Limits.MAX_SETTING_CHANGES,
 			"input_events": Limits.MAX_INPUT_EVENTS,
+			"diagnostics": Limits.MAX_DIAGNOSTICS,
+			"diagnostic_records": Limits.MAX_DIAGNOSTIC_RECORDS,
 		},
 	})
 
@@ -166,14 +184,24 @@ func _editor_state(_arguments: Dictionary) -> Dictionary:
 
 
 func _shutdown_services() -> void:
+	if scene_saved.is_connected(_on_scene_saved):
+		scene_saved.disconnect(_on_scene_saved)
 	if _state_monitor != null:
 		_state_monitor.stop()
+	if _diagnostics != null:
+		OS.remove_logger(_diagnostics)
 	_bridge_server = null
 	_discovery = null
+	_diagnostics = null
 	_events = null
 	_operations = null
 	_router = null
 	_state_monitor = null
+
+
+func _on_scene_saved(_path: String) -> void:
+	if _state_monitor != null:
+		_state_monitor.mark_scene_saved()
 
 
 func _load_or_create_token() -> String:

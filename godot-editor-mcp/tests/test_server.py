@@ -110,6 +110,41 @@ class MCPServerTests(unittest.TestCase):
         self.assertNotIn("isError", response["result"])
         self.assertEqual(self.bridge.calls, [("select", {"path": "Player"})])
 
+    def test_diagnostics_is_available_in_every_mode(self) -> None:
+        response = self.request("tools/call", {
+            "name": "get_diagnostics", "arguments": {
+                "scope": "parser", "severity": "error", "since": 4, "limit": 10,
+            },
+        })
+        self.assertNotIn("isError", response["result"])
+        self.assertEqual(self.bridge.calls, [("diagnostics", {
+            "scope": "parser", "severity": "error", "since": 4, "limit": 10,
+        })])
+
+    def test_open_scene_wait_fields_are_not_sent_to_plugin(self) -> None:
+        class CompletedBridge(FakeBridge):
+            def call(self, command: str, arguments: dict | None = None):
+                self.calls.append((command, arguments or {}))
+                if command == "open_scene":
+                    return {"operation_id": "op-1", "open": "requested"}
+                if command == "state":
+                    return {
+                        "scene": "res://scenes/main.tscn",
+                        "active_operations": [],
+                        "last_diagnostic_id": None,
+                    }
+                return {"command": command, "arguments": arguments or {}}
+
+        bridge = CompletedBridge()
+        self.server = MCPServer(bridge, self.assets)  # type: ignore[arg-type]
+        response = self.request("tools/call", {
+            "name": "open_scene", "arguments": {
+                "path": "scenes/main.tscn", "wait": True, "timeout_ms": 1000,
+            },
+        })
+        self.assertNotIn("isError", response["result"])
+        self.assertEqual(bridge.calls[0], ("open_scene", {"path": "scenes/main.tscn"}))
+
     def test_import_copies_then_queues_editor_scan(self) -> None:
         self.server = MCPServer(self.bridge, self.assets, mode="small")  # type: ignore[arg-type]
         response = self.request("tools/call", {

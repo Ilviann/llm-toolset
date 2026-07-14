@@ -83,6 +83,8 @@ func _input_map_patch(arguments: Dictionary) -> Dictionary:
 				InputMap.load_from_project_settings()
 				ProjectSettings.save()
 				return _failure("Could not save Input Map (Godot error %d); transaction rolled back" % error)
+			if _state_monitor != null:
+				_state_monitor.mark_project_settings_saved(false)
 	return _success({
 		"diff": {"before": before, "after": after, "changed": before != after},
 		"added": added_count,
@@ -208,5 +210,4 @@ func _named_index(value: Variant, names: Dictionary) -> Dictionary:
 	if value is String and value.to_lower() in names:
 		return _success(names[value.to_lower()])
 	return _failure("Named index is invalid")
-
 

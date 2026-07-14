@@ -50,3 +50,21 @@ func concise_active(limit := 16) -> Array[Dictionary]:
 			if output.size() >= limit:
 				break
 	return output
+
+
+func concise_recent(kind := "", limit := 16) -> Array[Dictionary]:
+	var output: Array[Dictionary] = []
+	for index in range(_order.size() - 1, -1, -1):
+		var operation: Dictionary = _operations[_order[index]]
+		if operation.status != "completed" or (not kind.is_empty() and operation.kind != kind):
+			continue
+		output.append({
+			"operation_id": operation.operation_id,
+			"kind": operation.kind,
+			"run_id": operation.run_id,
+			"details": operation.details,
+			"completion": operation.get("completion", {}),
+		})
+		if output.size() >= limit:
+			break
+	return output

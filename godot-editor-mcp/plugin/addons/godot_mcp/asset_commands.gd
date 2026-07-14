@@ -131,6 +131,8 @@ func _scan_asset(arguments: Dictionary) -> Dictionary:
 	if filesystem.is_scanning():
 		return _success({"path": checked.result, "scan": "already_running", "operation_id": null})
 	var operation_id = _accept_operation("filesystem_scan", {"path": checked.result})
+	if _state_monitor != null:
+		_state_monitor.track_import(checked.result, operation_id)
 	filesystem.scan()
 	return _success({"path": checked.result, "scan": "queued", "operation_id": operation_id})
 
