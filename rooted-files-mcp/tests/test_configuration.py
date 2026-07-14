@@ -43,7 +43,6 @@ class ConfigurationTests(unittest.TestCase):
         self.assertTrue(settings.read)
         self.assertTrue(settings.write)
         self.assertTrue(settings.show_hidden)
-        self.assertTrue(settings.line_access)
 
     def test_configuration_only_startup_uses_native_relative_root(self) -> None:
         exposed = self.workspace / "source files"
@@ -52,14 +51,13 @@ class ConfigurationTests(unittest.TestCase):
             "[paths]\n"
             f"root = {exposed.relative_to(self.workspace)}\n"
             "[permissions]\nread = false\nwrite = true\n"
-            "[features]\nshow_hidden = false\nline_access = false\n"
+            "[features]\nshow_hidden = false\n"
         )
         settings = load_settings(workspace=str(self.workspace))
         self.assertEqual(settings.root, exposed.resolve())
         self.assertFalse(settings.read)
         self.assertTrue(settings.write)
         self.assertFalse(settings.show_hidden)
-        self.assertFalse(settings.line_access)
 
     def test_current_directory_is_the_configuration_only_workspace(self) -> None:
         exposed = self.workspace / "root"
@@ -77,7 +75,7 @@ class ConfigurationTests(unittest.TestCase):
         self.write_config(
             "[paths]\nroot = configured\n"
             "[permissions]\nread = true\nwrite = false\n"
-            "[features]\nshow_hidden = true\nline_access = false\n"
+            "[features]\nshow_hidden = true\n"
         )
         settings = load_settings(
             root=explicit,
@@ -85,13 +83,11 @@ class ConfigurationTests(unittest.TestCase):
             read=False,
             write=True,
             show_hidden=False,
-            line_access=True,
         )
         self.assertEqual(settings.root, explicit.resolve())
         self.assertFalse(settings.read)
         self.assertTrue(settings.write)
         self.assertFalse(settings.show_hidden)
-        self.assertTrue(settings.line_access)
 
     def test_settings_are_frozen(self) -> None:
         settings = load_settings(root=self.workspace)
@@ -163,6 +159,9 @@ class ConfigurationTests(unittest.TestCase):
         cases = {
             "section": "[paths]\nroot = .\n[permission]\nread = false\n",
             "key": "[paths]\nroot = .\n[permissions]\nraed = false\n",
+            "removed line access": (
+                "[paths]\nroot = .\n[features]\nline_access = false\n"
+            ),
             "default": "[DEFAULT]\nread = false\n[paths]\nroot = .\n",
         }
         for label, content in cases.items():

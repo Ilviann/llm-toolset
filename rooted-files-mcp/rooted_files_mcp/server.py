@@ -36,10 +36,14 @@ TOOLS = [
     },
     {
         "name": "read_text",
-        "description": "Read a UTF-8 text file. Binary files are denied.",
+        "description": "Read all UTF-8 text or give both one-based, end-inclusive line bounds.",
         "inputSchema": {
             "type": "object",
-            "properties": {"path": {"type": "string"}},
+            "properties": {
+                "path": {"type": "string"},
+                "start_line": {"type": "integer", "minimum": 1},
+                "end_line": {"type": "integer", "minimum": 1},
+            },
             "required": ["path"],
             "additionalProperties": False,
         },
@@ -57,10 +61,25 @@ TOOLS = [
             "additionalProperties": False,
         },
     },
+    {
+        "name": "write_lines",
+        "description": "Atomically replace one-based, end-inclusive text lines.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "path": {"type": "string"},
+                "start_line": {"type": "integer", "minimum": 1},
+                "end_line": {"type": "integer", "minimum": 1},
+                "content": {"type": "string"},
+            },
+            "required": ["path", "start_line", "end_line", "content"],
+            "additionalProperties": False,
+        },
+    },
 ]
 
 READ_TOOLS = {"list_dir", "tree", "read_text"}
-WRITE_TOOLS = {"write_text"}
+WRITE_TOOLS = {"write_text", "write_lines"}
 KNOWN_TOOLS = READ_TOOLS | WRITE_TOOLS
 
 
@@ -152,9 +171,20 @@ class MCPServer:
             elif name == "tree":
                 output = self.fs.tree(arguments.get("path", "."))
             elif name == "read_text":
-                output = self.fs.read_text(arguments["path"])
+                output = self.fs.read_text(
+                    arguments["path"],
+                    arguments.get("start_line"),
+                    arguments.get("end_line"),
+                )
             elif name == "write_text":
                 output = self.fs.write_text(arguments["path"], arguments["content"])
+            elif name == "write_lines":
+                output = self.fs.write_lines(
+                    arguments["path"],
+                    arguments["start_line"],
+                    arguments["end_line"],
+                    arguments["content"],
+                )
             else:
                 return self._error(request_id, -32602, "Unknown tool")
             return self._result(request_id, self._tool_result(output))
@@ -207,14 +237,7 @@ def main() -> None:
     hidden_group.add_argument(
         "--hide-hidden", dest="show_hidden", action="store_false"
     )
-    line_group = parser.add_mutually_exclusive_group()
-    line_group.add_argument(
-        "--line-access", dest="line_access", action="store_true"
-    )
-    line_group.add_argument(
-        "--no-line-access", dest="line_access", action="store_false"
-    )
-    parser.set_defaults(read=None, write=None, show_hidden=None, line_access=None)
+    parser.set_defaults(read=None, write=None, show_hidden=None)
     args = parser.parse_args()
     try:
         settings = load_settings(
@@ -223,7 +246,6 @@ def main() -> None:
             read=args.read,
             write=args.write,
             show_hidden=args.show_hidden,
-            line_access=args.line_access,
         )
         run(settings)
     except (ConfigurationError, FileAccessError) as exc:

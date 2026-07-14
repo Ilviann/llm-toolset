@@ -18,8 +18,9 @@ recommended model-facing form.
 |---|---|
 | `list_dir` | List direct entries in a folder; requires read permission |
 | `tree` | Show a recursive tree, limited to 100 entries; requires read permission |
-| `read_text` | Read a UTF-8 text file; requires read permission |
+| `read_text` | Read a whole UTF-8 text file or a one-based, end-inclusive line range; requires read permission |
 | `write_text` | Create or replace a UTF-8 text file; requires write permission |
+| `write_lines` | Atomically replace a one-based, end-inclusive range of UTF-8 text lines; requires write permission |
 
 All paths are relative to the root argument. Absolute paths, `..` escapes, and
 symlinks resolving outside root are denied. Known binary/media extensions,
@@ -28,12 +29,13 @@ Tools disabled by the effective permissions are omitted from `tools/list` and
 direct calls to them are rejected. Hidden-path settings are enforced for every
 tool, not only directory output.
 
-The default `tools/list` result, including all four descriptions and input
-schemas, is about 840 characters of compact JSON, or roughly 200–300 tokens for
-common model tokenizers. Disabling permissions makes the catalog smaller. This
-is the tool-schema context cost before system prompts, the conversation, tool
-calls, and file contents. Exact usage varies by model and by how the MCP client
-represents tool definitions.
+The default `tools/list` response, including all five descriptions and input
+schemas, is 1,344 characters of compact JSON (1,300 characters for the tool
+definitions), or roughly 340–470 tokens for common model tokenizers. Disabling
+read or write permission makes the catalog smaller. This is the tool-schema
+context cost before system prompts, the conversation, tool calls, and file
+contents. Exact usage varies by model and by how the MCP client represents tool
+definitions.
 
 When pairing this server with `godot-editor-mcp` for GDScript work, prefer the
 Godot server's default `tiny` mode below 8k context. Use `small` only when the
@@ -44,10 +46,11 @@ combined schemas and file results bounded.
 ## Agentic usage by context size
 
 Agentic use is practical when the exposed root and task are kept narrow. The
-5 MiB file limit is a safety limit, not a useful context target: `read_text`
-returns a whole file, and `write_text` replaces a whole file, so avoid asking a
-small-context model to work on files that do not comfortably fit beside its
-instructions and tool history.
+5 MiB file limit is a safety limit, not a useful context target. Prefer
+the ranged form of `read_text` and use `write_lines` when the relevant
+coordinates are known so only the selected text enters the model context.
+Without range arguments, `read_text` returns a whole file; `write_text` always
+replaces a whole file.
 
 - **4k context:** Suitable for inspecting a small folder and reading or updating
   one small file. Expose the closest useful subfolder, start with `list_dir`, and
@@ -61,6 +64,48 @@ instructions and tool history.
   repository-wide autonomous development. Keep the root scoped, read files on
   demand, and divide large refactors into checkpoints; a single large
   `read_text` result can still consume the window.
+
+## Granular line access
+
+`read_text(path)` returns the whole file. Supplying both optional range arguments
+as `read_text(path, start_line, end_line)` returns only the selected complete
+logical lines, without line-number decoration or newline normalization. The two
+range arguments must be supplied together.
+
+`write_lines(path, start_line, end_line, content)` atomically replaces those
+complete lines; empty `content` deletes the range, while replacement content
+may expand or contract it. Both bounds are one-based and inclusive. Booleans,
+non-integers, line 0, reversed ranges, empty ranges, and coordinates beyond the
+current file are rejected. Empty files have no addressable lines and must be
+initialized with `write_text`.
+
+For example, a compiler diagnostic at line 12 maps to `start_line = 12` and
+`end_line = 12`. For a Git hunk
+`@@ -old_start,old_count +new_start,new_count @@`, use the `+` side:
+
+```text
+start_line = new_start
+end_line = new_start + new_count - 1
+```
+
+An omitted Git count means one line. A zero-count hunk describes a position
+between lines and cannot be passed to the line tools.
+
+Existing `\n` and `\r\n` line endings are returned exactly. Replacement text
+uses the selected range's newline convention, then the nearest preceding
+convention, then the nearest following convention, and finally `\n` when the
+file has none. A replacement through the end of the file preserves whether the
+original ended with a newline. UTF-8 BOMs are omitted from read results, as with
+whole-file `read_text`, and are preserved by `write_lines`. Unchanged prefix and
+suffix bytes are preserved.
+
+Ranged reads and line writes validate the entire source as UTF-8 text even
+though `read_text` returns only the selected range. The same extension, binary
+signature, NUL, UTF-8, 5 MiB, traversal, symlink, hidden-path, protected-path,
+and permission checks apply to whole-file and line-range operations. The
+resulting file from `write_lines`, not merely its new content, must fit within
+5 MiB. Coordinates refer to the file state at the start of each call, so a
+line-count-changing write can make later coordinates stale.
 
 ## Run
 
@@ -113,7 +158,6 @@ show_hidden = false
 hidden_allowlist =
     .editorconfig
     .github
-line_access = true
 ```
 
 For configuration-only startup, `[paths] root` is required. Relative roots are
@@ -125,14 +169,13 @@ paths remain relative to the effective root and should use forward slashes.
 
 Settings use this precedence: explicit command-line value, INI value, then the
 built-in default. With no corresponding INI or CLI setting, read and write are
-enabled, hidden paths are visible, and line access is enabled. Boolean command
-line overrides are paired so either value can override the INI:
+enabled and hidden paths are visible. Boolean command-line overrides are paired
+so either value can override the INI:
 
 ```text
 --read / --no-read
 --write / --no-write
 --show-hidden / --hide-hidden
---line-access / --no-line-access
 ```
 
 When `show_hidden = false`, every dot-prefixed path component is hidden on all
@@ -156,9 +199,10 @@ listing, reading, or changing `.mcp/rooted-files-mcp.ini` after the server loads
 it. Direct hidden or protected access returns the stable error `Hidden path
 access is denied` without identifying which component caused the denial.
 
-Line-access configuration is loaded and validated so its precedence is stable,
-but the `read_lines` and `write_lines` tools are scheduled for Phase 3 and are
-not active yet.
+Range access is always available. Read permission controls both whole-file and
+ranged `read_text` calls; write permission controls `write_text` and
+`write_lines`. The removed `line_access` INI setting and
+`--line-access`/`--no-line-access` CLI options are rejected as unknown input.
 
 The configuration must be a regular UTF-8 file no larger than 64 KiB. NUL
 bytes, malformed or duplicate INI entries, invalid booleans, unknown sections
@@ -215,3 +259,7 @@ python3 -m unittest discover -s tests -v
 On Windows, run `py -3 -m unittest discover -s tests -v`. Symbolic-link security
 tests are skipped when the account cannot create symbolic links; enable Windows
 Developer Mode or run with the required privilege to exercise them.
+
+The runtime uses only the Python standard library. No package download is
+needed to run or test from this source tree, so an offline machine only needs a
+prepared Python 3.10-or-newer installation and a local copy of the repository.

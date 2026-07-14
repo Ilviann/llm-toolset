@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 import stat
 import tempfile
 import unittest
@@ -10,6 +11,7 @@ from types import SimpleNamespace
 from unittest import mock
 
 from rooted_files_mcp.filesystem import (
+    MAX_TEXT_BYTES,
     TREE_LIMIT,
     FileAccessError,
     HiddenPathPolicy,
@@ -299,17 +301,219 @@ class RootedFilesystemTests(unittest.TestCase):
 
     def test_windows_attribute_change_before_replace_aborts_and_cleans_temp(self) -> None:
         target = self.root / "note.txt"
-        target.write_text("old", encoding="utf-8")
-        fs = self.hidden_fs()
-        fs.hidden_policy.windows = True
-        with mock.patch.object(
-            fs.hidden_policy,
-            "has_windows_hidden_attribute",
-            side_effect=[False, False, True],
+        operations = (
+            lambda fs: fs.write_text("note.txt", "new"),
+            lambda fs: fs.write_lines("note.txt", 1, 1, "new"),
+        )
+        for operation in operations:
+            with self.subTest(operation=operation):
+                target.write_text("old", encoding="utf-8")
+                fs = self.hidden_fs()
+                fs.hidden_policy.windows = True
+                with mock.patch.object(
+                    fs.hidden_policy,
+                    "has_windows_hidden_attribute",
+                    side_effect=[False, False, True],
+                ):
+                    with self.assertRaisesRegex(
+                        FileAccessError, "Hidden path access is denied"
+                    ):
+                        operation(fs)
+                self.assertEqual(target.read_text(encoding="utf-8"), "old")
+                self.assertEqual(list(self.root.glob(".rooted-mcp-*")), [])
+
+    def test_read_text_selects_first_middle_last_blank_and_all_lines(self) -> None:
+        target = self.root / "lines.txt"
+        target.write_bytes(b"first\n\nthird\nfourth")
+        self.assertEqual(self.fs.read_text("lines.txt", 1, 1), "first\n")
+        self.assertEqual(self.fs.read_text("lines.txt", 2, 3), "\nthird\n")
+        self.assertEqual(self.fs.read_text("lines.txt", 4, 4), "fourth")
+        self.assertEqual(
+            self.fs.read_text("lines.txt", 1, 4), "first\n\nthird\nfourth"
+        )
+
+    def test_write_lines_replaces_expands_contracts_and_deletes_ranges(self) -> None:
+        target = self.root / "edit.txt"
+        cases = (
+            (1, 1, "FIRST", b"FIRST\ntwo\nthree\nfour\n"),
+            (2, 3, "middle", b"one\nmiddle\nfour\n"),
+            (4, 4, "LAST", b"one\ntwo\nthree\nLAST\n"),
+            (2, 2, "two-a\ntwo-b", b"one\ntwo-a\ntwo-b\nthree\nfour\n"),
+            (2, 3, "short", b"one\nshort\nfour\n"),
+            (2, 3, "", b"one\nfour\n"),
+            (1, 4, "replacement", b"replacement\n"),
+        )
+        for start, end, content, expected in cases:
+            with self.subTest(start=start, end=end, content=content):
+                target.write_bytes(b"one\ntwo\nthree\nfour\n")
+                summary = self.fs.write_lines(
+                    "edit.txt", start, end, content
+                )
+                self.assertEqual(target.read_bytes(), expected)
+                self.assertIn(f"lines {start}-{end}", summary)
+                self.assertIn(f"{len(expected)} UTF-8 bytes", summary)
+
+    def test_line_tools_preserve_endings_bom_and_multibyte_text(self) -> None:
+        target = self.root / "formats.txt"
+        target.write_bytes("\ufeffα\r\nβ\r\nγ".encode("utf-8"))
+        self.assertEqual(self.fs.read_text("formats.txt", 1, 2), "α\r\nβ\r\n")
+        self.fs.write_lines("formats.txt", 2, 2, "новый\nряд")
+        self.assertEqual(
+            target.read_bytes(),
+            "\ufeffα\r\nновый\r\nряд\r\nγ".encode("utf-8"),
+        )
+        self.fs.write_lines("formats.txt", 4, 4, "конец\n")
+        self.assertEqual(
+            target.read_bytes(),
+            "\ufeffα\r\nновый\r\nряд\r\nконец".encode("utf-8"),
+        )
+        self.assertFalse(target.read_bytes().endswith(b"\n"))
+
+    def test_mixed_endings_use_the_selected_or_nearby_convention(self) -> None:
+        target = self.root / "mixed.txt"
+        target.write_bytes(b"one\nsecond\r\nthird")
+        self.fs.write_lines("mixed.txt", 2, 2, "a\nb")
+        self.assertEqual(target.read_bytes(), b"one\na\r\nb\r\nthird")
+        self.fs.write_lines("mixed.txt", 4, 4, "last-a\nlast-b")
+        self.assertEqual(
+            target.read_bytes(), b"one\na\r\nb\r\nlast-a\r\nlast-b"
+        )
+
+    def test_line_number_validation_has_stable_errors(self) -> None:
+        (self.root / "two.txt").write_text("one\ntwo", encoding="utf-8")
+        for start, end in ((1, None), (None, 1)):
+            with self.subTest(start=start, end=end), self.assertRaisesRegex(
+                FileAccessError,
+                "Start line and end line must be provided together",
+            ):
+                self.fs.read_text("two.txt", start, end)
+        cases = (
+            (0, 1, "Line numbers must be one-based"),
+            (-1, 1, "Line numbers must be one-based"),
+            (2, 1, "Start line must not exceed end line"),
+            (1.0, 1, "Line numbers must be integers"),
+            (True, 1, "Line numbers must be integers"),
+            (1, False, "Line numbers must be integers"),
+            (1, 3, "Line range exceeds file line count (2)"),
+        )
+        for start, end, message in cases:
+            with self.subTest(start=start, end=end):
+                with self.assertRaisesRegex(FileAccessError, f"^{re.escape(message)}\\Z"):
+                    self.fs.read_text("two.txt", start, end)
+                with self.assertRaisesRegex(FileAccessError, f"^{re.escape(message)}\\Z"):
+                    self.fs.write_lines("two.txt", start, end, "x")
+
+    def test_compiler_and_git_hunk_coordinates_map_directly(self) -> None:
+        target = self.root / "coordinates.txt"
+        target.write_text("1\n2\n3\n4\n5\n", encoding="utf-8")
+        compiler_line = 3
+        self.assertEqual(
+            self.fs.read_text("coordinates.txt", compiler_line, compiler_line),
+            "3\n",
+        )
+        new_start, new_count = 2, 3
+        self.assertEqual(
+            self.fs.read_text(
+                "coordinates.txt", new_start, new_start + new_count - 1
+            ),
+            "2\n3\n4\n",
+        )
+        omitted_count = 1
+        self.assertEqual(
+            self.fs.read_text(
+                "coordinates.txt", 5, 5 + omitted_count - 1
+            ),
+            "5\n",
+        )
+        with self.assertRaisesRegex(FileAccessError, "one-based"):
+            self.fs.read_text("coordinates.txt", 0, 0)
+
+    def test_empty_and_bom_only_files_have_no_addressable_lines(self) -> None:
+        for name, data in (("empty.txt", b""), ("bom.txt", b"\xef\xbb\xbf")):
+            (self.root / name).write_bytes(data)
+            with self.subTest(name=name), self.assertRaisesRegex(
+                FileAccessError, "File contains no addressable lines"
+            ):
+                self.fs.read_text(name, 1, 1)
+            with self.subTest(name=name), self.assertRaisesRegex(
+                FileAccessError, "File contains no addressable lines"
+            ):
+                self.fs.write_lines(name, 1, 1, "new")
+
+    def test_line_tools_reject_every_invalid_text_classification(self) -> None:
+        invalid = {
+            "missing.txt": None,
+            "folder": "folder",
+            "known.png": b"plain text",
+            "signature": b"\x7fELFpayload",
+            "nul.txt": b"one\ntwo\x00bad",
+            "utf8.txt": b"one\ntwo\xffbad",
+            "large.txt": b"x" * (MAX_TEXT_BYTES + 1),
+        }
+        for name, data in invalid.items():
+            path = self.root / name
+            if data == "folder":
+                path.mkdir()
+            elif data is not None:
+                path.write_bytes(data)
+            with self.subTest(name=name):
+                with self.assertRaises(FileAccessError):
+                    self.fs.read_text(name, 1, 1)
+                with self.assertRaises(FileAccessError):
+                    self.fs.write_lines(name, 1, 1, "x")
+
+        valid = self.root / "result.txt"
+        valid.write_text("x", encoding="utf-8")
+        with self.assertRaisesRegex(FileAccessError, "Text exceeds 5 MiB limit"):
+            self.fs.write_lines("result.txt", 1, 1, "x" * (MAX_TEXT_BYTES + 1))
+        self.assertEqual(valid.read_text(encoding="utf-8"), "x")
+
+    def test_line_tools_enforce_permissions_features_paths_and_symlinks(self) -> None:
+        (self.root / "visible.txt").write_text("one\ntwo\n", encoding="utf-8")
+        (self.root / ".secret").write_text("secret\n", encoding="utf-8")
+        outside = self.root.parent / "outside-lines.txt"
+        outside.write_text("outside\n", encoding="utf-8")
+        try:
+            os.symlink(outside, self.root / "outside-link")
+            os.symlink(".secret", self.root / "hidden-link")
+        except OSError as exc:
+            self.skipTest(f"symbolic links are unavailable: {exc}")
+
+        hidden = self.hidden_fs()
+        for operation in (
+            lambda: hidden.read_text(".secret", 1, 1),
+            lambda: hidden.write_lines(".secret", 1, 1, "no"),
+            lambda: hidden.read_text("hidden-link", 1, 1),
+            lambda: hidden.write_lines("hidden-link", 1, 1, "no"),
         ):
             with self.assertRaisesRegex(FileAccessError, "Hidden path access is denied"):
-                fs.write_text("note.txt", "new")
-        self.assertEqual(target.read_text(encoding="utf-8"), "old")
+                operation()
+        for operation in (
+            lambda: self.fs.read_text("../outside-lines.txt", 1, 1),
+            lambda: self.fs.write_lines("../outside-lines.txt", 1, 1, "no"),
+            lambda: self.fs.read_text("outside-link", 1, 1),
+            lambda: self.fs.write_lines("outside-link", 1, 1, "no"),
+        ):
+            with self.assertRaises(FileAccessError):
+                operation()
+
+        no_read = RootedFilesystem(replace(self.fs.settings, read=False))
+        no_write = RootedFilesystem(replace(self.fs.settings, write=False))
+        with self.assertRaisesRegex(FileAccessError, "Read access is disabled"):
+            no_read.read_text("visible.txt", 1, 1)
+        with self.assertRaisesRegex(FileAccessError, "Write access is disabled"):
+            no_write.write_lines("visible.txt", 1, 1, "no")
+
+    def test_write_lines_failure_preserves_original_mode_and_cleans_temp(self) -> None:
+        target = self.root / "atomic.txt"
+        target.write_text("old\ntext\n", encoding="utf-8")
+        target.chmod(0o640)
+        original_mode = stat.S_IMODE(target.stat().st_mode)
+        with mock.patch("rooted_files_mcp.filesystem.os.replace", side_effect=OSError("boom")):
+            with self.assertRaisesRegex(FileAccessError, "Cannot write file"):
+                self.fs.write_lines("atomic.txt", 1, 1, "new")
+        self.assertEqual(target.read_text(encoding="utf-8"), "old\ntext\n")
+        self.assertEqual(stat.S_IMODE(target.stat().st_mode), original_mode)
         self.assertEqual(list(self.root.glob(".rooted-mcp-*")), [])
 
 

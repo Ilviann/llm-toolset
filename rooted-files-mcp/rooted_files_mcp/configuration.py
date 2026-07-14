@@ -21,7 +21,7 @@ PROTECTED_NAMES = frozenset({".mcp"})
 _ALLOWED_SETTINGS = {
     "paths": {"root"},
     "permissions": {"read", "write"},
-    "features": {"show_hidden", "hidden_allowlist", "line_access"},
+    "features": {"show_hidden", "hidden_allowlist"},
 }
 
 
@@ -39,7 +39,6 @@ class Settings:
     write: bool = True
     show_hidden: bool = True
     hidden_allowlist: frozenset[str] = BUILTIN_HIDDEN_ALLOWLIST
-    line_access: bool = True
     case_sensitive: bool = True
 
     @classmethod
@@ -63,7 +62,6 @@ class IniSettings:
     write: bool | None = None
     show_hidden: bool | None = None
     hidden_allowlist: tuple[str, ...] | None = None
-    line_access: bool | None = None
 
 
 def _filesystem_is_case_sensitive(path: Path) -> bool:
@@ -238,7 +236,6 @@ def load_ini(workspace: Path) -> IniSettings | None:
         write=_optional_boolean(parser, "permissions", "write"),
         show_hidden=_optional_boolean(parser, "features", "show_hidden"),
         hidden_allowlist=_hidden_allowlist(parser),
-        line_access=_optional_boolean(parser, "features", "line_access"),
     )
 
 
@@ -257,7 +254,6 @@ def load_settings(
     read: bool | None = None,
     write: bool | None = None,
     show_hidden: bool | None = None,
-    line_access: bool | None = None,
     cwd: str | os.PathLike[str] | None = None,
 ) -> Settings:
     """Resolve workspace, validate INI values, and apply CLI precedence."""
@@ -292,6 +288,5 @@ def load_settings(
         hidden_allowlist=_effective_hidden_allowlist(
             ini.hidden_allowlist, case_sensitive=case_sensitive
         ),
-        line_access=_merge(line_access, ini.line_access, True),
         case_sensitive=case_sensitive,
     )

@@ -13,7 +13,8 @@ not yet been implemented.
 
 - [x] Phase 1 — Load workspace configuration and dynamic permissions.
 - [x] Phase 2 — Enforce hidden and protected path policy.
-- [ ] Phase 3 — Read and atomically replace bounded line ranges.
+- [x] Phase 3 — Read and atomically replace bounded line ranges.
+- [x] Phase 4 — Consolidate range reads and make all features unconditional.
 
 ## Phase delivery contract
 
@@ -66,7 +67,6 @@ show_hidden = false
 hidden_allowlist =
     .editorconfig
     .github
-line_access = true
 ```
 
 Configuration behavior:
@@ -76,8 +76,8 @@ Configuration behavior:
   the workspace so a writable project configuration cannot broaden access on
   the next server restart. An explicit CLI root remains trusted and may point
   anywhere selected by the user.
-- `permissions.read` controls `list_dir`, `tree`, `read_text`, and
-  `read_lines`. `permissions.write` controls `write_text` and `write_lines`.
+- `permissions.read` controls `list_dir`, `tree`, and whole-file or ranged
+  `read_text`. `permissions.write` controls `write_text` and `write_lines`.
 - `features.show_hidden = false` omits hidden entries from listings and denies
   direct or indirect access through every file tool, except for exact names in
   the effective hidden allowlist. The built-in allowlist contains `.gitignore`
@@ -100,11 +100,10 @@ Configuration behavior:
   under `.mcp` inaccessible to model-facing tools. Protection applies to
   root-relative components; the explicitly selected root itself is still the
   trust boundary even when its own basename is `.mcp`.
-- `features.line_access` controls whether `read_lines` and `write_lines` are
-  exposed. Its default is `true` after the feature is released.
 - Matching CLI boolean options must support explicit true and false values, for
   example `--show-hidden` and `--hide-hidden`, while retaining an unspecified
-  state for precedence resolution.
+  state for precedence resolution. Range access has no setting and is always
+  available subject to read or write permission.
 - A missing default INI file is not an error when an explicit root is present.
   A malformed file, unknown setting, invalid boolean, inaccessible configured
   root, or configuration-only startup without a root fails at startup with a
@@ -123,7 +122,7 @@ Configuration behavior:
   paths once during startup and retain normalized `Path` objects.
 - [x] Extend the CLI without breaking the positional-root form. Add
   `--workspace` and paired boolean overrides for read, write, hidden visibility,
-  and line access.
+  with the former line-access overrides removed in Phase 4.
 - [x] Reject unknown sections and keys so misspelled security settings cannot be
   silently ignored.
 - [x] Bound the INI file size, reject NUL bytes and invalid UTF-8, and reject a
@@ -131,7 +130,7 @@ Configuration behavior:
   traversal or symlinks.
 - [x] Pass an immutable effective settings object into the filesystem and MCP
   server instead of consulting configuration during individual tool calls.
-- [x] Build `tools/list` from the effective permissions and feature flags. Also
+- [x] Build `tools/list` from the effective permissions. Also
   reject direct calls to disabled tools so a client cannot bypass discovery.
 - [x] Keep stdout reserved for JSON-RPC; send startup/configuration diagnostics
   to stderr through the existing argument-parser error path.
@@ -328,65 +327,74 @@ write_lines(path, start_line, end_line, content)
 
 ### Implementation
 
-- [ ] Refactor common name, size, signature, NUL, UTF-8, and hidden-path checks
+- [x] Refactor common name, size, signature, NUL, UTF-8, and hidden-path checks
   so whole-file and line-range methods cannot drift apart.
-- [ ] Add a bounded line scanner that validates the entire file as UTF-8 text
+- [x] Add a bounded line scanner that validates the entire file as UTF-8 text
   while retaining only the requested read range. Do not return the rest of the
   file to the model.
-- [ ] Define line splitting for `\n`, `\r\n`, and final lines without a
+- [x] Define line splitting for `\n`, `\r\n`, and final lines without a
   terminator. Preserve a UTF-8 BOM consistently with `read_text` behavior.
-- [ ] Implement `RootedFilesystem.read_lines` with strict type and range checks.
-- [ ] Implement `RootedFilesystem.write_lines` by producing a complete validated
+- [x] Implement `RootedFilesystem.read_lines` with strict type and range checks.
+- [x] Implement `RootedFilesystem.write_lines` by producing a complete validated
   replacement and reusing the existing same-directory temporary file,
   `fsync`, permission preservation, and `os.replace` path.
-- [ ] Revalidate the target immediately before replacement so symlink and parent
+- [x] Revalidate the target immediately before replacement so symlink and parent
   checks are not skipped by the new write path.
-- [ ] Return a concise write summary containing the replaced range and resulting
+- [x] Return a concise write summary containing the replaced range and resulting
   UTF-8 byte count.
-- [ ] Add compact MCP schemas and dispatch branches. Keep descriptions explicit
+- [x] Add compact MCP schemas and dispatch branches. Keep descriptions explicit
   about one-based, end-inclusive line numbers, and measure the resulting compact
   `tools/list` size for the README.
 
 ### Tests
 
-- [ ] Cover first, middle, last, one-line, all-line, expansion, contraction, and
+- [x] Cover first, middle, last, one-line, all-line, expansion, contraction, and
   deletion ranges.
-- [ ] Cover `\n`, `\r\n`, mixed endings, a missing final newline, a final
+- [x] Cover `\n`, `\r\n`, mixed endings, a missing final newline, a final
   newline, an empty file, a UTF-8 BOM, and multibyte text.
-- [ ] Reject zero, negative, reversed, non-integer, boolean, and out-of-bounds
+- [x] Reject zero, negative, reversed, non-integer, boolean, and out-of-bounds
   line numbers with stable messages.
-- [ ] Test direct mapping from compiler line numbers and Git `+start,count` hunk
+- [x] Test direct mapping from compiler line numbers and Git `+start,count` hunk
   coordinates, including omitted counts (which mean one line) and zero-count
   hunks (which are not addressable ranges).
-- [ ] Reject missing files, folders, known binary extensions, binary signatures,
+- [x] Reject missing files, folders, known binary extensions, binary signatures,
   NUL bytes, invalid UTF-8, oversized source files, and oversized results.
-- [ ] Apply traversal, symlink, hidden-path, read-permission, and write-permission
+- [x] Apply traversal, symlink, hidden-path, read-permission, and write-permission
   cases to both new tools.
-- [ ] Simulate a replacement failure and confirm the original file and mode are
+- [x] Simulate a replacement failure and confirm the original file and mode are
   preserved and the temporary file is cleaned up.
-- [ ] Extend MCP tests for schemas, successful calls, missing arguments, disabled
+- [x] Extend MCP tests for schemas, successful calls, missing arguments, disabled
   line access, and tool-result errors.
 
 ### Documentation and release verification
 
-- [ ] Update `README.md` with the line tools, one-based inclusive indexing, Git
+- [x] Update `README.md` with the line tools, one-based inclusive indexing, Git
   hunk mapping, newline behavior, permissions, limits, and examples.
-- [ ] Update the README tool table and context-cost estimate after measuring the
+- [x] Update the README tool table and context-cost estimate after measuring the
   final compact `tools/list` response.
-- [ ] Review the existing macOS/Linux shell and Windows PowerShell setup
+- [x] Review the existing macOS/Linux shell and Windows PowerShell setup
   examples for the completed feature set and keep all paths portable.
-- [ ] Document safe offline preparation and confirm that the phase adds no
+- [x] Document safe offline preparation and confirm that the phase adds no
   runtime dependency or download.
-- [ ] Update the root README if the project summary or launch behavior changes,
+- [x] Update the root README if the project summary or launch behavior changes,
   and update this roadmap and `AGENTS.md` when their documented guidance or
   known issues are affected.
-- [ ] Run the complete offline test suite and record the verified platform.
-- [ ] Exercise JSON-RPC `initialize`, `tools/list`, successful `tools/call`, and
+- [x] Run the complete offline test suite and record the verified platform.
+- [x] Exercise JSON-RPC `initialize`, `tools/list`, successful `tools/call`, and
   denied `tools/call` through the stdio launcher.
-- [ ] Record native Windows and Linux results when those environments are
+- [x] Record native Windows and Linux results when those environments are
   tested; do not broaden verification claims from simulated branch coverage.
 
 ### Completion gate
+
+Completed on macOS on 2026-07-15. The full 57-test offline suite covers bounded
+reads, atomic range replacement, newline and BOM behavior, stable validation
+errors, security and permission boundaries, replacement failure cleanup, and
+end-to-end stdio discovery, successful calls, and denied calls. The measured
+default compact `tools/list` response is 1,558 characters. No runtime
+dependency or download was added. Native Linux and Windows validation remains
+pending; platform-specific behavior continues to be covered by portable code,
+simulated Windows metadata branches, and the existing platform launch examples.
 
 - Range operations have identical security and text classification behavior to
   `read_text` and `write_text`.
@@ -397,6 +405,58 @@ write_lines(path, start_line, end_line, content)
 - The complete offline suite and stdio MCP smoke checks pass, affected
   documentation matches the shipped behavior, and the recorded platform claims
   match the validation actually performed.
+
+## Phase 4 — Tool consolidation
+
+### Contract
+
+Replace the separate range-read tool with one overloaded read tool:
+
+```text
+read_text(path, start_line?, end_line?)
+write_text(path, content)
+write_lines(path, start_line, end_line, content)
+```
+
+With both range arguments omitted, `read_text` returns the whole file. With both
+present, it returns the same one-based, end-inclusive range previously returned
+by `read_lines`. Supplying only one bound is rejected. Keep `write_lines`
+separate so an omitted range cannot accidentally turn a targeted edit into a
+whole-file replacement.
+
+Range access is unconditional. Remove `features.line_access`,
+`--line-access`, and `--no-line-access`; the normal read and write permissions
+remain the only tool-availability controls. Treat the removed INI setting and
+CLI flags as unknown input so stale configurations fail clearly instead of
+silently suggesting that range access can be disabled.
+
+### Implementation and tests
+
+- [x] Add optional paired range arguments to `RootedFilesystem.read_text` and
+  remove the public `read_lines` method and MCP tool.
+- [x] Keep the existing bounded scanner, validation messages, text policy, and
+  context-bounded range result behavior behind ranged `read_text` calls.
+- [x] Remove line-access state from settings, INI loading, precedence merging,
+  CLI parsing, tool discovery, and direct filesystem checks.
+- [x] Keep `write_lines` exposed whenever write permission is enabled, with all
+  coordinates required and its atomic-write contract unchanged.
+- [x] Update filesystem, configuration, MCP, and stdio tests for optional paired
+  read bounds, the five-tool catalog, removed settings and flags, permissions,
+  security boundaries, and runtime version reporting.
+- [x] Update the README contracts and replace the measured schema estimate.
+- [x] Keep the consolidated, unreleased feature set at version 0.3.0
+  consistently.
+
+### Completion gate
+
+Completed on macOS on 2026-07-15. The full 57-test offline suite passes with
+whole-file and ranged reads sharing `read_text`, dedicated atomic range writes,
+and stale line-access configuration rejected. End-to-end stdio tests cover the
+five-tool catalog, whole and ranged reads, range writes, permission denial, and
+the removed CLI flags. The measured default compact `tools/list` response is
+1,344 characters (1,300 characters for the definitions), a 14.1% definition
+reduction from Phase 3. No dependency or runtime download was added. Native
+Linux and Windows validation remains pending.
 
 ## Planned file changes
 

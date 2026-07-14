@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import stat
 import tempfile
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
@@ -45,6 +46,18 @@ class FileAccessError(Exception):
 
 class _HiddenPathError(FileAccessError):
     """Internal marker used to prune entries without disclosing their names."""
+
+
+@dataclass(frozen=True)
+class _LineScan:
+    """Validated line metadata with optional source bytes for replacement."""
+
+    selected_text: str
+    line_count: int
+    has_bom: bool
+    ended_with_newline: bool
+    nearby_newline: bytes
+    raw_lines: tuple[bytes, ...] | None = None
 
 
 class HiddenPathPolicy:
@@ -284,41 +297,164 @@ class RootedFilesystem:
             raise FileAccessError("Binary file access is denied")
 
     @staticmethod
-    def _decode_text(data: bytes) -> str:
-        if any(data.startswith(magic) for magic in BINARY_MAGIC) or b"\x00" in data:
+    def _reject_binary_bytes(data: bytes, *, prefix: bool = True) -> None:
+        has_signature = prefix and any(
+            data.startswith(magic) for magic in BINARY_MAGIC
+        )
+        if has_signature or b"\x00" in data:
             raise FileAccessError("Binary file access is denied")
+
+    @staticmethod
+    def _decode_utf8(data: bytes, *, strip_bom: bool = True) -> str:
         try:
-            return data.decode("utf-8-sig")
+            return data.decode("utf-8-sig" if strip_bom else "utf-8")
         except UnicodeDecodeError:
             raise FileAccessError("File is not UTF-8 text") from None
 
-    def _read_text_file(self, path: Path) -> str:
+    def _validate_text_path(self, path: Path) -> None:
         if not path.is_file():
             raise FileAccessError("Path is not a file")
         self._reject_binary_name(path)
         try:
             size = path.stat().st_size
-            if size > MAX_TEXT_BYTES:
-                raise FileAccessError("Text file exceeds 5 MiB limit")
-            return self._decode_text(path.read_bytes())
+        except OSError as exc:
+            raise FileAccessError(f"Cannot read file: {exc.strerror or exc}") from None
+        if size > MAX_TEXT_BYTES:
+            raise FileAccessError("Text file exceeds 5 MiB limit")
+
+    def _read_text_bytes(self, path: Path) -> bytes:
+        self._validate_text_path(path)
+        try:
+            with path.open("rb") as source:
+                data = source.read(MAX_TEXT_BYTES + 1)
+        except OSError as exc:
+            raise FileAccessError(f"Cannot read file: {exc.strerror or exc}") from None
+        if len(data) > MAX_TEXT_BYTES:
+            raise FileAccessError("Text file exceeds 5 MiB limit")
+        self._reject_binary_bytes(data)
+        return data
+
+    def _read_text_file(self, path: Path) -> str:
+        return self._decode_utf8(self._read_text_bytes(path))
+
+    @staticmethod
+    def _validate_line_range(start_line: Any, end_line: Any) -> tuple[int, int]:
+        if (
+            isinstance(start_line, bool)
+            or isinstance(end_line, bool)
+            or not isinstance(start_line, int)
+            or not isinstance(end_line, int)
+        ):
+            raise FileAccessError("Line numbers must be integers")
+        if start_line < 1 or end_line < 1:
+            raise FileAccessError("Line numbers must be one-based")
+        if start_line > end_line:
+            raise FileAccessError("Start line must not exceed end line")
+        return start_line, end_line
+
+    @staticmethod
+    def _line_ending(raw_line: bytes) -> bytes | None:
+        if raw_line.endswith(b"\r\n"):
+            return b"\r\n"
+        if raw_line.endswith(b"\n"):
+            return b"\n"
+        return None
+
+    def _scan_text_lines(
+        self,
+        path: Path,
+        start_line: int,
+        end_line: int,
+        *,
+        retain_source: bool = False,
+    ) -> _LineScan:
+        """Validate the full file while retaining only requested read text."""
+
+        self._validate_text_path(path)
+        selected: list[str] = []
+        raw_lines: list[bytes] | None = [] if retain_source else None
+        endings: list[bytes | None] = []
+        line_count = 0
+        byte_count = 0
+        has_bom = False
+        prefix_length = max(len(magic) for magic in BINARY_MAGIC)
+
+        try:
+            with path.open("rb") as source:
+                prefix = source.read(prefix_length)
+                self._reject_binary_bytes(prefix)
+                source.seek(0)
+                for raw_line in source:
+                    byte_count += len(raw_line)
+                    if byte_count > MAX_TEXT_BYTES:
+                        raise FileAccessError("Text file exceeds 5 MiB limit")
+                    self._reject_binary_bytes(raw_line, prefix=False)
+                    if line_count == 0 and raw_line.startswith(b"\xef\xbb\xbf"):
+                        has_bom = True
+                        raw_line = raw_line[3:]
+                        if not raw_line:
+                            continue
+                    decoded = self._decode_utf8(raw_line, strip_bom=False)
+                    line_count += 1
+                    endings.append(self._line_ending(raw_line))
+                    if raw_lines is not None:
+                        raw_lines.append(raw_line)
+                    if start_line <= line_count <= end_line:
+                        selected.append(decoded)
         except FileAccessError:
             raise
         except OSError as exc:
             raise FileAccessError(f"Cannot read file: {exc.strerror or exc}") from None
 
-    def read_text(self, user_path: str) -> str:
+        if end_line > line_count:
+            if line_count == 0:
+                raise FileAccessError("File contains no addressable lines")
+            raise FileAccessError(f"Line range exceeds file line count ({line_count})")
+
+        nearby: bytes | None = next(
+            (
+                ending
+                for ending in endings[start_line - 1 : end_line]
+                if ending is not None
+            ),
+            None,
+        )
+        if nearby is None:
+            nearby = next(
+                (ending for ending in reversed(endings[: start_line - 1]) if ending),
+                None,
+            )
+        if nearby is None:
+            nearby = next((ending for ending in endings[end_line:] if ending), b"\n")
+
+        return _LineScan(
+            selected_text="".join(selected),
+            line_count=line_count,
+            has_bom=has_bom,
+            ended_with_newline=bool(endings and endings[-1] is not None),
+            nearby_newline=nearby,
+            raw_lines=tuple(raw_lines) if raw_lines is not None else None,
+        )
+
+    def read_text(
+        self,
+        user_path: str,
+        start_line: Any = None,
+        end_line: Any = None,
+    ) -> str:
         self._require_read()
-        return self._read_text_file(self.resolve(user_path))
+        if (start_line is None) != (end_line is None):
+            raise FileAccessError(
+                "Start line and end line must be provided together"
+            )
+        path = self.resolve(user_path)
+        if start_line is None:
+            return self._read_text_file(path)
+        start_line, end_line = self._validate_line_range(start_line, end_line)
+        return self._scan_text_lines(path, start_line, end_line).selected_text
 
-    def write_text(self, user_path: str, content: str) -> str:
-        self._require_write()
-        if not isinstance(content, str):
-            raise FileAccessError("Content must be a string")
-        data = content.encode("utf-8")
-        if len(data) > MAX_TEXT_BYTES:
-            raise FileAccessError("Text exceeds 5 MiB limit")
-
-        path = self.resolve(user_path, must_exist=False)
+    def _write_target(self, user_path: str, *, must_exist: bool) -> tuple[Path, Path]:
+        path = self.resolve(user_path, must_exist=must_exist)
         self._reject_binary_name(path)
         try:
             parent = path.parent.resolve(strict=True)
@@ -328,22 +464,34 @@ class RootedFilesystem:
         if not parent.is_dir():
             raise FileAccessError("Parent is not a folder")
         if path.exists():
-            if not path.is_file():
-                raise FileAccessError("Path is not a file")
-            # Do not allow a binary file to be replaced through the text tool.
             self._read_text_file(path)
+        elif must_exist:
+            raise FileAccessError("Path is outside root or does not exist")
+        return path, parent
 
+    def _replace_atomically(
+        self,
+        user_path: str,
+        path: Path,
+        parent: Path,
+        data: bytes,
+        *,
+        must_exist: bool,
+    ) -> None:
         temp_name: str | None = None
         try:
             mode = path.stat().st_mode if path.exists() else None
-            with tempfile.NamedTemporaryFile(dir=parent, prefix=".rooted-mcp-", delete=False) as temp:
+            with tempfile.NamedTemporaryFile(
+                dir=parent, prefix=".rooted-mcp-", delete=False
+            ) as temp:
                 temp_name = temp.name
                 temp.write(data)
                 temp.flush()
                 os.fsync(temp.fileno())
             if mode is not None:
                 os.chmod(temp_name, stat.S_IMODE(mode))
-            rechecked_path = self.resolve(user_path, must_exist=False)
+
+            rechecked_path = self.resolve(user_path, must_exist=must_exist)
             try:
                 rechecked_parent = rechecked_path.parent.resolve(strict=True)
                 rechecked_parent.relative_to(self.root)
@@ -355,6 +503,8 @@ class RootedFilesystem:
                 raise FileAccessError("Path changed during write")
             if rechecked_path.exists():
                 self._read_text_file(rechecked_path)
+            elif must_exist:
+                raise FileAccessError("Path changed during write")
             os.replace(temp_name, path)
         except (FileAccessError, OSError) as exc:
             if temp_name:
@@ -365,4 +515,85 @@ class RootedFilesystem:
             if isinstance(exc, FileAccessError):
                 raise
             raise FileAccessError(f"Cannot write file: {exc.strerror or exc}") from None
+
+    def write_text(self, user_path: str, content: str) -> str:
+        self._require_write()
+        if not isinstance(content, str):
+            raise FileAccessError("Content must be a string")
+        try:
+            data = content.encode("utf-8")
+        except UnicodeEncodeError:
+            raise FileAccessError("Content is not valid UTF-8 text") from None
+        if len(data) > MAX_TEXT_BYTES:
+            raise FileAccessError("Text exceeds 5 MiB limit")
+
+        path, parent = self._write_target(user_path, must_exist=False)
+        self._replace_atomically(user_path, path, parent, data, must_exist=False)
         return f"Wrote {len(data)} bytes to {user_path}"
+
+    @staticmethod
+    def _replacement_bytes(
+        content: str,
+        newline: bytes,
+        *,
+        needs_terminator: bool,
+    ) -> bytes:
+        """Normalize replacement separators and apply the required boundary."""
+
+        if not content:
+            return b""
+        normalized = content.replace("\r\n", "\n")
+        if normalized.endswith("\n"):
+            normalized = normalized[:-1]
+        if not needs_terminator:
+            normalized = normalized.rstrip("\n")
+        normalized = normalized.replace("\n", newline.decode("ascii"))
+        if needs_terminator:
+            normalized += newline.decode("ascii")
+        try:
+            return normalized.encode("utf-8")
+        except UnicodeEncodeError:
+            raise FileAccessError("Content is not valid UTF-8 text") from None
+
+    def write_lines(
+        self,
+        user_path: str,
+        start_line: Any,
+        end_line: Any,
+        content: Any,
+    ) -> str:
+        self._require_write()
+        start_line, end_line = self._validate_line_range(start_line, end_line)
+        if not isinstance(content, str):
+            raise FileAccessError("Content must be a string")
+
+        path, parent = self._write_target(user_path, must_exist=True)
+        scan = self._scan_text_lines(
+            path, start_line, end_line, retain_source=True
+        )
+        assert scan.raw_lines is not None
+        through_eof = end_line == scan.line_count
+        replacement = self._replacement_bytes(
+            content,
+            scan.nearby_newline,
+            needs_terminator=(not through_eof or scan.ended_with_newline),
+        )
+        prefix = b"\xef\xbb\xbf" if scan.has_bom else b""
+        data = b"".join(
+            (
+                prefix,
+                *scan.raw_lines[: start_line - 1],
+                replacement,
+                *scan.raw_lines[end_line:],
+            )
+        )
+        if len(data) > MAX_TEXT_BYTES:
+            raise FileAccessError("Text exceeds 5 MiB limit")
+
+        self._replace_atomically(
+            user_path, path, parent, data, must_exist=True
+        )
+        return (
+            f"Replaced lines {start_line}-{end_line}; "
+            f"result is {len(data)} UTF-8 bytes"
+        )
