@@ -1,12 +1,20 @@
 extends RefCounted
 
+const ErrorEnvelope := preload("error_envelope.gd")
+
 var _editor_interface: EditorInterface
 var _undo_redo: EditorUndoRedoManager
+var _operations: RefCounted
 
 
-func _init(editor_interface: EditorInterface, undo_redo: EditorUndoRedoManager) -> void:
+func _init(
+	editor_interface: EditorInterface,
+	undo_redo: EditorUndoRedoManager,
+	operations: RefCounted = null,
+) -> void:
 	_editor_interface = editor_interface
 	_undo_redo = undo_redo
+	_operations = operations
 
 
 func get_editor_interface() -> EditorInterface:
@@ -137,6 +145,14 @@ func _only_keys(dictionary: Dictionary, allowed: Array) -> bool:
 	return true
 
 
+func _accept_operation(kind: String, details: Dictionary = {}, run_id: Variant = null) -> Variant:
+	return null if _operations == null else _operations.accept(kind, details, run_id)
+
+
+func _error_message(response: Dictionary) -> String:
+	return ErrorEnvelope.message(response)
+
+
 func _normalize_input_event(event: Variant) -> Dictionary:
 	if event is InputEventKey:
 		var physical: bool = event.physical_keycode != 0
@@ -160,8 +176,13 @@ func _normalize_input_event(event: Variant) -> Dictionary:
 
 
 func _success(result: Variant) -> Dictionary:
-	return {"ok": true, "result": result}
+	return ErrorEnvelope.success(result)
 
 
-func _failure(message: String) -> Dictionary:
-	return {"ok": false, "error": message}
+func _failure(
+	message: String,
+	code := "",
+	details: Variant = {},
+	retryable := false,
+) -> Dictionary:
+	return ErrorEnvelope.failure(message, code, details, retryable)

@@ -34,6 +34,9 @@ to one boundary do not require editing the entire server:
 - `stdio.py` owns newline-delimited JSON-RPC input/output and stderr diagnostics.
 - `cli.py` parses arguments and composes the bridge, asset manager, launcher,
   and MCP server.
+- `errors.py` defines bounded error envelopes and stable typed exceptions.
+- `discovery.py` validates project-scoped bridge heartbeat records and selects a
+  live matching port when `--port` is omitted.
 - `assets.py`, `bridge.py`, and `launcher.py` remain focused adapters for their
   filesystem, localhost transport, and process responsibilities.
 
@@ -47,8 +50,13 @@ imports from `godot_editor_mcp.server` for compatibility.
 The dependency-free editor plugin is split by responsibility under
 `plugin/addons/godot_mcp`:
 
-- `godot_mcp.gd` owns the `EditorPlugin` lifecycle, authenticated localhost
-  transport, command routing, capabilities, and editor run-state tracking.
+- `godot_mcp.gd` owns only plugin lifecycle and service composition.
+- `bridge_server.gd` and `command_router.gd` own authenticated localhost
+  transport and command dispatch.
+- `editor_state_monitor.gd`, `event_store.gd`, and `operation_registry.gd` own
+  observed editor state, monotonic event IDs, and asynchronous operation IDs.
+- `discovery_record.gd` atomically publishes the project-scoped bridge heartbeat.
+- `error_envelope.gd` centralizes bounded bridge success and failure envelopes.
 - `asset_commands.gd` handles asset discovery, resource creation, and scene
   file creation or opening.
 - `scene_commands.gd` handles edited-scene inspection and UndoRedo-backed node
@@ -112,7 +120,7 @@ means `small` and `large`.
 | `instantiate_scene` | All | Add a PackedScene instance through undo history |
 | `node_info` | All | Editable properties for one node, limited to 64 |
 | `set_property` | All | Change one property through Godot's undo history |
-| `scene_control` | All | Save, run, or stop the current scene |
+| `scene_control` | All | Save or run the scene; stop the active run by its returned run ID |
 | `list_assets` | Small+ | Filtered project assets, limited to 100 results |
 | `asset_info` | Small+ | Type, category, size, import state, and dependencies |
 | `scan_asset` | Small+ | Queue a Godot filesystem scan for an existing project asset |
@@ -155,12 +163,19 @@ Exact token usage varies by model and by how the MCP client represents tool
 definitions. Enabling `rooted-files-mcp` alongside this server adds its own tool
 definitions, so prefer `tiny` for tightly supervised GDScript and UI work.
 
-`capabilities` is the authoritative compatibility check. Its result combines
+`capabilities` is the authoritative compatibility check. After MCP
+initialization, its result includes the negotiated protocol version and combines
 the Python MCP server's version, active mode, and exposed MCP tool names with
 the plugin's version, supported bridge commands, optional-feature flags, Godot
 version, and effective limits. Optional features currently reported as
 unsupported are diagnostics, runtime inspection, game-view capture, and input
 injection.
+
+Bridge failures have a stable JSON envelope with `code`, `message`, bounded
+`details`, and `retryable`. The Python client turns known codes into typed
+exceptions and preserves all four fields in MCP tool errors. It continues to
+decode old string failures so the Python package and installed plugin can be
+upgraded in either order; matching versions are still recommended.
 
 ## Project settings and Input Map
 
@@ -220,7 +235,8 @@ whether an editor refresh, project reload, or editor restart is required.
 
 `editor_state` reports the project name and path, main scene, Godot and bridge
 versions, bridge port, edited scene and selection, filesystem scan status and
-generation, play state, current/last run ID, last run status, and stop reason.
+generation, play state, current/last run ID, last run status, stop reason,
+latest observed event IDs, and concise accepted operations.
 The project path is absolute for issue identification; scene and asset paths
 remain `res://` or project-relative.
 
@@ -262,7 +278,8 @@ A `.gltf` file whose textures or buffers are separate must have those dependency
 files imported individually. Imports are limited to 100 MiB, stream-copy in
 1 MiB chunks, never overwrite existing files, and cannot target `.godot` or
 `addons`. Godot scans new files asynchronously, so `import_asset` reports
-`"scan":"queued"` or `"scan":"already_running"`. Use
+`"scan":"queued"` or `"scan":"already_running"` and returns the scan
+operation ID when new work is accepted. Use
 `editor_state.filesystem_scanning` and `filesystem_generation` to observe the
 scan, then use `asset_info` if the model needs to confirm the final resource
 type. `scan_asset` can explicitly request a scan for an existing project file.
@@ -322,10 +339,22 @@ Instantiate another scene in the edited scene:
 Added nodes receive the edited scene root as owner, so Godot includes them when
 the scene is saved. `add_node`, `instantiate_scene`, and `set_property` use the
 editor's undo history. Save explicitly with `scene_control` after a group of
-changes. The `run` and `stop` actions return the associated run ID; subsequent
-`editor_state` calls report whether that run is active and why the last run
-stopped. Commands are not yet awaitable, so “started” still means the editor
-accepted the request rather than that a startup health window passed.
+changes. The `run` action returns a run ID and operation ID. Pass that run ID
+back when calling `stop`; stale or missing IDs are rejected. Stop returns its
+own operation ID. Subsequent `editor_state` calls report whether that run is
+active and why it stopped. Commands are not yet awaitable, so “started” still
+means the editor accepted the request rather than that a startup health window
+passed.
+
+```json
+{"action":"run"}
+```
+
+If that returns `"run_id":3`, stop only that run with:
+
+```json
+{"action":"stop","run_id":3}
+```
 
 ## Install the Godot plugin
 
@@ -350,8 +379,15 @@ When updating, replace the installed `addons/godot_mcp` folder and restart the
 plugin or editor along with the Python MCP process. Keep their versions aligned;
 `capabilities` reports both versions for verification.
 
+The plugin atomically writes `.godot/godot_mcp_bridge.json` with its process ID,
+project-path hash, port, versions, and heartbeat. It never writes the token or
+absolute project path there. When `--port` is omitted, the Python process uses
+only a live record whose project hash matches; malformed or stale records fall
+back to 6505, and another-project records are rejected.
+
 If port 6505 is already in use, set `godot_mcp/port` to another port in the
-project's `project.godot`, then add the same port to the MCP arguments:
+project's `project.godot`. Automatic discovery needs no MCP argument; if you
+choose an explicit override, add the same port to the MCP arguments:
 
 ```ini
 [godot_mcp]
@@ -480,11 +516,13 @@ Set-Location "C:\path\to\godot-editor-mcp"
 py -3 -m unittest discover -s tests -v
 ```
 
-The Python suite tests MCP initialization, end-to-end stdio initialization,
+The 37-test Python suite tests MCP initialization, end-to-end stdio initialization,
 tool listing and calls, per-mode dispatch, capability augmentation, public scan
-routing, Project Settings command routing, authentication, bounded transport
+route selection, Project Settings command routing, authentication, bounded transport
 behavior, staged imports, traversal and symlink denial, size limits,
-no-overwrite behavior, and safe stdout/stderr error separation. A live check in Godot is still required
+no-overwrite behavior, structured and legacy bridge errors, negotiated protocol
+reporting, discovery record validation, and safe stdout/stderr error separation.
+A live check in Godot is still required
 when claiming compatibility because editor plugin APIs are only available inside
 the editor. Symbolic-link tests are skipped when the current account cannot
 create links; enable Windows Developer Mode or use the required privilege to run

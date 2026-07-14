@@ -99,12 +99,12 @@ func _project_settings_patch(arguments: Dictionary) -> Dictionary:
 			else:
 				var expected := _decode_setting_value(change.expected, typeof(before))
 				if not expected.ok:
-					return _failure("Invalid expected value for %s: %s" % [key, expected.error])
+					return _failure("Invalid expected value for %s: %s" % [key, _error_message(expected)])
 				if expected.result != before:
 					return _failure("Compare-and-swap failed for %s" % key)
 		var converted := _decode_setting_value(change.value, typeof(before) if existed else TYPE_NIL)
 		if not converted.ok:
-			return _failure("Invalid value for %s: %s" % [key, converted.error])
+			return _failure("Invalid value for %s: %s" % [key, _error_message(converted)])
 		prepared.append({
 			"key": key, "existed": existed, "before_raw": before,
 			"after_raw": converted.result,
@@ -292,6 +292,5 @@ func _encode_setting_value(value: Variant, depth := 0) -> Variant:
 			return output
 		_:
 			return "<unsupported:%s>" % type_string(typeof(value))
-
 
 

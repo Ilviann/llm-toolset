@@ -4,6 +4,7 @@ import json
 import unittest
 
 from godot_editor_mcp.bridge import BridgeError
+from godot_editor_mcp.errors import NotFoundError
 from godot_editor_mcp.server import MCPServer, MODE_TOOL_NAMES
 
 
@@ -14,7 +15,7 @@ class FakeBridge:
     def call(self, command: str, arguments: dict | None = None):
         self.calls.append((command, arguments or {}))
         if command == "inspect" and arguments == {"path": "Missing"}:
-            raise BridgeError("Node not found")
+            raise NotFoundError("Node not found", details={"path": "Missing"})
         return {"command": command, "arguments": arguments or {}}
 
 
@@ -122,6 +123,8 @@ class MCPServerTests(unittest.TestCase):
         self.assertEqual(self.bridge.calls, [
             ("scan_asset", {"path": "assets/hero.png"})
         ])
+        payload = json.loads(response["result"]["content"][0]["text"])
+        self.assertIn("operation_id", payload)
 
     def test_create_scene_is_validated_then_sent_to_editor(self) -> None:
         arguments = {"path": "scenes/main.tscn", "root_type": "Node2D", "root_name": "Main"}
@@ -179,11 +182,13 @@ class MCPServerTests(unittest.TestCase):
 
     def test_capabilities_include_mode_and_exposed_tools(self) -> None:
         self.server = MCPServer(self.bridge, self.assets, mode="small")  # type: ignore[arg-type]
+        self.request("initialize", {"protocolVersion": "2025-06-18"})
         response = self.request("tools/call", {"name": "capabilities"})
         payload = response["result"]["content"][0]["text"]
         capabilities = json.loads(payload)
         self.assertEqual(capabilities["mode"], "small")
         self.assertEqual(capabilities["tools"], list(MODE_TOOL_NAMES["small"]))
+        self.assertEqual(capabilities["mcp_protocol_version"], "2025-06-18")
         self.assertNotIn("editor_launcher", capabilities)
 
     def test_start_editor_is_large_only_and_uses_launcher(self) -> None:
@@ -211,7 +216,13 @@ class MCPServerTests(unittest.TestCase):
             "name": "node_info", "arguments": {"path": "Missing"}
         })
         self.assertTrue(response["result"]["isError"])
-        self.assertEqual(response["result"]["content"][0]["text"], "Node not found")
+        error = json.loads(response["result"]["content"][0]["text"])
+        self.assertEqual(error, {
+            "code": "not_found",
+            "details": {"path": "Missing"},
+            "message": "Node not found",
+            "retryable": False,
+        })
 
     def test_notification_has_no_response(self) -> None:
         self.assertIsNone(self.server.handle({

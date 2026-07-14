@@ -33,7 +33,12 @@ def build_parser() -> argparse.ArgumentParser:
         default="tiny",
         help="Available toolset: tiny (default), small, or large",
     )
-    parser.add_argument("--port", type=int, default=6505, help="Plugin port (default: 6505)")
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=None,
+        help="Plugin port (default: discover from the project, then 6505)",
+    )
     parser.add_argument("--import-root", help="Folder containing assets staged for import")
     return parser
 

@@ -144,7 +144,11 @@ class ToolDispatcher:
     def _queue_scan(self, output: dict[str, Any], path: str) -> None:
         try:
             scan = self.bridge.call("scan_asset", {"path": path.removeprefix("res://")})
-            output["scan"] = scan.get("scan", "queued") if isinstance(scan, dict) else "queued"
+            if isinstance(scan, dict):
+                output["scan"] = scan.get("scan", "queued")
+                output["operation_id"] = scan.get("operation_id")
+            else:
+                output["scan"] = "queued"
         except BridgeError as exc:
             output["scan"] = "pending"
             output["warning"] = str(exc)

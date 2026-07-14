@@ -193,10 +193,17 @@ TOOLS = [
     },
     {
         "name": "scene_control",
-        "description": "Save, run, or stop the current scene.",
+        "description": "Save or run the scene; stop requires its current run ID.",
         "inputSchema": {
             "type": "object",
-            "properties": {"action": {"type": "string", "enum": ["save", "run", "stop"]}},
+            "properties": {
+                "action": {"type": "string", "enum": ["save", "run", "stop"]},
+                "run_id": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Required for stop; use the ID returned by run.",
+                },
+            },
             "required": ["action"], "additionalProperties": False,
         },
     },

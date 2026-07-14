@@ -180,30 +180,11 @@ avoid full property listings.
 
 ## Priority 4: protocol quality and maintainability
 
-### Complete capability discovery
-
-Include the negotiated MCP protocol version in `capabilities` so clients can
-discover it without retaining the `initialize` response.
-
-### Return structured errors
-
-Return stable error codes, messages, and bounded details. Cover unauthorized,
-invalid argument, protected path, not found, editor busy, import pending, no
-active run, stale runtime ID, timeout, and unsupported capability cases.
-
-### Add operation IDs and complete run scoping
-
-Return operation IDs for asynchronous editor work. Include run IDs in future
-diagnostics, runtime-node results, captures, and input requests so stale results
-cannot be mistaken for current state.
-
-### Improve port-conflict reporting and discovery
-
-Report clearly when another editor may own the configured localhost port.
-Consider a project-scoped discovery record containing process identity, project
-path hash, port, protocol version, and heartbeat timestamp. Do not weaken
-localhost binding or token authentication, and never connect automatically to
-a bridge for another project.
+The Phase 1 protocol foundation is complete: negotiated protocol reporting,
+structured bridge errors, operation and event IDs, run-scoped stop requests,
+focused plugin services, and project-scoped bridge discovery are implemented.
+Extend those existing contracts rather than introducing parallel state or
+error formats in the remaining work.
 
 ### Add focused bridge tests for planned behavior
 
@@ -223,4 +204,4 @@ Add coverage alongside the corresponding features for:
 3. Read-only runtime inspection and signal watches.
 4. Game-view capture and bounded gameplay input.
 5. Structural editing and batched UndoRedo transactions.
-6. Autoload helpers, pagination, structured errors, and protocol discovery.
+6. Autoload helpers, pagination, and final capability coverage.

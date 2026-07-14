@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import Any
 
 from . import __version__
+from .errors import DomainError
 from .stdio import error, result, tool_result
 from .tool_catalog import (
     LATEST_PROTOCOL,
@@ -53,6 +54,7 @@ class MCPServer:
         self.launcher = launcher
         self.tool_names = MODE_TOOL_NAMES[mode]
         self.tools = tools_for_mode(mode)
+        self.negotiated_protocol_version: str | None = None
         self._dispatcher = ToolDispatcher(
             bridge, assets, mode=mode, launcher=launcher
         )
@@ -76,6 +78,7 @@ class MCPServer:
         if method == "initialize":
             requested = params.get("protocolVersion")
             protocol = requested if requested in SUPPORTED_PROTOCOLS else LATEST_PROTOCOL
+            self.negotiated_protocol_version = protocol
             return result(request_id, {
                 "protocolVersion": protocol,
                 "capabilities": {"tools": {}},
@@ -102,7 +105,14 @@ class MCPServer:
             )
         try:
             output = self._dispatcher.call(name, arguments)
+            if name == "capabilities" and isinstance(output, dict):
+                output = {
+                    **output,
+                    "mcp_protocol_version": self.negotiated_protocol_version,
+                }
             return result(request_id, tool_result(output))
+        except DomainError as exc:
+            return result(request_id, tool_result(exc.as_dict(), is_error=True))
         except TOOL_ERRORS as exc:
             return result(request_id, tool_result(str(exc), is_error=True))
 

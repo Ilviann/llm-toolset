@@ -2,13 +2,13 @@
 
 ## Implementation progress checklist
 
-- [ ] Phase 1 — Protocol and architecture foundation
-  - [ ] Add structured error envelopes and typed Python exceptions.
-  - [ ] Add operation IDs, event IDs, and complete run scoping.
-  - [ ] Report the negotiated MCP protocol version through `capabilities`.
-  - [ ] Split bridge transport, routing, state, and feature services.
-  - [ ] Add project-scoped port discovery and heartbeat records.
-  - [ ] Preserve existing tool names, modes, and public Python imports.
+- [x] Phase 1 — Protocol and architecture foundation
+  - [x] Add structured error envelopes and typed Python exceptions.
+  - [x] Add operation IDs, event IDs, and complete run scoping.
+  - [x] Report the negotiated MCP protocol version through `capabilities`.
+  - [x] Split bridge transport, routing, state, and feature services.
+  - [x] Add project-scoped port discovery and heartbeat records.
+  - [x] Preserve existing tool names, modes, and public Python imports.
 - [ ] Phase 2 — Diagnostics, editor state, imports, and bounded waiting
   - [ ] Add bounded editor and runtime diagnostic stores.
   - [ ] Add `get_diagnostics` with scope, severity, cursor, limit, and run filters.
@@ -52,10 +52,10 @@ reload, runtime inspection, capture, and input all require shared state,
 operation lifecycle, and error contracts. Adding them before those foundations
 would duplicate state and make failure handling unreliable.
 
-The protocol and architecture work currently listed under Priority 4 in
-`TODO.md` must therefore be delivered first. Structured errors, operation IDs,
-event cursors, run scoping, and capability negotiation are prerequisites for
-the higher-priority user-facing features rather than final cleanup work.
+Phase 1 delivered the protocol and architecture foundation previously listed
+under Priority 4 in `TODO.md`. Structured errors, operation IDs, event cursors,
+run scoping, capability negotiation, and project-scoped discovery are now the
+base for the higher-priority user-facing features.
 
 Development must remain offline-capable and dependency-free at runtime. The
 implementation should continue to use the Python standard library, Godot APIs,
@@ -71,7 +71,7 @@ The project already has a strong compact foundation:
   validation, and limit responsibilities.
 - Root confinement, traversal and symlink denial, request limits, tool modes,
   authentication, and basic UndoRedo integration are implemented.
-- The current Python suite contains 31 passing tests.
+- The current Python suite contains 37 passing tests.
 - The plugin is verified against Godot 4.7 stable on macOS.
 
 The main limitations affecting the roadmap are:
@@ -81,7 +81,8 @@ The main limitations affecting the roadmap are:
   plugin would freeze the editor.
 - The Python bridge uses short-lived connections and a fixed request timeout,
   with no operation or reconnection coordinator.
-- Bridge and tool errors are currently plain strings.
+- Bridge errors are structured; local filesystem and launcher errors still use
+  concise string results and can be migrated when their domains expand.
 - Editor state includes only basic filesystem and run observations.
 - Asset scans are project-wide and are not associated with per-resource
   completion or errors.

@@ -129,9 +129,10 @@ func _scan_asset(arguments: Dictionary) -> Dictionary:
 		return checked
 	var filesystem := get_editor_interface().get_resource_filesystem()
 	if filesystem.is_scanning():
-		return _success({"path": checked.result, "scan": "already_running"})
+		return _success({"path": checked.result, "scan": "already_running", "operation_id": null})
+	var operation_id = _accept_operation("filesystem_scan", {"path": checked.result})
 	filesystem.scan()
-	return _success({"path": checked.result, "scan": "queued"})
+	return _success({"path": checked.result, "scan": "queued", "operation_id": operation_id})
 
 
 func _create_resource(arguments: Dictionary) -> Dictionary:
@@ -165,7 +166,7 @@ func _create_resource(arguments: Dictionary) -> Dictionary:
 			return _failure("Editable resource property not found: %s" % property_name)
 		var converted := _convert_value(properties[property_name], int(property_info.type))
 		if not converted.ok:
-			return _failure("Invalid %s: %s" % [property_name, converted.error])
+			return _failure("Invalid %s: %s" % [property_name, _error_message(converted)])
 		resource.set(property_name, converted.result)
 	var save_error := ResourceSaver.save(resource, path)
 	if save_error != OK:
@@ -224,7 +225,8 @@ func _open_scene(arguments: Dictionary) -> Dictionary:
 		return _failure("PackedScene not found")
 	get_editor_interface().get_resource_filesystem().update_file(path)
 	get_editor_interface().open_scene_from_path(path)
-	return _success({"path": path, "open": "requested"})
+	var operation_id = _accept_operation("open_scene", {"path": path})
+	return _success({"path": path, "open": "requested", "operation_id": operation_id})
 
 
 func _asset_category(path: String, resource_type: String) -> String:

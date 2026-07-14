@@ -3,6 +3,19 @@
 This file records released changes. Planned work is tracked separately in
 [`TODO.md`](TODO.md).
 
+## 0.5.0 — 2026-07-14
+
+- Added bounded structured bridge errors, stable domain codes, and typed Python
+  exceptions while retaining transitional support for legacy string errors.
+- Added operation IDs for asynchronous scene, filesystem, and run requests;
+  monotonic event IDs for observed state changes; and run-scoped stop requests.
+- Added negotiated MCP protocol reporting through `capabilities`.
+- Split Godot transport, routing, editor state, events, operations, and bridge
+  discovery into focused services.
+- Added an atomic project-hash-scoped bridge discovery heartbeat under `.godot`
+  with no token or absolute project path, plus live, stale, malformed, and
+  project-mismatch tests.
+
 ## 0.4.1 — 2026-07-13
 
 - Split the Godot editor plugin into focused asset, scene, Project Settings,

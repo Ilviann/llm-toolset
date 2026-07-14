@@ -1,6 +1,7 @@
 extends RefCounted
 
 const MAX_REQUEST_BYTES := 64 * 1024
+const MAX_RESPONSE_BYTES := 256 * 1024
 const MAX_TREE_NODES := 200
 const MAX_PROPERTIES := 64
 const MAX_ASSETS := 100
