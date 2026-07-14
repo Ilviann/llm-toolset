@@ -116,6 +116,10 @@ class MCPServer:
         except TOOL_ERRORS as exc:
             return result(request_id, tool_result(str(exc), is_error=True))
 
+    def close(self) -> None:
+        """Cancel outstanding waits during stdio or host shutdown."""
+        self._dispatcher.close()
+
 
 def run(
     bridge: BridgeClient,

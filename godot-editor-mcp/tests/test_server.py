@@ -90,6 +90,7 @@ class MCPServerTests(unittest.TestCase):
         self.assertIn("project_settings_get", small)
         self.assertIn("project_settings_patch", small)
         self.assertIn("input_map_patch", small)
+        self.assertIn("reload_project", tiny)
 
     def test_tool_outside_mode_is_rejected_without_bridge_call(self) -> None:
         response = self.request("tools/call", {
@@ -144,6 +145,43 @@ class MCPServerTests(unittest.TestCase):
         })
         self.assertNotIn("isError", response["result"])
         self.assertEqual(bridge.calls[0], ("open_scene", {"path": "scenes/main.tscn"}))
+
+    def test_reload_wait_fields_stay_local_and_reconnect_is_reported(self) -> None:
+        class ReloadedBridge(FakeBridge):
+            def call(self, command: str, arguments: dict | None = None):
+                self.calls.append((command, arguments or {}))
+                if command == "reload_project":
+                    return {
+                        "status": "scheduled",
+                        "operation_id": "op-9",
+                        "project_hash": "a" * 64,
+                        "bridge_version": "0.7.0",
+                    }
+                if command == "reload_status":
+                    return {
+                        "completed": True,
+                        "status": "completed",
+                        "operation_id": "op-9",
+                        "project_hash": "a" * 64,
+                        "bridge_version": "0.7.0",
+                    }
+                raise AssertionError(command)
+
+        bridge = ReloadedBridge()
+        self.server = MCPServer(bridge, self.assets)  # type: ignore[arg-type]
+        response = self.request("tools/call", {
+            "name": "reload_project",
+            "arguments": {
+                "stop_running": True,
+                "save_scenes": True,
+                "wait": True,
+                "timeout_ms": 1000,
+            },
+        })
+        self.assertNotIn("isError", response["result"])
+        self.assertEqual(bridge.calls[0], ("reload_project", {
+            "stop_running": True, "save_scenes": True,
+        }))
 
     def test_import_copies_then_queues_editor_scan(self) -> None:
         self.server = MCPServer(self.bridge, self.assets, mode="small")  # type: ignore[arg-type]

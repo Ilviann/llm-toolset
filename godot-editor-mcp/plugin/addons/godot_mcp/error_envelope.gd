@@ -16,6 +16,10 @@ const TIMEOUT := "timeout"
 const UNSUPPORTED_CAPABILITY := "unsupported_capability"
 const STALE_CURSOR := "stale_cursor"
 const PROJECT_MISMATCH := "project_mismatch"
+const SAVE_FAILED := "save_failed"
+const MALFORMED_OPERATION := "malformed_operation"
+const STALE_OPERATION := "stale_operation"
+const VERSION_MISMATCH := "version_mismatch"
 
 
 static func success(result: Variant) -> Dictionary:

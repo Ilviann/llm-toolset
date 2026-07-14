@@ -37,6 +37,7 @@ BRIDGE_COMMANDS = {
     "capabilities": "capabilities",
     "editor_state": "state",
     "get_diagnostics": "diagnostics",
+    "reload_project": "reload_project",
     "list_assets": "assets",
     "asset_info": "asset_info",
     "scan_asset": "scan_asset",
@@ -87,11 +88,11 @@ class ToolDispatcher:
             raise ValueError("Unknown tool")
         self._validate_project_path(name, arguments)
         wait, timeout_ms = self.waiter.options(arguments) if name in {
-            "open_scene", "scan_asset", "scene_control"
+            "open_scene", "scan_asset", "scene_control", "reload_project"
         } else (False, 0)
         bridge_arguments = (
             self.waiter.bridge_arguments(arguments) if name in {
-                "open_scene", "scan_asset", "scene_control"
+            "open_scene", "scan_asset", "scene_control", "reload_project"
             } else arguments
         )
         output = self.bridge.call(command, bridge_arguments)
@@ -109,7 +110,17 @@ class ToolDispatcher:
                 output["wait"] = self._wait_for_control(
                     arguments, output, operation_id, timeout_ms
                 )
+            elif name == "reload_project":
+                output["wait"] = self.waiter.wait_for_reload(
+                    operation_id,
+                    output.get("project_hash"),
+                    output.get("bridge_version"),
+                    timeout_ms,
+                )
         return self._augment_capabilities(output) if name == "capabilities" else output
+
+    def close(self) -> None:
+        self.waiter.cancel()
 
     def _start_editor(self, arguments: dict[str, Any]) -> dict[str, str]:
         if arguments:

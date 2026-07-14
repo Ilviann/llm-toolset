@@ -61,6 +61,19 @@ TOOLS = [
         },
     },
     {
+        "name": "reload_project",
+        "description": "Safely restart this project and optionally wait for reconnect.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "stop_running": {"type": "boolean", "default": False},
+                "save_scenes": {"type": "boolean", "default": False},
+                **WAIT_PROPERTIES,
+            },
+            "additionalProperties": False,
+        },
+    },
+    {
         "name": "list_assets",
         "description": "List project assets, limited to 100 results.",
         "inputSchema": {
@@ -331,7 +344,7 @@ TOOL_BY_NAME = {tool["name"]: tool for tool in TOOLS}
 
 # Modes are strict supersets so clients can increase context without losing tools.
 TINY_TOOLS = (
-    "capabilities", "editor_state", "get_diagnostics", "create_scene", "open_scene", "scene_tree",
+    "capabilities", "editor_state", "get_diagnostics", "reload_project", "create_scene", "open_scene", "scene_tree",
     "add_node", "instantiate_scene", "node_info", "set_property", "scene_control",
 )
 SMALL_TOOLS = TINY_TOOLS + (

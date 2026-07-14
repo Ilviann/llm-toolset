@@ -3,6 +3,20 @@
 This file records released changes. Planned work is tracked separately in
 [`ROADMAP.md`](ROADMAP.md).
 
+## 0.7.0 — 2026-07-15
+
+- Added the all-mode `reload_project` tool with explicit run-stop and scene-save
+  safeguards, optional bounded waiting, and no silent scene discard.
+- Added bounded atomic pending-reload records, startup validation and recovery,
+  and distinct malformed, stale, version-mismatch, project-mismatch, save, and
+  timeout failures.
+- Added disconnect-aware project-scoped rediscovery, token reauthentication,
+  bridge/project/operation identity verification, and cancellable waits.
+- Added pure GDScript record checks, expanded the offline Python suite to 48
+  tests, and passed a native macOS Godot 4.7 subprocess restart test covering
+  active runs, dirty scenes, save failure, authenticated reconnect, and saved
+  scene continuity.
+
 ## 0.6.0 — 2026-07-15
 
 - Added a mutex-protected, 256-record diagnostic logger with stable event

@@ -30,6 +30,24 @@ func complete(operation_id: String, details: Dictionary = {}) -> void:
 	_operations[operation_id]["completion"] = details
 
 
+func restore_completed(
+	operation_id: String, kind: String, details: Dictionary = {}, completion: Dictionary = {},
+) -> void:
+	if operation_id.is_empty() or _operations.has(operation_id):
+		return
+	_operations[operation_id] = {
+		"operation_id": operation_id,
+		"kind": kind.left(64),
+		"status": "completed",
+		"run_id": null,
+		"details": details,
+		"completion": completion,
+	}
+	_order.append(operation_id)
+	while _order.size() > MAX_OPERATIONS:
+		_operations.erase(_order.pop_front())
+
+
 func complete_kind(kind: String, details: Dictionary = {}) -> void:
 	for operation_id in _order:
 		var operation: Dictionary = _operations[operation_id]

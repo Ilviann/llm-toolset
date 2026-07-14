@@ -2,7 +2,7 @@
 
 ## Phase checklist
 
-- [ ] Phase 3 — Reload the configured project and reconnect safely.
+- [x] Phase 3 — Reload the configured project and reconnect safely.
 - [ ] Phase 4 — Make edited-scene and asset inspection targeted and complete.
 - [ ] Phase 5 — Inspect the running scene through a read-only runtime probe.
 - [ ] Phase 6 — Capture, drive, and validate gameplay with a minimal fixed API.
@@ -49,6 +49,10 @@ introducing parallel lifecycle or error mechanisms.
 
 Project Settings and Input Map changes can require a reload. This phase closes
 that existing workflow before adding more project-level mutation features.
+
+Completed in 0.7.0. The all-mode `reload_project` workflow now enforces scene
+and run safeguards, persists and validates a bounded pending operation, and can
+wait through an authenticated project-scoped reconnect.
 
 ### Deliverables
 

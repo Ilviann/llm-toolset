@@ -3,9 +3,18 @@
 from __future__ import annotations
 
 import time
+from threading import Event
 from typing import Any, Callable, Protocol
 
-from .errors import ErrorCode, OperationTimeoutError
+from .errors import (
+    BridgeError,
+    ErrorCode,
+    OperationCancelledError,
+    OperationTimeoutError,
+    ProjectMismatchError,
+    StaleOperationError,
+    VersionMismatchError,
+)
 
 
 DEFAULT_TIMEOUT_MS = 10_000
@@ -29,10 +38,16 @@ class OperationWaiter:
         *,
         clock: Callable[[], float] = time.monotonic,
         sleep: Callable[[float], None] = time.sleep,
+        cancelled: Event | None = None,
     ) -> None:
         self.bridge = bridge
         self.clock = clock
         self.sleep = sleep
+        self.cancelled = cancelled or Event()
+
+    def cancel(self) -> None:
+        """Stop an in-flight wait when the owning MCP server shuts down."""
+        self.cancelled.set()
 
     @staticmethod
     def options(arguments: dict[str, Any]) -> tuple[bool, int]:
@@ -148,6 +163,80 @@ class OperationWaiter:
             "last_stop_reason": state.get("last_stop_reason"),
         }
 
+    def wait_for_reload(
+        self,
+        operation_id: Any,
+        expected_project_hash: Any,
+        expected_bridge_version: Any,
+        timeout_ms: int,
+    ) -> dict[str, Any]:
+        if not isinstance(operation_id, str) or not operation_id:
+            raise ValueError("Godot editor did not return a reload operation ID")
+        if (
+            not isinstance(expected_project_hash, str)
+            or len(expected_project_hash) != 64
+        ):
+            raise ValueError("Godot editor did not return a valid project hash")
+        if not isinstance(expected_bridge_version, str) or not expected_bridge_version:
+            raise ValueError("Godot editor did not return a bridge version")
+
+        deadline = self.clock() + timeout_ms / 1000
+        disconnected = False
+        while True:
+            self._raise_if_cancelled(operation_id)
+            try:
+                status = self.bridge.call(
+                    "reload_status", {"operation_id": operation_id}
+                )
+            except BridgeError as exc:
+                if exc.code not in {
+                    ErrorCode.EDITOR_UNAVAILABLE,
+                    ErrorCode.UNAUTHORIZED,
+                }:
+                    raise
+                disconnected = True
+                status = None
+            if status is not None:
+                if not isinstance(status, dict):
+                    raise ValueError("Godot editor returned invalid reload status")
+                actual_operation_id = status.get("operation_id")
+                if actual_operation_id != operation_id:
+                    raise StaleOperationError(
+                        "Reload operation ID changed during reconnect",
+                        details={
+                            "expected_operation_id": operation_id,
+                            "operation_id": actual_operation_id,
+                        },
+                    )
+                actual_project_hash = status.get("project_hash")
+                if actual_project_hash != expected_project_hash:
+                    raise ProjectMismatchError(
+                        "Godot bridge reconnected to another project",
+                        details={
+                            "expected_project_hash": expected_project_hash,
+                            "project_hash": actual_project_hash,
+                        },
+                    )
+                actual_bridge_version = status.get("bridge_version")
+                if actual_bridge_version != expected_bridge_version:
+                    raise VersionMismatchError(
+                        "Bridge version changed during project reload",
+                        details={
+                            "expected_bridge_version": expected_bridge_version,
+                            "bridge_version": actual_bridge_version,
+                        },
+                    )
+                if status.get("completed") is True:
+                    return {**status, "disconnected": disconnected}
+            if self.clock() >= deadline:
+                raise OperationTimeoutError(
+                    "Godot project reload timed out",
+                    code=ErrorCode.TIMEOUT,
+                    details={"operation_id": operation_id, "timeout_ms": timeout_ms},
+                    retryable=True,
+                )
+            self.sleep(POLL_INTERVAL_SECONDS)
+
     def _until(
         self,
         timeout_ms: int,
@@ -159,6 +248,7 @@ class OperationWaiter:
         last_diagnostic_id: Any = unset
         quiet_since: float | None = None
         while True:
+            self._raise_if_cancelled(operation_id)
             state = self._state()
             if predicate(state):
                 diagnostic_id = state.get("last_diagnostic_id")
@@ -179,6 +269,13 @@ class OperationWaiter:
                     retryable=True,
                 )
             self.sleep(POLL_INTERVAL_SECONDS)
+
+    def _raise_if_cancelled(self, operation_id: Any) -> None:
+        if self.cancelled.is_set():
+            raise OperationCancelledError(
+                "Godot editor operation wait was cancelled",
+                details={"operation_id": operation_id},
+            )
 
     def _state(self) -> dict[str, Any]:
         state = self.bridge.call("state", {})

@@ -59,6 +59,8 @@ The dependency-free editor plugin is split by responsibility under
   observed editor/import state, monotonic event IDs, and asynchronous operation IDs.
 - `diagnostic_store.gd` is a thread-safe bounded Godot logger and read API.
 - `discovery_record.gd` atomically publishes the project-scoped bridge heartbeat.
+- `reload_commands.gd` safeguards scene/run state, persists bounded pending
+  reloads, invokes the deferred restart, and validates startup recovery.
 - `error_envelope.gd` centralizes bounded bridge success and failure envelopes.
 - `asset_commands.gd` handles asset discovery, resource creation, and scene
   file creation or opening.
@@ -82,17 +84,17 @@ default is `tiny`. Modes are nested: every tool in a smaller mode is also
 available in the larger modes. Calls to tools outside the active mode are
 rejected even if a client retained an older `tools/list` response.
 
-- **`tiny` (default):** 11 focused tools for supervised GDScript-adjacent scene
+- **`tiny` (default):** 12 focused tools for supervised GDScript-adjacent scene
   work, including compact scene inspection, UI/node construction, property
   edits, and save/run controls. It is intended for models with context windows
   below 8k. Pair it with a confined text-file MCP when GDScript itself must be
   edited; this server never exposes arbitrary file writes.
-- **`small`:** 20 tools for autonomous local agents around 16k context. It adds
+- **`small`:** 21 tools for autonomous local agents around 16k context. It adds
   bounded asset discovery, import scanning, staged imports, folders, and
   whitelisted resource creation, plus atomic project-setting and Input Map
   editing. This is the appropriate mode when the agent must perform its own
   unit-test-oriented setup and verification.
-- **`large`:** all 22 tools. It adds `select_node` and the opt-in
+- **`large`:** all 23 tools. It adds `select_node` and the opt-in
   `start_editor` launcher for models that also control the Godot desktop UI.
 
 Example:
@@ -117,6 +119,7 @@ means `small` and `large`.
 | `capabilities` | All | Active mode plus MCP/bridge versions, commands, exposed tools, optional features, and limits |
 | `editor_state` | All | Project, bridge, edited scene, selection, filesystem scan, and run state |
 | `get_diagnostics` | All | Bounded editor, parser, and runtime diagnostics with stable cursors |
+| `reload_project` | All | Safely restart the configured project and optionally wait through reconnect |
 | `create_scene` | All | Create a scene with one built-in root node |
 | `open_scene` | All | Open an existing project scene |
 | `scene_tree` | All | Scene-relative node list, limited to 200 nodes |
@@ -267,15 +270,51 @@ verified standard Godot 4.7 build.
 
 ## Bounded waits
 
-`open_scene`, `scan_asset`, `import_asset`, and `scene_control` run/stop accept
-`"wait":true` and `timeout_ms` from 1 through 120000. Waiting happens only in
-the Python MCP process: it polls concise editor state with a monotonic deadline,
-so the Godot main loop stays responsive. The default timeout is 10 seconds.
+`open_scene`, `scan_asset`, `import_asset`, `scene_control` run/stop, and
+`reload_project` accept `"wait":true` and `timeout_ms` from 1 through 120000.
+Waiting happens only in the Python MCP process: it polls concise editor state or
+reload status with a monotonic deadline, so the Godot main loop stays
+responsive. The default timeout is 10 seconds. Closing the MCP server cancels
+an outstanding wait.
 
 Waited run results include the new `run_id` and whether the process survived
 the startup health window. Set `startup_window_ms` from 0 through 5000 on the
 run action; it defaults to 250. Completed waits also allow a short diagnostic
 quiet period so immediate parser, import, or startup errors reach the store.
+
+## Safe project reload
+
+`reload_project` is available in every mode. It accepts `stop_running`,
+`save_scenes`, `wait`, and `timeout_ms`; all booleans default to `false`. An
+active game blocks reload unless `stop_running` is true. Every unsaved open
+scene blocks reload unless `save_scenes` is true, and the plugin verifies that
+all of them were saved before scheduling the restart. There is no discard
+option.
+
+```json
+{
+  "stop_running": true,
+  "save_scenes": true,
+  "wait": true,
+  "timeout_ms": 30000
+}
+```
+
+Before restarting, the plugin atomically writes a bounded pending-operation
+record under `.godot`, returns its operation ID, and sends the bridge response.
+The restart itself is deferred until after that response. On startup, only a
+fresh record for the configured project and matching bridge version is
+completed. A waited call tolerates the expected disconnect, rediscovers only a
+live bridge for the configured project, rereads the project token, and verifies
+the project hash, bridge version, and exact operation ID before succeeding.
+
+Malformed or stale records, a changed plugin version, a project mismatch, scene
+save failure, and timeout have distinct bounded error codes. Keep the Python
+package and installed plugin on the same version; deliberately changing the
+plugin during a reload returns `version_mismatch` rather than reporting an
+ambiguous success. Native restart and reconnect are verified on macOS with
+Godot 4.7 stable. Linux and Windows use the same Godot API and Python discovery
+logic, but native reload validation remains pending on those platforms.
 
 ## Agentic usage by context size
 
@@ -385,9 +424,9 @@ editor's undo history. Save explicitly with `scene_control` after a group of
 changes. The `run` action returns a run ID and operation ID. Pass that run ID
 back when calling `stop`; stale or missing IDs are rejected. Stop returns its
 own operation ID. Subsequent `editor_state` calls report whether that run is
-active and why it stopped. Commands are not yet awaitable, so “started” still
-means the editor accepted the request rather than that a startup health window
-passed.
+active and why it stopped. Without `wait`, “started” means only that the editor
+accepted the request. Use `wait:true` for bounded scene-open, import/scan,
+run/stop, and reload completion checks.
 
 ```json
 {"action":"run"}

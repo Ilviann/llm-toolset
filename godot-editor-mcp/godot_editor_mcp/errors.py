@@ -30,6 +30,11 @@ class ErrorCode:
     RESPONSE_TOO_LARGE = "response_too_large"
     INVALID_CONFIGURATION = "invalid_configuration"
     COMMAND_FAILED = "command_failed"
+    SAVE_FAILED = "save_failed"
+    MALFORMED_OPERATION = "malformed_operation"
+    STALE_OPERATION = "stale_operation"
+    VERSION_MISMATCH = "version_mismatch"
+    CANCELLED = "cancelled"
 
 
 def bounded_details(value: Any, depth: int = 0) -> Any:
@@ -135,6 +140,26 @@ class ProjectMismatchError(BridgeError):
     default_code = ErrorCode.PROJECT_MISMATCH
 
 
+class SaveFailedError(BridgeError):
+    default_code = ErrorCode.SAVE_FAILED
+
+
+class MalformedOperationError(BridgeError):
+    default_code = ErrorCode.MALFORMED_OPERATION
+
+
+class StaleOperationError(BridgeError):
+    default_code = ErrorCode.STALE_OPERATION
+
+
+class VersionMismatchError(BridgeError):
+    default_code = ErrorCode.VERSION_MISMATCH
+
+
+class OperationCancelledError(BridgeError):
+    default_code = ErrorCode.CANCELLED
+
+
 _ERROR_TYPES: dict[str, type[BridgeError]] = {
     cls.default_code: cls
     for cls in (
@@ -150,6 +175,11 @@ _ERROR_TYPES: dict[str, type[BridgeError]] = {
         UnsupportedCapabilityError,
         StaleCursorError,
         ProjectMismatchError,
+        SaveFailedError,
+        MalformedOperationError,
+        StaleOperationError,
+        VersionMismatchError,
+        OperationCancelledError,
     )
 }
 
@@ -180,12 +210,17 @@ __all__ = [
     "NoActiveRunError",
     "NotFoundError",
     "OperationTimeoutError",
+    "OperationCancelledError",
+    "MalformedOperationError",
     "ProjectMismatchError",
+    "SaveFailedError",
     "ProtectedPathError",
     "StaleCursorError",
     "StaleRuntimeIdError",
+    "StaleOperationError",
     "UnauthorizedError",
     "UnsupportedCapabilityError",
+    "VersionMismatchError",
     "bounded_details",
     "bridge_error_from_payload",
 ]

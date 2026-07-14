@@ -13,9 +13,10 @@ const InputMapCommands := preload("input_map_commands.gd")
 const Limits := preload("command_limits.gd")
 const OperationRegistry := preload("operation_registry.gd")
 const ProjectSettingsCommands := preload("project_settings_commands.gd")
+const ReloadCommands := preload("reload_commands.gd")
 const SceneCommands := preload("scene_commands.gd")
 
-const BRIDGE_VERSION := "0.6.0"
+const BRIDGE_VERSION := "0.7.0"
 const BRIDGE_PROTOCOL_VERSION := "1"
 const DEFAULT_PORT := 6505
 const TOKEN_PATH := "res://.godot/godot_mcp_token"
@@ -26,6 +27,7 @@ var _diagnostics
 var _events
 var _operations
 var _router
+var _reload_commands
 var _state_monitor
 var _port := DEFAULT_PORT
 
@@ -44,6 +46,9 @@ func _enter_tree() -> void:
 	OS.add_logger(_diagnostics)
 	_state_monitor = EditorStateMonitor.new(
 		get_editor_interface(), get_undo_redo(), _events, _operations, _diagnostics,
+	)
+	_reload_commands = ReloadCommands.new(
+		get_editor_interface(), _operations, BRIDGE_VERSION,
 	)
 	if not scene_saved.is_connected(_on_scene_saved):
 		scene_saved.connect(_on_scene_saved)
@@ -82,6 +87,8 @@ func _process(_delta: float) -> void:
 		_bridge_server.poll()
 	if _discovery != null:
 		_discovery.poll()
+	if _reload_commands != null:
+		_reload_commands.poll()
 
 
 func _register_commands() -> void:
@@ -112,6 +119,7 @@ func _register_commands() -> void:
 		["project_settings_get", "project_settings_patch"], settings_commands,
 	)
 	_router.register_handler("input_map_patch", Callable(input_commands, "execute"))
+	_router.register_service(["reload_project", "reload_status"], _reload_commands)
 
 
 func _capabilities(_arguments: Dictionary) -> Dictionary:
@@ -134,6 +142,7 @@ func _capabilities(_arguments: Dictionary) -> Dictionary:
 			"operation_ids": true,
 			"event_ids": true,
 			"project_discovery": true,
+			"project_reload": true,
 		},
 		"error_codes": [
 			ErrorEnvelope.UNAUTHORIZED,
@@ -148,6 +157,10 @@ func _capabilities(_arguments: Dictionary) -> Dictionary:
 			ErrorEnvelope.UNSUPPORTED_CAPABILITY,
 			ErrorEnvelope.STALE_CURSOR,
 			ErrorEnvelope.PROJECT_MISMATCH,
+			ErrorEnvelope.SAVE_FAILED,
+			ErrorEnvelope.MALFORMED_OPERATION,
+			ErrorEnvelope.STALE_OPERATION,
+			ErrorEnvelope.VERSION_MISMATCH,
 		],
 		"project_settings": {
 			"value_types": [
@@ -196,6 +209,7 @@ func _shutdown_services() -> void:
 	_events = null
 	_operations = null
 	_router = null
+	_reload_commands = null
 	_state_monitor = null
 
 

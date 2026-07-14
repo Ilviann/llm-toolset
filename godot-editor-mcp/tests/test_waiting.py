@@ -2,7 +2,14 @@ from __future__ import annotations
 
 import unittest
 
-from godot_editor_mcp.errors import OperationTimeoutError
+from godot_editor_mcp.errors import (
+    BridgeError,
+    ErrorCode,
+    OperationCancelledError,
+    OperationTimeoutError,
+    ProjectMismatchError,
+    VersionMismatchError,
+)
 from godot_editor_mcp.waiting import OperationWaiter
 
 
@@ -32,6 +39,19 @@ class ScriptedBridge:
         if command == "asset_info":
             return self.asset
         raise AssertionError(command)
+
+
+class ReloadBridge:
+    def __init__(self, responses: list[object]) -> None:
+        self.responses = responses
+        self.calls: list[tuple[str, dict]] = []
+
+    def call(self, command: str, arguments: dict | None = None):
+        self.calls.append((command, arguments or {}))
+        response = self.responses.pop(0) if len(self.responses) > 1 else self.responses[0]
+        if isinstance(response, Exception):
+            raise response
+        return response
 
 
 class OperationWaiterTests(unittest.TestCase):
@@ -111,6 +131,63 @@ class OperationWaiterTests(unittest.TestCase):
         )
         with self.assertRaisesRegex(ValueError, "wait"):
             OperationWaiter.options({"wait": 1})
+
+    def test_reload_wait_tolerates_disconnect_and_verifies_reconnect(self) -> None:
+        expected_hash = "a" * 64
+        bridge = ReloadBridge([
+            BridgeError(
+                "offline", code=ErrorCode.EDITOR_UNAVAILABLE, retryable=True
+            ),
+            {
+                "completed": True,
+                "status": "completed",
+                "operation_id": "op-1",
+                "project_hash": expected_hash,
+                "bridge_version": "0.7.0",
+            },
+        ])
+        clock = FakeClock()
+        waiter = OperationWaiter(bridge, clock=clock, sleep=clock.sleep)
+        result = waiter.wait_for_reload("op-1", expected_hash, "0.7.0", 1000)
+        self.assertTrue(result["completed"])
+        self.assertTrue(result["disconnected"])
+
+    def test_reload_rejects_project_and_version_mismatch(self) -> None:
+        base = {
+            "completed": True,
+            "operation_id": "op-1",
+            "project_hash": "b" * 64,
+            "bridge_version": "0.7.0",
+        }
+        clock = FakeClock()
+        with self.assertRaises(ProjectMismatchError):
+            OperationWaiter(
+                ReloadBridge([base]), clock=clock, sleep=clock.sleep
+            ).wait_for_reload("op-1", "a" * 64, "0.7.0", 1000)
+        with self.assertRaises(VersionMismatchError):
+            OperationWaiter(
+                ReloadBridge([{**base, "project_hash": "a" * 64}]),
+                clock=clock,
+                sleep=clock.sleep,
+            ).wait_for_reload("op-1", "a" * 64, "0.6.0", 1000)
+
+    def test_reload_timeout_and_shutdown_cancellation_are_distinct(self) -> None:
+        pending = {
+            "completed": False,
+            "operation_id": "op-1",
+            "project_hash": "a" * 64,
+            "bridge_version": "0.7.0",
+        }
+        clock = FakeClock()
+        waiter = OperationWaiter(
+            ReloadBridge([pending]), clock=clock, sleep=clock.sleep
+        )
+        with self.assertRaises(OperationTimeoutError):
+            waiter.wait_for_reload("op-1", "a" * 64, "0.7.0", 100)
+        waiter = OperationWaiter(ReloadBridge([pending]))
+        waiter.cancel()
+        with self.assertRaises(OperationCancelledError):
+            waiter.wait_for_reload("op-1", "a" * 64, "0.7.0", 100)
 
 
 if __name__ == "__main__":
