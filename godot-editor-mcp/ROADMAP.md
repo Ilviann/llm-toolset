@@ -1,55 +1,14 @@
 # Godot Editor MCP Roadmap
 
-## Implementation progress checklist
+## Phase checklist
 
-- [x] Phase 1 — Protocol and architecture foundation
-  - [x] Add structured error envelopes and typed Python exceptions.
-  - [x] Add operation IDs, event IDs, and complete run scoping.
-  - [x] Report the negotiated MCP protocol version through `capabilities`.
-  - [x] Split bridge transport, routing, state, and feature services.
-  - [x] Add project-scoped port discovery and heartbeat records.
-  - [x] Preserve existing tool names, modes, and public Python imports.
-  - [x] Pass the phase completion gate and update affected documentation.
-- [ ] Phase 2 — Diagnostics, editor state, imports, and bounded waiting
-  - [ ] Add bounded editor and runtime diagnostic stores.
-  - [ ] Add `get_diagnostics` with scope, severity, cursor, limit, and run filters.
-  - [ ] Complete scene dirty-state and diagnostic-count reporting.
-  - [ ] Add import progress, per-resource state, and import/load errors.
-  - [ ] Detect external `project.godot` changes that require reload.
-  - [ ] Add `wait` and `timeout_ms` to asynchronous tools.
-  - [ ] Pass the phase completion gate and update affected documentation.
-- [ ] Phase 3 — Safe project reload and reconnection
-  - [ ] Add `reload_project` with active-run and dirty-scene safeguards.
-  - [ ] Persist reload operation state across the editor restart.
-  - [ ] Reconnect only to the same authenticated project bridge.
-  - [ ] Report structured completion, timeout, and mismatch results.
-  - [ ] Pass the phase completion gate and update affected documentation.
-- [ ] Phase 4 — Read-only runtime inspection
-  - [ ] Add the bounded debug-runtime probe and debugger handshake.
-  - [ ] Extend `scene_tree` and `node_info` with `tree_scope`.
-  - [ ] Add run-scoped runtime node identifiers and stale-ID rejection.
-  - [ ] Detect and reject ambiguous multiple debug sessions initially.
-  - [ ] Pass the phase completion gate and update affected documentation.
-- [ ] Phase 5 — Gameplay validation
-  - [ ] Add bounded game-view PNG capture and safe artifact staging.
-  - [ ] Add bounded action and physical-key input injection.
-  - [ ] Guarantee automatic release of injected input.
-  - [ ] Add declarative runtime watches and assertions.
-  - [ ] Pass the phase completion gate and update affected documentation.
-- [ ] Phase 6 — Scene authoring transaction engine
-  - [ ] Centralize bounded Variant conversion and compatibility checks.
-  - [ ] Add structural scene-edit operations with ownership validation.
-  - [ ] Add atomic, prevalidated UndoRedo transactions.
-  - [ ] Add enum, bit-flag, resource, typed-container, and NodePath support.
-  - [ ] Expand `create_scene` through the transaction engine.
-  - [ ] Pass the phase completion gate and update affected documentation.
-- [ ] Phase 7 — Project helpers, pagination, and final protocol coverage
-  - [ ] Add autoload listing and mutation helpers.
-  - [ ] Add enabled-editor-plugin discovery.
-  - [ ] Add stable opaque cursors and filters.
-  - [ ] Complete capability flags and effective-limit reporting.
-  - [ ] Complete macOS validation and record native Linux/Windows results.
-  - [ ] Pass the phase completion gate and update affected documentation.
+- [x] Phase 1 — Establish protocol, lifecycle, and discovery foundations.
+- [ ] Phase 2 — Add diagnostics, import state, and bounded waits.
+- [ ] Phase 3 — Reload and reconnect without losing project identity.
+- [ ] Phase 4 — Inspect the running scene safely.
+- [ ] Phase 5 — Capture, drive, and validate gameplay.
+- [ ] Phase 6 — Author scenes through atomic transactions.
+- [ ] Phase 7 — Add project helpers and stable pagination.
 
 ## Phase delivery contract
 

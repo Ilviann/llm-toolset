@@ -9,6 +9,12 @@ atomic writes, small tool catalog, or standard-library-only runtime.
 This roadmap is an implementation plan. Unchecked boxes describe work that has
 not yet been implemented.
 
+## Phase checklist
+
+- [x] Phase 1 — Load workspace configuration and dynamic permissions.
+- [x] Phase 2 — Enforce hidden and protected path policy.
+- [ ] Phase 3 — Read and atomically replace bounded line ranges.
+
 ## Phase delivery contract
 
 Each phase must leave the server in a working, releasable state and deliver a

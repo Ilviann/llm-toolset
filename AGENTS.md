@@ -34,6 +34,8 @@ Document run and test commands in each application's README. Prefer built-in tes
 
 Organize roadmaps as working feature increments. Every phase must deliver a complete, usable feature or cohesive feature set, including its implementation, relevant tests, and all affected documentation and examples. A phase may depend on completed earlier phases, but completing it must leave the project in a working, releasable state. Do not defer testing or documentation to a separate final phase.
 
+Every new `ROADMAP.md`, and every roadmap revision that introduces a new feature set, must include or update a top-level phase checklist. Give each phase a checkbox, phase number, and very brief one-line description. Keep checklist status and wording synchronized with the detailed phase sections as implementation progresses or scope changes.
+
 After implementing each roadmap phase, increase the application's version when that application uses versioning. Use a patch-version increase for bug-fix-only phases and a minor-version increase for phases that add features. Increase the major version only when the user explicitly requests it. Keep package metadata, runtime-reported versions, plugin manifests, documentation, examples, and history records consistent with the new version wherever they apply.
 
 When every roadmap phase has been implemented and the user asks to clean up the roadmap, keep the application's `ROADMAP.md` file instead of deleting it. Replace the completed implementation plan with a concise statement that there are currently no feature requests.
