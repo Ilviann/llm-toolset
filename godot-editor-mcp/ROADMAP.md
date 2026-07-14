@@ -18,7 +18,7 @@ complete only when all of its scoped workflows work end to end, its failure and
 security boundaries are covered, the full existing suite and relevant focused
 integration checks pass, and every affected user or maintainer document is
 updated. Documentation includes the README, examples, limits, platform notes,
-TODO and history records, and this roadmap as applicable.
+history records, and this roadmap as applicable.
 
 The completion gates below are phase-specific additions to this shared
 contract. Testing, documentation, examples, and release verification must be
@@ -35,10 +35,10 @@ reload, runtime inspection, capture, and input all require shared state,
 operation lifecycle, and error contracts. Adding them before those foundations
 would duplicate state and make failure handling unreliable.
 
-Phase 1 delivered the protocol and architecture foundation previously listed
-under Priority 4 in `TODO.md`. Structured errors, operation IDs, event cursors,
-run scoping, capability negotiation, and project-scoped discovery are now the
-base for the higher-priority user-facing features.
+Phase 1 delivered the protocol and architecture foundation. Structured errors,
+operation IDs, event cursors, run scoping, capability negotiation, and
+project-scoped discovery are now the base for the higher-priority user-facing
+features.
 
 Development must remain offline-capable and dependency-free at runtime. The
 implementation should continue to use the Python standard library, Godot APIs,
@@ -193,7 +193,8 @@ Each record should contain:
 - Run ID for runtime records; editor-only records use `null`.
 - Origin marking for physical versus injected input when relevant.
 
-`get_diagnostics` should support `scope`, `severity`, `since`, `limit`, and an
+`get_diagnostics` should support `scope` (`all`, `parser`, `runtime`, or
+`editor`), `severity` (`error`, `warning`, or `all`), `since`, `limit`, and an
 optional `run_id`. Reading diagnostics must not clear the store or mutate the
 editor's Output or Debugger panels.
 
@@ -320,8 +321,8 @@ record has appeared during a short bounded quiet period.
 
 ### Game-view capture
 
-Capture from inside the running project rather than capturing editor chrome or
-the desktop.
+Add `capture_game_view`. Capture from inside the running project rather than
+capturing editor chrome or the desktop.
 
 - Select the main viewport first; add subviewport selection only with a bounded,
   unambiguous identifier.
@@ -335,6 +336,8 @@ the desktop.
 - Never accept a runtime-provided arbitrary path for Python to read.
 
 ### Bounded gameplay input
+
+Add `send_input` with the following constraints:
 
 - Support an Input Map action, pressed/released state, strength, and either a
   bounded duration or frame count.
@@ -593,7 +596,6 @@ These requirements are part of every phase's completion gate. Each completed
 phase must update:
 
 - `README.md` tool tables, setup, examples, limits, and platform notes.
-- `TODO.md` to remove or revise delivered requirements.
 - `HISTORY.md` with the released version and behavior changes.
 - Configuration examples affected by modes, ports, runtime-probe registration,
   or new environment requirements.

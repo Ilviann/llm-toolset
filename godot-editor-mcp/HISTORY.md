@@ -1,7 +1,7 @@
 # Godot Editor MCP history
 
 This file records released changes. Planned work is tracked separately in
-[`TODO.md`](TODO.md).
+[`ROADMAP.md`](ROADMAP.md).
 
 ## 0.5.0 — 2026-07-14
 
