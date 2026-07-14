@@ -7,6 +7,8 @@ import stat
 import tempfile
 from pathlib import Path
 
+from .configuration import ConfigurationError, Settings
+
 
 TREE_LIMIT = 100
 MAX_TEXT_BYTES = 5 * 1024 * 1024
@@ -41,11 +43,23 @@ class FileAccessError(Exception):
 
 
 class RootedFilesystem:
-    def __init__(self, root: str | os.PathLike[str]) -> None:
-        candidate = Path(root).expanduser().resolve(strict=True)
-        if not candidate.is_dir():
-            raise FileAccessError("Root is not a folder")
-        self.root = candidate
+    def __init__(self, settings: Settings | str | os.PathLike[str]) -> None:
+        if isinstance(settings, Settings):
+            self.settings = settings
+        else:
+            try:
+                self.settings = Settings.for_root(settings)
+            except ConfigurationError as exc:
+                raise FileAccessError(str(exc)) from None
+        self.root = self.settings.root
+
+    def _require_read(self) -> None:
+        if not self.settings.read:
+            raise FileAccessError("Read access is disabled")
+
+    def _require_write(self) -> None:
+        if not self.settings.write:
+            raise FileAccessError("Write access is disabled")
 
     def resolve(self, user_path: str, *, must_exist: bool = True) -> Path:
         if not isinstance(user_path, str):
@@ -73,6 +87,7 @@ class RootedFilesystem:
         return (path.is_symlink() or not path.is_dir(), path.name.casefold())
 
     def list_dir(self, user_path: str = ".") -> str:
+        self._require_read()
         folder = self.resolve(user_path)
         if not folder.is_dir():
             raise FileAccessError("Path is not a folder")
@@ -83,6 +98,7 @@ class RootedFilesystem:
         return "\n".join(self._entry_label(entry) for entry in entries) or "(empty)"
 
     def tree(self, user_path: str = ".") -> str:
+        self._require_read()
         folder = self.resolve(user_path)
         if not folder.is_dir():
             raise FileAccessError("Path is not a folder")
@@ -132,8 +148,7 @@ class RootedFilesystem:
         except UnicodeDecodeError:
             raise FileAccessError("File is not UTF-8 text") from None
 
-    def read_text(self, user_path: str) -> str:
-        path = self.resolve(user_path)
+    def _read_text_file(self, path: Path) -> str:
         if not path.is_file():
             raise FileAccessError("Path is not a file")
         self._reject_binary_name(path)
@@ -147,7 +162,12 @@ class RootedFilesystem:
         except OSError as exc:
             raise FileAccessError(f"Cannot read file: {exc.strerror or exc}") from None
 
+    def read_text(self, user_path: str) -> str:
+        self._require_read()
+        return self._read_text_file(self.resolve(user_path))
+
     def write_text(self, user_path: str, content: str) -> str:
+        self._require_write()
         if not isinstance(content, str):
             raise FileAccessError("Content must be a string")
         data = content.encode("utf-8")
@@ -167,7 +187,7 @@ class RootedFilesystem:
             if not path.is_file():
                 raise FileAccessError("Path is not a file")
             # Do not allow a binary file to be replaced through the text tool.
-            self.read_text(user_path)
+            self._read_text_file(path)
 
         temp_name: str | None = None
         try:

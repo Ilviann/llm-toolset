@@ -6,7 +6,7 @@ Add workspace configuration, hidden-path filtering, and bounded line-range
 editing without weakening the server's root confinement, text-only policy,
 atomic writes, small tool catalog, or standard-library-only runtime.
 
-This roadmap is an implementation plan. The checkboxes describe work that has
+This roadmap is an implementation plan. Unchecked boxes describe work that has
 not yet been implemented.
 
 ## Compatibility and scope decisions
@@ -14,7 +14,7 @@ not yet been implemented.
 - Preserve the current `server.py <root>` and `rooted-files-mcp <root>` launch
   forms. The positional root remains an explicit command-line override.
 - Treat the workspace as the directory used to discover
-  `.mcp/file-access.ini`. Use `--workspace` when supplied; otherwise use the
+  `.mcp/rooted-files-mcp.ini`. Use `--workspace` when supplied; otherwise use the
   positional root, or the current working directory when configuration-only
   startup is requested.
 - Apply settings in this order: explicit command-line value, INI value,
@@ -35,7 +35,7 @@ not yet been implemented.
 
 ## Proposed configuration contract
 
-The default file is `<workspace>/.mcp/file-access.ini`:
+The default file is `<workspace>/.mcp/rooted-files-mcp.ini`:
 
 ```ini
 [paths]
@@ -79,36 +79,40 @@ Configuration behavior:
 
 ### Implementation
 
-- [ ] Add `rooted_files_mcp/configuration.py` with a frozen settings data class,
+- [x] Add `rooted_files_mcp/configuration.py` with a frozen settings data class,
   INI loader, validation helpers, and deterministic precedence merging.
-- [ ] Separate workspace discovery from exposed-root selection. Resolve both
+- [x] Separate workspace discovery from exposed-root selection. Resolve both
   paths once during startup and retain normalized `Path` objects.
-- [ ] Extend the CLI without breaking the positional-root form. Add
+- [x] Extend the CLI without breaking the positional-root form. Add
   `--workspace` and paired boolean overrides for read, write, hidden visibility,
   and line access.
-- [ ] Reject unknown sections and keys so misspelled security settings cannot be
+- [x] Reject unknown sections and keys so misspelled security settings cannot be
   silently ignored.
-- [ ] Bound the INI file size, reject NUL bytes and invalid UTF-8, and reject a
+- [x] Bound the INI file size, reject NUL bytes and invalid UTF-8, and reject a
   configuration file or configured root that escapes the workspace through
   traversal or symlinks.
-- [ ] Pass an immutable effective settings object into the filesystem and MCP
+- [x] Pass an immutable effective settings object into the filesystem and MCP
   server instead of consulting configuration during individual tool calls.
-- [ ] Build `tools/list` from the effective permissions and feature flags. Also
+- [x] Build `tools/list` from the effective permissions and feature flags. Also
   reject direct calls to disabled tools so a client cannot bypass discovery.
-- [ ] Keep stdout reserved for JSON-RPC; send startup/configuration diagnostics
+- [x] Keep stdout reserved for JSON-RPC; send startup/configuration diagnostics
   to stderr through the existing argument-parser error path.
 
 ### Tests
 
-- [ ] Add `tests/test_configuration.py` for missing, valid, malformed,
+- [x] Add `tests/test_configuration.py` for missing, valid, malformed,
   oversized, invalid-UTF-8, duplicate, unknown, and escaping configurations.
-- [ ] Test every precedence layer, including explicit false CLI overrides.
-- [ ] Test roots containing spaces and platform-native path syntax without
+- [x] Test every precedence layer, including explicit false CLI overrides.
+- [x] Test roots containing spaces and platform-native path syntax without
   changing model-facing relative paths.
-- [ ] Extend server tests to verify disabled tools are both omitted and rejected.
-- [ ] Verify the legacy positional-root launch path behaves as it does today.
+- [x] Extend server tests to verify disabled tools are both omitted and rejected.
+- [x] Verify the legacy positional-root launch path behaves as it does today.
 
 ### Completion gate
+
+Completed on macOS on 2026-07-14. The full 30-test suite includes end-to-end
+stdio coverage for legacy and configuration-only startup and confirms that
+startup diagnostics do not enter protocol stdout.
 
 - Existing filesystem and MCP tests pass unchanged.
 - Configuration-only and legacy CLI startup both pass end-to-end stdio tests.
@@ -146,8 +150,8 @@ Configuration behavior:
   visible targets where symbolic links are available.
 - [ ] Confirm traversal and out-of-root symlink failures remain denied whether
   hidden visibility is enabled or disabled.
-- [ ] Confirm `.mcp/file-access.ini` cannot be read or overwritten through MCP
-  while hidden access is disabled.
+- [ ] Confirm `.mcp/rooted-files-mcp.ini` cannot be read or overwritten through
+  MCP while hidden access is disabled.
 
 ### Completion gate
 

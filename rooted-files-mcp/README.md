@@ -16,20 +16,23 @@ recommended model-facing form.
 
 | Tool | Purpose |
 |---|---|
-| `list_dir` | List direct entries in a folder |
-| `tree` | Show a recursive tree, limited to 100 entries |
-| `read_text` | Read a UTF-8 text file |
-| `write_text` | Create or replace a UTF-8 text file |
+| `list_dir` | List direct entries in a folder; requires read permission |
+| `tree` | Show a recursive tree, limited to 100 entries; requires read permission |
+| `read_text` | Read a UTF-8 text file; requires read permission |
+| `write_text` | Create or replace a UTF-8 text file; requires write permission |
 
 All paths are relative to the root argument. Absolute paths, `..` escapes, and
 symlinks resolving outside root are denied. Known binary/media extensions,
 binary signatures, NUL bytes, invalid UTF-8, and files over 5 MiB are denied.
+Tools disabled by the effective permissions are omitted from `tools/list` and
+direct calls to them are rejected.
 
-The complete `tools/list` result, including all four descriptions and input
+The default `tools/list` result, including all four descriptions and input
 schemas, is about 840 characters of compact JSON, or roughly 200–300 tokens for
-common model tokenizers. This is the fixed context cost before system prompts,
-the conversation, tool calls, and file contents. Exact usage varies by model and
-by how the MCP client represents tool definitions.
+common model tokenizers. Disabling permissions makes the catalog smaller. This
+is the tool-schema context cost before system prompts, the conversation, tool
+calls, and file contents. Exact usage varies by model and by how the MCP client
+represents tool definitions.
 
 When pairing this server with `godot-editor-mcp` for GDScript work, prefer the
 Godot server's default `tiny` mode below 8k context. Use `small` only when the
@@ -73,6 +76,71 @@ Windows PowerShell:
 ```powershell
 py -3 "C:\path\to\rooted-files-mcp\server.py" "C:\path\to\folder\to\expose"
 ```
+
+The positional root remains the simplest launch form and does not require a
+configuration file. Configuration-only startup is also supported:
+
+macOS or Linux:
+
+```sh
+python3 /path/to/rooted-files-mcp/server.py --workspace /path/to/workspace
+```
+
+Windows PowerShell:
+
+```powershell
+py -3 "C:\path\to\rooted-files-mcp\server.py" --workspace "C:\path\to\workspace"
+```
+
+## Workspace configuration
+
+The server looks for `.mcp/rooted-files-mcp.ini` inside the workspace. The
+workspace is selected by `--workspace` when provided, otherwise by the
+positional root, or by the current working directory for configuration-only
+startup.
+
+```ini
+[paths]
+root = .
+
+[permissions]
+read = true
+write = true
+
+[features]
+show_hidden = false
+line_access = true
+```
+
+For configuration-only startup, `[paths] root` is required. Relative roots are
+resolved from the workspace. An INI-configured root must remain inside the
+workspace after resolving traversal and symbolic links; a positional CLI root
+is an explicit trusted override and may be elsewhere. Roots containing spaces
+and native macOS, Linux, or Windows path syntax are supported. Model-facing
+paths remain relative to the effective root and should use forward slashes.
+
+Settings use this precedence: explicit command-line value, INI value, then the
+built-in default. With no corresponding INI or CLI setting, read and write are
+enabled, hidden paths are visible, and line access is enabled. Boolean command
+line overrides are paired so either value can override the INI:
+
+```text
+--read / --no-read
+--write / --no-write
+--show-hidden / --hide-hidden
+--line-access / --no-line-access
+```
+
+Phase 1 enforces the read and write permissions. It loads and validates the
+hidden-visibility and line-access flags so their precedence is stable, but
+hidden-path filtering and the `read_lines`/`write_lines` tools are scheduled for
+Phases 2 and 3 and are not active yet.
+
+The configuration must be a regular UTF-8 file no larger than 64 KiB. NUL
+bytes, malformed or duplicate INI entries, invalid booleans, unknown sections
+or keys, inaccessible roots, and configuration or root symlink escapes fail at
+startup. Diagnostics go to stderr; stdout remains reserved for JSON-RPC. A
+missing configuration file is allowed when a positional root is present.
 
 Example LM Studio MCP configuration for macOS or Linux:
 

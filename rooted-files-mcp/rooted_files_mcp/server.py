@@ -8,6 +8,7 @@ import sys
 from typing import Any
 
 from . import __version__
+from .configuration import ConfigurationError, Settings, load_settings
 from .filesystem import FileAccessError, RootedFilesystem
 
 
@@ -58,10 +59,30 @@ TOOLS = [
     },
 ]
 
+READ_TOOLS = {"list_dir", "tree", "read_text"}
+WRITE_TOOLS = {"write_text"}
+KNOWN_TOOLS = READ_TOOLS | WRITE_TOOLS
+
+
+def build_tools(settings: Settings) -> list[dict[str, Any]]:
+    """Build the compact catalog from immutable effective permissions."""
+
+    enabled = set()
+    if settings.read:
+        enabled.update(READ_TOOLS)
+    if settings.write:
+        enabled.update(WRITE_TOOLS)
+    return [tool for tool in TOOLS if tool["name"] in enabled]
+
 
 class MCPServer:
-    def __init__(self, filesystem: RootedFilesystem) -> None:
+    def __init__(
+        self, filesystem: RootedFilesystem, settings: Settings | None = None
+    ) -> None:
         self.fs = filesystem
+        self.settings = settings or filesystem.settings
+        self.tools = build_tools(self.settings)
+        self.enabled_tools = {tool["name"] for tool in self.tools}
 
     @staticmethod
     def _result(request_id: Any, result: dict[str, Any]) -> dict[str, Any]:
@@ -110,7 +131,7 @@ class MCPServer:
         if method == "ping":
             return self._result(request_id, {})
         if method == "tools/list":
-            return self._result(request_id, {"tools": TOOLS})
+            return self._result(request_id, {"tools": self.tools})
         if method == "tools/call":
             return self._call_tool(request_id, params)
         return self._error(request_id, -32601, "Method not found")
@@ -118,8 +139,13 @@ class MCPServer:
     def _call_tool(self, request_id: Any, params: dict[str, Any]) -> dict[str, Any]:
         name = params.get("name")
         arguments = params.get("arguments") or {}
+        if not isinstance(name, str):
+            return self._error(request_id, -32602, "Invalid tool name")
         if not isinstance(arguments, dict):
             return self._error(request_id, -32602, "Invalid tool arguments")
+        if name in KNOWN_TOOLS and name not in self.enabled_tools:
+            result = self._tool_result("Tool is disabled", is_error=True)
+            return self._result(request_id, result)
         try:
             if name == "list_dir":
                 output = self.fs.list_dir(arguments.get("path", "."))
@@ -139,8 +165,13 @@ class MCPServer:
             return self._result(request_id, self._tool_result(str(exc), is_error=True))
 
 
-def run(root: str) -> None:
-    server = MCPServer(RootedFilesystem(root))
+def run(settings: Settings | str) -> None:
+    if not isinstance(settings, Settings):
+        try:
+            settings = Settings.for_root(settings)
+        except ConfigurationError as exc:
+            raise FileAccessError(str(exc)) from None
+    server = MCPServer(RootedFilesystem(settings), settings)
     for line in sys.stdin:
         try:
             message = json.loads(line)
@@ -159,14 +190,45 @@ def run(root: str) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Root-confined text file MCP server")
-    parser.add_argument("root", help="Folder exposed as MCP root")
+    parser.add_argument("root", nargs="?", help="Folder exposed as MCP root")
+    parser.add_argument(
+        "--workspace", help="Workspace containing .mcp/rooted-files-mcp.ini"
+    )
+    read_group = parser.add_mutually_exclusive_group()
+    read_group.add_argument("--read", dest="read", action="store_true")
+    read_group.add_argument("--no-read", dest="read", action="store_false")
+    write_group = parser.add_mutually_exclusive_group()
+    write_group.add_argument("--write", dest="write", action="store_true")
+    write_group.add_argument("--no-write", dest="write", action="store_false")
+    hidden_group = parser.add_mutually_exclusive_group()
+    hidden_group.add_argument(
+        "--show-hidden", dest="show_hidden", action="store_true"
+    )
+    hidden_group.add_argument(
+        "--hide-hidden", dest="show_hidden", action="store_false"
+    )
+    line_group = parser.add_mutually_exclusive_group()
+    line_group.add_argument(
+        "--line-access", dest="line_access", action="store_true"
+    )
+    line_group.add_argument(
+        "--no-line-access", dest="line_access", action="store_false"
+    )
+    parser.set_defaults(read=None, write=None, show_hidden=None, line_access=None)
     args = parser.parse_args()
     try:
-        run(args.root)
-    except FileAccessError as exc:
+        settings = load_settings(
+            root=args.root,
+            workspace=args.workspace,
+            read=args.read,
+            write=args.write,
+            show_hidden=args.show_hidden,
+            line_access=args.line_access,
+        )
+        run(settings)
+    except (ConfigurationError, FileAccessError) as exc:
         parser.error(str(exc))
 
 
 if __name__ == "__main__":
     main()
-
