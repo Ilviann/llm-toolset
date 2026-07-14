@@ -34,6 +34,8 @@ Document run and test commands in each application's README. Prefer built-in tes
 
 After completing implementation work, update every affected document, README, configuration example, and roadmap before handing off the change. Update this `AGENTS.md` file too whenever the work changes repository-wide guidance, supported behavior, constraints, or known issues.
 
+When clarification is useful, ask questions one at a time and state the approximate number of additional questions expected after each one. Continue with reasonable assumptions when an answer is not required to make safe progress.
+
 ## Godot Editor MCP Known Issues
 
 - The plugin targets Godot 4 and is verified with Godot 4.7 stable. Re-run the headless plugin load and bridge checks when changing editor APIs or claiming compatibility with another version.

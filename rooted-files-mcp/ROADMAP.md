@@ -47,6 +47,9 @@ write = true
 
 [features]
 show_hidden = false
+hidden_allowlist =
+    .editorconfig
+    .github
 line_access = true
 ```
 
@@ -60,8 +63,27 @@ Configuration behavior:
 - `permissions.read` controls `list_dir`, `tree`, `read_text`, and
   `read_lines`. `permissions.write` controls `write_text` and `write_lines`.
 - `features.show_hidden = false` omits hidden entries from listings and denies
-  direct or indirect access through every file tool. The default is `true` for
-  backward compatibility when the setting is absent.
+  direct or indirect access through every file tool, except for exact names in
+  the effective hidden allowlist. The built-in allowlist contains `.gitignore`
+  and `.env.template`. `features.hidden_allowlist` adds names to that built-in
+  set; it does not replace the built-ins. The multiline example above therefore
+  also permits `.editorconfig` and `.github`. The default for `show_hidden` is
+  `true` for backward compatibility when the setting is absent.
+- Allowlist values are exact single path-component names, shared by files and
+  folders. Put one name on each non-empty continuation line. Each name must
+  not be `.`, `..`, contain a path separator or NUL, or match a protected name.
+  Non-dot names are valid so Windows attribute-hidden entries such as
+  `desktop.ini` can be allowed explicitly; on other platforms such a name has
+  no special effect unless the entry is otherwise hidden. Trim surrounding
+  configuration whitespace, reject duplicates, and bound both the entry count
+  and entry length. The effective allowlist is immutable after startup.
+- Maintain a separate built-in protected-name set, initially `{.mcp}`. A
+  protected component is omitted and denied regardless of `show_hidden`, the
+  allowlist, file type, or Windows attributes. It cannot be overridden by INI
+  or CLI settings. This keeps `.mcp/rooted-files-mcp.ini` and any other content
+  under `.mcp` inaccessible to model-facing tools. Protection applies to
+  root-relative components; the explicitly selected root itself is still the
+  trust boundary even when its own basename is `.mcp`.
 - `features.line_access` controls whether `read_lines` and `write_lines` are
   exposed. Its default is `true` after the feature is released.
 - Matching CLI boolean options must support explicit true and false values, for
@@ -120,42 +142,110 @@ startup diagnostics do not enter protocol stdout.
 
 ## Phase 2 — Hidden-path policy
 
+### Policy contract
+
+Apply these rules in order to every root-relative path component:
+
+1. If the component matches a protected name, deny it. The initial protected
+   set contains only `.mcp`, and protection always wins.
+2. Determine whether the component is hidden. On every platform, names that
+   begin with `.` are hidden. On Windows, an existing file, directory, or
+   symbolic-link/reparse-point entry with `FILE_ATTRIBUTE_HIDDEN` is also
+   hidden, even when its name does not begin with `.`. The root aliases `.` and
+   an empty relative path are not components and are not hidden.
+3. If `show_hidden = true`, permit the component unless it is protected.
+4. If `show_hidden = false`, permit a hidden component only when its exact name
+   is in the effective allowlist. Permit ordinary non-hidden components.
+
+The built-in allowlist is `{.gitignore, .env.template}`. Configured names extend
+it. Matching is by a complete component, never a prefix, suffix, glob, or path:
+`.gitignore` is permitted, `.git` remains denied, and `.env.template.local`
+does not match `.env.template`. The same matching rule applies to files and
+folders, so an allowlisted folder may be listed and traversed. Every nested
+component is still evaluated independently.
+
+Protected-name comparison must prevent case-only aliases on case-insensitive
+filesystems. Allowlist comparison should use the actual on-disk component name,
+not merely user-supplied casing, so behavior follows exact configured names
+without allowing a differently cased request to bypass a protected component.
+Reject configured names that collide with built-in or configured entries under
+the relevant comparison rule.
+
+`show_hidden` changes access, not only presentation. A denied entry is absent
+from `list_dir` and `tree`, and direct reads and writes fail with the same
+non-revealing `Hidden path access is denied` error whether the entry exists,
+is protected, is dot-prefixed, has the Windows Hidden attribute, or is reached
+through a symlink. The error must not identify which component triggered it.
+
 ### Implementation
 
 - [ ] Add one centralized hidden-path policy used by resolution, listing,
-  traversal, reads, and writes. A root-relative component is hidden when its
-  name begins with `.`; the root aliases `.` and an empty relative path are not
-  themselves hidden.
+  traversal, reads, and writes. Keep protected names, built-in allowed names,
+  configured allowed names, hidden detection, and matching in this one policy.
+- [ ] Extend strict INI parsing for `features.hidden_allowlist`. Parse one
+  component per continuation line, validate and bound the set, merge it with
+  the built-in allowlist, and reject protected-name collisions at startup.
+- [ ] On Windows, detect `stat.FILE_ATTRIBUTE_HIDDEN` through standard-library
+  stat data for each existing lexical component and resolved target component.
+  Isolate the platform-specific branch so POSIX does no extra attribute work
+  and Windows behavior can be unit-tested without a Windows runtime.
 - [ ] When hidden access is disabled, reject a path if either the requested
-  normalized path or its resolved in-root target contains a hidden component.
-  This prevents a visible symlink from becoming an alias to hidden content.
-- [ ] Filter hidden entries from `list_dir` before sorting and formatting.
-- [ ] Prune hidden entries and folders from `tree` before counting against the
-  100-entry limit. Do not reveal that filtered entries exist.
-- [ ] Apply the same check to non-existent write targets and their existing
-  parents before creating temporary files.
+  normalized path or its resolved in-root target contains a denied hidden
+  component. Check protected components regardless of `show_hidden`. This
+  prevents a visible symlink from becoming an alias to hidden or protected
+  content, and prevents a denied hidden symlink from aliasing visible content.
+- [ ] Filter denied entries from `list_dir` before sorting and formatting, while
+  retaining allowlisted hidden entries.
+- [ ] Prune denied entries and folders from `tree` before counting against the
+  100-entry limit. Descend into allowlisted hidden folders, evaluate all of
+  their children normally, and do not reveal that filtered entries exist.
+- [ ] Apply name-based checks to non-existent write targets and attribute checks
+  to every existing parent before creating temporary files. Recheck the target
+  and parent chain immediately before replacement so a symlink, rename, or
+  Windows attribute change cannot skip the policy.
 - [ ] Keep the configuration load separate from model-facing access. The server
-  may read its INI once at startup, while later MCP calls to `.mcp` are denied
-  whenever hidden access is disabled.
-- [ ] Use one stable, non-revealing error such as `Hidden path access is denied`
-  for all direct and symlink-mediated hidden access failures.
+  may read its INI once at startup, while later MCP calls through a root-relative
+  `.mcp` component are always denied.
+- [ ] Use the stable, non-revealing `Hidden path access is denied` error for all
+  direct, protected, attribute-based, and symlink-mediated policy failures.
 
 ### Tests
 
-- [ ] Cover hidden files, hidden folders, nested hidden components, dot-prefixed
+- [ ] Cover the built-in `.gitignore` and `.env.template` allowances; denial of
+  `.git`, `.env`, and `.env.template.local`; configured additions; and the
+  additive rather than replacement merge behavior.
+- [ ] Cover allowlisted names used as both files and folders, nested allowlisted
+  folders, a denied hidden component below an allowed folder, dot-prefixed
   write targets, and ordinary names containing dots.
+- [ ] Cover invalid allowlist configuration: empty entries where applicable,
+  `.`, `..`, both separator styles, NUL, duplicates, excessive entries or name
+  length, and protected `.mcp` collisions.
+- [ ] Confirm `.mcp` is omitted and denied as a file, folder, nested component,
+  direct target, and write target with both values of `show_hidden`, including
+  when an allowlist entry attempts to differ only by case.
 - [ ] Cover `list_dir` and `tree`, including pruning, sorting, empty output, and
-  tree-limit accounting.
-- [ ] Cover visible symlinks to hidden in-root targets and hidden symlinks to
-  visible targets where symbolic links are available.
+  tree-limit accounting. Confirm allowlisted entries count normally and denied
+  entries do not consume the limit.
+- [ ] Cover visible symlinks to denied and allowlisted hidden in-root targets;
+  denied and allowlisted hidden symlinks to visible targets; and symlinks into
+  `.mcp` where symbolic links are available.
+- [ ] On Windows, cover attribute-hidden files, folders, and reparse-point
+  entries with and without dot-prefixed names; allowlisted attribute-hidden
+  names; inherited traversal through attribute-hidden folders; and an attribute
+  change before atomic replacement. On non-Windows hosts, unit-test attribute
+  classification with injected or mocked stat metadata.
+- [ ] Cover casing of protected and allowed names on case-sensitive and
+  case-insensitive filesystems without weakening root confinement.
 - [ ] Confirm traversal and out-of-root symlink failures remain denied whether
   hidden visibility is enabled or disabled.
-- [ ] Confirm `.mcp/rooted-files-mcp.ini` cannot be read or overwritten through
-  MCP while hidden access is disabled.
+- [ ] Confirm `.mcp/rooted-files-mcp.ini` cannot be listed, read, or overwritten
+  through MCP even when hidden visibility is enabled.
 
 ### Completion gate
 
 - Every filesystem operation enforces the same hidden policy.
+- Protected-name precedence, allowlist exceptions, and Windows Hidden
+  attributes behave identically across listing, traversal, reads, and writes.
 - Listing results and permission errors do not disclose filtered names.
 - Root confinement and current binary/text protections remain green.
 
