@@ -5,11 +5,17 @@ const Limits := preload("command_limits.gd")
 
 const HOST := "127.0.0.1"
 
-var _server := TCPServer.new()
+var _server
+var _clock: Callable
 var _clients: Array[Dictionary] = []
 var _token := ""
 var _handler: Callable
 var _pending_resolver: Callable
+
+
+func _init(server = null, clock: Callable = Callable()) -> void:
+	_server = server if server != null else TCPServer.new()
+	_clock = clock
 
 
 func start(
@@ -23,19 +29,28 @@ func start(
 
 func stop() -> void:
 	for client in _clients:
-		(client.peer as StreamPeerTCP).disconnect_from_host()
+		client.peer.disconnect_from_host()
 	_clients.clear()
 	_server.stop()
 
 
 func poll() -> void:
 	while _server.is_connection_available():
-		var peer := _server.take_connection()
-		_clients.append({"peer": peer, "buffer": PackedByteArray()})
+		var peer: Variant = _server.take_connection()
+		if peer == null:
+			continue
+		if _clients.size() >= Limits.MAX_BRIDGE_CLIENTS:
+			peer.disconnect_from_host()
+			continue
+		_clients.append({
+			"peer": peer,
+			"buffer": PackedByteArray(),
+			"deadline_msec": _now_msec() + Limits.BRIDGE_CLIENT_TIMEOUT_MSEC,
+		})
 
 	for index in range(_clients.size() - 1, -1, -1):
 		var client := _clients[index]
-		var peer := client.peer as StreamPeerTCP
+		var peer = client.peer
 		peer.poll()
 		if peer.get_status() != StreamPeerTCP.STATUS_CONNECTED:
 			_clients.remove_at(index)
@@ -48,10 +63,14 @@ func poll() -> void:
 				_send(peer, pending_response)
 				_clients.remove_at(index)
 			continue
-		var available := peer.get_available_bytes()
+		if _now_msec() >= int(client.deadline_msec):
+			peer.disconnect_from_host()
+			_clients.remove_at(index)
+			continue
+		var available: int = int(peer.get_available_bytes())
 		if available <= 0:
 			continue
-		var received := peer.get_data(available)
+		var received: Array = peer.get_data(available)
 		if received[0] != OK:
 			peer.disconnect_from_host()
 			_clients.remove_at(index)
@@ -74,6 +93,7 @@ func poll() -> void:
 		if response.has("__godot_mcp_deferred_response"):
 			client["pending_response_id"] = response.__godot_mcp_deferred_response
 			client.erase("buffer")
+			client.erase("deadline_msec")
 			continue
 		_send(peer, response)
 		_clients.remove_at(index)
@@ -92,7 +112,7 @@ func _handle_line(line: String) -> Dictionary:
 	return _handler.call(command, arguments)
 
 
-func _send(peer: StreamPeerTCP, response: Dictionary) -> void:
+func _send(peer, response: Dictionary) -> void:
 	var encoded := (JSON.stringify(response) + "\n").to_utf8_buffer()
 	if encoded.size() > Limits.MAX_RESPONSE_BYTES:
 		encoded = (JSON.stringify(ErrorEnvelope.failure(
@@ -101,6 +121,10 @@ func _send(peer: StreamPeerTCP, response: Dictionary) -> void:
 		)) + "\n").to_utf8_buffer()
 	peer.put_data(encoded)
 	peer.disconnect_from_host()
+
+
+func _now_msec() -> int:
+	return int(_clock.call()) if _clock.is_valid() else int(Time.get_ticks_msec())
 
 
 func _constant_time_equal(left: String, right: String) -> bool:

@@ -4,8 +4,14 @@ import os
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
-from godot_editor_mcp.assets import AssetError, MAX_IMPORT_BYTES, ProjectAssets
+from godot_editor_mcp.assets import (
+    AssetError,
+    MAX_IMPORT_BYTES,
+    ProjectAssets,
+    _publish_no_replace,
+)
 
 
 class ProjectAssetsTests(unittest.TestCase):
@@ -30,6 +36,32 @@ class ProjectAssetsTests(unittest.TestCase):
         self.assertEqual((self.project / "assets" / "hero.png").read_bytes(), b"PNG data")
         with self.assertRaisesRegex(AssetError, "already exists"):
             self.assets.import_asset("hero.png", "assets/hero.png")
+
+    def test_destination_created_immediately_before_publication_is_preserved(self) -> None:
+        (self.inbox / "hero.png").write_bytes(b"new bytes")
+        destination = self.project / "assets" / "hero.png"
+
+        def race(temporary, requested_destination, *, platform=None):
+            self.assertEqual(Path(requested_destination).resolve(), destination.resolve())
+            destination.write_bytes(b"winner bytes")
+            return _publish_no_replace(temporary, requested_destination, platform=platform)
+
+        with patch("godot_editor_mcp.assets._publish_no_replace", side_effect=race):
+            with self.assertRaisesRegex(AssetError, "already exists"):
+                self.assets.import_asset("hero.png", "assets/hero.png")
+        self.assertEqual(destination.read_bytes(), b"winner bytes")
+        self.assertEqual(list(destination.parent.glob(".godot-mcp-import-*")), [])
+
+    def test_mocked_windows_publication_preserves_existing_destination(self) -> None:
+        temporary = self.project / "assets" / ".completed.tmp"
+        destination = self.project / "assets" / "hero.png"
+        temporary.write_bytes(b"new bytes")
+        destination.write_bytes(b"winner bytes")
+        with patch("godot_editor_mcp.assets.os.rename", side_effect=FileExistsError):
+            with self.assertRaises(FileExistsError):
+                _publish_no_replace(temporary, destination, platform="nt")
+        self.assertEqual(temporary.read_bytes(), b"new bytes")
+        self.assertEqual(destination.read_bytes(), b"winner bytes")
 
     def test_missing_roots_raise_domain_errors(self) -> None:
         with self.assertRaisesRegex(AssetError, "project.godot"):

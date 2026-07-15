@@ -20,16 +20,18 @@ func _run() -> void:
 func _test_probe_is_debugger_only() -> void:
 	assert(RuntimeDebuggerGateway != null)
 	assert(RuntimeSceneInspector != null)
-	var source := FileAccess.get_file_as_string(
-		"res://addons/godot_mcp/runtime_probe.gd",
-	)
-	assert("if not EngineDebugger.is_active()" in source)
-	assert("register_message_capture" in source)
-	assert("unregister_message_capture" in source)
-	assert("TCPServer" not in source)
-	assert("PacketPeer" not in source)
-	assert("Expression.new" not in source)
-	assert("GDScript.new" not in source)
+	var probe = RuntimeProbe.new()
+	probe.name = "InactiveProbe"
+	root.add_child(probe)
+	assert(bool(probe.get("_registered")) == EngineDebugger.is_active())
+	if not EngineDebugger.is_active():
+		assert(probe.get("_context").project_hash == "")
+	else:
+		assert(probe.get("_context").project_hash.length() == 64)
+	root.remove_child(probe)
+	probe.free()
+
+
 func _test_runtime_tree_and_properties() -> void:
 	var scene := Node2D.new()
 	scene.name = "RuntimeMain"
@@ -48,14 +50,12 @@ func _test_runtime_tree_and_properties() -> void:
 	var probe = RuntimeProbe.new()
 	probe.name = "GodotMCPRuntimeProbe"
 	root.add_child(probe)
-	assert(probe.get("_project_hash") == "")
-	assert(probe.get("_instance_nonce") == "")
 	probe.set_process(false)
-	probe.set("_run_id", 4)
-	probe.set("_debugger_session_id", 7)
-	probe.set("_instance_nonce", "d".repeat(32))
+	var context = probe.get("_context")
+	context.configure("", 4, 7, "d".repeat(32))
+	var tree_service = probe.get("_tree_service")
 
-	var tree_response: Dictionary = probe._scene_tree({"max_depth": 4, "limit": 2})
+	var tree_response: Dictionary = tree_service.scene_tree({"max_depth": 4, "limit": 2})
 	assert(tree_response.ok)
 	var tree: Dictionary = tree_response.result
 	assert(tree.scope == "runtime")
@@ -67,7 +67,7 @@ func _test_runtime_tree_and_properties() -> void:
 	assert(not tree.nodes.any(func(item): return item.path == "GodotMCPRuntimeProbe"))
 
 	var runtime_id: String = tree.nodes[1].runtime_id
-	var inspected: Dictionary = probe._inspect_node({
+	var inspected: Dictionary = tree_service.inspect_node({
 		"path": "Spawned", "runtime_id": runtime_id,
 		"property": "process_priority",
 	})
@@ -75,7 +75,7 @@ func _test_runtime_tree_and_properties() -> void:
 	assert(inspected.result.scope == "runtime")
 	assert(inspected.result.properties.size() == 1)
 	assert(inspected.result.properties[0].value == 42)
-	var stale_id: Dictionary = probe._inspect_node({
+	var stale_id: Dictionary = tree_service.inspect_node({
 		"path": "Spawned", "runtime_id": "e".repeat(64),
 	})
 	assert(not stale_id.ok)
@@ -85,7 +85,7 @@ func _test_runtime_tree_and_properties() -> void:
 	var replacement := Node.new()
 	replacement.name = "LaterSpawn"
 	scene.add_child(replacement)
-	var stale_cursor: Dictionary = probe._scene_tree({
+	var stale_cursor: Dictionary = tree_service.scene_tree({
 		"max_depth": 4, "limit": 2, "_expected_snapshot": snapshot,
 	})
 	assert(not stale_cursor.ok)

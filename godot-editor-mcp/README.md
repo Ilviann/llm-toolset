@@ -30,6 +30,8 @@ to one boundary do not require editing the entire server:
 - `server.py` validates MCP requests and preserves the package's public server API.
 - `tool_catalog.py` contains one typed specification per tool and derives schemas,
   stable mode ordering, bridge routes, path/wait policy, and checked bridge contracts.
+- `schema_validation.py` enforces the published dependency-free JSON Schema
+  subset before any local or bridge-backed tool call is dispatched.
 - `tool_dispatch.py` resolves those specifications, applies project-path policy,
   and coordinates focused bridge, import, folder, and editor-launch handlers.
 - `stdio.py` owns newline-delimited JSON-RPC input/output and stderr diagnostics.
@@ -60,9 +62,10 @@ The dependency-free editor plugin is split by responsibility under
 `plugin/addons/godot_mcp`:
 
 - `godot_mcp.gd` owns only plugin lifecycle and service composition.
-- `bridge_server.gd` and `command_router.gd` own authenticated localhost
-  transport, immediate or debugger-deferred dispatch, and duplicate-safe
-  command ownership.
+- `token_store.gd`, `authenticated_startup.gd`, `bridge_server.gd`, and
+  `command_router.gd` own fail-closed credential persistence, authenticated
+  startup, bounded localhost clients and request deadlines, immediate or
+  debugger-deferred dispatch, and duplicate-safe command ownership.
 - `editor_state_monitor.gd` is the stable state facade over focused scene, run,
   import, and project-file trackers; `event_store.gd` and
   `operation_registry.gd` retain shared monotonic identities.
@@ -78,10 +81,11 @@ The dependency-free editor plugin is split by responsibility under
   file creation or opening.
 - `edited_scene_inspector.gd` owns bounded edited-scene reads and scope routing;
   `runtime_scene_inspector.gd` adapts runtime reads to the same cursor contract.
-- `runtime_debugger_gateway.gd` and `runtime_probe.gd` own the validated
-  editor/game debugger handshake and bounded running-game data plane;
-  `runtime_gameplay_commands.gd` exposes only the fixed capture, action-input,
-  and condition command family.
+- `runtime_debugger_gateway.gd` and the compact `runtime_probe.gd` shell own the
+  validated editor/game debugger handshake and protocol. Focused runtime tree,
+  capture, input, and condition services share one confined identity/path
+  context; `runtime_gameplay_commands.gd` exposes only the fixed capture,
+  action-input, and condition command family.
 - `scene_commands.gd` owns UndoRedo-backed node/property changes and selection.
 - `project_settings_commands.gd` and `input_map_commands.gd` handle their
   respective validated, atomic project configuration operations.
@@ -106,6 +110,15 @@ Choose the exposed toolset at startup with `--mode tiny|small|large`. The
 default is `tiny`. Modes are nested: every tool in a smaller mode is also
 available in the larger modes. Calls to tools outside the active mode are
 rejected even if a client retained an older `tools/list` response.
+
+Every `tools/call` argument object is validated against the exact schema
+published by `tools/list` before dispatch. Required fields, JSON types,
+enums/constants, numeric and collection bounds, object property limits,
+unknown fields, nested `oneOf` shapes, local schema references, and the
+`res://` path pattern are enforced without a runtime dependency. Explicit
+non-object `params` or `arguments`, including falsy values such as `null`, are
+rejected rather than treated as empty objects. Godot handlers retain their own
+validation as a second boundary.
 
 - **`tiny` (default):** 12 focused tools for supervised GDScript-adjacent scene
   work, including compact scene inspection, UI/node construction, property
@@ -231,6 +244,12 @@ and stopped/replaced runs or debugger reconnects reject stale runtime IDs and
 cursors. Runtime requests retain at most 16 pending responses. Inspection and
 capture use a two-second operation bound; condition waits are bounded to ten
 seconds and remain inside the existing bridge response bound.
+
+The editor bridge also retains at most 16 localhost clients. Each newly
+accepted client has two seconds to authenticate and submit one complete bounded
+request; excess, idle, or partial-request clients are disconnected. A deferred
+runtime response continues to occupy one of those client slots and is also
+subject to the runtime gateway's independent pending-request and timeout bounds.
 
 ### Gameplay validation
 
@@ -541,8 +560,11 @@ bmp csv exr glb gltf hdr jpeg jpg json mp3 obj ogg otf png svg ttf wav webp
 Prefer `.glb` for 3D models because a single file can contain its textures.
 A `.gltf` file whose textures or buffers are separate must have those dependency
 files imported individually. Imports are limited to 100 MiB, stream-copy in
-1 MiB chunks, never overwrite existing files, and cannot target `.godot` or
-`addons`. Godot scans new files asynchronously, so `import_asset` reports
+1 MiB chunks to a flushed same-directory temporary file, never overwrite
+existing files, and cannot target `.godot` or `addons`. Final publication is
+atomic and no-replace: a destination created after validation but before
+publication remains unchanged on both POSIX and Windows. Godot scans new files
+asynchronously, so `import_asset` reports
 `"scan":"queued"` or `"scan":"already_running"` and returns the scan
 operation ID when new work is accepted. Use `"wait":true` for a bounded result,
 or observe `editor_state.active_imports`, `recent_imports`,
@@ -731,6 +753,11 @@ Open the project in Godot 4.7, then enable **Project → Project Settings → Pl
 inside Godot's generated-data folder and should not be committed. Other Godot 4
 releases may work, but 4.7 stable is the currently verified version.
 
+Token loading and creation fail closed. If the bounded token cannot be read,
+generated, written, or flushed, the plugin starts neither the localhost
+listener nor its discovery heartbeat, so it never advertises a bridge that the
+Python client cannot authenticate to.
+
 While enabled, the plugin also persists its reserved runtime-probe autoload so
 new debug runs can load it, and removes that exact registration on clean plugin
 shutdown. A pre-existing autoload with the same name is never overwritten.
@@ -876,11 +903,13 @@ Set-Location "C:\path\to\godot-editor-mcp"
 py -3 -m unittest discover -s tests -v
 ```
 
-The 76-test Python suite tests MCP initialization, end-to-end stdio initialization,
+The 85-test Python suite tests MCP initialization, end-to-end stdio initialization,
 tool listing and calls, per-mode dispatch, registry invariants, stable ordering,
-complete routes, path/wait policy, schema-to-limit alignment, release consistency,
+complete routes, path/wait policy, table-driven enforcement of every published
+schema keyword and nested transaction shape, executable-source release consistency,
 capability contracts, authentication, bounded transport behavior, staged imports,
-traversal and symlink denial, size limits, no-overwrite behavior, structured and
+traversal and symlink denial, size limits, atomic publication-race and mocked
+Windows no-overwrite behavior, structured and
 legacy bridge errors, discovery, safe stdout/stderr error separation, typed state
 and reload payloads, exact wait-version enforcement, cancellation, diagnostic
 settling, stale identities, and run startup health.
@@ -920,6 +949,7 @@ Run the focused infrastructure and state-transition checks with:
 /path/to/Godot --headless --path plugin --script res://tests/phase10_gameplay_validation_test.gd
 /path/to/Godot --headless --path plugin --script res://tests/phase11_scene_transaction_test.gd
 /path/to/Godot --headless --path plugin --script res://tests/phase12_project_workflow_test.gd
+/path/to/Godot --headless --path plugin --script res://tests/phase13_boundary_hardening_test.gd
 ```
 
 On the verified macOS platform, the opt-in subprocess check validates the live

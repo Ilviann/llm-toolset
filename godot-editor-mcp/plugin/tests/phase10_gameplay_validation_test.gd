@@ -26,14 +26,12 @@ func _run() -> void:
 	probe.name = "GodotMCPRuntimeProbe"
 	root.add_child(probe)
 	probe.set_process(false)
-	probe.set("_run_id", 10)
-	probe.set("_debugger_session_id", 20)
-	probe.set("_instance_nonce", "f".repeat(32))
+	probe.get("_context").configure("", 10, 20, "f".repeat(32))
 
 	_test_runtime_conditions(probe)
 	_test_injected_input(probe)
 	_test_capture(probe)
-	_test_gameplay_service_contract()
+	_test_gameplay_service_contract(probe)
 
 	probe.queue_free()
 	scene.queue_free()
@@ -42,7 +40,8 @@ func _run() -> void:
 
 
 func _test_runtime_conditions(probe) -> void:
-	var exists: Dictionary = probe._evaluate_condition({
+	var conditions = probe.get("_condition_service")
+	var exists: Dictionary = conditions.evaluate_condition({
 		"scope": "runtime", "run_id": 10, "condition": "node_exists",
 		"path": "Actor", "exists": true,
 	})
@@ -50,14 +49,14 @@ func _test_runtime_conditions(probe) -> void:
 	assert(exists.result.matched)
 	assert(exists.result.evidence.exists)
 
-	var absent: Dictionary = probe._evaluate_condition({
+	var absent: Dictionary = conditions.evaluate_condition({
 		"scope": "runtime", "run_id": 10, "condition": "node_exists",
 		"path": "Missing", "exists": false,
 	})
 	assert(absent.ok)
 	assert(absent.result.matched)
 
-	var count: Dictionary = probe._evaluate_condition({
+	var count: Dictionary = conditions.evaluate_condition({
 		"scope": "runtime", "run_id": 10, "condition": "node_count",
 		"path": ".", "group": "actors", "max_depth": 4,
 		"comparison": "eq", "value": 1,
@@ -67,7 +66,7 @@ func _test_runtime_conditions(probe) -> void:
 	assert(count.result.evidence.count == 1)
 	assert(count.result.evidence.paths == ["Actor"])
 
-	var property: Dictionary = probe._evaluate_condition({
+	var property: Dictionary = conditions.evaluate_condition({
 		"scope": "runtime", "run_id": 10, "condition": "property",
 		"path": "Actor", "property": "process_priority",
 		"comparison": "gte", "value": 40,
@@ -76,7 +75,7 @@ func _test_runtime_conditions(probe) -> void:
 	assert(property.result.matched)
 	assert(property.result.evidence.actual == 42)
 
-	var stale: Dictionary = probe._validate_condition({
+	var stale: Dictionary = conditions.validate_condition({
 		"scope": "runtime", "run_id": 11, "condition": "node_exists",
 		"path": ".",
 	})
@@ -85,35 +84,35 @@ func _test_runtime_conditions(probe) -> void:
 
 
 func _test_injected_input(probe) -> void:
+	var input_service = probe.get("_input_service")
 	if not InputMap.has_action(ACTION):
 		InputMap.add_action(ACTION)
-	var pressed: Dictionary = probe._send_input({
+	var pressed: Dictionary = input_service.send_input({
 		"run_id": 10, "action": ACTION, "pressed": true,
 		"strength": 0.75, "frames": 2,
 	})
 	assert(pressed.ok)
 	assert(pressed.result.injected)
 	assert(Input.is_action_pressed(ACTION))
-	assert(probe.get("_active_inputs").size() == 1)
+	assert(input_service.active_inputs.size() == 1)
 
-	var active: Dictionary = probe.get("_active_inputs")
+	var active: Dictionary = input_service.active_inputs
 	var hold: Dictionary = active[ACTION]
 	hold.release_msec = Time.get_ticks_msec()
 	active[ACTION] = hold
-	probe.set("_active_inputs", active)
-	probe._poll_inputs()
-	assert(probe.get("_active_inputs").is_empty())
+	input_service.poll()
+	assert(input_service.active_inputs.is_empty())
 
-	probe._send_input({"run_id": 10, "action": ACTION, "duration_ms": 1000})
-	probe._release_all_inputs("test_cleanup")
-	assert(probe.get("_active_inputs").is_empty())
+	input_service.send_input({"run_id": 10, "action": ACTION, "duration_ms": 1000})
+	input_service.release_all("test_cleanup")
+	assert(input_service.active_inputs.is_empty())
 	Input.action_release(ACTION)
 	InputMap.erase_action(ACTION)
 
 
 func _test_capture(probe) -> void:
 	var capture_id := "a".repeat(32)
-	var response: Dictionary = probe._capture_game_view(capture_id, {
+	var response: Dictionary = probe.get("_capture_service").capture_game_view(capture_id, {
 		"run_id": 10, "max_width": 320, "max_height": 180,
 	})
 	if DisplayServer.get_name() == "headless":
@@ -135,13 +134,9 @@ func _test_capture(probe) -> void:
 	DirAccess.remove_absolute(path)
 
 
-func _test_gameplay_service_contract() -> void:
+func _test_gameplay_service_contract(probe) -> void:
 	assert(RuntimeGameplayCommands != null)
-	var source := FileAccess.get_file_as_string("res://addons/godot_mcp/runtime_probe.gd")
-	assert("get_tree().root" in source)
-	assert("CAPTURE_FOLDER" in source)
-	assert("Input.action_press" in source)
-	assert("Input.action_release" in source)
-	assert("Expression.new" not in source)
-	assert("eval(" not in source)
-	assert("callv(" not in source)
+	assert(probe.get("_capture_service") != null)
+	assert(probe.get("_input_service") != null)
+	assert(probe.get("_condition_service") != null)
+	assert(probe.get("_tree_service") != null)

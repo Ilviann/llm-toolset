@@ -2,6 +2,7 @@
 extends EditorPlugin
 
 const AssetCommands := preload("asset_commands.gd")
+const AuthenticatedStartup := preload("authenticated_startup.gd")
 const BridgeServer := preload("bridge_server.gd")
 const CommandRouter := preload("command_router.gd")
 const CursorStore := preload("cursor_store.gd")
@@ -31,8 +32,9 @@ const SceneCommands := preload("scene_commands.gd")
 const SceneNodeAccess := preload("scene_node_access.gd")
 const SceneStateTracker := preload("scene_state_tracker.gd")
 const SceneTransaction := preload("scene_transaction.gd")
+const TokenStore := preload("token_store.gd")
 
-const BRIDGE_VERSION := "0.16.0"
+const BRIDGE_VERSION := "0.16.1"
 const BRIDGE_PROTOCOL_VERSION := "1"
 const DEFAULT_PORT := 6505
 const TOKEN_PATH := "res://.godot/godot_mcp_token"
@@ -58,16 +60,24 @@ var _runtime_probe_uid := ""
 var _run_state
 var _scene_state
 var _state_monitor
+var _token_store = TokenStore.new()
 var _port := DEFAULT_PORT
 
 
 func _enter_tree() -> void:
 	set_process(false)
-	var token := _load_or_create_token()
+	var token_result: Dictionary = _token_store.load_or_create(TOKEN_PATH)
+	var startup_result: Dictionary = AuthenticatedStartup.new().run(
+		token_result, Callable(self, "_start_authenticated_services"),
+	)
+	if not startup_result.ok:
+		push_error(ErrorEnvelope.message(startup_result))
+
+
+func _start_authenticated_services(token: String) -> Dictionary:
 	_port = int(ProjectSettings.get_setting("godot_mcp/port", DEFAULT_PORT))
 	if _port < 1 or _port > 65535:
-		push_error("Godot MCP bridge port must be between 1 and 65535")
-		return
+		return ErrorEnvelope.failure("Godot MCP bridge port must be between 1 and 65535")
 
 	_events = EventStore.new()
 	_operations = OperationRegistry.new()
@@ -97,7 +107,7 @@ func _enter_tree() -> void:
 	_router = CommandRouter.new()
 	if not _register_commands():
 		_shutdown_services()
-		return
+		return ErrorEnvelope.failure("Godot MCP command registration failed")
 
 	_bridge_server = BridgeServer.new()
 	var error: int = _bridge_server.start(
@@ -105,17 +115,18 @@ func _enter_tree() -> void:
 		Callable(_runtime_debugger, "take_response"),
 	)
 	if error != OK:
-		push_error(
+		var listen_message := (
 			"Godot MCP bridge could not listen on 127.0.0.1:%d (error %d); " % [_port, error]
 			+ "another editor may already own this port"
 		)
 		_shutdown_services()
-		return
+		return ErrorEnvelope.failure(listen_message, ErrorEnvelope.EDITOR_BUSY)
 
 	_discovery = DiscoveryRecord.new()
 	_discovery.start(_port, BRIDGE_VERSION)
 	set_process(true)
 	print("Godot MCP bridge listening on 127.0.0.1:%d" % _port)
+	return ErrorEnvelope.success({})
 
 
 func _exit_tree() -> void:
@@ -291,6 +302,8 @@ func _capabilities(_arguments: Dictionary) -> Dictionary:
 		"limits": {
 			"request_bytes": Limits.MAX_REQUEST_BYTES,
 			"response_bytes": Limits.MAX_RESPONSE_BYTES,
+			"bridge_clients": Limits.MAX_BRIDGE_CLIENTS,
+			"bridge_client_timeout_ms": Limits.BRIDGE_CLIENT_TIMEOUT_MSEC,
 			"tree_nodes": Limits.MAX_TREE_NODES,
 			"tree_depth": Limits.MAX_TREE_DEPTH,
 			"tree_scan": Limits.MAX_TREE_SCAN,
@@ -429,17 +442,3 @@ func _runtime_probe_matches(value: Variant) -> bool:
 func _on_scene_saved(_path: String) -> void:
 	if _scene_state != null:
 		_scene_state.mark_saved()
-
-
-func _load_or_create_token() -> String:
-	if FileAccess.file_exists(TOKEN_PATH):
-		var existing := FileAccess.get_file_as_string(TOKEN_PATH).strip_edges().to_lower()
-		if existing.length() == 64 and existing.is_valid_hex_number():
-			return existing
-	var token := Crypto.new().generate_random_bytes(32).hex_encode()
-	var file := FileAccess.open(TOKEN_PATH, FileAccess.WRITE)
-	if file == null:
-		push_error("Godot MCP bridge could not create its token")
-		return token
-	file.store_string(token + "\n")
-	return token

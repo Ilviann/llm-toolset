@@ -3,6 +3,26 @@
 This file records released changes. Planned work is tracked separately in
 [`ROADMAP.md`](ROADMAP.md).
 
+## 0.16.1 — 2026-07-15
+
+- Bounded the localhost editor bridge to 16 active clients and added a
+  two-second monotonic authentication/request deadline, including deferred
+  client accounting, excess/idle/partial-request rejection, shutdown cleanup,
+  and capability-contract reporting.
+- Made project-token reads and flushed writes fail closed so listener and
+  discovery startup cannot proceed with an unusable credential.
+- Replaced staged-import overwrite publication with portable atomic no-replace
+  behavior, preserving a concurrently created destination on POSIX and Windows.
+- Added dependency-free enforcement of every published tool argument schema
+  before local or bridge dispatch, including strict falsy non-object rejection,
+  nested local references, exact `oneOf`, and bounded object/collection shapes.
+- Split the runtime probe into a compact protocol/composition shell plus focused
+  identity/path, tree/property, capture, injected-input, and condition services
+  while preserving probe protocol 2 and all model-facing behavior.
+- Removed documentation-content dependencies from release checks, expanded the
+  Python suite to 85 tests, added the Phase 13 headless boundary checks, and
+  passed the complete headless and native macOS Godot 4.7 integration suites.
+
 ## 0.16.0 — 2026-07-15
 
 - Added small/large-mode `list_autoloads` and atomic `autoload_patch` helpers

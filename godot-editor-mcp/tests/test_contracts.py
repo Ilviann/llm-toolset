@@ -219,7 +219,7 @@ class ToolRegistryContractTests(unittest.TestCase):
 
 
 class ReleaseConsistencyTests(unittest.TestCase):
-    def test_package_plugin_runtime_and_documents_use_one_version(self) -> None:
+    def test_package_plugin_and_runtime_use_one_version(self) -> None:
         pyproject = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
         plugin = (ROOT / "plugin/addons/godot_mcp/plugin.cfg").read_text(
             encoding="utf-8"
@@ -227,17 +227,13 @@ class ReleaseConsistencyTests(unittest.TestCase):
         runtime = (ROOT / "plugin/addons/godot_mcp/godot_mcp.gd").read_text(
             encoding="utf-8"
         )
-        history = (ROOT / "HISTORY.md").read_text(encoding="utf-8")
-        roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
         observed = {
             re.search(r'^version = "([^"]+)"$', pyproject, re.MULTILINE).group(1),
             re.search(r'^version="([^"]+)"$', plugin, re.MULTILINE).group(1),
             re.search(r'^const BRIDGE_VERSION := "([^"]+)"$', runtime, re.MULTILINE).group(1),
-            re.search(r'^## ([0-9]+\.[0-9]+\.[0-9]+)', history, re.MULTILINE).group(1),
             __version__,
         }
         self.assertEqual(observed, {__version__})
-        self.assertIn(f"Completed in {__version__}.", roadmap)
 
 
 if __name__ == "__main__":

@@ -137,6 +137,36 @@ class MCPServerTests(unittest.TestCase):
         self.assertEqual(self.bridge.calls, [])
         self.assertEqual(self.assets.calls, [])
 
+    def test_falsy_non_object_params_and_arguments_are_rejected(self) -> None:
+        for params in (None, False, 0, "", []):
+            with self.subTest(params=params):
+                response = self.server.handle({
+                    "jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": params,
+                })
+                assert response is not None
+                self.assertEqual(response["error"]["code"], -32602)
+        for arguments in (None, False, 0, "", []):
+            with self.subTest(arguments=arguments):
+                response = self.server.handle({
+                    "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+                    "params": {"name": "capabilities", "arguments": arguments},
+                })
+                assert response is not None
+                self.assertEqual(response["error"]["code"], -32602)
+
+    def test_schema_rejection_prevents_local_and_bridge_dispatch(self) -> None:
+        cases = [
+            ("open_scene", {}),
+            ("scene_tree", {"limit": 0}),
+            ("node_info", {"path": ".", "unknown": True}),
+        ]
+        for name, arguments in cases:
+            with self.subTest(name=name):
+                response = self.request("tools/call", {"name": name, "arguments": arguments})
+                self.assertEqual(response["error"]["code"], -32602)
+        self.assertEqual(self.bridge.calls, [])
+        self.assertEqual(self.assets.calls, [])
+
     def test_tool_maps_to_short_plugin_command(self) -> None:
         self.server = MCPServer(self.bridge, self.assets, mode="large")  # type: ignore[arg-type]
         response = self.request("tools/call", {

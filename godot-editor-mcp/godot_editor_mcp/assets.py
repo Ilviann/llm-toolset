@@ -22,6 +22,39 @@ ALLOWED_IMPORT_EXTENSIONS = {
 PROTECTED_PROJECT_FOLDERS = {".godot", "addons"}
 
 
+def _publish_no_replace(
+    temporary: str | Path,
+    destination: str | Path,
+    *,
+    platform: str | None = None,
+) -> None:
+    """Atomically publish a completed same-directory file without replacement."""
+    selected_platform = os.name if platform is None else platform
+    if selected_platform == "nt":
+        # Windows rename is atomic and fails when the destination exists.
+        os.rename(temporary, destination)
+        return
+    # A same-filesystem hard link atomically creates the destination name with
+    # no overwrite semantics. The temporary name is removed only after success.
+    os.link(temporary, destination)
+    os.unlink(temporary)
+
+
+def _sync_directory(folder: Path) -> None:
+    """Persist a POSIX directory entry when the platform supports directory fsync."""
+    if os.name == "nt":
+        return
+    descriptor: int | None = None
+    try:
+        descriptor = os.open(folder, os.O_RDONLY)
+        os.fsync(descriptor)
+    except OSError:
+        pass
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
+
+
 class ProjectAssets:
     def __init__(self, project: str | Path, import_root: str | Path | None = None) -> None:
         try:
@@ -159,7 +192,16 @@ class ProjectAssets:
                     temp.write(chunk)
                 temp.flush()
                 os.fsync(temp.fileno())
-            os.replace(temp_name, destination)
+            _publish_no_replace(temp_name, destination)
+            temp_name = None
+            _sync_directory(parent)
+        except FileExistsError:
+            if temp_name:
+                try:
+                    os.unlink(temp_name)
+                except OSError:
+                    pass
+            raise AssetError("Destination already exists") from None
         except AssetError:
             if temp_name:
                 try:

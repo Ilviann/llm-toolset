@@ -788,6 +788,8 @@ BRIDGE_PROTOCOL_VERSION = "1"
 EXPECTED_BRIDGE_LIMITS = {
     "request_bytes": 64 * 1024,
     "response_bytes": 256 * 1024,
+    "bridge_clients": 16,
+    "bridge_client_timeout_ms": 2000,
     "tree_nodes": 200,
     "tree_depth": 64,
     "tree_scan": 5000,

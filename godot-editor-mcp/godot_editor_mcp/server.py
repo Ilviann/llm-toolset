@@ -12,6 +12,7 @@ from typing import Any, Callable
 from . import __version__
 from .errors import DomainError
 from .stdio import error, result, tool_result
+from .schema_validation import SchemaValidationError, validate_tool_arguments
 from .tool_catalog import (
     LATEST_PROTOCOL,
     MODES,
@@ -70,7 +71,7 @@ class MCPServer:
     def handle(self, message: dict[str, Any]) -> dict[str, Any] | None:
         request_id = message.get("id")
         method = message.get("method")
-        params = message.get("params") or {}
+        params = message.get("params", {})
         if "id" not in message:
             return None
         if message.get("jsonrpc") != "2.0" or not isinstance(method, str):
@@ -99,13 +100,17 @@ class MCPServer:
 
     def _call_tool(self, request_id: Any, params: dict[str, Any]) -> dict[str, Any]:
         name = params.get("name")
-        arguments = params.get("arguments") or {}
+        arguments = params.get("arguments", {})
         if not isinstance(arguments, dict):
             return error(request_id, -32602, "Invalid tool arguments")
         if name not in self.tool_names:
             return error(
                 request_id, -32602, f"Tool is unavailable in {self.mode} mode"
             )
+        try:
+            validate_tool_arguments(arguments, TOOL_BY_NAME[name]["inputSchema"])
+        except SchemaValidationError as exc:
+            return error(request_id, -32602, f"Invalid tool arguments: {exc}")
         try:
             output = self._dispatcher.call(name, arguments)
             if name == "capabilities" and isinstance(output, dict):
