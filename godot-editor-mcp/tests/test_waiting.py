@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import unittest
 
+from godot_editor_mcp import __version__
 from godot_editor_mcp.errors import (
     BridgeError,
     ErrorCode,
@@ -9,6 +10,7 @@ from godot_editor_mcp.errors import (
     OperationCancelledError,
     OperationTimeoutError,
     ProjectMismatchError,
+    StaleOperationError,
     VersionMismatchError,
 )
 from godot_editor_mcp.waiting import OperationWaiter
@@ -66,11 +68,13 @@ class OperationWaiterTests(unittest.TestCase):
                 "scene": "res://old.tscn",
                 "active_operations": [{"operation_id": "op-1"}],
                 "last_diagnostic_id": 3,
+                "bridge_version": __version__,
             },
             {
                 "scene": "res://main.tscn",
                 "active_operations": [],
                 "last_diagnostic_id": 4,
+                "bridge_version": __version__,
             },
         ])
         waiter, clock = self.waiter(bridge)
@@ -80,7 +84,7 @@ class OperationWaiterTests(unittest.TestCase):
 
     def test_import_failure_is_returned_as_bounded_completion(self) -> None:
         failure = {
-            "path": "res://bad.png", "status": "failed",
+            "operation_id": "op-2", "path": "res://bad.png", "status": "failed",
             "error": {"message": "decode failed"},
         }
         bridge = ScriptedBridge([
@@ -89,6 +93,7 @@ class OperationWaiterTests(unittest.TestCase):
                 "active_operations": [],
                 "recent_imports": [failure],
                 "last_diagnostic_id": 8,
+                "bridge_version": __version__,
             }
         ])
         waiter, _ = self.waiter(bridge)
@@ -101,6 +106,7 @@ class OperationWaiterTests(unittest.TestCase):
             {
                 "playing": True, "run_id": 7, "active_operations": [],
                 "last_diagnostic_id": None, "last_run_exit_status": "running",
+                "bridge_version": __version__,
             }
         ])
         waiter, _ = self.waiter(bridge)
@@ -112,6 +118,7 @@ class OperationWaiterTests(unittest.TestCase):
         bridge = ScriptedBridge([{
             "scene": "res://old.tscn", "active_operations": [],
             "last_diagnostic_id": None,
+            "bridge_version": __version__,
         }])
         waiter, _ = self.waiter(bridge)
         with self.assertRaises(OperationTimeoutError) as raised:
@@ -144,51 +151,91 @@ class OperationWaiterTests(unittest.TestCase):
                 "status": "completed",
                 "operation_id": "op-1",
                 "project_hash": expected_hash,
-                "bridge_version": "0.7.0",
+                "bridge_version": __version__,
             },
         ])
         clock = FakeClock()
         waiter = OperationWaiter(bridge, clock=clock, sleep=clock.sleep)
-        result = waiter.wait_for_reload("op-1", expected_hash, "0.7.0", 1000)
+        result = waiter.wait_for_reload("op-1", expected_hash, __version__, 1000)
         self.assertTrue(result["completed"])
         self.assertTrue(result["disconnected"])
 
     def test_reload_rejects_project_and_version_mismatch(self) -> None:
         base = {
             "completed": True,
+            "status": "completed",
             "operation_id": "op-1",
             "project_hash": "b" * 64,
-            "bridge_version": "0.7.0",
+            "bridge_version": __version__,
         }
         clock = FakeClock()
         with self.assertRaises(ProjectMismatchError):
             OperationWaiter(
                 ReloadBridge([base]), clock=clock, sleep=clock.sleep
-            ).wait_for_reload("op-1", "a" * 64, "0.7.0", 1000)
+            ).wait_for_reload("op-1", "a" * 64, __version__, 1000)
         with self.assertRaises(VersionMismatchError):
             OperationWaiter(
-                ReloadBridge([{**base, "project_hash": "a" * 64}]),
+                ReloadBridge([{
+                    **base,
+                    "project_hash": "a" * 64,
+                    "bridge_version": "0.11.0",
+                }]),
                 clock=clock,
                 sleep=clock.sleep,
-            ).wait_for_reload("op-1", "a" * 64, "0.6.0", 1000)
+            ).wait_for_reload("op-1", "a" * 64, __version__, 1000)
+
+    def test_state_wait_rejects_mismatched_plugin_version(self) -> None:
+        bridge = ScriptedBridge([{
+            "scene": "res://main.tscn",
+            "active_operations": [],
+            "last_diagnostic_id": None,
+            "bridge_version": "0.9.0",
+        }])
+        waiter, _ = self.waiter(bridge)
+        with self.assertRaises(VersionMismatchError):
+            waiter.wait_for_scene("main.tscn", "op-1", 1000)
+
+    def test_reload_rejects_stale_operation_identity(self) -> None:
+        clock = FakeClock()
+        with self.assertRaises(StaleOperationError):
+            OperationWaiter(
+                ReloadBridge([{
+                    "completed": True,
+                    "status": "completed",
+                    "operation_id": "op-other",
+                    "project_hash": "a" * 64,
+                    "bridge_version": __version__,
+                }]),
+                clock=clock,
+                sleep=clock.sleep,
+            ).wait_for_reload("op-1", "a" * 64, __version__, 1000)
+
+    def test_shutdown_cancels_state_wait_before_polling(self) -> None:
+        bridge = ScriptedBridge([{}])
+        waiter, _ = self.waiter(bridge)
+        waiter.cancel()
+        with self.assertRaises(OperationCancelledError):
+            waiter.wait_for_scene("main.tscn", "op-1", 1000)
+        self.assertEqual(bridge.calls, [])
 
     def test_reload_timeout_and_shutdown_cancellation_are_distinct(self) -> None:
         pending = {
             "completed": False,
+            "status": "pending",
             "operation_id": "op-1",
             "project_hash": "a" * 64,
-            "bridge_version": "0.7.0",
+            "bridge_version": __version__,
         }
         clock = FakeClock()
         waiter = OperationWaiter(
             ReloadBridge([pending]), clock=clock, sleep=clock.sleep
         )
         with self.assertRaises(OperationTimeoutError):
-            waiter.wait_for_reload("op-1", "a" * 64, "0.7.0", 100)
+            waiter.wait_for_reload("op-1", "a" * 64, __version__, 100)
         waiter = OperationWaiter(ReloadBridge([pending]))
         waiter.cancel()
         with self.assertRaises(OperationCancelledError):
-            waiter.wait_for_reload("op-1", "a" * 64, "0.7.0", 100)
+            waiter.wait_for_reload("op-1", "a" * 64, __version__, 100)
 
 
 if __name__ == "__main__":

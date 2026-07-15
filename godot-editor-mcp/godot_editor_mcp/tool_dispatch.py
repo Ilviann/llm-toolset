@@ -13,7 +13,7 @@ from .errors import (
     LauncherError,
 )
 from .tool_catalog import BRIDGE_COMMANDS, MODE_TOOL_NAMES, SPEC_BY_NAME, Mode, ToolSpec
-from .waiting import DEFAULT_STARTUP_WINDOW_MS, OperationWaiter
+from .waiting import DEFAULT_STARTUP_WINDOW_MS
 
 
 class BridgeClient(Protocol):
@@ -35,6 +35,25 @@ class EditorStarter(Protocol):
     def start(self, bridge: BridgeClient) -> dict[str, str]: ...
 
 
+class Waiter(Protocol):
+    def cancel(self) -> None: ...
+    def options(self, arguments: dict[str, Any]) -> tuple[bool, int]: ...
+    def bridge_arguments(self, arguments: dict[str, Any]) -> dict[str, Any]: ...
+    def wait_for_scene(self, path: str, operation_id: Any, timeout_ms: int) -> dict[str, Any]: ...
+    def wait_for_asset(self, path: str, operation_id: Any, timeout_ms: int) -> dict[str, Any]: ...
+    def wait_for_run(
+        self, run_id: int, operation_id: Any, timeout_ms: int, startup_window_ms: int
+    ) -> dict[str, Any]: ...
+    def wait_for_stop(self, run_id: int, operation_id: Any, timeout_ms: int) -> dict[str, Any]: ...
+    def wait_for_reload(
+        self,
+        operation_id: Any,
+        expected_project_hash: Any,
+        expected_bridge_version: Any,
+        timeout_ms: int,
+    ) -> dict[str, Any]: ...
+
+
 class ToolDispatcher:
     """Execute tools exposed by one mode against injected local services."""
 
@@ -45,13 +64,14 @@ class ToolDispatcher:
         *,
         mode: Mode,
         launcher: EditorStarter | None,
+        waiter: Waiter,
     ) -> None:
         self.bridge = bridge
         self.assets = assets
         self.mode = mode
         self.launcher = launcher
         self.tool_names = MODE_TOOL_NAMES[mode]
-        self.waiter = OperationWaiter(bridge)
+        self.waiter = waiter
         self._local_handlers = {
             "start_editor": self._start_editor,
             "import_asset": self._import_asset,

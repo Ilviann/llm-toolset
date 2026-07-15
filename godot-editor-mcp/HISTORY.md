@@ -3,6 +3,19 @@
 This file records released changes. Planned work is tracked separately in
 [`ROADMAP.md`](ROADMAP.md).
 
+## 0.10.0 — 2026-07-15
+
+- Split edited-scene, run, import/filesystem, and `project.godot` transitions
+  into focused state trackers behind the wire-compatible `editor_state` facade.
+- Routed asset-import and project-file-write callbacks directly to their narrow
+  trackers while preserving shared event and operation registries.
+- Added validated Python views for editor-state and reload-status payloads,
+  centralized deadline/cancellation/diagnostic-settling behavior, and injected
+  waiter construction outside tool dispatch.
+- Added focused headless transition characterization plus malformed identity,
+  stale reload, cancellation, quiet-period, and composition tests; passed the
+  complete Python suite and Godot 4.7 headless Phase 2–6 checks on macOS.
+
 ## 0.9.0 — 2026-07-15
 
 - Replaced the broad inherited Godot command base with focused project-path,

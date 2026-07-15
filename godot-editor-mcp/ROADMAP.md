@@ -5,7 +5,7 @@
 - [x] Phase 3 — Reload the configured project and reconnect safely.
 - [x] Phase 4 — Consolidate tool contracts and add cross-language guardrails.
 - [x] Phase 5 — Replace broad command inheritance with narrow services.
-- [ ] Phase 6 — Separate editor-state ownership and typed wait contracts.
+- [x] Phase 6 — Separate editor-state ownership and typed wait contracts.
 - [ ] Phase 7 — Make edited-scene and asset inspection targeted and complete.
 - [ ] Phase 8 — Inspect the running scene through a read-only runtime probe.
 - [ ] Phase 9 — Capture, drive, and validate gameplay with a minimal fixed API.
@@ -211,6 +211,10 @@ event, and diagnostic transitions in one monitor, while Python waits interpret
 the resulting dictionaries directly. This phase separates temporal ownership
 without changing the concise public state response.
 
+Completed in 0.10.0. Scene, run, import, and project-file transitions now have
+focused owners behind the stable state facade; Python waits consume validated
+payload views and receive their waiter through explicit composition.
+
 ### Editor-side state ownership
 
 - Keep `EditorStateMonitor` as the stable state-command facade while delegating
@@ -232,8 +236,9 @@ without changing the concise public state response.
   responses so wire-field knowledge is centralized outside wait algorithms.
 - Separate common deadline, cancellation, polling, and diagnostic-settling
   behavior from scene, import, run, stop, and reload completion predicates.
-- Preserve transitional behavior for compatible older plugins where fields are
-  optional, while rejecting malformed identity-bearing responses explicitly.
+- Require the simultaneously deployed Python and plugin versions to match;
+  reject missing, inconsistent, or malformed wait fields and identities
+  explicitly instead of maintaining an older-payload compatibility branch.
 - Inject the waiter or its factory into dispatch composition instead of
   constructing it inside `ToolDispatcher`.
 

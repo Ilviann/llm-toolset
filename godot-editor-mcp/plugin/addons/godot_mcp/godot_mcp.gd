@@ -9,18 +9,22 @@ const DiagnosticStore := preload("diagnostic_store.gd")
 const EditorStateMonitor := preload("editor_state_monitor.gd")
 const ErrorEnvelope := preload("error_envelope.gd")
 const EventStore := preload("event_store.gd")
+const ImportStateTracker := preload("import_state_tracker.gd")
 const InputMapCommands := preload("input_map_commands.gd")
 const InputEventCodec := preload("input_event_codec.gd")
 const Limits := preload("command_limits.gd")
 const OperationRegistry := preload("operation_registry.gd")
 const ProjectPathGuard := preload("project_path_guard.gd")
+const ProjectFileStateTracker := preload("project_file_state_tracker.gd")
 const ProjectSettingsCommands := preload("project_settings_commands.gd")
 const PropertyValueCodec := preload("property_value_codec.gd")
 const ReloadCommands := preload("reload_commands.gd")
+const RunStateTracker := preload("run_state_tracker.gd")
 const SceneCommands := preload("scene_commands.gd")
 const SceneNodeAccess := preload("scene_node_access.gd")
+const SceneStateTracker := preload("scene_state_tracker.gd")
 
-const BRIDGE_VERSION := "0.9.0"
+const BRIDGE_VERSION := "0.10.0"
 const BRIDGE_PROTOCOL_VERSION := "1"
 const DEFAULT_PORT := 6505
 const TOKEN_PATH := "res://.godot/godot_mcp_token"
@@ -30,9 +34,13 @@ var _command_services: Array = []
 var _discovery
 var _diagnostics
 var _events
+var _import_state
 var _operations
+var _project_file_state
 var _router
 var _reload_commands
+var _run_state
+var _scene_state
 var _state_monitor
 var _port := DEFAULT_PORT
 
@@ -49,8 +57,19 @@ func _enter_tree() -> void:
 	_operations = OperationRegistry.new()
 	_diagnostics = DiagnosticStore.new()
 	OS.add_logger(_diagnostics)
+	_scene_state = SceneStateTracker.new(
+		get_editor_interface(), get_undo_redo(), _events, _operations,
+	)
+	_run_state = RunStateTracker.new(
+		get_editor_interface(), _events, _operations, _diagnostics,
+	)
+	_import_state = ImportStateTracker.new(
+		get_editor_interface(), _events, _operations, _diagnostics,
+	)
+	_project_file_state = ProjectFileStateTracker.new()
 	_state_monitor = EditorStateMonitor.new(
-		get_editor_interface(), get_undo_redo(), _events, _operations, _diagnostics,
+		_events, _operations, _diagnostics,
+		_scene_state, _run_state, _import_state, _project_file_state,
 	)
 	_reload_commands = ReloadCommands.new(
 		get_editor_interface(), _operations, BRIDGE_VERSION,
@@ -105,7 +124,7 @@ func _register_commands() -> bool:
 	var input_events = InputEventCodec.new()
 	var asset_commands = AssetCommands.new(
 		get_editor_interface(), _operations,
-		Callable(_state_monitor, "track_import"), project_paths, scene_nodes,
+		Callable(_import_state, "track_import"), project_paths, scene_nodes,
 		property_values,
 	)
 	var scene_commands = SceneCommands.new(
@@ -113,10 +132,10 @@ func _register_commands() -> bool:
 		property_values,
 	)
 	var settings_commands = ProjectSettingsCommands.new(
-		Callable(_state_monitor, "mark_project_settings_saved"), input_events,
+		Callable(_project_file_state, "mark_saved"), input_events,
 	)
 	var input_commands = InputMapCommands.new(
-		Callable(_state_monitor, "mark_project_settings_saved"), input_events,
+		Callable(_project_file_state, "mark_saved"), input_events,
 	)
 	_command_services = [
 		asset_commands, scene_commands, settings_commands, input_commands, _reload_commands,
@@ -228,15 +247,19 @@ func _shutdown_services() -> void:
 	_discovery = null
 	_diagnostics = null
 	_events = null
+	_import_state = null
 	_operations = null
+	_project_file_state = null
 	_router = null
 	_reload_commands = null
+	_run_state = null
+	_scene_state = null
 	_state_monitor = null
 
 
 func _on_scene_saved(_path: String) -> void:
-	if _state_monitor != null:
-		_state_monitor.mark_scene_saved()
+	if _scene_state != null:
+		_scene_state.mark_saved()
 
 
 func _load_or_create_token() -> String:

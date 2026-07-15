@@ -36,8 +36,9 @@ to one boundary do not require editing the entire server:
 - `cli.py` parses arguments and composes the bridge, asset manager, launcher,
   and MCP server.
 - `errors.py` defines bounded error envelopes and stable typed exceptions.
-- `waiting.py` owns monotonic deadlines, concise state polling, diagnostic
-  quiet periods, and run startup health windows.
+- `state_payloads.py` validates the editor-state and reload-status fields used
+  by waits; `waiting.py` owns monotonic deadlines, polling, cancellation,
+  diagnostic quiet periods, completion predicates, and startup health windows.
 - `discovery.py` validates project-scoped bridge heartbeat records and selects a
   live matching port when `--port` is omitted.
 - `assets.py`, `bridge.py`, and `launcher.py` remain focused adapters for their
@@ -61,8 +62,9 @@ The dependency-free editor plugin is split by responsibility under
 - `godot_mcp.gd` owns only plugin lifecycle and service composition.
 - `bridge_server.gd` and `command_router.gd` own authenticated localhost
   transport, direct-callable dispatch, and duplicate-safe command ownership.
-- `editor_state_monitor.gd`, `event_store.gd`, and `operation_registry.gd` own
-  observed editor/import state, monotonic event IDs, and asynchronous operation IDs.
+- `editor_state_monitor.gd` is the stable state facade over focused scene, run,
+  import, and project-file trackers; `event_store.gd` and
+  `operation_registry.gd` retain shared monotonic identities.
 - `diagnostic_store.gd` is a thread-safe bounded Godot logger and read API.
 - `project_identity.gd` and `atomic_json_record.gd` provide the shared
   cross-platform identity and bounded crash-safe record primitives used by
@@ -87,6 +89,10 @@ command service publishes its own handler mapping; the composition root retains
 the service and registers that mapping explicitly. New command families should
 remain focused and receive only the narrow guards, codecs, state callbacks, and
 editor services they use.
+
+The Python server and installed Godot plugin are released and deployed
+together. Their versions must match exactly; wait payloads are validated as a
+lockstep contract rather than interpreted through an older-plugin fallback.
 
 ## Tool modes
 
@@ -287,6 +293,10 @@ Waiting happens only in the Python MCP process: it polls concise editor state or
 reload status with a monotonic deadline, so the Godot main loop stays
 responsive. The default timeout is 10 seconds. Closing the MCP server cancels
 an outstanding wait.
+
+Wait predicates consume validated payload views. Missing or malformed state,
+operation, import, run, project, or bridge identities fail as bounded protocol
+errors. Install the matching Python and plugin release before using waits.
 
 Waited run results include the new `run_id` and whether the process survived
 the startup health window. Set `startup_window_ms` from 0 through 5000 on the
@@ -609,13 +619,14 @@ Set-Location "C:\path\to\godot-editor-mcp"
 py -3 -m unittest discover -s tests -v
 ```
 
-The 56-test Python suite tests MCP initialization, end-to-end stdio initialization,
+The 69-test Python suite tests MCP initialization, end-to-end stdio initialization,
 tool listing and calls, per-mode dispatch, registry invariants, stable ordering,
 complete routes, path/wait policy, schema-to-limit alignment, release consistency,
 capability contracts, authentication, bounded transport behavior, staged imports,
 traversal and symlink denial, size limits, no-overwrite behavior, structured and
-legacy bridge errors, discovery, safe stdout/stderr error separation, waits,
-diagnostic settling, and run startup health.
+legacy bridge errors, discovery, safe stdout/stderr error separation, typed state
+and reload payloads, exact wait-version enforcement, cancellation, diagnostic
+settling, stale identities, and run startup health.
 A live check in Godot is still required
 when claiming compatibility because editor plugin APIs are only available inside
 the editor. Symbolic-link tests are skipped when the current account cannot
@@ -639,6 +650,13 @@ Run the reload-record and duplicate-safe router checks with:
 ```sh
 /path/to/Godot --headless --path plugin --script res://tests/phase3_reload_record_test.gd
 /path/to/Godot --headless --path plugin --script res://tests/phase4_command_router_test.gd
+```
+
+Run the focused infrastructure and state-transition checks with:
+
+```sh
+/path/to/Godot --headless --path plugin --script res://tests/phase5_infrastructure_test.gd
+/path/to/Godot --headless --path plugin --script res://tests/phase6_state_trackers_test.gd
 ```
 
 On the verified macOS platform, the opt-in subprocess check validates the live

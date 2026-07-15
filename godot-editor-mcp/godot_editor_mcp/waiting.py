@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import time
+from dataclasses import dataclass
 from threading import Event
 from typing import Any, Callable, Protocol
 
+from . import __version__
 from .errors import (
     BridgeError,
     ErrorCode,
@@ -17,6 +19,7 @@ from .errors import (
     StaleOperationError,
     VersionMismatchError,
 )
+from .state_payloads import EditorStatePayload, ReloadStatusPayload
 
 
 DEFAULT_TIMEOUT_MS = 10_000
@@ -29,6 +32,26 @@ DIAGNOSTIC_QUIET_SECONDS = 0.10
 
 class BridgeClient(Protocol):
     def call(self, command: str, arguments: dict[str, Any] | None = None) -> Any: ...
+
+
+@dataclass(frozen=True)
+class _Deadline:
+    expires_at: float
+    clock: Callable[[], float]
+
+    @classmethod
+    def after(
+        cls, timeout_ms: int, clock: Callable[[], float]
+    ) -> _Deadline:
+        return cls(clock() + timeout_ms / 1000, clock)
+
+    @property
+    def expired(self) -> bool:
+        return self.clock() >= self.expires_at
+
+    @property
+    def remaining(self) -> float:
+        return max(0.0, self.expires_at - self.clock())
 
 
 class OperationWaiter:
@@ -72,49 +95,44 @@ class OperationWaiter:
         self, path: str, operation_id: Any, timeout_ms: int
     ) -> dict[str, Any]:
         expected = "res://" + path.removeprefix("res://")
-        state = self._until(
+        state = self._until_state(
             timeout_ms,
             operation_id,
-            lambda item: item.get("scene") == expected
-            and not self._operation_active(item, operation_id),
+            lambda item: item.scene == expected
+            and not item.operation_active(operation_id),
         )
-        return {"completed": True, "scene": state.get("scene")}
+        return {"completed": True, "scene": state.scene}
 
     def wait_for_asset(
         self, path: str, operation_id: Any, timeout_ms: int
     ) -> dict[str, Any]:
         expected = "res://" + path.removeprefix("res://")
 
-        def complete(state: dict[str, Any]) -> bool:
-            if state.get("filesystem_scanning"):
+        def complete(state: EditorStatePayload) -> bool:
+            if state.filesystem_scanning:
                 return False
-            if self._operation_active(state, operation_id):
+            if state.operation_active(operation_id):
                 return False
-            for item in state.get("recent_imports", []):
-                if isinstance(item, dict) and item.get("path") == expected:
-                    if item.get("status") == "failed":
-                        return True
-                    if item.get("status") == "completed":
-                        return True
-            # Older plugins do not expose per-resource imports. Operation
-            # completion remains a safe transitional completion signal.
-            return True
+            if operation_id is None:
+                return True
+            return any(item.path == expected for item in state.recent_imports)
 
-        state = self._until(timeout_ms, operation_id, complete)
+        state = self._until_state(timeout_ms, operation_id, complete)
         record = next(
             (
-                item for item in state.get("recent_imports", [])
-                if isinstance(item, dict) and item.get("path") == expected
+                item for item in state.recent_imports
+                if item.path == expected
             ),
             None,
         )
-        if isinstance(record, dict) and record.get("status") == "failed":
-            return {"completed": True, "import": record}
+        record_dict = None if record is None else record.as_dict()
+        if record is not None and record.status == "failed":
+            return {"completed": True, "import": record_dict}
         try:
             info = self.bridge.call("asset_info", {"path": path.removeprefix("res://")})
         except BridgeError:
             info = None
-        return {"completed": True, "import": record, "asset": info}
+        return {"completed": True, "import": record_dict, "asset": info}
 
     def wait_for_run(
         self,
@@ -127,18 +145,19 @@ class OperationWaiter:
             raise InvalidArgumentError(
                 f"startup_window_ms must be between 0 and {MAX_STARTUP_WINDOW_MS}"
             )
-        started = self._until(
+        started = self._until_state(
             timeout_ms,
             operation_id,
-            lambda item: item.get("playing") is True and item.get("run_id") == run_id,
+            lambda item: item.playing and item.run_id == run_id,
         )
-        deadline = self.clock() + startup_window_ms / 1000
+        deadline = _Deadline.after(startup_window_ms, self.clock)
         survived = True
         state = started
-        while self.clock() < deadline:
-            self.sleep(min(POLL_INTERVAL_SECONDS, max(0.0, deadline - self.clock())))
+        while not deadline.expired:
+            self._raise_if_cancelled(operation_id)
+            self.sleep(min(POLL_INTERVAL_SECONDS, deadline.remaining))
             state = self._state()
-            if state.get("playing") is not True or state.get("run_id") != run_id:
+            if not state.playing or state.run_id != run_id:
                 survived = False
                 break
         return {
@@ -146,23 +165,22 @@ class OperationWaiter:
             "run_id": run_id,
             "startup_window_ms": startup_window_ms,
             "survived_startup_window": survived,
-            "last_run_exit_status": state.get("last_run_exit_status"),
+            "last_run_exit_status": state.last_run_exit_status,
         }
 
     def wait_for_stop(
         self, run_id: int, operation_id: Any, timeout_ms: int
     ) -> dict[str, Any]:
-        state = self._until(
+        state = self._until_state(
             timeout_ms,
             operation_id,
-            lambda item: item.get("playing") is False
-            and item.get("last_run_id") == run_id,
+            lambda item: not item.playing and item.last_run_id == run_id,
         )
         return {
             "completed": True,
             "run_id": run_id,
-            "last_run_exit_status": state.get("last_run_exit_status"),
-            "last_stop_reason": state.get("last_stop_reason"),
+            "last_run_exit_status": state.last_run_exit_status,
+            "last_stop_reason": state.last_stop_reason,
         }
 
     def wait_for_reload(
@@ -177,12 +195,24 @@ class OperationWaiter:
         if (
             not isinstance(expected_project_hash, str)
             or len(expected_project_hash) != 64
+            or any(
+                character not in "0123456789abcdef"
+                for character in expected_project_hash
+            )
         ):
             raise InvalidResponseError("Godot editor did not return a valid project hash")
         if not isinstance(expected_bridge_version, str) or not expected_bridge_version:
             raise InvalidResponseError("Godot editor did not return a bridge version")
+        if expected_bridge_version != __version__:
+            raise VersionMismatchError(
+                "Python server and Godot plugin versions do not match",
+                details={
+                    "mcp_server_version": __version__,
+                    "bridge_version": expected_bridge_version,
+                },
+            )
 
-        deadline = self.clock() + timeout_ms / 1000
+        deadline = _Deadline.after(timeout_ms, self.clock)
         disconnected = False
         while True:
             self._raise_if_cancelled(operation_id)
@@ -199,38 +229,34 @@ class OperationWaiter:
                 disconnected = True
                 status = None
             if status is not None:
-                if not isinstance(status, dict):
-                    raise InvalidResponseError("Godot editor returned invalid reload status")
-                actual_operation_id = status.get("operation_id")
-                if actual_operation_id != operation_id:
+                view = ReloadStatusPayload.from_payload(status)
+                if view.operation_id != operation_id:
                     raise StaleOperationError(
                         "Reload operation ID changed during reconnect",
                         details={
                             "expected_operation_id": operation_id,
-                            "operation_id": actual_operation_id,
+                            "operation_id": view.operation_id,
                         },
                     )
-                actual_project_hash = status.get("project_hash")
-                if actual_project_hash != expected_project_hash:
+                if view.project_hash != expected_project_hash:
                     raise ProjectMismatchError(
                         "Godot bridge reconnected to another project",
                         details={
                             "expected_project_hash": expected_project_hash,
-                            "project_hash": actual_project_hash,
+                            "project_hash": view.project_hash,
                         },
                     )
-                actual_bridge_version = status.get("bridge_version")
-                if actual_bridge_version != expected_bridge_version:
+                if view.bridge_version != expected_bridge_version:
                     raise VersionMismatchError(
                         "Bridge version changed during project reload",
                         details={
                             "expected_bridge_version": expected_bridge_version,
-                            "bridge_version": actual_bridge_version,
+                            "bridge_version": view.bridge_version,
                         },
                     )
-                if status.get("completed") is True:
-                    return {**status, "disconnected": disconnected}
-            if self.clock() >= deadline:
+                if view.completed:
+                    return {**view.as_dict(), "disconnected": disconnected}
+            if deadline.expired:
                 raise OperationTimeoutError(
                     "Godot project reload timed out",
                     code=ErrorCode.TIMEOUT,
@@ -239,13 +265,13 @@ class OperationWaiter:
                 )
             self.sleep(POLL_INTERVAL_SECONDS)
 
-    def _until(
+    def _until_state(
         self,
         timeout_ms: int,
         operation_id: Any,
-        predicate: Callable[[dict[str, Any]], bool],
-    ) -> dict[str, Any]:
-        deadline = self.clock() + timeout_ms / 1000
+        predicate: Callable[[EditorStatePayload], bool],
+    ) -> EditorStatePayload:
+        deadline = _Deadline.after(timeout_ms, self.clock)
         unset = object()
         last_diagnostic_id: Any = unset
         quiet_since: float | None = None
@@ -253,7 +279,7 @@ class OperationWaiter:
             self._raise_if_cancelled(operation_id)
             state = self._state()
             if predicate(state):
-                diagnostic_id = state.get("last_diagnostic_id")
+                diagnostic_id = state.last_diagnostic_id
                 now = self.clock()
                 if diagnostic_id != last_diagnostic_id:
                     last_diagnostic_id = diagnostic_id
@@ -263,7 +289,7 @@ class OperationWaiter:
             else:
                 quiet_since = None
                 last_diagnostic_id = unset
-            if self.clock() >= deadline:
+            if deadline.expired:
                 raise OperationTimeoutError(
                     "Godot editor operation timed out",
                     code=ErrorCode.TIMEOUT,
@@ -279,20 +305,17 @@ class OperationWaiter:
                 details={"operation_id": operation_id},
             )
 
-    def _state(self) -> dict[str, Any]:
-        state = self.bridge.call("state", {})
-        if not isinstance(state, dict):
-            raise InvalidResponseError("Godot editor returned invalid state while waiting")
+    def _state(self) -> EditorStatePayload:
+        state = EditorStatePayload.from_payload(self.bridge.call("state", {}))
+        if state.bridge_version != __version__:
+            raise VersionMismatchError(
+                "Python server and Godot plugin versions do not match",
+                details={
+                    "mcp_server_version": __version__,
+                    "bridge_version": state.bridge_version,
+                },
+            )
         return state
-
-    @staticmethod
-    def _operation_active(state: dict[str, Any], operation_id: Any) -> bool:
-        if operation_id is None:
-            return False
-        return any(
-            isinstance(item, dict) and item.get("operation_id") == operation_id
-            for item in state.get("active_operations", [])
-        )
 
 
 __all__ = [

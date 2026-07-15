@@ -17,6 +17,7 @@ from godot_editor_mcp.discovery import read_discovery_record
 from godot_editor_mcp.errors import EditorBusyError, SaveFailedError
 from godot_editor_mcp.tool_dispatch import ToolDispatcher
 from godot_editor_mcp.tool_catalog import bridge_contract_mismatches
+from godot_editor_mcp.waiting import OperationWaiter
 
 
 RUN_INTEGRATION = os.environ.get("GODOT_RELOAD_INTEGRATION") == "1"
@@ -135,7 +136,9 @@ class ReloadSubprocessIntegrationTests(unittest.TestCase):
 
         old_record = read_discovery_record(self.project)
         assert old_record is not None
-        dispatcher = ToolDispatcher(bridge, None, mode="tiny", launcher=None)
+        dispatcher = ToolDispatcher(
+            bridge, None, mode="tiny", launcher=None, waiter=OperationWaiter(bridge)
+        )
         result = dispatcher.call(
             "reload_project",
             {"save_scenes": True, "wait": True, "timeout_ms": 30_000},

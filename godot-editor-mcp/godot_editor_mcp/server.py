@@ -7,7 +7,7 @@ transport in :mod:`stdio`, and command-line setup in :mod:`cli`.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Callable
 
 from . import __version__
 from .errors import DomainError
@@ -31,7 +31,9 @@ from .tool_dispatch import (
     BridgeClient,
     EditorStarter,
     ToolDispatcher,
+    Waiter,
 )
+from .waiting import OperationWaiter
 
 
 class MCPServer:
@@ -44,6 +46,7 @@ class MCPServer:
         *,
         mode: Mode = "tiny",
         launcher: EditorStarter | None = None,
+        waiter_factory: Callable[[BridgeClient], Waiter] = OperationWaiter,
     ) -> None:
         if mode not in MODES:
             raise ValueError(f"Mode must be one of: {', '.join(MODES)}")
@@ -55,7 +58,8 @@ class MCPServer:
         self.tools = tools_for_mode(mode)
         self.negotiated_protocol_version: str | None = None
         self._dispatcher = ToolDispatcher(
-            bridge, assets, mode=mode, launcher=launcher
+            bridge, assets, mode=mode, launcher=launcher,
+            waiter=waiter_factory(bridge),
         )
 
     # Preserve these helpers for callers that used the earlier server module.

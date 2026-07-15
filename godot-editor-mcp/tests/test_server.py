@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import unittest
 
+from godot_editor_mcp import __version__
 from godot_editor_mcp.bridge import BridgeError
 from godot_editor_mcp.errors import AssetError, NotFoundError
 from godot_editor_mcp.server import MCPServer, MODE_TOOL_NAMES
@@ -74,6 +75,24 @@ class MCPServerTests(unittest.TestCase):
         names = [tool["name"] for tool in self.request("tools/list")["result"]["tools"]]
         self.assertEqual(names, list(MODE_TOOL_NAMES["tiny"]))
 
+    def test_waiter_factory_is_composed_outside_dispatcher(self) -> None:
+        created: list[object] = []
+
+        class FakeWaiter:
+            def cancel(self) -> None:
+                created.append("cancelled")
+
+        def factory(bridge):
+            created.append(bridge)
+            return FakeWaiter()
+
+        server = MCPServer(  # type: ignore[arg-type]
+            self.bridge, self.assets, waiter_factory=factory
+        )
+        self.assertEqual(created, [self.bridge])
+        server.close()
+        self.assertEqual(created, [self.bridge, "cancelled"])
+
     def test_modes_have_separate_nested_toolsets(self) -> None:
         tiny = set(MODE_TOOL_NAMES["tiny"])
         small = set(MODE_TOOL_NAMES["small"])
@@ -133,6 +152,7 @@ class MCPServerTests(unittest.TestCase):
                         "scene": "res://scenes/main.tscn",
                         "active_operations": [],
                         "last_diagnostic_id": None,
+                        "bridge_version": __version__,
                     }
                 return {"command": command, "arguments": arguments or {}}
 
@@ -155,7 +175,7 @@ class MCPServerTests(unittest.TestCase):
                         "status": "scheduled",
                         "operation_id": "op-9",
                         "project_hash": "a" * 64,
-                        "bridge_version": "0.7.0",
+                        "bridge_version": __version__,
                     }
                 if command == "reload_status":
                     return {
@@ -163,7 +183,7 @@ class MCPServerTests(unittest.TestCase):
                         "status": "completed",
                         "operation_id": "op-9",
                         "project_hash": "a" * 64,
-                        "bridge_version": "0.7.0",
+                        "bridge_version": __version__,
                     }
                 raise AssertionError(command)
 
