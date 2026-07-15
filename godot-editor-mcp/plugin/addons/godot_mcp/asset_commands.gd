@@ -45,7 +45,6 @@ func handlers() -> Dictionary:
 		"asset_info": Callable(self, "_asset_info"),
 		"scan_asset": Callable(self, "_scan_asset"),
 		"create_resource": Callable(self, "_create_resource"),
-		"create_scene": Callable(self, "_create_scene"),
 		"open_scene": Callable(self, "_open_scene"),
 	}
 
@@ -219,7 +218,9 @@ func _create_resource(arguments: Dictionary) -> Dictionary:
 				break
 		if property_info.is_empty():
 			return _failure("Editable resource property not found: %s" % property_name)
-		var converted: Dictionary = _property_values.convert(properties[property_name], int(property_info.type))
+		var converted: Dictionary = _property_values.convert(
+			properties[property_name], int(property_info.type), property_info,
+		)
 		if not converted.ok:
 			return _failure("Invalid %s: %s" % [property_name, ErrorEnvelope.message(converted)])
 		resource.set(property_name, converted.result)
@@ -228,44 +229,6 @@ func _create_resource(arguments: Dictionary) -> Dictionary:
 		return _failure("Could not save resource")
 	_editor_interface.get_resource_filesystem().update_file(path)
 	return _success({"path": path, "type": resource_type, "properties": properties.keys()})
-
-
-func _create_scene(arguments: Dictionary) -> Dictionary:
-	var checked: Dictionary = _project_paths.check(arguments.get("path"), true, PackedStringArray(["tscn"]))
-	if not checked.ok:
-		return checked
-	var path := checked.result as String
-	if FileAccess.file_exists(path):
-		return _failure("Scene already exists")
-	var parent_folder := path.get_base_dir()
-	if not DirAccess.dir_exists_absolute(ProjectSettings.globalize_path(parent_folder)):
-		return _failure("Scene folder does not exist")
-	var root_type = arguments.get("root_type")
-	if not root_type is String or root_type.is_empty() or root_type.length() > 128:
-		return _failure("Root type must be a non-empty string up to 128 characters")
-	if not ClassDB.class_exists(root_type) or not ClassDB.can_instantiate(root_type) or not ClassDB.is_parent_class(root_type, "Node"):
-		return _failure("Root type must be an instantiable built-in Node class")
-	var valid_name: Dictionary = _scene_nodes.checked_name(arguments.get("root_name"))
-	if not valid_name.ok:
-		return valid_name
-	var root_object = ClassDB.instantiate(root_type)
-	if not root_object is Node:
-		if root_object != null:
-			root_object.free()
-		return _failure("Could not instantiate root node")
-	var root := root_object as Node
-	root.name = valid_name.result
-	var packed := PackedScene.new()
-	var pack_error := packed.pack(root)
-	if pack_error != OK:
-		root.free()
-		return _failure("Could not pack scene")
-	var save_error := ResourceSaver.save(packed, path)
-	root.free()
-	if save_error != OK:
-		return _failure("Could not save scene")
-	_editor_interface.get_resource_filesystem().update_file(path)
-	return _success({"path": path, "root_type": root_type, "root_name": valid_name.result})
 
 
 func _open_scene(arguments: Dictionary) -> Dictionary:

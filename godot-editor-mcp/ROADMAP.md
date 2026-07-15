@@ -6,7 +6,7 @@
 - [x] Phase 8 — Separate edited-scene inspection from mutation services.
 - [x] Phase 9 — Inspect the running scene through a read-only runtime probe.
 - [x] Phase 10 — Capture, drive, and validate gameplay with a minimal fixed API.
-- [ ] Phase 11 — Author scenes through bounded atomic transactions.
+- [x] Phase 11 — Author scenes through bounded atomic transactions.
 - [ ] Phase 12 — Add autoload helpers and finish proven project-workflow gaps.
 
 ## Phase delivery contract
@@ -240,6 +240,8 @@ simulation or a general expression language.
   fixtures, not only unit tests.
 
 ## Phase 11 — Core scene transaction engine
+
+Completed in 0.15.0.
 
 Current focused mutations remain useful for tiny mode, but larger scene changes
 need one validated action, stable references between operations, and protection

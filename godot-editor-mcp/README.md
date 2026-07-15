@@ -143,7 +143,7 @@ means `small` and `large`.
 | `editor_state` | All | Project, bridge, edited scene, selection, filesystem scan, and run state |
 | `get_diagnostics` | All | Bounded editor, parser, and runtime diagnostics with stable cursors |
 | `reload_project` | All | Safely restart the configured project and optionally wait through reconnect |
-| `create_scene` | All | Create a scene with one built-in root node |
+| `create_scene` | All | Create a bounded scene tree with built-in nodes, scripts, groups, and initial properties |
 | `open_scene` | All | Open an existing project scene |
 | `scene_tree` | All | Targeted, paginated edited or runtime nodes with root, depth, and class filters |
 | `add_node` | All | Add a built-in node through Godot's undo history |
@@ -160,6 +160,7 @@ means `small` and `large`.
 | `project_settings_get` | Small+ | Read one setting or up to 100 settings under a prefix |
 | `project_settings_patch` | Small+ | Atomically validate, compare, dry-run, and save up to 32 settings |
 | `input_map_patch` | Small+ | Add/remove key, mouse, and joypad bindings without duplicates |
+| `scene_transaction` | Small+ | Prevalidate and apply a bounded structural/property batch as one undo step |
 | `capture_game_view` | Small+ | Return the active run's bounded main viewport as MCP PNG image content |
 | `send_input` | Small+ | Inject one run-scoped Input Map action with automatic bounded release |
 | `wait_for_runtime_condition` | Small+ | Wait for one play, node, count, or built-in scalar property condition |
@@ -167,8 +168,10 @@ means `small` and `large`.
 | `start_editor` | Large | Start Godot for the configured project using `GODOT_EXECUTABLE` |
 
 Node paths are relative to the selected edited or runtime scene root. Use `.` for the root and, for
-example, `Player/Camera2D` for a child. Vector and color property values use JSON
-number arrays such as `[100, 200]` or `[1, 0.5, 0, 1]`.
+example, `Player/Camera2D` for a child. Vector and color property values retain
+their concise JSON number arrays such as `[100, 200]` or `[1, 0.5, 0, 1]`.
+Node, resource, NodePath, transform, enum/flags, and packed-array values use the
+explicit tagged forms described under Scene construction.
 
 ### Targeted inspection and pagination
 
@@ -289,8 +292,8 @@ started by this MCP server is still launching return `starting`. The plugin
 must already be installed and enabled in the project. The MCP server does not
 provide a tool to close the editor.
 
-The fixed context cost depends on the selected mode. `tiny` omits the twelve
-asset, settings, and gameplay workflow schemas, while `small` omits the two desktop-only
+The fixed context cost depends on the selected mode. `tiny` omits the thirteen
+asset, settings, transaction, and gameplay workflow schemas, while `small` omits the two desktop-only
 selection and launcher helpers.
 Exact token usage varies by model and by how the MCP client represents tool
 definitions. Enabling `rooted-files-mcp` alongside this server adds its own tool
@@ -305,6 +308,9 @@ injection, and runtime conditions are reported with probe protocol, autoload
 availability, commands, bounds, and active/ready debugger-session counts.
 Targeted inspection and stable pagination are reported as supported, along
 with tree depth/scan, property scan, cursor count/length, and lifetime limits.
+Scene transaction support reports its value forms and operation, created-node,
+tree-depth, retained-undo, nesting, element, string, packed-array, and encoded-byte
+limits. Tagged node and resource reference support is reported explicitly.
 Diagnostics report separate GDScript, C#, and runtime capability flags because
 complete C# compiler capture depends on the installed Godot build.
 
@@ -326,7 +332,10 @@ reload level.
 Each change can include `expected` for compare-and-swap protection. A stale
 value rejects the complete transaction. `dry_run` returns the same normalized
 `diff` as a subsequent real patch, and `save` defaults to `true`. Failed saves
-restore all in-memory values. General Input Map keys must use
+restore all in-memory values. Settings share the bounded value codec used by
+scene workflows, including finite-number checks and tagged non-scalar forms;
+InputEvent records continue through their dedicated normalized event codec.
+General Input Map keys must use
 `input_map_patch`; editor/internal and secret-bearing keys are rejected.
 
 ```json
@@ -524,13 +533,24 @@ text `.tres` file. Example:
 
 ## Scene construction
 
-`create_scene` accepts a built-in Godot node class for its root:
+`create_scene` accepts a built-in Godot node class for its root. Optional
+`script`, `groups`, `properties`, and recursive `children` fields create a
+complete bounded initial scene before any file is written:
 
 ```json
 {
   "path": "scenes/player.tscn",
   "root_type": "CharacterBody2D",
-  "root_name": "Player"
+  "root_name": "Player",
+  "script": "scripts/player.gd",
+  "groups": ["players"],
+  "children": [
+    {
+      "type": "Camera2D",
+      "name": "Camera2D",
+      "properties": {"position": [0, -64]}
+    }
+  ]
 }
 ```
 
@@ -553,9 +573,83 @@ Instantiate another scene in the edited scene:
 ```
 
 Added nodes receive the edited scene root as owner, so Godot includes them when
-the scene is saved. `add_node`, `instantiate_scene`, and `set_property` use the
-editor's undo history. Save explicitly with `scene_control` after a group of
-changes. The `run` action returns a run ID and operation ID. Pass that run ID
+the scene is saved. `add_node`, `instantiate_scene`, and `set_property` are
+compact tiny-mode adapters over the same transaction engine used by
+`scene_transaction`.
+
+### Atomic scene transactions
+
+`scene_transaction` is available in `small` and `large`. It validates the
+complete batch against an isolated PackedScene snapshot before creating an
+UndoRedo action. Failed validation and stale preconditions leave the edited
+scene and undo history unchanged. A successful batch increments the scene's
+UndoRedo version once and returns concise per-operation results, final paths,
+path transitions, and final dirty state.
+
+Node operands are explicit objects containing exactly one current `path` or
+transaction-local `handle`. `add_node`, `instantiate_scene`, `rename_node`, and
+`reparent_node` can bind a handle for later operations. Supported operations are
+`add_node`, `instantiate_scene`, `set_property`, `remove_node`, `rename_node`,
+`reparent_node`, `attach_script`, `detach_script`, `connect_signal`,
+`disconnect_signal`, `add_to_group`, and `remove_from_group`.
+
+```json
+{
+  "label": "Build player camera",
+  "preconditions": {
+    "scene": "res://scenes/player.tscn",
+    "undo_version": 4
+  },
+  "operations": [
+    {
+      "op": "add_node",
+      "parent": {"path": "."},
+      "type": "Camera2D",
+      "name": "Camera2D",
+      "handle": "camera"
+    },
+    {
+      "op": "set_property",
+      "target": {"handle": "camera"},
+      "property": "position",
+      "value": [0, -64]
+    },
+    {
+      "op": "add_to_group",
+      "target": {"handle": "camera"},
+      "group": "player_cameras"
+    }
+  ]
+}
+```
+
+The engine permits normal locally owned nodes and safe operations on a
+PackedScene instance root. It rejects inherited scenes, instantiated-scene
+editable children, root removal/reparenting, ownership-changing destinations,
+self-reparenting, undeclared signals/methods, and incompatible scripts or
+resource classes before mutation. Remove operations retain bounded undo state;
+unexpected postconditions trigger immediate undo.
+
+Scene property values are bounded to depth 8, 256 total elements, 128 object
+keys, 2,048-character strings, 4,096 packed-array elements, and 32 KiB encoded
+output. Scalars and ordinary JSON arrays/dictionaries remain direct. References
+are never inferred from strings:
+
+```json
+{"$type":"node","path":"Player/Camera2D"}
+{"$type":"node","handle":"camera"}
+{"$type":"resource","path":"res://materials/player.tres"}
+{"$type":"node_path","path":"Player/Camera2D"}
+```
+
+Resource references must exist under `res://` and match the property's resource
+class hint. Node references must resolve inside the edited scene and match the
+property's node-class hint. Additional tagged forms cover `rect2`, `rect2i`,
+`transform2d`, `plane`, `quaternion`, `aabb`, `basis`, `transform3d`, `enum`,
+`flags`, and packed byte/int/float/string/vector/color arrays. All numbers must
+be finite; enum and flag names must be declared by the target property.
+
+Save explicitly with `scene_control` after a group of changes. The `run` action returns a run ID and operation ID. Pass that run ID
 back when calling `stop`; stale or missing IDs are rejected. Stop returns its
 own operation ID. Subsequent `editor_state` calls report whether that run is
 active and why it stopped. Without `wait`, “started” means only that the editor
@@ -736,7 +830,7 @@ Set-Location "C:\path\to\godot-editor-mcp"
 py -3 -m unittest discover -s tests -v
 ```
 
-The 74-test Python suite tests MCP initialization, end-to-end stdio initialization,
+The 75-test Python suite tests MCP initialization, end-to-end stdio initialization,
 tool listing and calls, per-mode dispatch, registry invariants, stable ordering,
 complete routes, path/wait policy, schema-to-limit alignment, release consistency,
 capability contracts, authentication, bounded transport behavior, staged imports,
@@ -778,10 +872,12 @@ Run the focused infrastructure and state-transition checks with:
 /path/to/Godot --headless --path plugin --script res://tests/phase8_service_boundary_test.gd
 /path/to/Godot --headless --path plugin --script res://tests/phase9_runtime_inspection_test.gd
 /path/to/Godot --headless --path plugin --script res://tests/phase10_gameplay_validation_test.gd
+/path/to/Godot --headless --path plugin --script res://tests/phase11_scene_transaction_test.gd
 ```
 
 On the verified macOS platform, the opt-in subprocess check validates the live
-plugin capability contract, editor/game debugger handshake, spawned-node and
+plugin capability contract, atomic scene transactions and persistence,
+editor/game debugger handshake, spawned-node and
 live-property reads, action injection and release, runtime conditions,
 headless-renderer capture rejection, replacement-run staleness, and
 authenticated reload/reconnect:

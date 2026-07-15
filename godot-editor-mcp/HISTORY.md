@@ -3,6 +3,26 @@
 This file records released changes. Planned work is tracked separately in
 [`ROADMAP.md`](ROADMAP.md).
 
+## 0.15.0 — 2026-07-15
+
+- Added small/large-mode `scene_transaction` with bounded operation, created-node,
+  depth, payload, and retained-undo limits; optional scene/UndoRedo optimistic
+  preconditions; transaction-local handles; complete shadow-scene prevalidation;
+  one-step commit; postcondition checking; and immediate rollback on failure.
+- Added atomic add/instantiate/property changes plus remove, rename, reparent,
+  script attach/detach, persistent signal connect/disconnect, and persistent
+  group add/remove operations with final paths and safe scene-ownership checks.
+- Routed the existing tiny-mode add, instantiate, and property tools through the
+  shared engine and expanded scene creation with scripts, groups, properties,
+  and bounded initial child trees.
+- Expanded the common model-facing value codec, shared by settings and scene
+  workflows, with bounded 2D/3D math values, enums,
+  flags, packed primitive arrays, tagged scene-relative NodePaths, and explicit
+  tagged node/resource references with property-class compatibility checks.
+- Added focused codec and undo/redo coverage plus native Godot 4.7 integration
+  for stale/preflight rejection, tagged references, instantiated-scene safety,
+  single-version transactions, save, close, reopen, and persisted signals/groups.
+
 ## 0.14.0 — 2026-07-15
 
 - Added small/large-mode game viewport capture with fixed project-internal PNG

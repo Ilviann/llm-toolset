@@ -73,7 +73,8 @@ func mark_saved() -> void:
 func _history_version(root) -> int:
 	if root == null:
 		return 0
-	var history = _undo_redo.get_history_undo_redo(root.get_instance_id())
+	var history_id: int = _undo_redo.get_object_history_id(root)
+	var history = _undo_redo.get_history_undo_redo(history_id)
 	return 0 if history == null else int(history.get_version())
 
 

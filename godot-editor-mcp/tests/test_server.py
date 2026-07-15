@@ -119,6 +119,8 @@ class MCPServerTests(unittest.TestCase):
         self.assertIn("capture_game_view", small)
         self.assertIn("send_input", small)
         self.assertIn("wait_for_runtime_condition", small)
+        self.assertNotIn("scene_transaction", tiny)
+        self.assertIn("scene_transaction", small)
 
     def test_tool_outside_mode_is_rejected_without_bridge_call(self) -> None:
         response = self.request("tools/call", {
@@ -274,6 +276,21 @@ class MCPServerTests(unittest.TestCase):
             ("send_input", calls[0][1]),
             ("wait_runtime_condition", calls[1][1]),
         ])
+
+    def test_scene_transaction_routes_only_in_small_and_large_modes(self) -> None:
+        self.server = MCPServer(self.bridge, self.assets, mode="small")  # type: ignore[arg-type]
+        arguments = {
+            "preconditions": {"scene": "res://main.tscn", "undo_version": 4},
+            "operations": [{
+                "op": "rename_node", "target": {"path": "Player"},
+                "name": "Hero", "handle": "hero",
+            }],
+        }
+        response = self.request("tools/call", {
+            "name": "scene_transaction", "arguments": arguments,
+        })
+        self.assertNotIn("isError", response["result"])
+        self.assertEqual(self.bridge.calls, [("scene_transaction", arguments)])
 
     def test_capture_is_validated_returned_as_image_and_deleted(self) -> None:
         png = base64.b64decode(

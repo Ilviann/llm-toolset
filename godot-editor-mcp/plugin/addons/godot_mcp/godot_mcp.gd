@@ -29,8 +29,9 @@ const RuntimeSceneInspector := preload("runtime_scene_inspector.gd")
 const SceneCommands := preload("scene_commands.gd")
 const SceneNodeAccess := preload("scene_node_access.gd")
 const SceneStateTracker := preload("scene_state_tracker.gd")
+const SceneTransaction := preload("scene_transaction.gd")
 
-const BRIDGE_VERSION := "0.14.0"
+const BRIDGE_VERSION := "0.15.0"
 const BRIDGE_PROTOCOL_VERSION := "1"
 const DEFAULT_PORT := 6505
 const TOKEN_PATH := "res://.godot/godot_mcp_token"
@@ -149,16 +150,20 @@ func _register_commands() -> bool:
 		Callable(_import_state, "filesystem_generation"),
 		project_paths, scene_nodes, property_values, _cursors,
 	)
+	var scene_transaction = SceneTransaction.new(
+		get_editor_interface(), get_undo_redo(), project_paths, property_values,
+		Callable(_scene_state, "state"),
+	)
 	var scene_commands = SceneCommands.new(
-		get_editor_interface(), get_undo_redo(), project_paths, scene_nodes,
-		property_values,
+		get_editor_interface(), project_paths, scene_nodes, property_values,
+		scene_transaction,
 	)
 	var edited_scene_inspector = EditedSceneInspector.new(
 		get_editor_interface(), get_undo_redo(), scene_nodes, property_values, _cursors,
 		RuntimeSceneInspector.new(_runtime_debugger, _cursors),
 	)
 	var settings_commands = ProjectSettingsCommands.new(
-		Callable(_project_file_state, "mark_saved"), input_events,
+		Callable(_project_file_state, "mark_saved"), input_events, property_values,
 	)
 	var input_commands = InputMapCommands.new(
 		Callable(_project_file_state, "mark_saved"), input_events,
@@ -167,7 +172,7 @@ func _register_commands() -> bool:
 		_runtime_debugger, Callable(_run_state, "current_run_id"),
 	)
 	_command_services = [
-		asset_commands, edited_scene_inspector, scene_commands,
+		asset_commands, edited_scene_inspector, scene_transaction, scene_commands,
 		settings_commands, input_commands, gameplay_commands, _reload_commands,
 	]
 	if not _register_handlers("plugin", {
@@ -219,6 +224,9 @@ func _capabilities(_arguments: Dictionary) -> Dictionary:
 			"project_reload": true,
 			"targeted_inspection": true,
 			"stable_pagination": true,
+			"scene_transactions": true,
+			"structural_scene_editing": true,
+			"tagged_value_references": true,
 		},
 		"error_codes": [
 			ErrorEnvelope.UNAUTHORIZED,
@@ -239,6 +247,8 @@ func _capabilities(_arguments: Dictionary) -> Dictionary:
 			ErrorEnvelope.VERSION_MISMATCH,
 			ErrorEnvelope.RUNTIME_PROBE_UNAVAILABLE,
 			ErrorEnvelope.AMBIGUOUS_RUNTIME_SESSION,
+			ErrorEnvelope.STALE_SCENE,
+			ErrorEnvelope.TRANSACTION_FAILED,
 		],
 		"runtime_probe": runtime_probe_status,
 		"project_settings": {
@@ -250,6 +260,11 @@ func _capabilities(_arguments: Dictionary) -> Dictionary:
 			"input_event_types": [
 				"key", "mouse_button", "joypad_button", "joypad_motion",
 			],
+		},
+		"scene_values": {
+			"forms": PropertyValueCodec.new().supported_forms(),
+			"resource_references_tagged": true,
+			"node_references_tagged": true,
 		},
 		"limits": {
 			"request_bytes": Limits.MAX_REQUEST_BYTES,
@@ -285,6 +300,16 @@ func _capabilities(_arguments: Dictionary) -> Dictionary:
 			"input_frames": Limits.MAX_INPUT_FRAMES,
 			"condition_timeout_ms": Limits.MAX_CONDITION_TIMEOUT_MSEC,
 			"condition_evidence": Limits.MAX_CONDITION_EVIDENCE,
+			"transaction_operations": Limits.MAX_TRANSACTION_OPERATIONS,
+			"transaction_created_nodes": Limits.MAX_TRANSACTION_CREATED_NODES,
+			"transaction_tree_depth": Limits.MAX_TRANSACTION_TREE_DEPTH,
+			"transaction_undo_bytes": Limits.MAX_TRANSACTION_UNDO_BYTES,
+			"value_depth": Limits.MAX_VALUE_DEPTH,
+			"value_items": Limits.MAX_VALUE_ITEMS,
+			"value_keys": Limits.MAX_VALUE_KEYS,
+			"value_string_chars": Limits.MAX_VALUE_STRING_CHARS,
+			"packed_value_items": Limits.MAX_PACKED_VALUE_ITEMS,
+			"value_bytes": Limits.MAX_VALUE_BYTES,
 		},
 	})
 

@@ -18,6 +18,17 @@ SUPPORTED_PROTOCOLS = frozenset(
 PATH_PROPERTY = {
     "path": {"type": "string", "description": "Scene-relative node path; . is root"}
 }
+NODE_REFERENCE_SCHEMA = {
+    "type": "object",
+    "description": "A current scene path or a transaction-local handle",
+    "properties": {
+        "path": {"type": "string", "minLength": 1, "maxLength": 512},
+        "handle": {"type": "string", "minLength": 1, "maxLength": 64},
+    },
+    "minProperties": 1,
+    "maxProperties": 1,
+    "additionalProperties": False,
+}
 RESOURCE_PATH = {"type": "string", "description": "Project-relative path without res://"}
 WAIT_PROPERTIES = {
     "wait": {"type": "boolean", "default": False},
@@ -225,8 +236,38 @@ _TOOL_DEFINITIONS = [
                 "path": RESOURCE_PATH,
                 "root_type": {"type": "string", "description": "Built-in Node class, e.g. Node2D"},
                 "root_name": {"type": "string"},
+                "script": RESOURCE_PATH,
+                "groups": {
+                    "type": "array", "maxItems": 32,
+                    "items": {"type": "string", "minLength": 1, "maxLength": 128},
+                },
+                "properties": {"type": "object", "maxProperties": 32},
+                "children": {
+                    "type": "array", "maxItems": 32,
+                    "items": {"$ref": "#/$defs/node"},
+                },
             },
             "required": ["path", "root_type", "root_name"], "additionalProperties": False,
+            "$defs": {
+                "node": {
+                    "type": "object",
+                    "properties": {
+                        "type": {"type": "string", "minLength": 1, "maxLength": 128},
+                        "name": {"type": "string", "minLength": 1, "maxLength": 128},
+                        "script": RESOURCE_PATH,
+                        "groups": {
+                            "type": "array", "maxItems": 32,
+                            "items": {"type": "string", "minLength": 1, "maxLength": 128},
+                        },
+                        "properties": {"type": "object", "maxProperties": 32},
+                        "children": {
+                            "type": "array", "maxItems": 32,
+                            "items": {"$ref": "#/$defs/node"},
+                        },
+                    },
+                    "required": ["type", "name"], "additionalProperties": False,
+                },
+            },
         },
     },
     {
@@ -326,16 +367,133 @@ _TOOL_DEFINITIONS = [
             "properties": {
                 **PATH_PROPERTY,
                 "property": {"type": "string"},
-                "value": {"description": "JSON value; vectors and colors use number arrays"},
+                "value": {"description": "Bounded scene value; references use explicit $type tags"},
             },
             "required": ["path", "property", "value"],
             "additionalProperties": False,
         },
     },
     {
+        "name": "scene_transaction",
+        "description": "Apply a bounded, prevalidated scene-edit batch as one undo step.",
+        "minimum_mode": "small", "mode_order": 21, "target": "bridge",
+        "bridge_command": "scene_transaction",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "label": {"type": "string", "minLength": 1, "maxLength": 128},
+                "preconditions": {
+                    "type": "object",
+                    "properties": {
+                        "scene": {"type": "string"},
+                        "undo_version": {"type": "integer", "minimum": -1},
+                    },
+                    "additionalProperties": False,
+                },
+                "operations": {
+                    "type": "array", "minItems": 1, "maxItems": 64,
+                    "items": {"oneOf": [
+                        {"$ref": "#/$defs/add_node"},
+                        {"$ref": "#/$defs/instantiate_scene"},
+                        {"$ref": "#/$defs/set_property"},
+                        {"$ref": "#/$defs/remove_node"},
+                        {"$ref": "#/$defs/rename_node"},
+                        {"$ref": "#/$defs/reparent_node"},
+                        {"$ref": "#/$defs/attach_script"},
+                        {"$ref": "#/$defs/detach_script"},
+                        {"$ref": "#/$defs/connect_signal"},
+                        {"$ref": "#/$defs/disconnect_signal"},
+                        {"$ref": "#/$defs/add_to_group"},
+                        {"$ref": "#/$defs/remove_from_group"},
+                    ]},
+                },
+            },
+            "required": ["operations"], "additionalProperties": False,
+            "$defs": {
+                "ref": NODE_REFERENCE_SCHEMA,
+                "handle": {"type": "string", "minLength": 1, "maxLength": 64},
+                "add_node": {
+                    "type": "object", "properties": {
+                        "op": {"const": "add_node"}, "parent": {"$ref": "#/$defs/ref"},
+                        "type": {"type": "string"}, "name": {"type": "string"},
+                        "handle": {"$ref": "#/$defs/handle"},
+                    }, "required": ["op", "parent", "type", "name"], "additionalProperties": False,
+                },
+                "instantiate_scene": {
+                    "type": "object", "properties": {
+                        "op": {"const": "instantiate_scene"}, "parent": {"$ref": "#/$defs/ref"},
+                        "scene": RESOURCE_PATH, "name": {"type": "string"},
+                        "handle": {"$ref": "#/$defs/handle"},
+                    }, "required": ["op", "parent", "scene", "name"], "additionalProperties": False,
+                },
+                "set_property": {
+                    "type": "object", "properties": {
+                        "op": {"const": "set_property"}, "target": {"$ref": "#/$defs/ref"},
+                        "property": {"type": "string"}, "value": {},
+                    }, "required": ["op", "target", "property", "value"], "additionalProperties": False,
+                },
+                "remove_node": {
+                    "type": "object", "properties": {
+                        "op": {"const": "remove_node"}, "target": {"$ref": "#/$defs/ref"},
+                    }, "required": ["op", "target"], "additionalProperties": False,
+                },
+                "rename_node": {
+                    "type": "object", "properties": {
+                        "op": {"const": "rename_node"}, "target": {"$ref": "#/$defs/ref"},
+                        "name": {"type": "string"}, "handle": {"$ref": "#/$defs/handle"},
+                    }, "required": ["op", "target", "name"], "additionalProperties": False,
+                },
+                "reparent_node": {
+                    "type": "object", "properties": {
+                        "op": {"const": "reparent_node"}, "target": {"$ref": "#/$defs/ref"},
+                        "parent": {"$ref": "#/$defs/ref"}, "name": {"type": "string"},
+                        "handle": {"$ref": "#/$defs/handle"},
+                    }, "required": ["op", "target", "parent"], "additionalProperties": False,
+                },
+                "attach_script": {
+                    "type": "object", "properties": {
+                        "op": {"const": "attach_script"}, "target": {"$ref": "#/$defs/ref"},
+                        "script": RESOURCE_PATH,
+                    }, "required": ["op", "target", "script"], "additionalProperties": False,
+                },
+                "detach_script": {
+                    "type": "object", "properties": {
+                        "op": {"const": "detach_script"}, "target": {"$ref": "#/$defs/ref"},
+                    }, "required": ["op", "target"], "additionalProperties": False,
+                },
+                "connect_signal": {
+                    "type": "object", "properties": {
+                        "op": {"const": "connect_signal"}, "source": {"$ref": "#/$defs/ref"},
+                        "signal": {"type": "string"}, "target": {"$ref": "#/$defs/ref"},
+                        "method": {"type": "string"},
+                    }, "required": ["op", "source", "signal", "target", "method"], "additionalProperties": False,
+                },
+                "disconnect_signal": {
+                    "type": "object", "properties": {
+                        "op": {"const": "disconnect_signal"}, "source": {"$ref": "#/$defs/ref"},
+                        "signal": {"type": "string"}, "target": {"$ref": "#/$defs/ref"},
+                        "method": {"type": "string"},
+                    }, "required": ["op", "source", "signal", "target", "method"], "additionalProperties": False,
+                },
+                "add_to_group": {
+                    "type": "object", "properties": {
+                        "op": {"const": "add_to_group"}, "target": {"$ref": "#/$defs/ref"},
+                        "group": {"type": "string"},
+                    }, "required": ["op", "target", "group"], "additionalProperties": False,
+                },
+                "remove_from_group": {
+                    "type": "object", "properties": {
+                        "op": {"const": "remove_from_group"}, "target": {"$ref": "#/$defs/ref"},
+                        "group": {"type": "string"},
+                    }, "required": ["op", "target", "group"], "additionalProperties": False,
+                },
+            },
+        },
+    },
+    {
         "name": "select_node",
         "description": "Select one node in the Godot editor.",
-        "minimum_mode": "large", "mode_order": 24, "target": "bridge",
+        "minimum_mode": "large", "mode_order": 25, "target": "bridge",
         "bridge_command": "select",
         "inputSchema": {
             "type": "object", "properties": PATH_PROPERTY, "required": ["path"],
@@ -368,7 +526,7 @@ _TOOL_DEFINITIONS = [
     {
         "name": "capture_game_view",
         "description": "Capture the active run's main viewport as a bounded PNG image.",
-        "minimum_mode": "small", "mode_order": 21, "target": "bridge",
+        "minimum_mode": "small", "mode_order": 22, "target": "bridge",
         "bridge_command": "capture_game_view",
         "inputSchema": {
             "type": "object",
@@ -389,7 +547,7 @@ _TOOL_DEFINITIONS = [
     {
         "name": "send_input",
         "description": "Inject one bounded Input Map action into the active run.",
-        "minimum_mode": "small", "mode_order": 22, "target": "bridge",
+        "minimum_mode": "small", "mode_order": 23, "target": "bridge",
         "bridge_command": "send_input",
         "inputSchema": {
             "type": "object",
@@ -410,7 +568,7 @@ _TOOL_DEFINITIONS = [
     {
         "name": "wait_for_runtime_condition",
         "description": "Wait for one bounded runtime play, node, count, or property condition.",
-        "minimum_mode": "small", "mode_order": 23, "target": "bridge",
+        "minimum_mode": "small", "mode_order": 24, "target": "bridge",
         "bridge_command": "wait_runtime_condition",
         "inputSchema": {
             "type": "object",
@@ -532,7 +690,7 @@ _TOOL_DEFINITIONS = [
     {
         "name": "start_editor",
         "description": "Start the configured Godot editor for this project.",
-        "minimum_mode": "large", "mode_order": 25, "target": "launcher",
+        "minimum_mode": "large", "mode_order": 26, "target": "launcher",
         "local_handler": "start_editor",
         "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
     },
@@ -602,6 +760,16 @@ EXPECTED_BRIDGE_LIMITS = {
     "input_frames": 600,
     "condition_timeout_ms": 10000,
     "condition_evidence": 8,
+    "transaction_operations": 64,
+    "transaction_created_nodes": 32,
+    "transaction_tree_depth": 32,
+    "transaction_undo_bytes": 262144,
+    "value_depth": 8,
+    "value_items": 256,
+    "value_keys": 128,
+    "value_string_chars": 2048,
+    "packed_value_items": 4096,
+    "value_bytes": 32768,
 }
 EXPECTED_EDITOR_ERROR_CODES = (
     "unauthorized", "invalid_argument", "protected_path", "not_found",
@@ -609,6 +777,7 @@ EXPECTED_EDITOR_ERROR_CODES = (
     "timeout", "unsupported_capability", "stale_cursor", "project_mismatch",
     "save_failed", "malformed_operation", "stale_operation", "version_mismatch",
     "runtime_probe_unavailable", "ambiguous_runtime_session",
+    "stale_scene", "transaction_failed",
 )
 
 

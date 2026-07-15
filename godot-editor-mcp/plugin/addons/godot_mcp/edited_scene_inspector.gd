@@ -219,7 +219,9 @@ func _inspect_node(arguments: Dictionary) -> Dictionary:
 			has_more = true
 			break
 		var result_property: Dictionary = descriptor.duplicate()
-		result_property["value"] = _property_values.encode(node.get(descriptor.name))
+		result_property["value"] = _property_values.encode(
+			node.get(descriptor.name), {}, root,
+		)
 		properties.append(result_property)
 		matched += 1
 	var continuation_available := has_more
@@ -253,7 +255,8 @@ func _tree_scope(arguments: Dictionary) -> Dictionary:
 
 
 func _tree_snapshot(root: Node) -> String:
-	var history = _undo_redo.get_history_undo_redo(root.get_instance_id())
+	var history_id: int = _undo_redo.get_object_history_id(root)
+	var history = _undo_redo.get_history_undo_redo(history_id)
 	var version := 0 if history == null else int(history.get_version())
 	var hashing := HashingContext.new()
 	hashing.start(HashingContext.HASH_SHA256)

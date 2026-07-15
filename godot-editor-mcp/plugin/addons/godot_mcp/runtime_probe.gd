@@ -373,7 +373,9 @@ func _inspect_node(arguments: Dictionary) -> Dictionary:
 			has_more = true
 			break
 		var result_property: Dictionary = descriptor.duplicate()
-		result_property["value"] = _property_values.encode(node.get(descriptor.name))
+		result_property["value"] = _property_values.encode(
+			node.get(descriptor.name), {}, root,
+		)
 		properties.append(result_property)
 		matched += 1
 	var result := _node_metadata(root, node, 0)

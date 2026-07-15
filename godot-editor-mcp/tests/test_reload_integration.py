@@ -21,6 +21,7 @@ from godot_editor_mcp.errors import (
     NoActiveRunError,
     RuntimeProbeUnavailableError,
     SaveFailedError,
+    StaleSceneError,
     StaleCursorError,
     StaleRuntimeIdError,
     UnsupportedCapabilityError,
@@ -74,6 +75,14 @@ class ReloadSubprocessIntegrationTests(unittest.TestCase):
             'script = ExtResource("1")\n',
             encoding="utf-8",
         )
+        (self.project / "scenes" / "transaction_target.gd").write_text(
+            "extends Node2D\n\n"
+            "@export var target_path: NodePath\n"
+            "@export var target_node: Node\n\n"
+            "func _on_pressed():\n"
+            "    pass\n",
+            encoding="utf-8",
+        )
         assets = self.project / "assets"
         assets.mkdir()
         for name in ("one", "two", "three"):
@@ -117,6 +126,17 @@ class ReloadSubprocessIntegrationTests(unittest.TestCase):
         self._wait_for_bridge()
 
     def tearDown(self) -> None:
+        failed = any(
+            test is self
+            for test, _ in (
+                getattr(self._outcome.result, "errors", [])
+                + getattr(self._outcome.result, "failures", [])
+            )
+        )
+        if failed:
+            self.log.flush()
+            self.log.seek(0)
+            print("\n--- Godot integration log ---\n" + self.log.read())
         try:
             record = read_discovery_record(self.project)
             if record is not None:
@@ -150,6 +170,188 @@ class ReloadSubprocessIntegrationTests(unittest.TestCase):
         self.assertEqual(created["path"], "res://scenes/main.tscn")
         bridge.call("open_scene", {"path": "scenes/main.tscn"})
         self._wait_until(lambda: bridge.call("state", {}).get("scene") == "res://scenes/main.tscn")
+
+        expanded = bridge.call(
+            "create_scene",
+            {
+                "path": "scenes/expanded.tscn",
+                "root_type": "Node2D",
+                "root_name": "Expanded",
+                "script": "scenes/transaction_target.gd",
+                "groups": ["expanded_roots"],
+                "properties": {
+                    "target_path": {"$type": "node_path", "path": "InitialChild"},
+                },
+                "children": [{
+                    "type": "Node2D",
+                    "name": "InitialChild",
+                    "groups": ["initial_children"],
+                    "properties": {"position": [12, 34]},
+                }],
+            },
+        )
+        self.assertEqual(expanded["node_count"], 2)
+        self.assertGreaterEqual(expanded["operation_count"], 5)
+
+        transaction = bridge.call(
+            "scene_transaction",
+            {
+                "label": "Build transaction fixture",
+                "preconditions": {"scene": "res://scenes/main.tscn"},
+                "operations": [
+                    {
+                        "op": "add_node", "parent": {"path": "."},
+                        "type": "Node2D", "name": "Builder", "handle": "builder",
+                    },
+                    {
+                        "op": "attach_script", "target": {"handle": "builder"},
+                        "script": "scenes/transaction_target.gd",
+                    },
+                    {
+                        "op": "add_node", "parent": {"handle": "builder"},
+                        "type": "Button", "name": "Action", "handle": "button",
+                    },
+                    {
+                        "op": "set_property", "target": {"handle": "button"},
+                        "property": "text", "value": "Atomic",
+                    },
+                    {
+                        "op": "add_to_group", "target": {"handle": "button"},
+                        "group": "transaction_buttons",
+                    },
+                    {
+                        "op": "rename_node", "target": {"handle": "button"},
+                        "name": "ActionButton", "handle": "action",
+                    },
+                    {
+                        "op": "add_node", "parent": {"path": "."},
+                        "type": "Node2D", "name": "Destination", "handle": "destination",
+                    },
+                    {
+                        "op": "reparent_node", "target": {"handle": "action"},
+                        "parent": {"handle": "destination"},
+                    },
+                    {
+                        "op": "set_property", "target": {"handle": "builder"},
+                        "property": "target_path",
+                        "value": {"$type": "node_path", "path": "Destination/ActionButton"},
+                    },
+                    {
+                        "op": "set_property", "target": {"handle": "builder"},
+                        "property": "target_node",
+                        "value": {"$type": "node", "handle": "action"},
+                    },
+                    {
+                        "op": "connect_signal", "source": {"handle": "action"},
+                        "signal": "pressed", "target": {"handle": "builder"},
+                        "method": "_on_pressed",
+                    },
+                    {
+                        "op": "instantiate_scene", "parent": {"path": "."},
+                        "scene": "scenes/expanded.tscn", "name": "ExpandedInstance",
+                        "handle": "expanded",
+                    },
+                    {
+                        "op": "rename_node", "target": {"handle": "expanded"},
+                        "name": "SafeInstanceRoot",
+                    },
+                ],
+            },
+        )
+        self.assertEqual(transaction["operation_count"], 13)
+        self.assertEqual(
+            transaction["undo_version_after"], transaction["undo_version_before"] + 1
+        )
+        self.assertTrue(transaction["scene_dirty"])
+        paths = {
+            node["path"] for node in bridge.call("tree", {"max_depth": 4})["nodes"]
+        }
+        self.assertTrue({
+            "Builder", "Destination", "Destination/ActionButton",
+            "SafeInstanceRoot", "SafeInstanceRoot/InitialChild",
+        }.issubset(paths))
+        button_info = bridge.call(
+            "inspect", {"path": "Destination/ActionButton", "property": "text"}
+        )
+        self.assertEqual(button_info["properties"][0]["value"], "Atomic")
+        builder_path = bridge.call(
+            "inspect", {"path": "Builder", "property": "target_path"}
+        )
+        self.assertEqual(builder_path["properties"][0]["value"], {
+            "$type": "node_path", "path": "Destination/ActionButton",
+        })
+        builder_node = bridge.call(
+            "inspect", {"path": "Builder", "property": "target_node"}
+        )
+        self.assertEqual(builder_node["properties"][0]["value"], {
+            "$type": "node", "path": "Destination/ActionButton",
+        })
+
+        with self.assertRaises(StaleSceneError):
+            bridge.call("scene_transaction", {
+                "preconditions": {
+                    "scene": "res://scenes/main.tscn",
+                    "undo_version": transaction["undo_version_before"],
+                },
+                "operations": [{
+                    "op": "add_node", "parent": {"path": "."},
+                    "type": "Node", "name": "StaleEdit",
+                }],
+            })
+        with self.assertRaises(InvalidArgumentError):
+            bridge.call("scene_transaction", {
+                "operations": [
+                    {
+                        "op": "add_node", "parent": {"path": "."},
+                        "type": "Node", "name": "PreflightOnly", "handle": "preflight",
+                    },
+                    {
+                        "op": "set_property", "target": {"handle": "preflight"},
+                        "property": "missing_property", "value": 1,
+                    },
+                ],
+            })
+        with self.assertRaises(InvalidArgumentError):
+            bridge.call("scene_transaction", {
+                "operations": [{
+                    "op": "set_property",
+                    "target": {"path": "SafeInstanceRoot/InitialChild"},
+                    "property": "position", "value": [1, 2],
+                }],
+            })
+        paths_after_failures = {
+            node["path"] for node in bridge.call("tree", {"max_depth": 4})["nodes"]
+        }
+        self.assertNotIn("StaleEdit", paths_after_failures)
+        self.assertNotIn("PreflightOnly", paths_after_failures)
+
+        bridge.call("control", {"action": "save"})
+        bridge.call("open_scene", {"path": "scenes/expanded.tscn"})
+        self._wait_until(
+            lambda: bridge.call("state", {}).get("scene") == "res://scenes/expanded.tscn"
+        )
+        expanded_tree = bridge.call("tree", {"max_depth": 2})
+        self.assertEqual(
+            {node["path"] for node in expanded_tree["nodes"]}, {".", "InitialChild"}
+        )
+        bridge.call("open_scene", {"path": "scenes/main.tscn"})
+        self._wait_until(
+            lambda: bridge.call("state", {}).get("scene") == "res://scenes/main.tscn"
+        )
+        reopened_paths = {
+            node["path"] for node in bridge.call("tree", {"max_depth": 4})["nodes"]
+        }
+        self.assertIn("Destination/ActionButton", reopened_paths)
+        saved_text = (self.project / "scenes" / "main.tscn").read_text(encoding="utf-8")
+        self.assertIn('signal="pressed"', saved_text)
+        self.assertIn('groups=["transaction_buttons"]', saved_text)
+        bridge.call("scene_transaction", {
+            "operations": [
+                {"op": "remove_node", "target": {"path": "Builder"}},
+                {"op": "remove_node", "target": {"path": "Destination"}},
+                {"op": "remove_node", "target": {"path": "SafeInstanceRoot"}},
+            ],
+        })
 
         bridge.call("open_scene", {"path": "scenes/runtime.tscn"})
         self._wait_until(

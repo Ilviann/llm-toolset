@@ -7,11 +7,17 @@ const MAX_SETTING_CHANGES := Limits.MAX_SETTING_CHANGES
 
 var _mark_project_file_saved: Callable
 var _input_events: RefCounted
+var _property_values: RefCounted
 
 
-func _init(mark_project_file_saved: Callable, input_events: RefCounted) -> void:
+func _init(
+	mark_project_file_saved: Callable,
+	input_events: RefCounted,
+	property_values: RefCounted,
+) -> void:
 	_mark_project_file_saved = mark_project_file_saved
 	_input_events = input_events
+	_property_values = property_values
 
 
 func handlers() -> Dictionary:
@@ -197,110 +203,14 @@ func _checked_setting_key(value: Variant, writable: bool) -> Dictionary:
 	return _success(value)
 
 
-func _decode_setting_value(value: Variant, target_type: int, depth := 0) -> Dictionary:
-	if depth > 6:
-		return _failure("Value nesting is too deep")
-	if value is String and value.length() > 4096:
-		return _failure("String value is too long")
-	if target_type == TYPE_NIL:
-		if value == null or value is bool or value is int or value is float or value is String:
-			return _success(value)
-		if value is Array:
-			var new_array: Array = []
-			if value.size() > 100:
-				return _failure("Array has more than 100 entries")
-			for child in value:
-				var decoded := _decode_setting_value(child, TYPE_NIL, depth + 1)
-				if not decoded.ok:
-					return decoded
-				new_array.append(decoded.result)
-			return _success(new_array)
-		if value is Dictionary:
-			var new_dictionary := {}
-			if value.size() > 100:
-				return _failure("Dictionary has more than 100 entries")
-			for child_key in value:
-				if not child_key is String or child_key.length() > 256:
-					return _failure("Dictionary keys must be strings up to 256 characters")
-				var decoded := _decode_setting_value(value[child_key], TYPE_NIL, depth + 1)
-				if not decoded.ok:
-					return decoded
-				new_dictionary[child_key] = decoded.result
-			return _success(new_dictionary)
-		return _failure("Unsupported JSON value")
-	if target_type == TYPE_INT and (value is int or value is float):
-		return _success(int(value))
-	if target_type == TYPE_FLOAT and (value is int or value is float):
-		return _success(float(value))
-	if target_type == TYPE_STRING and value is String:
-		return _success(value)
-	if target_type == TYPE_STRING_NAME and value is String:
-		return _success(StringName(value))
-	if target_type == TYPE_NODE_PATH and value is String:
-		return _success(NodePath(value))
-	if target_type == TYPE_VECTOR2 and _number_array(value, 2):
-		return _success(Vector2(float(value[0]), float(value[1])))
-	if target_type == TYPE_VECTOR2I and _number_array(value, 2):
-		return _success(Vector2i(int(value[0]), int(value[1])))
-	if target_type == TYPE_VECTOR3 and _number_array(value, 3):
-		return _success(Vector3(float(value[0]), float(value[1]), float(value[2])))
-	if target_type == TYPE_VECTOR3I and _number_array(value, 3):
-		return _success(Vector3i(int(value[0]), int(value[1]), int(value[2])))
-	if target_type == TYPE_COLOR and _number_array(value, 4):
-		return _success(Color(float(value[0]), float(value[1]), float(value[2]), float(value[3])))
-	if target_type == TYPE_PACKED_STRING_ARRAY and value is Array:
-		var strings := PackedStringArray()
-		for item in value:
-			if not item is String:
-				return _failure("Packed string array entries must be strings")
-			strings.append(item)
-		return _success(strings)
-	if target_type in [TYPE_ARRAY, TYPE_DICTIONARY]:
-		var decoded := _decode_setting_value(value, TYPE_NIL, depth)
-		if decoded.ok and typeof(decoded.result) == target_type:
-			return decoded
-	if target_type == typeof(value):
-		return _success(value)
-	return _failure("Value does not match setting type %s" % type_string(target_type))
+func _decode_setting_value(value: Variant, target_type: int) -> Dictionary:
+	return _property_values.convert(value, target_type)
 
 
-func _number_array(value: Variant, size: int) -> bool:
-	if not value is Array or value.size() != size:
-		return false
-	for item in value:
-		if not item is int and not item is float:
-			return false
-	return true
-
-
-func _encode_setting_value(value: Variant, depth := 0) -> Variant:
-	if depth > 6:
-		return "..."
+func _encode_setting_value(value: Variant) -> Variant:
 	if value is InputEvent:
 		return _input_events.normalize(value)
-	match typeof(value):
-		TYPE_NIL, TYPE_BOOL, TYPE_INT, TYPE_FLOAT:
-			return value
-		TYPE_STRING, TYPE_STRING_NAME, TYPE_NODE_PATH:
-			return str(value).left(4096)
-		TYPE_VECTOR2, TYPE_VECTOR2I:
-			return [value.x, value.y]
-		TYPE_VECTOR3, TYPE_VECTOR3I:
-			return [value.x, value.y, value.z]
-		TYPE_COLOR:
-			return [value.r, value.g, value.b, value.a]
-		TYPE_ARRAY, TYPE_PACKED_STRING_ARRAY:
-			var output: Array = []
-			for item in value.slice(0, 100):
-				output.append(_encode_setting_value(item, depth + 1))
-			return output
-		TYPE_DICTIONARY:
-			var output := {}
-			for key in value.keys().slice(0, 100):
-				output[str(key)] = _encode_setting_value(value[key], depth + 1)
-			return output
-		_:
-			return "<unsupported:%s>" % type_string(typeof(value))
+	return _property_values.encode(value)
 
 
 func _only_keys(dictionary: Dictionary, allowed: Array) -> bool:

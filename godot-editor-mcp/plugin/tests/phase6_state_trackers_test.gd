@@ -18,6 +18,8 @@ class FakeHistory extends RefCounted:
 
 class FakeUndoRedo extends RefCounted:
 	var history := FakeHistory.new()
+	func get_object_history_id(_object: Object) -> int:
+		return 1
 
 	func get_history_undo_redo(_instance_id: int):
 		return history

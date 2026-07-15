@@ -36,6 +36,8 @@ class ErrorCode:
     VERSION_MISMATCH = "version_mismatch"
     RUNTIME_PROBE_UNAVAILABLE = "runtime_probe_unavailable"
     AMBIGUOUS_RUNTIME_SESSION = "ambiguous_runtime_session"
+    STALE_SCENE = "stale_scene"
+    TRANSACTION_FAILED = "transaction_failed"
     CANCELLED = "cancelled"
 
 
@@ -177,6 +179,14 @@ class AmbiguousRuntimeSessionError(BridgeError):
     default_code = ErrorCode.AMBIGUOUS_RUNTIME_SESSION
 
 
+class StaleSceneError(BridgeError):
+    default_code = ErrorCode.STALE_SCENE
+
+
+class TransactionFailedError(BridgeError):
+    default_code = ErrorCode.TRANSACTION_FAILED
+
+
 class OperationCancelledError(BridgeError):
     default_code = ErrorCode.CANCELLED
 
@@ -206,6 +216,8 @@ _ERROR_TYPES: dict[str, type[BridgeError]] = {
         VersionMismatchError,
         RuntimeProbeUnavailableError,
         AmbiguousRuntimeSessionError,
+        StaleSceneError,
+        TransactionFailedError,
         OperationCancelledError,
         InvalidResponseError,
     )
@@ -254,6 +266,8 @@ __all__ = [
     "VersionMismatchError",
     "RuntimeProbeUnavailableError",
     "AmbiguousRuntimeSessionError",
+    "StaleSceneError",
+    "TransactionFailedError",
     "bounded_details",
     "bridge_error_from_payload",
 ]

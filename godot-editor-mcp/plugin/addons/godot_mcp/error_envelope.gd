@@ -22,6 +22,8 @@ const STALE_OPERATION := "stale_operation"
 const VERSION_MISMATCH := "version_mismatch"
 const RUNTIME_PROBE_UNAVAILABLE := "runtime_probe_unavailable"
 const AMBIGUOUS_RUNTIME_SESSION := "ambiguous_runtime_session"
+const STALE_SCENE := "stale_scene"
+const TRANSACTION_FAILED := "transaction_failed"
 
 
 static func success(result: Variant) -> Dictionary:
