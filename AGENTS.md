@@ -42,6 +42,8 @@ Keep shared documentation at the workspace root. Introduce shared libraries only
 
 Document run and test commands in each application's README. Prefer built-in test frameworks and fast offline suites. Test normal behavior, invalid input, resource limits, and security boundaries. Run the complete suite after behavior changes.
 
+Production code, test code, generated code, and release checks must not depend on the contents of documentation files. Documentation includes `README.md`, `ROADMAP.md`, `HISTORY.md`, `CODE.md`, and other prose files. Treat documentation as an output of development, not as an executable input, source of runtime truth, or test fixture. Tests must derive expected behavior and release consistency from code, package or plugin metadata, runtime-reported contracts, and behavioral results instead. This restriction does not prevent maintainers or agents from reading documentation as guidance.
+
 Organize roadmaps as working feature increments. Every phase must deliver a complete, usable feature or cohesive feature set, including its implementation, relevant tests, and all affected documentation and examples. A phase may depend on completed earlier phases, but completing it must leave the project in a working, releasable state. Do not defer testing or documentation to a separate final phase.
 
 Every new `ROADMAP.md`, and every roadmap revision that introduces a new feature set, must include or update a top-level phase checklist. Give each phase a checkbox, phase number, and very brief one-line description. Keep checklist status and wording synchronized with the detailed phase sections as implementation progresses or scope changes.
