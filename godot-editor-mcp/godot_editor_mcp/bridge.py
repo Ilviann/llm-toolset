@@ -24,7 +24,10 @@ class GodotBridge:
         port: int | None = None,
         timeout: float = 3.0,
     ) -> None:
-        root = Path(project).expanduser().resolve(strict=True)
+        try:
+            root = Path(project).expanduser().resolve(strict=True)
+        except (OSError, RuntimeError):
+            raise BridgeError("Project must be a folder containing project.godot") from None
         if not root.is_dir() or not (root / "project.godot").is_file():
             raise BridgeError("Project must be a folder containing project.godot")
         if host not in {"127.0.0.1", "::1", "localhost"}:

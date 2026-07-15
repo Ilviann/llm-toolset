@@ -85,6 +85,16 @@ class DomainError(Exception):
         }
 
 
+class AssetError(DomainError):
+    """A confined local project or import-root operation failed."""
+
+
+class LauncherError(DomainError):
+    """The explicitly configured local editor could not be started."""
+
+    default_code = ErrorCode.INVALID_CONFIGURATION
+
+
 class BridgeError(DomainError):
     """Base error for the authenticated localhost bridge."""
 
@@ -160,6 +170,10 @@ class OperationCancelledError(BridgeError):
     default_code = ErrorCode.CANCELLED
 
 
+class InvalidResponseError(BridgeError):
+    default_code = ErrorCode.INVALID_RESPONSE
+
+
 _ERROR_TYPES: dict[str, type[BridgeError]] = {
     cls.default_code: cls
     for cls in (
@@ -180,6 +194,7 @@ _ERROR_TYPES: dict[str, type[BridgeError]] = {
         StaleOperationError,
         VersionMismatchError,
         OperationCancelledError,
+        InvalidResponseError,
     )
 }
 
@@ -201,12 +216,15 @@ def bridge_error_from_payload(payload: Any) -> BridgeError:
 
 
 __all__ = [
+    "AssetError",
     "BridgeError",
     "DomainError",
     "EditorBusyError",
     "ErrorCode",
     "ImportPendingError",
     "InvalidArgumentError",
+    "InvalidResponseError",
+    "LauncherError",
     "NoActiveRunError",
     "NotFoundError",
     "OperationTimeoutError",

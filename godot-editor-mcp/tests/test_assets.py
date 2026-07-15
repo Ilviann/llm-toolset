@@ -31,6 +31,12 @@ class ProjectAssetsTests(unittest.TestCase):
         with self.assertRaisesRegex(AssetError, "already exists"):
             self.assets.import_asset("hero.png", "assets/hero.png")
 
+    def test_missing_roots_raise_domain_errors(self) -> None:
+        with self.assertRaisesRegex(AssetError, "project.godot"):
+            ProjectAssets(self.base / "missing")
+        with self.assertRaisesRegex(AssetError, "Import root"):
+            ProjectAssets(self.project, self.base / "missing-inbox")
+
     def test_import_requires_configured_inbox_and_allowed_extension(self) -> None:
         without_inbox = ProjectAssets(self.project)
         with self.assertRaisesRegex(AssetError, "--import-root"):

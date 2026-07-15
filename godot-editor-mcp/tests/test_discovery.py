@@ -5,10 +5,12 @@ import tempfile
 import time
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from godot_editor_mcp.discovery import (
     DISCOVERY_FILE,
     discovered_port,
+    normalized_project_path,
     project_path_hash,
     read_discovery_record,
 )
@@ -55,6 +57,13 @@ class DiscoveryTests(unittest.TestCase):
         self.write_record(project_hash="f" * 64)
         with self.assertRaises(ProjectMismatchError):
             discovered_port(self.project, 6505)
+
+    def test_project_identity_normalization_covers_platform_branches(self) -> None:
+        resolved = str(self.project).replace("\\", "/").rstrip("/")
+        with patch("godot_editor_mcp.discovery.os.name", "posix"):
+            self.assertEqual(normalized_project_path(self.project), resolved)
+        with patch("godot_editor_mcp.discovery.os.name", "nt"):
+            self.assertEqual(normalized_project_path(self.project), resolved.lower())
 
 
 if __name__ == "__main__":

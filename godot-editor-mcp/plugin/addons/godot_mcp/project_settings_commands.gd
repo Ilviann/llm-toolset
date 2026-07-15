@@ -1,8 +1,17 @@
-extends "command_base.gd"
+extends RefCounted
 
+const ErrorEnvelope := preload("error_envelope.gd")
 const Limits := preload("command_limits.gd")
 const MAX_SETTINGS := Limits.MAX_SETTINGS
 const MAX_SETTING_CHANGES := Limits.MAX_SETTING_CHANGES
+
+var _mark_project_file_saved: Callable
+var _input_events: RefCounted
+
+
+func _init(mark_project_file_saved: Callable, input_events: RefCounted) -> void:
+	_mark_project_file_saved = mark_project_file_saved
+	_input_events = input_events
 
 
 func handlers() -> Dictionary:
@@ -96,12 +105,12 @@ func _project_settings_patch(arguments: Dictionary) -> Dictionary:
 			else:
 				var expected := _decode_setting_value(change.expected, typeof(before))
 				if not expected.ok:
-					return _failure("Invalid expected value for %s: %s" % [key, _error_message(expected)])
+					return _failure("Invalid expected value for %s: %s" % [key, ErrorEnvelope.message(expected)])
 				if expected.result != before:
 					return _failure("Compare-and-swap failed for %s" % key)
 		var converted := _decode_setting_value(change.value, typeof(before) if existed else TYPE_NIL)
 		if not converted.ok:
-			return _failure("Invalid value for %s: %s" % [key, _error_message(converted)])
+			return _failure("Invalid value for %s: %s" % [key, ErrorEnvelope.message(converted)])
 		prepared.append({
 			"key": key, "existed": existed, "before_raw": before,
 			"after_raw": converted.result,
@@ -125,9 +134,9 @@ func _project_settings_patch(arguments: Dictionary) -> Dictionary:
 					_restore_settings(prepared)
 					ProjectSettings.save()
 					return _failure("Could not save project settings (Godot error %d); transaction rolled back" % error)
-		if save and _state_monitor != null:
+		if save and _mark_project_file_saved.is_valid():
 			var requirements := _combined_reload_requirements(prepared)
-			_state_monitor.mark_project_settings_saved(requirements.project_reload or requirements.editor_restart)
+			_mark_project_file_saved.call(requirements.project_reload or requirements.editor_restart)
 	return _success({
 		"diff": diffs,
 		"dry_run": dry_run,
@@ -268,7 +277,7 @@ func _encode_setting_value(value: Variant, depth := 0) -> Variant:
 	if depth > 6:
 		return "..."
 	if value is InputEvent:
-		return _normalize_input_event(value)
+		return _input_events.normalize(value)
 	match typeof(value):
 		TYPE_NIL, TYPE_BOOL, TYPE_INT, TYPE_FLOAT:
 			return value
@@ -292,3 +301,18 @@ func _encode_setting_value(value: Variant, depth := 0) -> Variant:
 			return output
 		_:
 			return "<unsupported:%s>" % type_string(typeof(value))
+
+
+func _only_keys(dictionary: Dictionary, allowed: Array) -> bool:
+	for key in dictionary:
+		if key not in allowed:
+			return false
+	return true
+
+
+func _success(result: Variant) -> Dictionary:
+	return ErrorEnvelope.success(result)
+
+
+func _failure(message: String) -> Dictionary:
+	return ErrorEnvelope.failure(message)

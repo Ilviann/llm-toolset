@@ -24,10 +24,10 @@ var _pending_imports: Dictionary = {}
 var _recent_imports: Array[Dictionary] = []
 var _saved_history_version := 0
 var _scene_modified_time := 0
-var _project_hash := ""
-var _known_project_hash := ""
+var _project_file_hash := ""
+var _known_project_file_hash := ""
 var _project_reload_required := false
-var _next_project_hash_check_ms := 0
+var _next_project_file_hash_check_ms := 0
 
 
 func _init(
@@ -56,8 +56,8 @@ func _init(
 		filesystem.filesystem_changed.connect(_on_filesystem_changed)
 	if not filesystem.resources_reimported.is_connected(_on_resources_reimported):
 		filesystem.resources_reimported.connect(_on_resources_reimported)
-	_project_hash = _hash_project_file()
-	_known_project_hash = _project_hash
+	_project_file_hash = _hash_project_file()
+	_known_project_file_hash = _project_file_hash
 
 
 func stop() -> void:
@@ -109,13 +109,13 @@ func poll() -> void:
 	if _was_scanning and not scanning:
 		_finish_pending_imports()
 	_was_scanning = scanning
-	if Time.get_ticks_msec() >= _next_project_hash_check_ms:
-		_check_project_hash()
-		_next_project_hash_check_ms = Time.get_ticks_msec() + 1000
+	if Time.get_ticks_msec() >= _next_project_file_hash_check_ms:
+		_check_project_file_hash()
+		_next_project_file_hash_check_ms = Time.get_ticks_msec() + 1000
 
 
 func state() -> Dictionary:
-	_check_project_hash()
+	_check_project_file_hash()
 	var root := _editor_interface.get_edited_scene_root()
 	var filesystem := _editor_interface.get_resource_filesystem()
 	var playing := _editor_interface.is_playing_scene()
@@ -155,8 +155,8 @@ func state() -> Dictionary:
 		"last_run_exit_status": _last_run_exit_status,
 		"last_stop_reason": _last_stop_reason,
 		"current_run_diagnostic_counts": run_counts,
-		"project_file_hash": _project_hash,
-		"project_file_hash_matches_known_write": _project_hash == _known_project_hash,
+		"project_file_hash": _project_file_hash,
+		"project_file_hash_matches_known_write": _project_file_hash == _known_project_file_hash,
 		"project_reload_required": _project_reload_required,
 		"last_event_id": _events.latest_id(),
 		"last_diagnostic_id": _diagnostics.latest_id(),
@@ -179,8 +179,8 @@ func track_import(path: String, operation_id: Variant) -> void:
 
 
 func mark_project_settings_saved(reload_required: bool) -> void:
-	_project_hash = _hash_project_file()
-	_known_project_hash = _project_hash
+	_project_file_hash = _hash_project_file()
+	_known_project_file_hash = _project_file_hash
 	_project_reload_required = _project_reload_required or reload_required
 
 
@@ -353,9 +353,9 @@ func _hash_project_file() -> String:
 	return context.finish().hex_encode()
 
 
-func _check_project_hash() -> void:
+func _check_project_file_hash() -> void:
 	var current := _hash_project_file()
-	if current != _project_hash:
-		_project_hash = current
-		if current != _known_project_hash:
+	if current != _project_file_hash:
+		_project_file_hash = current
+		if current != _known_project_file_hash:
 			_project_reload_required = true

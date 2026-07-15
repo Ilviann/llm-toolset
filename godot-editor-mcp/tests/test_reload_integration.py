@@ -155,6 +155,10 @@ class ReloadSubprocessIntegrationTests(unittest.TestCase):
         self.started_pids.add(new_record.process_id)
         self.assertNotEqual(new_record.process_id, old_record.process_id)
         self.assertEqual(new_record.project_hash, old_record.project_hash)
+        self._wait_until(
+            lambda: bridge.call("state", {}).get("scene")
+            == "res://scenes/main.tscn"
+        )
         tree = bridge.call("tree", {})
         self.assertTrue(any(node["path"] == "UnsavedChild" for node in tree["nodes"]))
 

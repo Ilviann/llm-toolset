@@ -9,6 +9,8 @@ from typing import Any, Callable, Protocol
 from .errors import (
     BridgeError,
     ErrorCode,
+    InvalidArgumentError,
+    InvalidResponseError,
     OperationCancelledError,
     OperationTimeoutError,
     ProjectMismatchError,
@@ -54,9 +56,9 @@ class OperationWaiter:
         wait = arguments.get("wait", False)
         timeout_ms = arguments.get("timeout_ms", DEFAULT_TIMEOUT_MS)
         if not isinstance(wait, bool):
-            raise ValueError("wait must be a boolean")
+            raise InvalidArgumentError("wait must be a boolean")
         if type(timeout_ms) is not int or not 1 <= timeout_ms <= MAX_TIMEOUT_MS:
-            raise ValueError(f"timeout_ms must be between 1 and {MAX_TIMEOUT_MS}")
+            raise InvalidArgumentError(f"timeout_ms must be between 1 and {MAX_TIMEOUT_MS}")
         return wait, timeout_ms
 
     @staticmethod
@@ -110,7 +112,7 @@ class OperationWaiter:
             return {"completed": True, "import": record}
         try:
             info = self.bridge.call("asset_info", {"path": path.removeprefix("res://")})
-        except Exception:
+        except BridgeError:
             info = None
         return {"completed": True, "import": record, "asset": info}
 
@@ -122,7 +124,7 @@ class OperationWaiter:
         startup_window_ms: int,
     ) -> dict[str, Any]:
         if type(startup_window_ms) is not int or not 0 <= startup_window_ms <= MAX_STARTUP_WINDOW_MS:
-            raise ValueError(
+            raise InvalidArgumentError(
                 f"startup_window_ms must be between 0 and {MAX_STARTUP_WINDOW_MS}"
             )
         started = self._until(
@@ -171,14 +173,14 @@ class OperationWaiter:
         timeout_ms: int,
     ) -> dict[str, Any]:
         if not isinstance(operation_id, str) or not operation_id:
-            raise ValueError("Godot editor did not return a reload operation ID")
+            raise InvalidResponseError("Godot editor did not return a reload operation ID")
         if (
             not isinstance(expected_project_hash, str)
             or len(expected_project_hash) != 64
         ):
-            raise ValueError("Godot editor did not return a valid project hash")
+            raise InvalidResponseError("Godot editor did not return a valid project hash")
         if not isinstance(expected_bridge_version, str) or not expected_bridge_version:
-            raise ValueError("Godot editor did not return a bridge version")
+            raise InvalidResponseError("Godot editor did not return a bridge version")
 
         deadline = self.clock() + timeout_ms / 1000
         disconnected = False
@@ -198,7 +200,7 @@ class OperationWaiter:
                 status = None
             if status is not None:
                 if not isinstance(status, dict):
-                    raise ValueError("Godot editor returned invalid reload status")
+                    raise InvalidResponseError("Godot editor returned invalid reload status")
                 actual_operation_id = status.get("operation_id")
                 if actual_operation_id != operation_id:
                     raise StaleOperationError(
@@ -280,7 +282,7 @@ class OperationWaiter:
     def _state(self) -> dict[str, Any]:
         state = self.bridge.call("state", {})
         if not isinstance(state, dict):
-            raise ValueError("Godot editor returned invalid state while waiting")
+            raise InvalidResponseError("Godot editor returned invalid state while waiting")
         return state
 
     @staticmethod

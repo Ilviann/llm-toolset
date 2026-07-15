@@ -1,6 +1,8 @@
 extends RefCounted
 
+const AtomicJsonRecord := preload("atomic_json_record.gd")
 const ErrorEnvelope := preload("error_envelope.gd")
+const ProjectIdentity := preload("project_identity.gd")
 
 const RECORD_PATH := "res://.godot/godot_mcp_reload.json"
 const RECORD_VERSION := 1
@@ -11,7 +13,7 @@ const MAX_FUTURE_SKEW_MS := 10_000
 var _editor_interface: EditorInterface
 var _operations: RefCounted
 var _bridge_version := ""
-var _project_hash := ""
+var _project_identity_hash := ""
 var _restart_requested := false
 var _cleanup_requested := false
 var _pending_operation_id := ""
@@ -25,7 +27,7 @@ func _init(
 	_editor_interface = editor_interface
 	_operations = operations
 	_bridge_version = bridge_version
-	_project_hash = project_hash()
+	_project_identity_hash = ProjectIdentity.current_hash()
 	_recover_pending()
 
 
@@ -107,7 +109,7 @@ func _schedule(arguments: Dictionary) -> Dictionary:
 		"record_version": RECORD_VERSION,
 		"status": "pending",
 		"operation_id": operation_id,
-		"project_hash": _project_hash,
+		"project_hash": _project_identity_hash,
 		"bridge_version": _bridge_version,
 		"created_unix_ms": int(Time.get_unix_time_from_system() * 1000.0),
 	}
@@ -123,7 +125,7 @@ func _schedule(arguments: Dictionary) -> Dictionary:
 	return ErrorEnvelope.success({
 		"status": "scheduled",
 		"operation_id": operation_id,
-		"project_hash": _project_hash,
+		"project_hash": _project_identity_hash,
 		"bridge_version": _bridge_version,
 	})
 
@@ -143,7 +145,7 @@ func _status(arguments: Dictionary) -> Dictionary:
 			"completed": false,
 			"status": "pending",
 			"operation_id": requested,
-			"project_hash": _project_hash,
+			"project_hash": _project_identity_hash,
 			"bridge_version": _bridge_version,
 		})
 	if not _completed_reload.is_empty() and requested == _completed_reload.operation_id:
@@ -166,17 +168,17 @@ func _status(arguments: Dictionary) -> Dictionary:
 func _recover_pending() -> void:
 	if not FileAccess.file_exists(RECORD_PATH):
 		return
-	var bytes := FileAccess.get_file_as_bytes(RECORD_PATH)
-	if bytes.is_empty() or bytes.size() > MAX_RECORD_BYTES:
+	var loaded := AtomicJsonRecord.read(RECORD_PATH, MAX_RECORD_BYTES)
+	if not loaded.ok:
 		_set_recovery_error(
 			ErrorEnvelope.MALFORMED_OPERATION,
 			"Pending reload operation record is malformed",
-			{"bytes": bytes.size()},
+			{"bytes": loaded.bytes},
 		)
 		return
-	var value = JSON.parse_string(bytes.get_string_from_utf8())
+	var value = loaded.value
 	var validation := validate_record(
-		value, _project_hash, _bridge_version,
+		value, _project_identity_hash, _bridge_version,
 		int(Time.get_unix_time_from_system() * 1000.0),
 	)
 	if not validation.ok:
@@ -187,7 +189,7 @@ func _recover_pending() -> void:
 		"completed": true,
 		"status": "completed",
 		"operation_id": record.operation_id,
-		"project_hash": _project_hash,
+		"project_hash": _project_identity_hash,
 		"bridge_version": _bridge_version,
 		"recovered": true,
 	}
@@ -267,13 +269,7 @@ static func validate_record(
 
 
 static func project_hash() -> String:
-	var path := ProjectSettings.globalize_path("res://").replace("\\", "/").trim_suffix("/")
-	if OS.get_name() == "Windows":
-		path = path.to_lower()
-	var context := HashingContext.new()
-	context.start(HashingContext.HASH_SHA256)
-	context.update(path.to_utf8_buffer())
-	return context.finish().hex_encode()
+	return ProjectIdentity.current_hash()
 
 
 static func _invalid_record(message: String) -> Dictionary:
@@ -295,19 +291,7 @@ func _dirty_scenes() -> Array[String]:
 
 
 func _write_record(record: Dictionary) -> int:
-	var temporary := RECORD_PATH + ".tmp-%d" % OS.get_process_id()
-	var file := FileAccess.open(temporary, FileAccess.WRITE)
-	if file == null:
-		return FileAccess.get_open_error()
-	file.store_string(JSON.stringify(record) + "\n")
-	file.close()
-	var error := DirAccess.rename_absolute(
-		ProjectSettings.globalize_path(temporary),
-		ProjectSettings.globalize_path(RECORD_PATH),
-	)
-	if error != OK:
-		DirAccess.remove_absolute(ProjectSettings.globalize_path(temporary))
-	return error
+	return AtomicJsonRecord.write(RECORD_PATH, record)
 
 
 func _set_recovery_error(code: String, message: String, details: Dictionary) -> void:

@@ -21,7 +21,7 @@ DEFAULT_MAX_AGE_SECONDS = 5.0
 
 def normalized_project_path(project: Path) -> str:
     path = str(project.resolve(strict=True)).replace("\\", "/").rstrip("/")
-    return path.casefold() if os.name == "nt" else path
+    return path.lower() if os.name == "nt" else path
 
 
 def project_path_hash(project: Path) -> str:

@@ -7,6 +7,8 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
+from .errors import AssetError
+
 
 MAX_IMPORT_BYTES = 100 * 1024 * 1024
 MAX_PATH_LENGTH = 512
@@ -20,19 +22,21 @@ ALLOWED_IMPORT_EXTENSIONS = {
 PROTECTED_PROJECT_FOLDERS = {".godot", "addons"}
 
 
-class AssetError(Exception):
-    """A concise asset error safe to return to an MCP client."""
-
-
 class ProjectAssets:
     def __init__(self, project: str | Path, import_root: str | Path | None = None) -> None:
-        root = Path(project).expanduser().resolve(strict=True)
+        try:
+            root = Path(project).expanduser().resolve(strict=True)
+        except (OSError, RuntimeError):
+            raise AssetError("Project must be a folder containing project.godot") from None
         if not root.is_dir() or not (root / "project.godot").is_file():
             raise AssetError("Project must be a folder containing project.godot")
         self.project = root
         self.import_root: Path | None = None
         if import_root is not None:
-            inbox = Path(import_root).expanduser().resolve(strict=True)
+            try:
+                inbox = Path(import_root).expanduser().resolve(strict=True)
+            except (OSError, RuntimeError):
+                raise AssetError("Import root must be a folder") from None
             if not inbox.is_dir():
                 raise AssetError("Import root must be a folder")
             self.import_root = inbox

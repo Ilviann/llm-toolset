@@ -4,7 +4,7 @@
 
 - [x] Phase 3 — Reload the configured project and reconnect safely.
 - [x] Phase 4 — Consolidate tool contracts and add cross-language guardrails.
-- [ ] Phase 5 — Replace broad command inheritance with narrow services.
+- [x] Phase 5 — Replace broad command inheritance with narrow services.
 - [ ] Phase 6 — Separate editor-state ownership and typed wait contracts.
 - [ ] Phase 7 — Make edited-scene and asset inspection targeted and complete.
 - [ ] Phase 8 — Inspect the running scene through a read-only runtime probe.
@@ -150,6 +150,11 @@ The current command base provides every service with editor access, undo,
 operations, state callbacks, path checks, value conversion, node lookup, and
 input-event helpers. This phase replaces that inheritance surface with small
 collaborators and removes duplicated project identity and record handling.
+
+Completed in 0.9.0. Command services now receive only the editor, undo,
+operation, codec, guard, and tracker callbacks they use; discovery and reload
+share project identity and bounded atomic-record helpers; and Python local and
+bridge failures cross one structured domain-error boundary.
 
 ### Command boundaries
 

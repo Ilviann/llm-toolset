@@ -5,9 +5,13 @@ from __future__ import annotations
 from typing import Any, Protocol
 
 from . import __version__
-from .assets import AssetError
-from .bridge import BridgeError
-from .launcher import LauncherError
+from .errors import (
+    AssetError,
+    BridgeError,
+    InvalidArgumentError,
+    InvalidResponseError,
+    LauncherError,
+)
 from .tool_catalog import BRIDGE_COMMANDS, MODE_TOOL_NAMES, SPEC_BY_NAME, Mode, ToolSpec
 from .waiting import DEFAULT_STARTUP_WINDOW_MS, OperationWaiter
 
@@ -30,8 +34,6 @@ class EditorStarter(Protocol):
 
     def start(self, bridge: BridgeClient) -> dict[str, str]: ...
 
-
-TOOL_ERRORS = (AssetError, BridgeError, LauncherError, TypeError, ValueError)
 
 class ToolDispatcher:
     """Execute tools exposed by one mode against injected local services."""
@@ -59,17 +61,17 @@ class ToolDispatcher:
     def call(self, name: str, arguments: dict[str, Any]) -> Any:
         spec = SPEC_BY_NAME.get(name)
         if spec is None:
-            raise ValueError("Unknown tool")
+            raise RuntimeError("Unknown tool reached dispatcher")
         if spec.target != "bridge":
             handler = self._local_handlers.get(spec.local_handler or "")
             if handler is None:
-                raise ValueError("Tool has no local execution handler")
+                raise RuntimeError("Tool has no local execution handler")
             return handler(arguments)
         return self._call_bridge(spec, arguments)
 
     def _call_bridge(self, spec: ToolSpec, arguments: dict[str, Any]) -> Any:
         if spec.bridge_command is None:
-            raise ValueError("Tool has no bridge command")
+            raise RuntimeError("Tool has no bridge command")
         self._validate_project_path(spec, arguments)
         wait, timeout_ms = (
             self.waiter.options(arguments)
@@ -114,7 +116,7 @@ class ToolDispatcher:
 
     def _start_editor(self, arguments: dict[str, Any]) -> dict[str, str]:
         if arguments:
-            raise ValueError("start_editor does not accept arguments")
+            raise InvalidArgumentError("start_editor does not accept arguments")
         if self.launcher is None:
             raise LauncherError("Godot executable is not configured; set GODOT_EXECUTABLE")
         return self.launcher.start(self.bridge)
@@ -193,7 +195,7 @@ class ToolDispatcher:
         action = arguments.get("action")
         run_id = output.get("run_id", arguments.get("run_id"))
         if type(run_id) is not int:
-            raise ValueError("Godot editor did not return a run ID")
+            raise InvalidResponseError("Godot editor did not return a run ID")
         if action == "run":
             return self.waiter.wait_for_run(
                 run_id,

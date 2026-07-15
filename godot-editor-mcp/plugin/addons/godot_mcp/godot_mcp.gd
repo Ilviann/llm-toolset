@@ -10,13 +10,17 @@ const EditorStateMonitor := preload("editor_state_monitor.gd")
 const ErrorEnvelope := preload("error_envelope.gd")
 const EventStore := preload("event_store.gd")
 const InputMapCommands := preload("input_map_commands.gd")
+const InputEventCodec := preload("input_event_codec.gd")
 const Limits := preload("command_limits.gd")
 const OperationRegistry := preload("operation_registry.gd")
+const ProjectPathGuard := preload("project_path_guard.gd")
 const ProjectSettingsCommands := preload("project_settings_commands.gd")
+const PropertyValueCodec := preload("property_value_codec.gd")
 const ReloadCommands := preload("reload_commands.gd")
 const SceneCommands := preload("scene_commands.gd")
+const SceneNodeAccess := preload("scene_node_access.gd")
 
-const BRIDGE_VERSION := "0.8.0"
+const BRIDGE_VERSION := "0.9.0"
 const BRIDGE_PROTOCOL_VERSION := "1"
 const DEFAULT_PORT := 6505
 const TOKEN_PATH := "res://.godot/godot_mcp_token"
@@ -95,15 +99,24 @@ func _process(_delta: float) -> void:
 
 
 func _register_commands() -> bool:
+	var project_paths = ProjectPathGuard.new()
+	var scene_nodes = SceneNodeAccess.new(get_editor_interface())
+	var property_values = PropertyValueCodec.new()
+	var input_events = InputEventCodec.new()
 	var asset_commands = AssetCommands.new(
-		get_editor_interface(), get_undo_redo(), _operations, _state_monitor,
+		get_editor_interface(), _operations,
+		Callable(_state_monitor, "track_import"), project_paths, scene_nodes,
+		property_values,
 	)
-	var scene_commands = SceneCommands.new(get_editor_interface(), get_undo_redo(), _operations)
+	var scene_commands = SceneCommands.new(
+		get_editor_interface(), get_undo_redo(), project_paths, scene_nodes,
+		property_values,
+	)
 	var settings_commands = ProjectSettingsCommands.new(
-		get_editor_interface(), get_undo_redo(), _operations, _state_monitor,
+		Callable(_state_monitor, "mark_project_settings_saved"), input_events,
 	)
 	var input_commands = InputMapCommands.new(
-		get_editor_interface(), get_undo_redo(), _operations, _state_monitor,
+		Callable(_state_monitor, "mark_project_settings_saved"), input_events,
 	)
 	_command_services = [
 		asset_commands, scene_commands, settings_commands, input_commands, _reload_commands,

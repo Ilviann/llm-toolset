@@ -5,6 +5,7 @@ import unittest
 from godot_editor_mcp.errors import (
     BridgeError,
     ErrorCode,
+    InvalidArgumentError,
     OperationCancelledError,
     OperationTimeoutError,
     ProjectMismatchError,
@@ -129,7 +130,7 @@ class OperationWaiterTests(unittest.TestCase):
             }),
             {"path": "x.tscn"},
         )
-        with self.assertRaisesRegex(ValueError, "wait"):
+        with self.assertRaisesRegex(InvalidArgumentError, "wait"):
             OperationWaiter.options({"wait": 1})
 
     def test_reload_wait_tolerates_disconnect_and_verifies_reconnect(self) -> None:

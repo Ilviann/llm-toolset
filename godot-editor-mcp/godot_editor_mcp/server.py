@@ -30,7 +30,6 @@ from .tool_dispatch import (
     AssetManager,
     BridgeClient,
     EditorStarter,
-    TOOL_ERRORS,
     ToolDispatcher,
 )
 
@@ -113,8 +112,6 @@ class MCPServer:
             return result(request_id, tool_result(output))
         except DomainError as exc:
             return result(request_id, tool_result(exc.as_dict(), is_error=True))
-        except TOOL_ERRORS as exc:
-            return result(request_id, tool_result(str(exc), is_error=True))
 
     def close(self) -> None:
         """Cancel outstanding waits during stdio or host shutdown."""

@@ -43,6 +43,11 @@ to one boundary do not require editing the entire server:
 - `assets.py`, `bridge.py`, and `launcher.py` remain focused adapters for their
   filesystem, localhost transport, and process responsibilities.
 
+All expected asset, launcher, argument-validation, bridge, timeout, and
+cancellation failures inherit one structured domain-error boundary. Unexpected
+Python exceptions remain internal errors instead of being presented as normal
+tool failures.
+
 This organization keeps the model-facing schemas easy to audit, makes service
 dependencies replaceable in unit tests through small structural interfaces, and
 retains the existing `MCPServer`, mode/catalog constants, `run`, and `main`
@@ -59,7 +64,10 @@ The dependency-free editor plugin is split by responsibility under
 - `editor_state_monitor.gd`, `event_store.gd`, and `operation_registry.gd` own
   observed editor/import state, monotonic event IDs, and asynchronous operation IDs.
 - `diagnostic_store.gd` is a thread-safe bounded Godot logger and read API.
-- `discovery_record.gd` atomically publishes the project-scoped bridge heartbeat.
+- `project_identity.gd` and `atomic_json_record.gd` provide the shared
+  cross-platform identity and bounded crash-safe record primitives used by
+  discovery and reload recovery.
+- `discovery_record.gd` publishes the project-scoped bridge heartbeat.
 - `reload_commands.gd` safeguards scene/run state, persists bounded pending
   reloads, invokes the deferred restart, and validates startup recovery.
 - `error_envelope.gd` centralizes bounded bridge success and failure envelopes.
@@ -69,16 +77,16 @@ The dependency-free editor plugin is split by responsibility under
   and property changes.
 - `project_settings_commands.gd` and `input_map_commands.gd` handle their
   respective validated, atomic project configuration operations.
-- `command_base.gd` centralizes editor dependencies, project confinement,
-  shared validation, and bounded value encoding.
+- `project_path_guard.gd`, `scene_node_access.gd`, `property_value_codec.gd`,
+  and `input_event_codec.gd` are narrow collaborators injected only where used.
 - `command_limits.gd` is the single source for limits used by handlers and the
   `capabilities` response.
 
 Keep command names and wire responses stable when changing these modules. Each
 command service publishes its own handler mapping; the composition root retains
 the service and registers that mapping explicitly. New command families should
-remain focused and inherit the shared validation base rather than duplicating
-path or result handling.
+remain focused and receive only the narrow guards, codecs, state callbacks, and
+editor services they use.
 
 ## Tool modes
 

@@ -8,19 +8,19 @@ import subprocess
 from typing import Any
 
 from .bridge import BridgeError, GodotBridge
+from .errors import LauncherError
 
 
 def _is_windows() -> bool:
     return os.name == "nt"
 
 
-class LauncherError(Exception):
-    """A concise launcher error safe to return to an MCP client."""
-
-
 class EditorLauncher:
     def __init__(self, project: str | Path, executable: str | None) -> None:
-        self.project = Path(project).expanduser().resolve(strict=True)
+        try:
+            self.project = Path(project).expanduser().resolve(strict=True)
+        except (OSError, RuntimeError):
+            raise LauncherError("Godot project folder does not exist") from None
         self.executable = executable.strip() if executable else None
         self._process: subprocess.Popen[bytes] | None = None
 

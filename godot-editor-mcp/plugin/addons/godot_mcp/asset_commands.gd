@@ -1,5 +1,6 @@
-extends "command_base.gd"
+extends RefCounted
 
+const ErrorEnvelope := preload("error_envelope.gd")
 const Limits := preload("command_limits.gd")
 const MAX_ASSETS := Limits.MAX_ASSETS
 const MAX_ASSET_SCAN := Limits.MAX_ASSET_SCAN
@@ -7,6 +8,29 @@ const CREATABLE_RESOURCE_TYPES := [
 	"StandardMaterial3D", "ORMMaterial3D", "ShaderMaterial", "Environment",
 	"Gradient", "Curve", "StyleBoxFlat", "AudioStreamRandomizer",
 ]
+
+var _editor_interface: EditorInterface
+var _operations: RefCounted
+var _track_import: Callable
+var _project_paths: RefCounted
+var _scene_nodes: RefCounted
+var _property_values: RefCounted
+
+
+func _init(
+	editor_interface: EditorInterface,
+	operations: RefCounted,
+	track_import: Callable,
+	project_paths: RefCounted,
+	scene_nodes: RefCounted,
+	property_values: RefCounted,
+) -> void:
+	_editor_interface = editor_interface
+	_operations = operations
+	_track_import = track_import
+	_project_paths = project_paths
+	_scene_nodes = scene_nodes
+	_property_values = property_values
 
 
 func handlers() -> Dictionary:
@@ -24,7 +48,7 @@ func _list_assets(arguments: Dictionary) -> Dictionary:
 	var folder_value = arguments.get("folder", ".")
 	var folder_path := "res://"
 	if folder_value != ".":
-		var checked := _project_path(folder_value)
+		var checked: Dictionary = _project_paths.check(folder_value)
 		if not checked.ok:
 			return checked
 		folder_path = checked.result
@@ -39,7 +63,7 @@ func _list_assets(arguments: Dictionary) -> Dictionary:
 	if limit < 1 or limit > MAX_ASSETS:
 		return _failure("Limit must be between 1 and 100")
 
-	var filesystem := get_editor_interface().get_resource_filesystem()
+	var filesystem := _editor_interface.get_resource_filesystem()
 	var directory := filesystem.get_filesystem_path(folder_path)
 	if directory == null:
 		return _failure("Asset folder not found")
@@ -83,7 +107,7 @@ func _collect_assets(
 
 
 func _asset_info(arguments: Dictionary) -> Dictionary:
-	var checked := _project_path(arguments.get("path"))
+	var checked: Dictionary = _project_paths.check(arguments.get("path"))
 	if not checked.ok:
 		return checked
 	var path := checked.result as String
@@ -93,7 +117,7 @@ func _asset_info(arguments: Dictionary) -> Dictionary:
 	if file == null:
 		return _failure("Cannot read asset information")
 	var size := file.get_length()
-	var resource_type: String = get_editor_interface().get_resource_filesystem().get_file_type(path)
+	var resource_type: String = _editor_interface.get_resource_filesystem().get_file_type(path)
 	if resource_type.is_empty() and path.get_extension().to_lower() in ["tres", "res", "tscn", "scn"]:
 		var loaded := ResourceLoader.load(path)
 		if loaded != null:
@@ -117,21 +141,21 @@ func _asset_info(arguments: Dictionary) -> Dictionary:
 
 
 func _scan_asset(arguments: Dictionary) -> Dictionary:
-	var checked := _project_path(arguments.get("path"))
+	var checked: Dictionary = _project_paths.check(arguments.get("path"))
 	if not checked.ok:
 		return checked
-	var filesystem := get_editor_interface().get_resource_filesystem()
+	var filesystem := _editor_interface.get_resource_filesystem()
 	if filesystem.is_scanning():
 		return _success({"path": checked.result, "scan": "already_running", "operation_id": null})
-	var operation_id = _accept_operation("filesystem_scan", {"path": checked.result})
-	if _state_monitor != null:
-		_state_monitor.track_import(checked.result, operation_id)
+	var operation_id = _operations.accept("filesystem_scan", {"path": checked.result})
+	if _track_import.is_valid():
+		_track_import.call(checked.result, operation_id)
 	filesystem.scan()
 	return _success({"path": checked.result, "scan": "queued", "operation_id": operation_id})
 
 
 func _create_resource(arguments: Dictionary) -> Dictionary:
-	var checked := _project_path(arguments.get("path"), true, PackedStringArray(["tres"]))
+	var checked: Dictionary = _project_paths.check(arguments.get("path"), true, PackedStringArray(["tres"]))
 	if not checked.ok:
 		return checked
 	var path := checked.result as String
@@ -159,19 +183,19 @@ func _create_resource(arguments: Dictionary) -> Dictionary:
 				break
 		if property_info.is_empty():
 			return _failure("Editable resource property not found: %s" % property_name)
-		var converted := _convert_value(properties[property_name], int(property_info.type))
+		var converted: Dictionary = _property_values.convert(properties[property_name], int(property_info.type))
 		if not converted.ok:
-			return _failure("Invalid %s: %s" % [property_name, _error_message(converted)])
+			return _failure("Invalid %s: %s" % [property_name, ErrorEnvelope.message(converted)])
 		resource.set(property_name, converted.result)
 	var save_error := ResourceSaver.save(resource, path)
 	if save_error != OK:
 		return _failure("Could not save resource")
-	get_editor_interface().get_resource_filesystem().update_file(path)
+	_editor_interface.get_resource_filesystem().update_file(path)
 	return _success({"path": path, "type": resource_type, "properties": properties.keys()})
 
 
 func _create_scene(arguments: Dictionary) -> Dictionary:
-	var checked := _project_path(arguments.get("path"), true, PackedStringArray(["tscn"]))
+	var checked: Dictionary = _project_paths.check(arguments.get("path"), true, PackedStringArray(["tscn"]))
 	if not checked.ok:
 		return checked
 	var path := checked.result as String
@@ -185,7 +209,7 @@ func _create_scene(arguments: Dictionary) -> Dictionary:
 		return _failure("Root type must be a non-empty string up to 128 characters")
 	if not ClassDB.class_exists(root_type) or not ClassDB.can_instantiate(root_type) or not ClassDB.is_parent_class(root_type, "Node"):
 		return _failure("Root type must be an instantiable built-in Node class")
-	var valid_name := _checked_node_name(arguments.get("root_name"))
+	var valid_name: Dictionary = _scene_nodes.checked_name(arguments.get("root_name"))
 	if not valid_name.ok:
 		return valid_name
 	var root_object = ClassDB.instantiate(root_type)
@@ -204,12 +228,12 @@ func _create_scene(arguments: Dictionary) -> Dictionary:
 	root.free()
 	if save_error != OK:
 		return _failure("Could not save scene")
-	get_editor_interface().get_resource_filesystem().update_file(path)
+	_editor_interface.get_resource_filesystem().update_file(path)
 	return _success({"path": path, "root_type": root_type, "root_name": valid_name.result})
 
 
 func _open_scene(arguments: Dictionary) -> Dictionary:
-	var checked := _project_path(arguments.get("path"), false, PackedStringArray(["tscn", "scn"]))
+	var checked: Dictionary = _project_paths.check(arguments.get("path"), false, PackedStringArray(["tscn", "scn"]))
 	if not checked.ok:
 		return checked
 	var path := checked.result as String
@@ -218,9 +242,9 @@ func _open_scene(arguments: Dictionary) -> Dictionary:
 	var resource := ResourceLoader.load(path)
 	if not resource is PackedScene:
 		return _failure("PackedScene not found")
-	get_editor_interface().get_resource_filesystem().update_file(path)
-	get_editor_interface().open_scene_from_path(path)
-	var operation_id = _accept_operation("open_scene", {"path": path})
+	_editor_interface.get_resource_filesystem().update_file(path)
+	_editor_interface.open_scene_from_path(path)
+	var operation_id = _operations.accept("open_scene", {"path": path})
 	return _success({"path": path, "open": "requested", "operation_id": operation_id})
 
 
@@ -241,3 +265,11 @@ func _asset_category(path: String, resource_type: String) -> String:
 	if "Material" in resource_type or extension in ["material", "shader"]:
 		return "material"
 	return "resource"
+
+
+func _success(result: Variant) -> Dictionary:
+	return ErrorEnvelope.success(result)
+
+
+func _failure(message: String) -> Dictionary:
+	return ErrorEnvelope.failure(message)

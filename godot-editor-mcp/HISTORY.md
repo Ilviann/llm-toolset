@@ -3,6 +3,22 @@
 This file records released changes. Planned work is tracked separately in
 [`ROADMAP.md`](ROADMAP.md).
 
+## 0.9.0 — 2026-07-15
+
+- Replaced the broad inherited Godot command base with focused project-path,
+  scene-node, property-value, and input-event collaborators, and injected only
+  the editor, undo, operation, import, and project-file callbacks each command
+  service uses.
+- Centralized cross-platform project identity and bounded atomic JSON records
+  for discovery heartbeats and reload recovery while preserving existing wire
+  fields, ownership checks, and crash-safe replacement behavior.
+- Unified asset, launcher, validation, bridge, timeout, and cancellation
+  failures under the structured Python domain-error boundary; unexpected
+  programming errors now remain internal.
+- Added platform-branch, record-bound, codec, dependency-surface, and error-
+  boundary regression tests and passed the full Python and focused Godot 4.7
+  headless suites on macOS.
+
 ## 0.8.0 — 2026-07-15
 
 - Consolidated every model-facing schema, minimum mode, execution target,

@@ -5,8 +5,9 @@ from __future__ import annotations
 import argparse
 import os
 
-from .assets import AssetError, ProjectAssets
-from .bridge import BridgeError, GodotBridge
+from .assets import ProjectAssets
+from .bridge import GodotBridge
+from .errors import DomainError
 from .launcher import EditorLauncher
 from .server import MCPServer
 from .stdio import serve
@@ -55,5 +56,5 @@ def main() -> None:
             mode=args.mode,
             launcher=launcher,
         )
-    except (AssetError, BridgeError) as exc:
+    except DomainError as exc:
         parser.error(str(exc))

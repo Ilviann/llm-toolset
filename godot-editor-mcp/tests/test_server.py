@@ -4,7 +4,7 @@ import json
 import unittest
 
 from godot_editor_mcp.bridge import BridgeError
-from godot_editor_mcp.errors import NotFoundError
+from godot_editor_mcp.errors import AssetError, NotFoundError
 from godot_editor_mcp.server import MCPServer, MODE_TOOL_NAMES
 
 
@@ -296,6 +296,29 @@ class MCPServerTests(unittest.TestCase):
             "message": "Node not found",
             "retryable": False,
         })
+
+    def test_local_domain_error_is_structured(self) -> None:
+        self.server = MCPServer(self.bridge, None, mode="small")  # type: ignore[arg-type]
+        response = self.request("tools/call", {
+            "name": "create_folder", "arguments": {"path": "assets/new"}
+        })
+        self.assertTrue(response["result"]["isError"])
+        error = json.loads(response["result"]["content"][0]["text"])
+        self.assertEqual(error["code"], AssetError.default_code)
+        self.assertIn("unavailable", error["message"])
+
+    def test_unexpected_programming_error_is_not_flattened(self) -> None:
+        class BrokenAssets(FakeAssets):
+            def validate_file(self, path, extensions=None):
+                raise TypeError("private programming error")
+
+        self.server = MCPServer(
+            self.bridge, BrokenAssets(), mode="small"
+        )  # type: ignore[arg-type]
+        with self.assertRaisesRegex(TypeError, "private programming error"):
+            self.request("tools/call", {
+                "name": "asset_info", "arguments": {"path": "asset.tres"}
+            })
 
     def test_notification_has_no_response(self) -> None:
         self.assertIsNone(self.server.handle({
