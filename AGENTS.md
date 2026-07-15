@@ -13,6 +13,16 @@ This repository contains lightweight tools for local LLM workflows, primarily MC
 - Keep runtime behavior and documented setup portable across macOS, Linux, and Windows. Isolate unavoidable platform-specific process behavior and test each branch without adding runtime dependencies.
 - Pin unavoidable dependencies and document how to prepare them before going offline.
 
+## Refactoring and Architecture
+
+Refactoring and major architectural changes are always valid options when they would materially improve project structure, maintainability, clarity, performance, security, or testability. Do not assume that work must be limited to small incremental changes when a broader redesign is the better long-term solution.
+
+When analysis or implementation reveals modules that would benefit from optimization or refactoring, always propose a concrete recommendation. Identify the affected modules, expected maintainability or structural benefit, scope, risks, and relevant tradeoffs. A recommendation does not by itself authorize implementation outside the user's requested scope; present it for consideration when the broader change has not already been requested.
+
+Prefer low coupling between modules and isolate the context needed for each change. Keep responsibilities and interfaces narrow, avoid introducing dependencies between unrelated modules, and preserve boundaries that allow an agent or maintainer to understand and modify one feature without loading the entire codebase.
+
+For every feature request, read the target application's `CODE.md` before inspecting or changing source code. For work spanning applications, read each affected application's `CODE.md`. Use the module and file dependency maps to identify the smallest relevant working set, then work only with files and modules related to the feature. Related files include direct and transitive dependencies that the feature affects, corresponding tests, and any documentation, configuration, examples, metadata, history, or roadmap records that repository rules require updating. Expand beyond that working set only when source evidence reveals an undocumented dependency; when this happens, update the affected application's `CODE.md` as part of the change.
+
 ## MCP Design for Small Models
 
 Tool definitions and results consume the model's context. Small models also have weaker tool-selection and argument accuracy. Expose a small, focused tool set with short, distinct names, brief descriptions, simple schemas, and few arguments. Avoid redundant tools and long instructions. Return concise, predictable results with clear errors and bounded output. Prefer identifiers and paths relative to a configured root; do not expose long absolute paths to the model.
