@@ -3,7 +3,7 @@
 ## Phase checklist
 
 - [x] Phase 7 — Make edited-scene and asset inspection targeted and complete.
-- [ ] Phase 8 — Separate edited-scene inspection from mutation services.
+- [x] Phase 8 — Separate edited-scene inspection from mutation services.
 - [ ] Phase 9 — Inspect the running scene through a read-only runtime probe.
 - [ ] Phase 10 — Capture, drive, and validate gameplay with a minimal fixed API.
 - [ ] Phase 11 — Author scenes through bounded atomic transactions.
@@ -88,6 +88,8 @@ before runtime inspection adds another potentially large data source.
 - Result and cursor sizes remain within configured limits.
 
 ## Phase 8 — Edited-scene inspection service separation
+
+Completed in 0.12.0.
 
 Phase 7 made `scene_commands.gd` the largest scene service by adding targeted
 tree traversal, structural snapshots, categorized property fingerprints, and

@@ -75,8 +75,9 @@ The dependency-free editor plugin is split by responsibility under
 - `error_envelope.gd` centralizes bounded bridge success and failure envelopes.
 - `asset_commands.gd` handles asset discovery, resource creation, and scene
   file creation or opening.
-- `scene_commands.gd` handles edited-scene inspection and UndoRedo-backed node
-  and property changes.
+- `edited_scene_inspector.gd` owns bounded edited-scene tree and property reads,
+  including targeting, snapshots, and shared-cursor continuation.
+- `scene_commands.gd` owns UndoRedo-backed node/property changes and selection.
 - `project_settings_commands.gd` and `input_map_commands.gd` handle their
   respective validated, atomic project configuration operations.
 - `project_path_guard.gd`, `scene_node_access.gd`, `property_value_codec.gd`,
@@ -685,6 +686,7 @@ Run the focused infrastructure and state-transition checks with:
 /path/to/Godot --headless --path plugin --script res://tests/phase5_infrastructure_test.gd
 /path/to/Godot --headless --path plugin --script res://tests/phase6_state_trackers_test.gd
 /path/to/Godot --headless --path plugin --script res://tests/phase7_cursor_store_test.gd
+/path/to/Godot --headless --path plugin --script res://tests/phase8_service_boundary_test.gd
 ```
 
 On the verified macOS platform, the opt-in subprocess check validates the live

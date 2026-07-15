@@ -7,6 +7,7 @@ const CommandRouter := preload("command_router.gd")
 const CursorStore := preload("cursor_store.gd")
 const DiscoveryRecord := preload("discovery_record.gd")
 const DiagnosticStore := preload("diagnostic_store.gd")
+const EditedSceneInspector := preload("edited_scene_inspector.gd")
 const EditorStateMonitor := preload("editor_state_monitor.gd")
 const ErrorEnvelope := preload("error_envelope.gd")
 const EventStore := preload("event_store.gd")
@@ -25,7 +26,7 @@ const SceneCommands := preload("scene_commands.gd")
 const SceneNodeAccess := preload("scene_node_access.gd")
 const SceneStateTracker := preload("scene_state_tracker.gd")
 
-const BRIDGE_VERSION := "0.11.0"
+const BRIDGE_VERSION := "0.12.0"
 const BRIDGE_PROTOCOL_VERSION := "1"
 const DEFAULT_PORT := 6505
 const TOKEN_PATH := "res://.godot/godot_mcp_token"
@@ -133,7 +134,10 @@ func _register_commands() -> bool:
 	)
 	var scene_commands = SceneCommands.new(
 		get_editor_interface(), get_undo_redo(), project_paths, scene_nodes,
-		property_values, _cursors,
+		property_values,
+	)
+	var edited_scene_inspector = EditedSceneInspector.new(
+		get_editor_interface(), get_undo_redo(), scene_nodes, property_values, _cursors,
 	)
 	var settings_commands = ProjectSettingsCommands.new(
 		Callable(_project_file_state, "mark_saved"), input_events,
@@ -142,7 +146,8 @@ func _register_commands() -> bool:
 		Callable(_project_file_state, "mark_saved"), input_events,
 	)
 	_command_services = [
-		asset_commands, scene_commands, settings_commands, input_commands, _reload_commands,
+		asset_commands, edited_scene_inspector, scene_commands,
+		settings_commands, input_commands, _reload_commands,
 	]
 	if not _register_handlers("plugin", {
 		"capabilities": Callable(self, "_capabilities"),

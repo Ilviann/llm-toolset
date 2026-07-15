@@ -2,6 +2,7 @@ extends SceneTree
 
 const AssetCommands := preload("../addons/godot_mcp/asset_commands.gd")
 const AtomicJsonRecord := preload("../addons/godot_mcp/atomic_json_record.gd")
+const EditedSceneInspector := preload("../addons/godot_mcp/edited_scene_inspector.gd")
 const InputEventCodec := preload("../addons/godot_mcp/input_event_codec.gd")
 const InputMapCommands := preload("../addons/godot_mcp/input_map_commands.gd")
 const ProjectIdentity := preload("../addons/godot_mcp/project_identity.gd")
@@ -18,7 +19,7 @@ func _init() -> void:
 	_test_focused_codecs_and_path_guard()
 	# Loading every command and helper script above is also a parser-level guard
 	# for their narrowed constructor and dependency surfaces.
-	assert(AssetCommands != null and SceneCommands != null)
+	assert(AssetCommands != null and EditedSceneInspector != null and SceneCommands != null)
 	assert(ProjectSettingsCommands != null and InputMapCommands != null)
 	assert(SceneNodeAccess != null)
 	print("phase5_infrastructure_test: PASS")

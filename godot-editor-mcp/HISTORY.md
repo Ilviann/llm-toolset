@@ -3,6 +3,17 @@
 This file records released changes. Planned work is tracked separately in
 [`ROADMAP.md`](ROADMAP.md).
 
+## 0.12.0 — 2026-07-15
+
+- Split edited-scene tree and property reads into a dedicated inspector while
+  retaining the existing tool schemas, bridge commands, wire fields, defaults,
+  bounds, ordering, snapshot identities, and cursor behavior.
+- Reduced `scene_commands.gd` to UndoRedo-backed node/property mutations and
+  selection, with inspection traversal, fingerprints, and cursor logic removed.
+- Added focused service-boundary coverage, parser/load guards, and live bridge
+  regression coverage for independently registered inspection and mutation
+  handlers under the duplicate-safe router.
+
 ## 0.11.0 — 2026-07-15
 
 - Added targeted edited-scene reads with root, depth, exact class, property,
