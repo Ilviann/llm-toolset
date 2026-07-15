@@ -9,11 +9,15 @@ var _server := TCPServer.new()
 var _clients: Array[Dictionary] = []
 var _token := ""
 var _handler: Callable
+var _pending_resolver: Callable
 
 
-func start(port: int, token: String, handler: Callable) -> int:
+func start(
+	port: int, token: String, handler: Callable, pending_resolver := Callable(),
+) -> int:
 	_token = token
 	_handler = handler
+	_pending_resolver = pending_resolver
 	return _server.listen(port, HOST)
 
 
@@ -35,6 +39,14 @@ func poll() -> void:
 		peer.poll()
 		if peer.get_status() != StreamPeerTCP.STATUS_CONNECTED:
 			_clients.remove_at(index)
+			continue
+		if client.has("pending_response_id"):
+			var pending_response: Variant = null
+			if _pending_resolver.is_valid():
+				pending_response = _pending_resolver.call(client.pending_response_id)
+			if pending_response is Dictionary:
+				_send(peer, pending_response)
+				_clients.remove_at(index)
 			continue
 		var available := peer.get_available_bytes()
 		if available <= 0:
@@ -58,7 +70,12 @@ func poll() -> void:
 			client.buffer = buffer
 			continue
 		var line := buffer.slice(0, newline).get_string_from_utf8()
-		_send(peer, _handle_line(line))
+		var response := _handle_line(line)
+		if response.has("__godot_mcp_deferred_response"):
+			client["pending_response_id"] = response.__godot_mcp_deferred_response
+			client.erase("buffer")
+			continue
+		_send(peer, response)
 		_clients.remove_at(index)
 
 

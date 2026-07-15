@@ -20,6 +20,8 @@ const SAVE_FAILED := "save_failed"
 const MALFORMED_OPERATION := "malformed_operation"
 const STALE_OPERATION := "stale_operation"
 const VERSION_MISMATCH := "version_mismatch"
+const RUNTIME_PROBE_UNAVAILABLE := "runtime_probe_unavailable"
+const AMBIGUOUS_RUNTIME_SESSION := "ambiguous_runtime_session"
 
 
 static func success(result: Variant) -> Dictionary:

@@ -17,8 +17,11 @@ from godot_editor_mcp.discovery import read_discovery_record
 from godot_editor_mcp.errors import (
     EditorBusyError,
     InvalidArgumentError,
+    NoActiveRunError,
+    RuntimeProbeUnavailableError,
     SaveFailedError,
     StaleCursorError,
+    StaleRuntimeIdError,
 )
 from godot_editor_mcp.tool_dispatch import ToolDispatcher
 from godot_editor_mcp.tool_catalog import bridge_contract_mismatches
@@ -47,6 +50,23 @@ class ReloadSubprocessIntegrationTests(unittest.TestCase):
             self.project / "addons",
         )
         (self.project / "scenes").mkdir()
+        (self.project / "scenes" / "runtime.gd").write_text(
+            "extends Node2D\n\n"
+            "func _ready():\n"
+            "    var spawned = Node2D.new()\n"
+            '    spawned.name = "SpawnedAtRuntime"\n'
+            "    spawned.process_priority = 73\n"
+            '    spawned.add_to_group("runtime_enemies")\n'
+            "    add_child(spawned)\n",
+            encoding="utf-8",
+        )
+        (self.project / "scenes" / "runtime.tscn").write_text(
+            '[gd_scene load_steps=2 format=3]\n\n'
+            '[ext_resource path="res://scenes/runtime.gd" type="Script" id="1"]\n\n'
+            '[node name="RuntimeMain" type="Node2D"]\n'
+            'script = ExtResource("1")\n',
+            encoding="utf-8",
+        )
         assets = self.project / "assets"
         assets.mkdir()
         for name in ("one", "two", "three"):
@@ -76,6 +96,8 @@ class ReloadSubprocessIntegrationTests(unittest.TestCase):
                 "--editor",
                 "--path",
                 str(self.project),
+                "--log-file",
+                str(self.project / "godot.log"),
             ],
             stdin=subprocess.DEVNULL,
             stdout=self.log,
@@ -119,6 +141,71 @@ class ReloadSubprocessIntegrationTests(unittest.TestCase):
         self.assertEqual(created["path"], "res://scenes/main.tscn")
         bridge.call("open_scene", {"path": "scenes/main.tscn"})
         self._wait_until(lambda: bridge.call("state", {}).get("scene") == "res://scenes/main.tscn")
+
+        bridge.call("open_scene", {"path": "scenes/runtime.tscn"})
+        self._wait_until(
+            lambda: bridge.call("state", {}).get("scene") == "res://scenes/runtime.tscn"
+        )
+        with self.assertRaises(NoActiveRunError):
+            bridge.call("tree", {"tree_scope": "runtime"})
+        first_run = bridge.call("control", {"action": "run"})
+        self._wait_until(lambda: bridge.call("state", {}).get("playing") is True)
+        runtime_tree = self._runtime_call(
+            bridge, "tree", {"tree_scope": "runtime", "max_depth": 3, "limit": 1}
+        )
+        self.assertEqual(runtime_tree["scope"], "runtime")
+        self.assertEqual(runtime_tree["run_id"], first_run["run_id"])
+        self.assertTrue(runtime_tree["continuation_available"])
+        runtime_cursor = runtime_tree["cursor"]
+        runtime_next = self._runtime_call(
+            bridge,
+            "tree",
+            {
+                "tree_scope": "runtime", "max_depth": 3, "limit": 1,
+                "cursor": runtime_cursor,
+            },
+        )
+        spawned = runtime_next["nodes"][0]
+        self.assertEqual(spawned["path"], "SpawnedAtRuntime")
+        self.assertEqual(spawned["groups"], ["runtime_enemies"])
+        self.assertEqual(len(spawned["runtime_id"]), 64)
+        runtime_info = self._runtime_call(
+            bridge,
+            "inspect",
+            {
+                "tree_scope": "runtime", "path": "SpawnedAtRuntime",
+                "runtime_id": spawned["runtime_id"], "property": "process_priority",
+            },
+        )
+        self.assertEqual(runtime_info["scope"], "runtime")
+        self.assertEqual(runtime_info["properties"][0]["value"], 73)
+        bridge.call("control", {"action": "stop", "run_id": first_run["run_id"]})
+        self._wait_until(lambda: bridge.call("state", {}).get("playing") is False)
+        second_run = bridge.call("control", {"action": "run"})
+        self._wait_until(lambda: bridge.call("state", {}).get("playing") is True)
+        self._runtime_call(bridge, "tree", {"tree_scope": "runtime", "limit": 1})
+        with self.assertRaises(StaleRuntimeIdError):
+            bridge.call(
+                "inspect",
+                {
+                    "tree_scope": "runtime", "path": "SpawnedAtRuntime",
+                    "runtime_id": spawned["runtime_id"],
+                },
+            )
+        with self.assertRaises(StaleCursorError):
+            bridge.call(
+                "tree",
+                {
+                    "tree_scope": "runtime", "max_depth": 3, "limit": 1,
+                    "cursor": runtime_cursor,
+                },
+            )
+        bridge.call("control", {"action": "stop", "run_id": second_run["run_id"]})
+        self._wait_until(lambda: bridge.call("state", {}).get("playing") is False)
+        bridge.call("open_scene", {"path": "scenes/main.tscn"})
+        self._wait_until(
+            lambda: bridge.call("state", {}).get("scene") == "res://scenes/main.tscn"
+        )
 
         asset_page = bridge.call(
             "assets", {"folder": "assets", "type": "script", "limit": 1}
@@ -298,6 +385,9 @@ class ReloadSubprocessIntegrationTests(unittest.TestCase):
             lambda: bridge.call("state", {}).get("scene")
             == "res://scenes/main.tscn"
         )
+        reloaded_capabilities = bridge.call("capabilities", {})
+        self.assertTrue(reloaded_capabilities["features"]["runtime_inspection"])
+        self.assertTrue(reloaded_capabilities["runtime_probe"]["available"])
         tree = bridge.call("tree", {})
         self.assertTrue(any(node["path"] == "UnsavedChild" for node in tree["nodes"]))
 
@@ -331,6 +421,29 @@ class ReloadSubprocessIntegrationTests(unittest.TestCase):
         self.log.seek(0)
         output = self.log.read()[-4000:]
         self.fail(f"condition timed out; last_error={last_error!r}\n{output}")
+
+    def _runtime_call(
+        self, bridge: GodotBridge, command: str, arguments: dict
+    ) -> dict:
+        deadline = time.monotonic() + 5
+        last_error: Exception | None = None
+        while time.monotonic() < deadline:
+            try:
+                result = bridge.call(command, arguments)
+                assert isinstance(result, dict)
+                return result
+            except RuntimeProbeUnavailableError as exc:
+                last_error = exc
+                time.sleep(0.05)
+        self.log.flush()
+        self.log.seek(0)
+        output = self.log.read()[-4000:]
+        capabilities = bridge.call("capabilities", {})
+        self.fail(
+            "runtime probe handshake timed out; "
+            f"last_error={last_error!r}; status={capabilities.get('runtime_probe')}\n"
+            f"{output}"
+        )
 
 
 if __name__ == "__main__":

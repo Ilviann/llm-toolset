@@ -29,6 +29,10 @@ CURSOR_PROPERTY = {
     "type": "string", "minLength": 48, "maxLength": 48,
     "description": "Opaque continuation cursor",
 }
+TREE_SCOPE_PROPERTY = {
+    "type": "string", "enum": ["edited", "runtime"], "default": "edited",
+    "description": "Inspect the editor scene or the active debug run",
+}
 
 Mode = Literal["tiny", "small", "large"]
 MODES: tuple[Mode, ...] = ("tiny", "small", "large")
@@ -238,12 +242,13 @@ _TOOL_DEFINITIONS = [
     },
     {
         "name": "scene_tree",
-        "description": "Read a targeted, paginated slice of the edited scene tree.",
+        "description": "Read a targeted, paginated edited or runtime scene tree.",
         "minimum_mode": "tiny", "mode_order": 6, "target": "bridge",
         "bridge_command": "tree",
         "inputSchema": {
             "type": "object",
             "properties": {
+                "tree_scope": TREE_SCOPE_PROPERTY,
                 "root": {**PATH_PROPERTY["path"], "default": "."},
                 "max_depth": {
                     "type": "integer", "minimum": 0, "maximum": 64, "default": 3,
@@ -290,13 +295,18 @@ _TOOL_DEFINITIONS = [
     },
     {
         "name": "node_info",
-        "description": "Read filtered, categorized editable properties of one scene node.",
+        "description": "Read filtered properties of one edited or runtime scene node.",
         "minimum_mode": "tiny", "mode_order": 9, "target": "bridge",
         "bridge_command": "inspect",
         "inputSchema": {
             "type": "object",
             "properties": {
+                "tree_scope": TREE_SCOPE_PROPERTY,
                 **PATH_PROPERTY,
+                "runtime_id": {
+                    "type": "string", "minLength": 64, "maxLength": 64,
+                    "description": "Optional runtime identity returned by scene_tree",
+                },
                 "property": {"type": "string", "description": "Exact property-name filter"},
                 "category": {"type": "string", "description": "Exact Godot category filter"},
                 "limit": {"type": "integer", "minimum": 1, "maximum": 64, "default": 24},
@@ -498,12 +508,16 @@ EXPECTED_BRIDGE_LIMITS = {
     "input_events": 32,
     "diagnostics": 100,
     "diagnostic_records": 256,
+    "runtime_pending_requests": 16,
+    "runtime_request_timeout_ms": 2000,
+    "runtime_groups": 8,
 }
 EXPECTED_EDITOR_ERROR_CODES = (
     "unauthorized", "invalid_argument", "protected_path", "not_found",
     "editor_busy", "import_pending", "no_active_run", "stale_runtime_id",
     "timeout", "unsupported_capability", "stale_cursor", "project_mismatch",
     "save_failed", "malformed_operation", "stale_operation", "version_mismatch",
+    "runtime_probe_unavailable", "ambiguous_runtime_session",
 )
 
 

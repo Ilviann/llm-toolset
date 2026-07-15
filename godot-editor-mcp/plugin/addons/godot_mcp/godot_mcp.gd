@@ -18,18 +18,24 @@ const Limits := preload("command_limits.gd")
 const OperationRegistry := preload("operation_registry.gd")
 const ProjectPathGuard := preload("project_path_guard.gd")
 const ProjectFileStateTracker := preload("project_file_state_tracker.gd")
+const ProjectIdentity := preload("project_identity.gd")
 const ProjectSettingsCommands := preload("project_settings_commands.gd")
 const PropertyValueCodec := preload("property_value_codec.gd")
 const ReloadCommands := preload("reload_commands.gd")
 const RunStateTracker := preload("run_state_tracker.gd")
+const RuntimeDebuggerGateway := preload("runtime_debugger_gateway.gd")
+const RuntimeSceneInspector := preload("runtime_scene_inspector.gd")
 const SceneCommands := preload("scene_commands.gd")
 const SceneNodeAccess := preload("scene_node_access.gd")
 const SceneStateTracker := preload("scene_state_tracker.gd")
 
-const BRIDGE_VERSION := "0.12.0"
+const BRIDGE_VERSION := "0.13.0"
 const BRIDGE_PROTOCOL_VERSION := "1"
 const DEFAULT_PORT := 6505
 const TOKEN_PATH := "res://.godot/godot_mcp_token"
+const RUNTIME_PROBE_AUTOLOAD := "GodotMCPRuntimeProbe"
+const RUNTIME_PROBE_PATH := "res://addons/godot_mcp/runtime_probe.gd"
+const RUNTIME_PROBE_VERSION := "1"
 
 var _bridge_server
 var _command_services: Array = []
@@ -42,6 +48,10 @@ var _operations
 var _project_file_state
 var _router
 var _reload_commands
+var _runtime_debugger
+var _runtime_probe_available := false
+var _runtime_probe_owned := false
+var _runtime_probe_uid := ""
 var _run_state
 var _scene_state
 var _state_monitor
@@ -67,6 +77,7 @@ func _enter_tree() -> void:
 	_run_state = RunStateTracker.new(
 		get_editor_interface(), _events, _operations, _diagnostics,
 	)
+	_install_runtime_plane()
 	_import_state = ImportStateTracker.new(
 		get_editor_interface(), _events, _operations, _diagnostics,
 	)
@@ -86,7 +97,10 @@ func _enter_tree() -> void:
 		return
 
 	_bridge_server = BridgeServer.new()
-	var error: int = _bridge_server.start(_port, token, Callable(_router, "dispatch"))
+	var error: int = _bridge_server.start(
+		_port, token, Callable(_router, "dispatch"),
+		Callable(_runtime_debugger, "take_response"),
+	)
 	if error != OK:
 		push_error(
 			"Godot MCP bridge could not listen on 127.0.0.1:%d (error %d); " % [_port, error]
@@ -138,6 +152,7 @@ func _register_commands() -> bool:
 	)
 	var edited_scene_inspector = EditedSceneInspector.new(
 		get_editor_interface(), get_undo_redo(), scene_nodes, property_values, _cursors,
+		RuntimeSceneInspector.new(_runtime_debugger, _cursors),
 	)
 	var settings_commands = ProjectSettingsCommands.new(
 		Callable(_project_file_state, "mark_saved"), input_events,
@@ -171,13 +186,17 @@ func _register_handlers(owner: String, handlers: Dictionary) -> bool:
 
 
 func _capabilities(_arguments: Dictionary) -> Dictionary:
+	var runtime_probe_status: Dictionary = _runtime_debugger.status()
+	runtime_probe_status["autoload"] = RUNTIME_PROBE_AUTOLOAD
+	runtime_probe_status["available"] = _runtime_probe_available
+	runtime_probe_status["inert_without_debugger"] = true
 	return ErrorEnvelope.success({
 		"bridge_version": BRIDGE_VERSION,
 		"bridge_protocol_version": BRIDGE_PROTOCOL_VERSION,
 		"godot_version": str(Engine.get_version_info().get("string", "Godot 4")),
 		"commands": _router.commands(),
 		"features": {
-			"runtime_inspection": false,
+			"runtime_inspection": _runtime_probe_available,
 			"game_view_capture": false,
 			"input_injection": false,
 			"diagnostics": true,
@@ -211,7 +230,10 @@ func _capabilities(_arguments: Dictionary) -> Dictionary:
 			ErrorEnvelope.MALFORMED_OPERATION,
 			ErrorEnvelope.STALE_OPERATION,
 			ErrorEnvelope.VERSION_MISMATCH,
+			ErrorEnvelope.RUNTIME_PROBE_UNAVAILABLE,
+			ErrorEnvelope.AMBIGUOUS_RUNTIME_SESSION,
 		],
+		"runtime_probe": runtime_probe_status,
 		"project_settings": {
 			"value_types": [
 				"null", "bool", "int", "float", "string", "string_name",
@@ -240,6 +262,9 @@ func _capabilities(_arguments: Dictionary) -> Dictionary:
 			"input_events": Limits.MAX_INPUT_EVENTS,
 			"diagnostics": Limits.MAX_DIAGNOSTICS,
 			"diagnostic_records": Limits.MAX_DIAGNOSTIC_RECORDS,
+			"runtime_pending_requests": Limits.MAX_RUNTIME_PENDING_REQUESTS,
+			"runtime_request_timeout_ms": Limits.RUNTIME_REQUEST_TIMEOUT_MSEC,
+			"runtime_groups": Limits.MAX_RUNTIME_GROUPS,
 		},
 	})
 
@@ -259,6 +284,10 @@ func _shutdown_services() -> void:
 		_state_monitor.stop()
 	if _diagnostics != null:
 		OS.remove_logger(_diagnostics)
+	if _runtime_debugger != null:
+		_runtime_debugger.stop()
+		remove_debugger_plugin(_runtime_debugger)
+	_remove_runtime_probe()
 	_bridge_server = null
 	_command_services.clear()
 	_discovery = null
@@ -272,9 +301,59 @@ func _shutdown_services() -> void:
 	_project_file_state = null
 	_router = null
 	_reload_commands = null
+	_runtime_debugger = null
 	_run_state = null
 	_scene_state = null
 	_state_monitor = null
+
+
+func _install_runtime_plane() -> void:
+	_runtime_probe_uid = ResourceUID.path_to_uid(RUNTIME_PROBE_PATH)
+	_runtime_debugger = RuntimeDebuggerGateway.new(
+		Callable(_run_state, "current_run_id"), ProjectIdentity.current_hash(),
+		RUNTIME_PROBE_VERSION,
+	)
+	add_debugger_plugin(_runtime_debugger)
+	var setting := "autoload/" + RUNTIME_PROBE_AUTOLOAD
+	if not ProjectSettings.has_setting(setting):
+		add_autoload_singleton(RUNTIME_PROBE_AUTOLOAD, RUNTIME_PROBE_PATH)
+		var save_error := ProjectSettings.save()
+		if save_error != OK:
+			push_error("Godot MCP could not persist its runtime probe autoload")
+			ProjectSettings.set_setting(setting, null)
+			_runtime_probe_available = false
+			return
+		_runtime_probe_owned = true
+		_runtime_probe_available = true
+		return
+	if _runtime_probe_matches(ProjectSettings.get_setting(setting, "")):
+		_runtime_probe_owned = true
+		_runtime_probe_available = true
+		return
+	_runtime_probe_available = false
+	push_warning(
+		"Godot MCP runtime inspection is disabled because autoload %s already exists"
+		% RUNTIME_PROBE_AUTOLOAD
+	)
+
+
+func _remove_runtime_probe() -> void:
+	if _runtime_probe_owned:
+		var setting := "autoload/" + RUNTIME_PROBE_AUTOLOAD
+		if (
+			ProjectSettings.has_setting(setting)
+			and _runtime_probe_matches(ProjectSettings.get_setting(setting, ""))
+		):
+			# Avoid resolving a uid:// value while Godot's UID cache is shutting down.
+			ProjectSettings.set_setting(setting, null)
+			ProjectSettings.save()
+	_runtime_probe_owned = false
+	_runtime_probe_available = false
+
+
+func _runtime_probe_matches(value: Variant) -> bool:
+	var path := str(value).trim_prefix("*")
+	return path == RUNTIME_PROBE_PATH or path == _runtime_probe_uid
 
 
 func _on_scene_saved(_path: String) -> void:

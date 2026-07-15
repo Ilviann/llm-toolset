@@ -10,7 +10,7 @@ Dependencies below include:
 - **runtime dependencies**: Python standard-library facilities or Godot editor APIs used by a file;
 - **contract dependencies**: cross-process names and data shapes that must remain synchronized even though the files cannot import one another.
 
-The implementation contains **42 production source files** (15 Python and 27 GDScript), totaling about **5,668 lines**, and **17 test source files** totaling about **2,124 lines**. These line counts include comments and blank lines and are only structural indicators, not cyclomatic-complexity measurements.
+The implementation contains **44 production source files** (14 Python and 30 GDScript), totaling about **6,795 lines**, and **18 test source files** totaling about **2,369 lines**. These line counts include comments and blank lines and are only structural indicators, not cyclomatic-complexity measurements.
 
 ## Implemented modules
 
@@ -66,11 +66,11 @@ The word *module* in this section means a cohesive architectural subsystem. The 
 
 ### M7. Godot plugin lifecycle, network bridge, discovery, and routing
 
-**Responsibility:** Compose all editor-side services, register their direct callable maps with atomic duplicate-ownership checks, manage plugin startup/shutdown and polling, create/load the auth token, listen only on localhost, validate bounded requests, dispatch command names, publish a project-specific heartbeat, and report capabilities.
+**Responsibility:** Compose all editor-side services, register their direct callable maps with atomic duplicate-ownership checks, manage plugin/debugger-probe/autoload startup and shutdown, create/load the auth token, listen only on localhost, validate bounded requests, dispatch immediate or debugger-deferred responses, publish a project-specific heartbeat, and report capabilities.
 
 **Files:** `plugin/addons/godot_mcp/godot_mcp.gd`, `bridge_server.gd`, `command_router.gd`, `discovery_record.gd`.
 
-**Dependencies on other modules:** M8 for envelopes, limits, and operation/event primitives; M9 for state and diagnostics; M10 for asset, edited-scene inspection, and scene mutation services; M11 for project settings, input map, and reload commands. Contract-coupled to M3 and M5 through commands, transport, authentication, discovery records, limits, versions, and response envelopes.
+**Dependencies on other modules:** M8 for envelopes, limits, identities, cursors, and operation/event primitives; M9 for state and diagnostics; M10 for asset, scope-aware inspection, and scene mutation services; M11 for project settings, input map, and reload commands; M12 for the debugger gateway and runtime probe. Contract-coupled to M3 and M5 through commands, transport, authentication, discovery records, limits, versions, and response envelopes.
 
 ### M8. Godot shared command infrastructure and bounded records
 
@@ -78,7 +78,7 @@ The word *module* in this section means a cohesive architectural subsystem. The 
 
 **Files:** `project_path_guard.gd`, `scene_node_access.gd`, `property_value_codec.gd`, `input_event_codec.gd`, `cursor_store.gd`, `project_identity.gd`, `atomic_json_record.gd`, `command_limits.gd`, `error_envelope.gd`, `operation_registry.gd`, `event_store.gd`.
 
-**Dependencies on other modules:** `scene_node_access.gd` receives only an editor interface; the remaining helpers have no higher-level service dependency. This is the low-level Godot module on which M7, M9, M10, and M11 depend. It is contract-coupled to M3/M5/M6 through project identity normalization, limits, error codes, operation IDs, and response shapes.
+**Dependencies on other modules:** `scene_node_access.gd` receives only an editor interface; the remaining helpers have no higher-level service dependency. This is the low-level Godot module on which M7 and M9-M12 depend. It is contract-coupled to M3/M5/M6 through project identity normalization, limits, error codes, operation IDs, and response shapes.
 
 ### M9. Godot editor state and diagnostics
 
@@ -90,11 +90,11 @@ The word *module* in this section means a cohesive architectural subsystem. The 
 
 ### M10. Godot asset and edited-scene services
 
-**Responsibility:** List targeted paginated assets, request scans, create resources and scenes, open scenes, inspect targeted paginated edited-scene trees and categorized node properties through a read-only inspector, and keep instantiate/add/set/select mutations isolated behind editor undo history.
+**Responsibility:** List targeted paginated assets, request scans, create resources and scenes, open scenes, route explicit edited/runtime inspection scope through the existing read-only handlers, inspect targeted edited-scene pages locally, and keep instantiate/add/set/select mutations isolated behind editor undo history.
 
 **Files:** `asset_commands.gd`, `edited_scene_inspector.gd`, `scene_commands.gd`.
 
-**Dependencies on other modules:** M8 for narrow path/node/value/cursor collaborators, limits, error envelopes, and operation IDs; M9 through injected import-tracking and filesystem-generation callbacks. M7 registers these services. Contract-coupled to M3/M4/M6 through command and result shapes and the copy-then-scan workflow.
+**Dependencies on other modules:** M8 for narrow path/node/value/cursor collaborators, limits, error envelopes, and operation IDs; M9 through injected import-tracking and filesystem-generation callbacks; M12 through the injected runtime inspector. M7 registers these services. Contract-coupled to M3/M4/M6 through command and result shapes and the copy-then-scan workflow.
 
 ### M11. Godot project settings, input map, and reload commands
 
@@ -104,13 +104,21 @@ The word *module* in this section means a cohesive architectural subsystem. The 
 
 **Dependencies on other modules:** M8 for the input-event codec, shared project identity/records, limits, envelopes, and operation IDs; M9 only through an injected project-file-write callback. M7 registers and polls the services. Contract-coupled to M3 and M6 through tool/command arguments and reload identity/status fields.
 
-### M12. Automated verification
+### M12. Godot read-only runtime inspection
+
+**Responsibility:** Register an editor debugger gateway, complete a project/run/session/version/command/limit/nonce handshake with a debugger-only runtime autoload, send bounded read requests without a runtime network port, traverse and inspect the active scene without mutation or supplied-code evaluation, and translate results into shared cursor semantics and deferred bridge responses.
+
+**Files:** `runtime_debugger_gateway.gd`, `runtime_scene_inspector.gd`, `runtime_probe.gd`.
+
+**Dependencies on other modules:** M8 for errors, limits, project identity, value encoding, and cursor records; M9 through an injected current-run identity; M7 for debugger-plugin/autoload composition and deferred bridge completion. M10 consumes the runtime inspector through injection. Contract-coupled to M3/M5 through the unchanged `tree` and `inspect` bridge commands and their extended schemas/results.
+
+### M13. Automated verification
 
 **Responsibility:** Verify Python units and MCP integration plus focused headless-Godot behavior, including registry and release contracts, live capabilities, duplicate-safe routing, bridge security/bounds, discovery, filesystem confinement, modes and routing, typed payloads and waiting, launcher portability, diagnostics, focused state transitions, and reload persistence/reconnect.
 
 **Files:** all files under `godot-editor-mcp/tests/` ending in `.py` and `godot-editor-mcp/plugin/tests/` ending in `.gd`.
 
-**Dependencies on other modules:** Directly tests M2-M6 and selected pieces of M8-M11. The reload integration test additionally launches Godot with the plugin from M7 and covers Phase 7 pagination/filter/staleness through the Phase 8 service boundary plus reload across the Python/GDScript boundary.
+**Dependencies on other modules:** Directly tests M2-M6 and selected pieces of M8-M12. The subprocess integration test additionally launches Godot with the plugin from M7, covers Phase 7 pagination/filter/staleness through the Phase 8 service boundary, validates the Phase 9 editor/game debugger data plane and replacement-run staleness, and completes reload across the Python/GDScript boundary.
 
 ## Complexity and coupling assessment
 
@@ -118,18 +126,20 @@ The word *module* in this section means a cohesive architectural subsystem. The 
 
 | Area | Indicator | Assessment |
 | --- | ---: | --- |
-| `tool_catalog.py` | 532 lines | Large but mostly declarative tool specifications and JSON Schemas. It centralizes routing, modes, paths, waits, inspection/cursor limits, and live-contract expectations; control-flow complexity remains low while cross-language policy is intentionally concentrated. |
-| `edited_scene_inspector.gd` | 278 lines | Owns targeted tree traversal, structural snapshot hashing, categorized property-list fingerprinting, pagination, and result shaping without exposing mutation handlers or creating undo actions. Cursor state remains delegated to M8. |
+| `tool_catalog.py` | 546 lines | Large but mostly declarative tool specifications and JSON Schemas. It centralizes routing, modes, paths, waits, inspection/cursor limits, and live-contract expectations; control-flow complexity remains low while cross-language policy is intentionally concentrated. |
+| `runtime_probe.gd` | 483 lines | Bundled debugger-only data plane: validates editor identities, traverses the live scene, hashes runtime object identities and tree generations, reads selected properties, and bounds response data. It is intentionally read-only but is now the largest single Godot service. |
+| `runtime_debugger_gateway.gd` | 372 lines | Owns editor debugger-session discovery, handshake validation, request identities, bounded pending/deferred responses, timeouts, and stopped-session cleanup. Temporal and cross-process branching make it the main Phase 9 risk surface. |
+| `edited_scene_inspector.gd` | 306 lines | Routes explicit edited/runtime scope while retaining edited traversal, structural snapshots, categorized property fingerprints, and pagination without mutation. Runtime work is delegated to M12. |
 | `scene_commands.gd` | 154 lines | Focused UndoRedo-backed add, instantiate, and set-property mutations plus editor selection. It no longer owns inspection traversal, fingerprints, or cursor state. |
 | `project_settings_commands.gd` | 318 lines | Recursive type conversion plus validation, compare-and-swap behavior, transactional rollback, and reload classification. High branching and data-shape complexity. |
 | `reload_commands.gd` | 305 lines | Stateful restart/recovery protocol with persisted records, time validation, dirty-scene safeguards, deferred cleanup, and identity checks. Shared record/identity primitives now remove its filesystem duplication. |
 | `waiting.py` / `state_payloads.py` | 327 / 181 lines | Wait algorithms now operate on validated views, enforce the lockstep plugin version, and share deadline, cancellation, polling, and diagnostic-settling mechanics. Reload reconnect remains the main temporal branch. |
 | `asset_commands.gd` | 311 lines | Combines bounded paginated filesystem traversal, Godot resource introspection, creation, scanning, and operation tracking. Its dependencies are explicit narrow collaborators. |
-| `cursor_store.gd` | 94 lines | Owns bounded opaque IDs, expiry/eviction, normalized-query fingerprints, snapshot validation, and stale-cursor classification for three read surfaces. |
-| `godot_mcp.gd` | Composition root, 24 direct source preloads | Intentional highest fan-out. It constructs the shared cursor service, separate edited-scene inspector and mutation service, and four state trackers explicitly, then routes narrow callbacks to command services. |
-| `import_state_tracker.gd` / `run_state_tracker.gd` | 146 / 119 lines | The largest extracted temporal owners. Import completion and run lifecycle remain stateful but no longer share mutable fields with scene or project-file tracking. |
+| `cursor_store.gd` | 105 lines | Owns bounded opaque IDs, expiry/eviction, normalized-query fingerprints, preflight lookup for remote snapshots, snapshot validation, and stale-cursor classification across edited, asset, and runtime reads. |
+| `godot_mcp.gd` | Composition root, 27 direct source preloads | Intentional highest fan-out. It constructs shared services, four state trackers, the editor debugger gateway, scope-aware inspectors, probe autoload lifecycle, and deferred bridge resolver explicitly. |
+| `import_state_tracker.gd` / `run_state_tracker.gd` | 150 / 128 lines | The largest extracted editor-state temporal owners. Run state additionally supplies the active identity to the debugger gateway and accepts integral JSON run IDs without weakening stop scoping. |
 | `editor_state_monitor.gd` | 72 lines | Thin stable facade that aggregates focused tracker dictionaries and routes save/run/stop without owning temporal transitions. |
-| `errors.py` / `diagnostic_store.gd` | 244 / 224 lines | Broad shared contracts. They are not algorithmically dominant, but many modules rely on their stable bounded shapes and identifiers. |
+| `errors.py` / `diagnostic_store.gd` | 259 / 224 lines | Broad shared contracts. They are not algorithmically dominant, but many modules rely on their stable bounded shapes and identifiers. |
 | `tool_dispatch.py` | 208 lines, 5 direct internal imports | Main Python orchestration hub. It resolves registry policy into focused local or bridge execution, preflight validation, waits, capability enrichment, and structured domain errors. |
 | `input_event_codec.gd` / `input_map_commands.gd` | 133 / 135 lines | Input-event conversion is isolated from transactional Input Map mutation, reducing each file's responsibility and dependency surface. |
 
@@ -137,7 +147,7 @@ The word *module* in this section means a cohesive architectural subsystem. The 
 
 1. **The bridge protocol is intentionally duplicated across languages and guarded by tests.** `tool_catalog.py` owns Python policy, while `godot_mcp.gd`, `command_router.gd`, and command-service handler maps own editor registration. Live capability and invariant tests fail on command, protocol, limit, error-code, wait-field, or version drift.
 2. **Errors are a mirrored contract.** `errors.py` and `error_envelope.gd` duplicate stable error-code strings and bounded detail behavior. Unknown plugin codes degrade to generic `BridgeError`, but omitted or mismatched known codes weaken typed handling.
-3. **Versions and capabilities remain duplicated but are release-checked.** `godot_editor_mcp/__init__.py`, `godot_mcp.gd`, package/plugin metadata, capability responses, and reload records all carry version information. The current source versions are `0.12.0`; Python and plugin releases are deployed together and exact matches are required.
+3. **Versions and capabilities remain duplicated but are release-checked.** `godot_editor_mcp/__init__.py`, `godot_mcp.gd`, package/plugin metadata, capability responses, and reload records all carry version information. The current source versions are `0.13.0`; Python and plugin releases are deployed together and exact matches are required. The runtime probe has a separate protocol version (`1`) checked during its handshake.
 4. **Limits are mirrored with explicit regression checks.** Python byte limits and schemas must match `command_limits.gd` and live capabilities. Changing only one side fails the contract suite before it can cause rejected requests, oversized responses, or misleading metadata.
 5. **Discovery and reload records are cross-language persistent schemas.** `discovery.py` must match `discovery_record.gd`. `waiting.py` must match `reload_commands.gd`. Project-path normalization, hashes, timestamps, record versions, operation IDs, and bridge versions are all compatibility-sensitive.
 6. **Temporal state is isolated behind one aggregation contract.** Scene, run, import, and project-file trackers own disjoint mutable fields. `editor_state_monitor.gd` merges their concise results, so cross-language wire changes remain centralized without making the facade a state hub.
@@ -145,6 +155,8 @@ The word *module* in this section means a cohesive architectural subsystem. The 
 8. **Dependency injection contains Python test coupling.** `MCPServer`, `ToolDispatcher`, `OperationWaiter`, and `EditorLauncher` accept small structural interfaces, so tests use fakes without extra dependencies. This lowers concrete coupling even though orchestration fan-out remains high.
 9. **No third-party runtime dependency is present in the source.** Python uses only the standard library and GDScript uses Godot APIs. This keeps deployment coupling low and supports offline operation.
 10. **Pagination is deliberately server-stateful and bounded.** `cursor_store.gd` keeps at most 128 opaque 48-character IDs for two minutes. Each record binds a normalized query fingerprint, snapshot ID, and next offset; asset, tree, and property services own their distinct snapshot construction while sharing validation and error semantics.
+11. **Runtime inspection adds an asynchronous debugger boundary without adding a game-side socket.** The localhost editor bridge retains a client only when a runtime handler returns the private deferred marker. The gateway accepts one active debugger session, bounds requests and time, and validates every response against project, run, session, probe version, and request identity before the bridge can release it.
+12. **The runtime autoload is guarded and debugger-only.** `godot_mcp.gd` persists only its reserved matching autoload, refuses conflicts, and removes only the path it owns. `runtime_probe.gd` registers and processes only when `EngineDebugger` is active, exposes only `tree`/`inspect`, and contains no networking, mutation, method execution, expression, or supplied-script evaluation path.
 
 ### Overall assessment
 
@@ -164,7 +176,7 @@ The codebase is moderately sized and intentionally split by boundary: MCP presen
 
 #### `godot-editor-mcp/godot_editor_mcp/__init__.py`
 
-**Responsibility:** Define the package identity and authoritative Python package version (`0.12.0`).
+**Responsibility:** Define the package identity and authoritative Python package version (`0.13.0`).
 
 **Internal source dependencies:** None.
 
@@ -278,19 +290,19 @@ The codebase is moderately sized and intentionally split by boundary: MCP presen
 
 #### `godot-editor-mcp/plugin/addons/godot_mcp/godot_mcp.gd`
 
-**Responsibility:** Main `EditorPlugin` composition root: create shared services, register every command, manage token/port/listener/discovery lifecycle, poll asynchronous services, publish capabilities, and synchronize scene-save notifications.
+**Responsibility:** Main `EditorPlugin` composition root: create shared services, register every command, manage token/port/listener/discovery plus debugger gateway and guarded probe-autoload lifecycle, poll asynchronous services, publish capabilities, and synchronize scene-save notifications.
 
-**Internal source dependencies:** `asset_commands.gd`, `bridge_server.gd`, `command_router.gd`, `cursor_store.gd`, `discovery_record.gd`, `diagnostic_store.gd`, `edited_scene_inspector.gd`, `editor_state_monitor.gd`, `error_envelope.gd`, `event_store.gd`, `import_state_tracker.gd`, `input_event_codec.gd`, `input_map_commands.gd`, `command_limits.gd`, `operation_registry.gd`, `project_file_state_tracker.gd`, `project_path_guard.gd`, `project_settings_commands.gd`, `property_value_codec.gd`, `reload_commands.gd`, `run_state_tracker.gd`, `scene_commands.gd`, `scene_node_access.gd`, `scene_state_tracker.gd`.
+**Internal source dependencies:** `asset_commands.gd`, `bridge_server.gd`, `command_router.gd`, `cursor_store.gd`, `discovery_record.gd`, `diagnostic_store.gd`, `edited_scene_inspector.gd`, `editor_state_monitor.gd`, `error_envelope.gd`, `event_store.gd`, `import_state_tracker.gd`, `input_event_codec.gd`, `input_map_commands.gd`, `command_limits.gd`, `operation_registry.gd`, `project_file_state_tracker.gd`, `project_identity.gd`, `project_path_guard.gd`, `project_settings_commands.gd`, `property_value_codec.gd`, `reload_commands.gd`, `run_state_tracker.gd`, `runtime_debugger_gateway.gd`, `runtime_scene_inspector.gd`, `scene_commands.gd`, `scene_node_access.gd`, `scene_state_tracker.gd`.
 
-**Module dependencies:** M7 directly and M8-M11 through composition. Runtime dependencies: Godot `EditorPlugin`, `EditorInterface`, `EditorUndoRedoManager`, `ProjectSettings`, `OS`, `Crypto`, and file APIs. Contract dependencies: Python M3/M5 and plugin metadata/version.
+**Module dependencies:** M7 directly and M8-M12 through composition. Runtime dependencies: Godot `EditorPlugin`, `EditorInterface`, `EditorUndoRedoManager`, `EditorDebuggerPlugin`, `ProjectSettings`, `OS`, `Crypto`, and file APIs. Contract dependencies: Python M3/M5 and plugin metadata/version.
 
 #### `godot-editor-mcp/plugin/addons/godot_mcp/bridge_server.gd`
 
-**Responsibility:** Maintain the localhost TCP listener and clients, buffer one bounded newline-delimited request, authenticate the token in constant-time style, invoke the injected router, bound responses, and disconnect.
+**Responsibility:** Maintain the localhost TCP listener and clients, buffer one bounded newline-delimited request, authenticate the token in constant-time style, invoke the injected router, retain only private debugger-deferred responses for later resolution, bound responses, and disconnect.
 
-**Internal source dependencies:** `error_envelope.gd`, `command_limits.gd`; injected dispatch callable from `command_router.gd`.
+**Internal source dependencies:** `error_envelope.gd`, `command_limits.gd`; injected dispatch callable from `command_router.gd` and pending resolver from `runtime_debugger_gateway.gd`.
 
-**Module dependencies:** M7 and M8. Runtime dependencies: Godot `TCPServer`, `StreamPeerTCP`, `PackedByteArray`, and `JSON`. Contract dependency: Python `bridge.py`.
+**Module dependencies:** M7, M8, and M12. Runtime dependencies: Godot `TCPServer`, `StreamPeerTCP`, `PackedByteArray`, and `JSON`. Contract dependency: Python `bridge.py`.
 
 #### `godot-editor-mcp/plugin/addons/godot_mcp/command_router.gd`
 
@@ -302,11 +314,11 @@ The codebase is moderately sized and intentionally split by boundary: MCP presen
 
 #### `godot-editor-mcp/plugin/addons/godot_mcp/cursor_store.gd`
 
-**Responsibility:** Issue opaque random continuation IDs; retain at most 128 two-minute records; fingerprint normalized queries; bind next offsets to snapshot identities; and distinguish malformed, expired, query-mismatched, and stale-snapshot cursors.
+**Responsibility:** Issue opaque random continuation IDs; retain at most 128 two-minute records; fingerprint normalized queries; expose an expected-snapshot/offset preflight for remote runtime reads; and distinguish malformed, expired, query-mismatched, and stale-snapshot cursors.
 
 **Internal source dependencies:** `error_envelope.gd`, `command_limits.gd`.
 
-**Module dependencies:** M8. Runtime dependencies: Godot `Crypto`, `JSON`, string hashing, and monotonic time APIs. Injected into M10 asset and scene services.
+**Module dependencies:** M8. Runtime dependencies: Godot `Crypto`, `JSON`, string hashing, and monotonic time APIs. Injected into M10 asset/edited-scene services and M12 runtime inspection.
 
 #### `godot-editor-mcp/plugin/addons/godot_mcp/discovery_record.gd`
 
@@ -414,7 +426,7 @@ The codebase is moderately sized and intentionally split by boundary: MCP presen
 
 #### `godot-editor-mcp/plugin/addons/godot_mcp/run_state_tracker.gd`
 
-**Responsibility:** Own run IDs, play/stop transitions, operation completion, runtime diagnostic association, run events, last-exit status, and run-scoped control safeguards.
+**Responsibility:** Own run IDs, play/stop transitions, operation completion, runtime diagnostic association, run events, last-exit status, run-scoped control safeguards, and the active-run identity callback consumed by runtime inspection.
 
 **Internal source dependencies:** `error_envelope.gd`; injected editor, event, operation, and diagnostic collaborators.
 
@@ -454,11 +466,11 @@ The codebase is moderately sized and intentionally split by boundary: MCP presen
 
 #### `godot-editor-mcp/plugin/addons/godot_mcp/edited_scene_inspector.gd`
 
-**Responsibility:** Return root/depth/class-targeted edited-scene pages and exact-name/category-filtered property pages with normalized paths, bounded traversal, stable snapshots, truncation metadata, and cursor continuation. It publishes only the existing `tree` and `inspect` handlers and performs no mutation.
+**Responsibility:** Publish the existing `tree` and `inspect` handlers, validate explicit edited/runtime scope, delegate runtime requests to M12, and return root/depth/class-targeted edited pages or exact-name/category-filtered edited properties with normalized paths, stable snapshots, truncation, and continuation. It performs no mutation.
 
-**Internal source dependencies:** `error_envelope.gd`, `command_limits.gd`; receives editor/undo-version services plus scene-node, property-value, and shared cursor collaborators.
+**Internal source dependencies:** `error_envelope.gd`, `command_limits.gd`; receives editor/undo-version services plus scene-node, property-value, shared cursor, and runtime-inspector collaborators.
 
-**Module dependencies:** M10 and M8. Runtime dependencies: Godot scene tree, property metadata, hashing/JSON, and editor undo-version APIs. Contract dependency: Python `tool_catalog.py`/`tool_dispatch.py`.
+**Module dependencies:** M10, M8, and M12. Runtime dependencies: Godot scene tree, property metadata, hashing/JSON, and editor undo-version APIs. Contract dependency: Python `tool_catalog.py`/`tool_dispatch.py`.
 
 #### `godot-editor-mcp/plugin/addons/godot_mcp/scene_commands.gd`
 
@@ -467,6 +479,30 @@ The codebase is moderately sized and intentionally split by boundary: MCP presen
 **Internal source dependencies:** `error_envelope.gd`; receives editor/undo services plus project-path, scene-node, and property-value collaborators.
 
 **Module dependencies:** M10 and M8. Runtime dependencies: Godot scene tree, `ClassDB`, `ResourceLoader`, `PackedScene`, selection, property metadata, and editor undo APIs. Contract dependency: Python `tool_catalog.py`/`tool_dispatch.py`.
+
+#### `godot-editor-mcp/plugin/addons/godot_mcp/runtime_debugger_gateway.gd`
+
+**Responsibility:** Discover active editor debugger sessions, enforce the single-session rule, validate probe hello/handshake identities and capabilities, send bounded read requests, validate returned run/session/project/version/request identities, and retain bounded deferred responses until the localhost bridge retrieves them or they time out.
+
+**Internal source dependencies:** `error_envelope.gd`, `command_limits.gd`; receives the current-run callback and optional session/sender/clock collaborators.
+
+**Module dependencies:** M12, M8, M9, and M7. Runtime dependencies: Godot `EditorDebuggerPlugin`, `EditorDebuggerSession`, `Crypto`, and monotonic time. Contract dependencies: `runtime_probe.gd`, `bridge_server.gd`, and Python bridge error handling.
+
+#### `godot-editor-mcp/plugin/addons/godot_mcp/runtime_scene_inspector.gd`
+
+**Responsibility:** Normalize runtime tree/property queries, preflight shared opaque cursors before remote work, attach expected snapshots and offsets, submit debugger requests, validate bounded result shape, and issue the next shared cursor without exposing debugger message details to the model-facing handlers.
+
+**Internal source dependencies:** `error_envelope.gd`; receives `runtime_debugger_gateway.gd` and `cursor_store.gd` collaborators.
+
+**Module dependencies:** M12, M8, and M7. Runtime dependencies: Godot dictionaries, arrays, callables, and typed debugger-plugin references. Contract dependency: Python `tool_catalog.py` scope/cursor schemas.
+
+#### `godot-editor-mcp/plugin/addons/godot_mcp/runtime_probe.gd`
+
+**Responsibility:** Act as the guarded runtime autoload, remain inactive without `EngineDebugger`, retry and complete the project/run/session/version/command/limit/nonce handshake, accept only read-only tree/property requests, return rich bounded runtime metadata and selected encoded properties, hash runtime object identities, and advance structural generations without opening a network port or evaluating supplied code.
+
+**Internal source dependencies:** `error_envelope.gd`, `command_limits.gd`, `project_identity.gd`, `property_value_codec.gd`.
+
+**Module dependencies:** M12 and M8. Runtime dependencies: Godot `Node`, `EngineDebugger`, `SceneTree`, property metadata, `Crypto`, `HashingContext`, `JSON`, and visibility/group/script APIs. Contract dependencies: `runtime_debugger_gateway.gd` and `runtime_scene_inspector.gd`.
 
 #### `godot-editor-mcp/plugin/addons/godot_mcp/project_settings_commands.gd`
 
@@ -500,7 +536,7 @@ The codebase is moderately sized and intentionally split by boundary: MCP presen
 
 **Internal source dependencies:** `godot_editor_mcp/assets.py`.
 
-**Module dependencies:** M12 testing M4. Runtime dependencies: Python `os`, `tempfile`, `unittest`, and `pathlib`.
+**Module dependencies:** M13 testing M4. Runtime dependencies: Python `os`, `tempfile`, `unittest`, and `pathlib`.
 
 #### `godot-editor-mcp/tests/test_bridge.py`
 
@@ -508,7 +544,7 @@ The codebase is moderately sized and intentionally split by boundary: MCP presen
 
 **Internal source dependencies:** `bridge.py`, `discovery.py`, `errors.py`.
 
-**Module dependencies:** M12 testing M5. Runtime dependencies: Python `json`, `tempfile`, `time`, `unittest`, `pathlib`, and mocking.
+**Module dependencies:** M13 testing M5. Runtime dependencies: Python `json`, `tempfile`, `time`, `unittest`, `pathlib`, and mocking.
 
 #### `godot-editor-mcp/tests/test_contracts.py`
 
@@ -516,7 +552,7 @@ The codebase is moderately sized and intentionally split by boundary: MCP presen
 
 **Internal source dependencies:** `__init__.py`, `bridge.py`, `errors.py`, `tool_catalog.py`; reads package/plugin/runtime metadata plus `HISTORY.md` and `ROADMAP.md` as release records.
 
-**Module dependencies:** M12 testing M1, M3, M5, and cross-language contracts with M7/M8. Runtime dependencies: Python `re`, `unittest`, and `pathlib`.
+**Module dependencies:** M13 testing M1, M3, M5, and cross-language contracts with M7/M8. Runtime dependencies: Python `re`, `unittest`, and `pathlib`.
 
 #### `godot-editor-mcp/tests/test_discovery.py`
 
@@ -524,7 +560,7 @@ The codebase is moderately sized and intentionally split by boundary: MCP presen
 
 **Internal source dependencies:** `discovery.py`, `errors.py`.
 
-**Module dependencies:** M12 testing M5. Runtime dependencies: Python `json`, `tempfile`, `time`, `unittest`, and `pathlib`.
+**Module dependencies:** M13 testing M5. Runtime dependencies: Python `json`, `tempfile`, `time`, `unittest`, and `pathlib`.
 
 #### `godot-editor-mcp/tests/test_launcher.py`
 
@@ -532,23 +568,23 @@ The codebase is moderately sized and intentionally split by boundary: MCP presen
 
 **Internal source dependencies:** `bridge.py`, `launcher.py`.
 
-**Module dependencies:** M12 testing M4/M5. Runtime dependencies: Python `tempfile`, `unittest`, `pathlib`, and mocking.
+**Module dependencies:** M13 testing M4/M5. Runtime dependencies: Python `tempfile`, `unittest`, `pathlib`, and mocking.
 
 #### `godot-editor-mcp/tests/test_reload_integration.py`
 
-**Responsibility:** Optional subprocess integration test that copies the plugin into a temporary project, launches Godot headlessly, verifies the live capability contract, exercises targeted asset/tree/property pagination and relevant stale/query failures, then exercises reload safeguards and authenticated reconnect.
+**Responsibility:** Optional subprocess integration test that copies the plugin into a temporary project, launches Godot headlessly, verifies the live capability contract, exercises targeted asset/edited-scene pagination, completes a real editor/game debugger handshake, observes a script-spawned runtime node and changed property, rejects replaced-run IDs/cursors, then exercises reload safeguards and authenticated reconnect.
 
 **Internal source dependencies:** `bridge.py`, `discovery.py`, `errors.py`, `tool_dispatch.py`; runtime dependency on the complete `plugin/addons/godot_mcp/` source and `plugin/project.godot` fixture.
 
-**Module dependencies:** M12 testing M3, M5-M11 across the process boundary. Runtime dependencies: Python `os`, `shutil`, `signal`, `socket`, `subprocess`, `sys`, `tempfile`, `time`, `unittest`, and `pathlib`, plus an installed Godot executable.
+**Module dependencies:** M13 testing M3, M5-M12 across the process boundary. Runtime dependencies: Python `os`, `shutil`, `signal`, `socket`, `subprocess`, `sys`, `tempfile`, `time`, `unittest`, and `pathlib`, plus an installed Godot executable.
 
 #### `godot-editor-mcp/tests/test_server.py`
 
-**Responsibility:** Verify MCP initialization/tool listing, nested mode subsets, forbidden-tool rejection, command mapping, diagnostics availability, local-only wait fields, reload waits, import/scan flow, path validation, settings routing, capabilities, launcher exposure, structured local/bridge error encoding, internal programming-error propagation, and notification behavior using fakes.
+**Responsibility:** Verify MCP initialization/tool listing, nested mode subsets, forbidden-tool rejection, command mapping including runtime scope/identity forwarding, diagnostics availability, local-only wait fields, reload waits, import/scan flow, path validation, settings routing, capabilities, launcher exposure, structured local/bridge error encoding, internal programming-error propagation, and notification behavior using fakes.
 
 **Internal source dependencies:** `bridge.py`, `errors.py`, `server.py` (which transitively exercises `tool_catalog.py`, `tool_dispatch.py`, `waiting.py`, and `stdio.py`).
 
-**Module dependencies:** M12 testing M2-M6. Runtime dependencies: Python `json` and `unittest`.
+**Module dependencies:** M13 testing M2-M6. Runtime dependencies: Python `json` and `unittest`.
 
 #### `godot-editor-mcp/tests/test_stdio.py`
 
@@ -556,7 +592,7 @@ The codebase is moderately sized and intentionally split by boundary: MCP presen
 
 **Internal source dependencies:** `server.py`, `stdio.py`.
 
-**Module dependencies:** M12 testing M2 and indirectly M3. Runtime dependencies: Python `io.StringIO`, `json`, and `unittest`.
+**Module dependencies:** M13 testing M2 and indirectly M3. Runtime dependencies: Python `io.StringIO`, `json`, and `unittest`.
 
 #### `godot-editor-mcp/tests/test_waiting.py`
 
@@ -564,7 +600,7 @@ The codebase is moderately sized and intentionally split by boundary: MCP presen
 
 **Internal source dependencies:** `errors.py`, `waiting.py`.
 
-**Module dependencies:** M12 testing M5/M6. Runtime dependency: Python `unittest`.
+**Module dependencies:** M13 testing M5/M6. Runtime dependency: Python `unittest`.
 
 #### `godot-editor-mcp/tests/test_state_payloads.py`
 
@@ -572,7 +608,7 @@ The codebase is moderately sized and intentionally split by boundary: MCP presen
 
 **Internal source dependencies:** `errors.py`, `state_payloads.py`.
 
-**Module dependencies:** M12 testing M5/M6. Runtime dependency: Python `unittest`.
+**Module dependencies:** M13 testing M5/M6. Runtime dependency: Python `unittest`.
 
 ### GDScript test files
 
@@ -582,7 +618,7 @@ The codebase is moderately sized and intentionally split by boundary: MCP presen
 
 **Internal source dependencies:** `diagnostic_store.gd` (which transitively preloads `error_envelope.gd`).
 
-**Module dependencies:** M12 testing M8/M9. Runtime dependencies: Godot `SceneTree` and logging APIs.
+**Module dependencies:** M13 testing M8/M9. Runtime dependencies: Godot `SceneTree` and logging APIs.
 
 #### `godot-editor-mcp/plugin/tests/phase3_reload_record_test.gd`
 
@@ -590,7 +626,7 @@ The codebase is moderately sized and intentionally split by boundary: MCP presen
 
 **Internal source dependencies:** `error_envelope.gd`, `reload_commands.gd`.
 
-**Module dependencies:** M12 testing M8/M11. Runtime dependency: Godot `SceneTree`, time, and hashing/project APIs used by the tested script.
+**Module dependencies:** M13 testing M8/M11. Runtime dependency: Godot `SceneTree`, time, and hashing/project APIs used by the tested script.
 
 #### `godot-editor-mcp/plugin/tests/phase4_command_router_test.gd`
 
@@ -598,7 +634,7 @@ The codebase is moderately sized and intentionally split by boundary: MCP presen
 
 **Internal source dependencies:** `command_router.gd` (which preloads `error_envelope.gd`).
 
-**Module dependencies:** M12 testing M7/M8. Runtime dependency: Godot `SceneTree` and callable/container APIs.
+**Module dependencies:** M13 testing M7/M8. Runtime dependency: Godot `SceneTree` and callable/container APIs.
 
 #### `godot-editor-mcp/plugin/tests/phase5_infrastructure_test.gd`
 
@@ -606,7 +642,7 @@ The codebase is moderately sized and intentionally split by boundary: MCP presen
 
 **Internal source dependencies:** all Phase 5 M8 helpers plus `asset_commands.gd`, `edited_scene_inspector.gd`, `scene_commands.gd`, `project_settings_commands.gd`, and `input_map_commands.gd`.
 
-**Module dependencies:** M12 testing M8-M11. Runtime dependencies: Godot `SceneTree`, user-data file APIs, hashing, input events, and variant conversion APIs.
+**Module dependencies:** M13 testing M8-M11. Runtime dependencies: Godot `SceneTree`, user-data file APIs, hashing, input events, and variant conversion APIs.
 
 #### `godot-editor-mcp/plugin/tests/phase6_state_trackers_test.gd`
 
@@ -614,7 +650,7 @@ The codebase is moderately sized and intentionally split by boundary: MCP presen
 
 **Internal source dependencies:** `editor_state_monitor.gd`, all four state trackers, `event_store.gd`, and `operation_registry.gd`.
 
-**Module dependencies:** M12 testing M8/M9. Runtime dependencies: Godot `SceneTree`, `Node`, signals, callables, and lightweight fake editor collaborators.
+**Module dependencies:** M13 testing M8/M9. Runtime dependencies: Godot `SceneTree`, `Node`, signals, callables, and lightweight fake editor collaborators.
 
 #### `godot-editor-mcp/plugin/tests/phase7_cursor_store_test.gd`
 
@@ -622,7 +658,7 @@ The codebase is moderately sized and intentionally split by boundary: MCP presen
 
 **Internal source dependencies:** `cursor_store.gd` (which transitively preloads `error_envelope.gd` and `command_limits.gd`).
 
-**Module dependencies:** M12 testing M8. Runtime dependencies: Godot `SceneTree`, `Crypto`, hashing, JSON, and a lightweight fake clock.
+**Module dependencies:** M13 testing M8. Runtime dependencies: Godot `SceneTree`, `Crypto`, hashing, JSON, and a lightweight fake clock.
 
 #### `godot-editor-mcp/plugin/tests/phase8_service_boundary_test.gd`
 
@@ -630,7 +666,15 @@ The codebase is moderately sized and intentionally split by boundary: MCP presen
 
 **Internal source dependencies:** `edited_scene_inspector.gd` and `scene_commands.gd`, including their focused transitive infrastructure dependencies.
 
-**Module dependencies:** M12 testing M7/M8/M10. Runtime dependencies: Godot `SceneTree`, callable introspection, and bounded source-file reads for the structural regression guard.
+**Module dependencies:** M13 testing M7/M8/M10. Runtime dependencies: Godot `SceneTree`, callable introspection, and bounded source-file reads for the structural regression guard.
+
+#### `godot-editor-mcp/plugin/tests/phase9_runtime_inspection_test.gd`
+
+**Responsibility:** Verify that the runtime probe contains no network, expression, or supplied-script execution path; exercise bounded runtime metadata, grouping, visibility, pagination markers, selected live properties, hashed object identities, and stale identity/snapshot rejection against an in-process running-scene fixture.
+
+**Internal source dependencies:** `runtime_probe.gd` and its `error_envelope.gd`, `command_limits.gd`, `project_identity.gd`, and `property_value_codec.gd` dependencies.
+
+**Module dependencies:** M13 testing M8/M12. Runtime dependencies: Godot `SceneTree`, `Node2D`, `Sprite2D`, property metadata, groups, hashing, and bounded source-file reads.
 
 ## Dependency direction summary
 
@@ -649,8 +693,9 @@ localhost JSON contract
 Godot plugin lifecycle/transport/router (M7)
   -> shared infrastructure (M8)
   -> state/diagnostics (M9) -> M8
-  -> asset/edited-scene inspection/scene mutation services (M10) -> M8, M9
+  -> asset/scope-aware inspection/scene mutation services (M10) -> M8, M9, M12
   -> settings/input/reload (M11) -> M8, M9
+  -> runtime debugger gateway/probe (M12) -> M8, M9
 ```
 
 There are no production import cycles inside the Python package. The only reverse Python edge is a deliberate lazy compatibility import from `server.py` back to `cli.py`, which avoids an import-time cycle. On the Godot side, composition is centralized in `godot_mcp.gd`; apparent two-way relationships with the state monitor are runtime injection/callback relationships rather than script preload cycles.

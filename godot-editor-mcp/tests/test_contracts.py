@@ -120,6 +120,18 @@ class ToolRegistryContractTests(unittest.TestCase):
             schemas["node_info"]["properties"]["limit"]["maximum"],
             EXPECTED_BRIDGE_LIMITS["properties"],
         )
+
+        for name in ("scene_tree", "node_info"):
+            self.assertEqual(
+                schemas[name]["properties"]["tree_scope"]["enum"],
+                ["edited", "runtime"],
+            )
+            self.assertEqual(
+                schemas[name]["properties"]["tree_scope"]["default"], "edited"
+            )
+        self.assertEqual(
+            schemas["node_info"]["properties"]["runtime_id"]["minLength"], 64
+        )
         for name in ("list_assets", "scene_tree", "node_info"):
             cursor = schemas[name]["properties"]["cursor"]
             self.assertEqual(

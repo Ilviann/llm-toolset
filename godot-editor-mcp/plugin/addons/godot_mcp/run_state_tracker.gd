@@ -75,6 +75,10 @@ func state() -> Dictionary:
 	}
 
 
+func current_run_id() -> Variant:
+	return _run_id if _editor_interface.is_playing_scene() else null
+
+
 func run() -> Dictionary:
 	if _editor_interface.get_edited_scene_root() == null:
 		return ErrorEnvelope.failure("No scene is open", ErrorEnvelope.NOT_FOUND)
@@ -100,10 +104,15 @@ func stop_run(arguments: Dictionary) -> Dictionary:
 	if not _editor_interface.is_playing_scene():
 		return ErrorEnvelope.failure("No scene is running", ErrorEnvelope.NO_ACTIVE_RUN)
 	var requested_run_id = arguments.get("run_id")
-	if not requested_run_id is int or requested_run_id < 1:
+	if (
+		(not requested_run_id is int and not requested_run_id is float)
+		or float(requested_run_id) != floorf(float(requested_run_id))
+		or int(requested_run_id) < 1
+	):
 		return ErrorEnvelope.failure(
 			"run_id is required to stop a scene", ErrorEnvelope.INVALID_ARGUMENT,
 		)
+	requested_run_id = int(requested_run_id)
 	if requested_run_id != _run_id:
 		return ErrorEnvelope.failure(
 			"Run ID is stale", ErrorEnvelope.STALE_RUNTIME_ID,

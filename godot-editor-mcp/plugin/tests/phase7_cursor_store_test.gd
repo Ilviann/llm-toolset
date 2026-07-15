@@ -18,6 +18,12 @@ func _init() -> void:
 	var cursor: String = cursors.issue("assets", ["res://", "all", 2], snapshot, 2)
 	assert(cursor.length() == 48)
 	assert("secret" not in cursor)
+	var prepared: Dictionary = cursors.prepare(
+		cursor, "assets", ["res://", "all", 2],
+	)
+	assert(prepared.ok)
+	assert(prepared.result.offset == 2)
+	assert(prepared.result.snapshot == snapshot)
 	var resumed: Dictionary = cursors.resume(
 		cursor, "assets", ["res://", "all", 2], snapshot,
 	)

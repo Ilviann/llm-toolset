@@ -3,6 +3,23 @@
 This file records released changes. Planned work is tracked separately in
 [`ROADMAP.md`](ROADMAP.md).
 
+## 0.13.0 — 2026-07-15
+
+- Added a debugger-only, read-only runtime probe and editor debugger gateway
+  with per-run project, session, version, command, limit, and nonce handshake
+  validation; the probe opens no port, evaluates no supplied code, and remains
+  inert when Godot's engine debugger is inactive.
+- Extended `scene_tree` and `node_info` with explicit edited/runtime scope while
+  preserving edited defaults, and added targeted runtime traversal, rich node
+  metadata, filtered live properties, opaque runtime identities, and shared
+  bounded cursor behavior.
+- Added deferred debugger responses to the localhost bridge, stable missing,
+  ambiguous, incompatible, stale-identity, and stale-cursor failures, plus
+  autoload conflict protection and bounded runtime request/response limits.
+- Added a Godot probe test and a native macOS Godot 4.7 editor/game spike that
+  observes a script-spawned node and property change, paginates results, and
+  rejects identities and cursors after a replacement run.
+
 ## 0.12.0 — 2026-07-15
 
 - Split edited-scene tree and property reads into a dedicated inspector while

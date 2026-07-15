@@ -34,6 +34,8 @@ class ErrorCode:
     MALFORMED_OPERATION = "malformed_operation"
     STALE_OPERATION = "stale_operation"
     VERSION_MISMATCH = "version_mismatch"
+    RUNTIME_PROBE_UNAVAILABLE = "runtime_probe_unavailable"
+    AMBIGUOUS_RUNTIME_SESSION = "ambiguous_runtime_session"
     CANCELLED = "cancelled"
 
 
@@ -166,6 +168,15 @@ class VersionMismatchError(BridgeError):
     default_code = ErrorCode.VERSION_MISMATCH
 
 
+class RuntimeProbeUnavailableError(BridgeError):
+    default_code = ErrorCode.RUNTIME_PROBE_UNAVAILABLE
+    default_retryable = True
+
+
+class AmbiguousRuntimeSessionError(BridgeError):
+    default_code = ErrorCode.AMBIGUOUS_RUNTIME_SESSION
+
+
 class OperationCancelledError(BridgeError):
     default_code = ErrorCode.CANCELLED
 
@@ -193,6 +204,8 @@ _ERROR_TYPES: dict[str, type[BridgeError]] = {
         MalformedOperationError,
         StaleOperationError,
         VersionMismatchError,
+        RuntimeProbeUnavailableError,
+        AmbiguousRuntimeSessionError,
         OperationCancelledError,
         InvalidResponseError,
     )
@@ -239,6 +252,8 @@ __all__ = [
     "UnauthorizedError",
     "UnsupportedCapabilityError",
     "VersionMismatchError",
+    "RuntimeProbeUnavailableError",
+    "AmbiguousRuntimeSessionError",
     "bounded_details",
     "bridge_error_from_payload",
 ]

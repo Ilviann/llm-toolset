@@ -34,6 +34,20 @@ func issue(kind: String, query: Variant, snapshot: String, offset: int) -> Strin
 
 
 func resume(cursor_value: Variant, kind: String, query: Variant, snapshot: String) -> Dictionary:
+	var prepared := prepare(cursor_value, kind, query)
+	if not prepared.ok:
+		return prepared
+	var record: Dictionary = prepared.result
+	if record.snapshot != snapshot:
+		_records.erase(cursor_value)
+		return ErrorEnvelope.failure(
+			"Cursor snapshot is stale", ErrorEnvelope.STALE_CURSOR,
+			{"expected_snapshot": record.snapshot, "current_snapshot": snapshot},
+		)
+	return ErrorEnvelope.success(int(record.offset))
+
+
+func prepare(cursor_value: Variant, kind: String, query: Variant) -> Dictionary:
 	if not cursor_value is String or cursor_value.length() != Limits.MAX_CURSOR_CHARS or not cursor_value.is_valid_hex_number():
 		return ErrorEnvelope.failure(
 			"Cursor is malformed", ErrorEnvelope.INVALID_ARGUMENT,
@@ -52,13 +66,10 @@ func resume(cursor_value: Variant, kind: String, query: Variant, snapshot: Strin
 		return ErrorEnvelope.failure(
 			"Cursor does not match this query", ErrorEnvelope.INVALID_ARGUMENT,
 		)
-	if record.snapshot != snapshot:
-		_records.erase(cursor_value)
-		return ErrorEnvelope.failure(
-			"Cursor snapshot is stale", ErrorEnvelope.STALE_CURSOR,
-			{"expected_snapshot": record.snapshot, "current_snapshot": snapshot},
-		)
-	return ErrorEnvelope.success(int(record.offset))
+	return ErrorEnvelope.success({
+		"offset": int(record.offset),
+		"snapshot": str(record.snapshot),
+	})
 
 
 func clear() -> void:

@@ -13,6 +13,7 @@ var _undo_redo: EditorUndoRedoManager
 var _scene_nodes: RefCounted
 var _property_values: RefCounted
 var _cursors: RefCounted
+var _runtime_inspector: Variant
 
 
 func _init(
@@ -21,12 +22,14 @@ func _init(
 	scene_nodes: RefCounted,
 	property_values: RefCounted,
 	cursors: RefCounted,
+	runtime_inspector: Variant = null,
 ) -> void:
 	_editor_interface = editor_interface
 	_undo_redo = undo_redo
 	_scene_nodes = scene_nodes
 	_property_values = property_values
 	_cursors = cursors
+	_runtime_inspector = runtime_inspector
 
 
 func handlers() -> Dictionary:
@@ -37,6 +40,11 @@ func handlers() -> Dictionary:
 
 
 func _scene_tree(arguments: Dictionary) -> Dictionary:
+	var scope_result := _tree_scope(arguments)
+	if not scope_result.ok:
+		return scope_result
+	if scope_result.result == "runtime":
+		return _runtime_inspector.scene_tree(arguments)
 	var root := _editor_interface.get_edited_scene_root()
 	if root == null:
 		return _failure("No scene is open")
@@ -131,6 +139,13 @@ func _collect_nodes(
 
 
 func _inspect_node(arguments: Dictionary) -> Dictionary:
+	var scope_result := _tree_scope(arguments)
+	if not scope_result.ok:
+		return scope_result
+	if scope_result.result == "runtime":
+		return _runtime_inspector.inspect_node(arguments)
+	if arguments.has("runtime_id"):
+		return _failure("runtime_id is valid only for runtime inspection")
 	var found: Dictionary = _scene_nodes.find(arguments.get("path"))
 	if not found.ok:
 		return found
@@ -214,6 +229,7 @@ func _inspect_node(arguments: Dictionary) -> Dictionary:
 			"node_properties", query, snapshot, offset + properties.size(),
 		)
 	return _success({
+		"scope": "edited",
 		"path": normalized_path,
 		"type": node.get_class(),
 		"properties": properties,
@@ -222,6 +238,18 @@ func _inspect_node(arguments: Dictionary) -> Dictionary:
 		"continuation_available": continuation_available,
 		"cursor": cursor,
 	})
+
+
+func _tree_scope(arguments: Dictionary) -> Dictionary:
+	var scope = arguments.get("tree_scope", "edited")
+	if not scope is String or scope not in ["edited", "runtime"]:
+		return _failure("tree_scope must be edited or runtime")
+	if scope == "runtime" and _runtime_inspector == null:
+		return ErrorEnvelope.failure(
+			"Runtime inspection is unavailable",
+			ErrorEnvelope.RUNTIME_PROBE_UNAVAILABLE, {}, true,
+		)
+	return _success(scope)
 
 
 func _tree_snapshot(root: Node) -> String:

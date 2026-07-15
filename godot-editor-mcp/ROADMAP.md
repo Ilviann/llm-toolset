@@ -4,7 +4,7 @@
 
 - [x] Phase 7 — Make edited-scene and asset inspection targeted and complete.
 - [x] Phase 8 — Separate edited-scene inspection from mutation services.
-- [ ] Phase 9 — Inspect the running scene through a read-only runtime probe.
+- [x] Phase 9 — Inspect the running scene through a read-only runtime probe.
 - [ ] Phase 10 — Capture, drive, and validate gameplay with a minimal fixed API.
 - [ ] Phase 11 — Author scenes through bounded atomic transactions.
 - [ ] Phase 12 — Add autoload helpers and finish proven project-workflow gaps.
@@ -137,6 +137,8 @@ before runtime inspection adds another read plane.
   response bounds.
 
 ## Phase 9 — Read-only runtime inspection
+
+Completed in 0.13.0.
 
 The edited scene cannot reveal nodes spawned, removed, or changed by scripts.
 This phase adds runtime observation without exposing runtime mutation or method

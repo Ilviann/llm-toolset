@@ -228,6 +228,25 @@ class MCPServerTests(unittest.TestCase):
         ])
         self.assertEqual(self.bridge.calls, [("create_scene", arguments)])
 
+    def test_runtime_inspection_scope_and_identity_reach_existing_routes(self) -> None:
+        tree_arguments = {
+            "tree_scope": "runtime", "root": "Enemies", "limit": 5,
+        }
+        info_arguments = {
+            "tree_scope": "runtime", "path": "Enemies/Slime",
+            "runtime_id": "a" * 64, "property": "health",
+        }
+        for name, arguments in (
+            ("scene_tree", tree_arguments), ("node_info", info_arguments)
+        ):
+            response = self.request(
+                "tools/call", {"name": name, "arguments": arguments}
+            )
+            self.assertNotIn("isError", response["result"])
+        self.assertEqual(self.bridge.calls, [
+            ("tree", tree_arguments), ("inspect", info_arguments),
+        ])
+
     def test_create_resource_is_validated_then_sent_to_editor(self) -> None:
         self.server = MCPServer(self.bridge, self.assets, mode="small")  # type: ignore[arg-type]
         arguments = {

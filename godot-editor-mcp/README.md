@@ -61,7 +61,8 @@ The dependency-free editor plugin is split by responsibility under
 
 - `godot_mcp.gd` owns only plugin lifecycle and service composition.
 - `bridge_server.gd` and `command_router.gd` own authenticated localhost
-  transport, direct-callable dispatch, and duplicate-safe command ownership.
+  transport, immediate or debugger-deferred dispatch, and duplicate-safe
+  command ownership.
 - `editor_state_monitor.gd` is the stable state facade over focused scene, run,
   import, and project-file trackers; `event_store.gd` and
   `operation_registry.gd` retain shared monotonic identities.
@@ -75,8 +76,10 @@ The dependency-free editor plugin is split by responsibility under
 - `error_envelope.gd` centralizes bounded bridge success and failure envelopes.
 - `asset_commands.gd` handles asset discovery, resource creation, and scene
   file creation or opening.
-- `edited_scene_inspector.gd` owns bounded edited-scene tree and property reads,
-  including targeting, snapshots, and shared-cursor continuation.
+- `edited_scene_inspector.gd` owns bounded edited-scene reads and scope routing;
+  `runtime_scene_inspector.gd` adapts runtime reads to the same cursor contract.
+- `runtime_debugger_gateway.gd` and `runtime_probe.gd` own the validated
+  editor/game debugger handshake and read-only running-scene data plane.
 - `scene_commands.gd` owns UndoRedo-backed node/property changes and selection.
 - `project_settings_commands.gd` and `input_map_commands.gd` handle their
   respective validated, atomic project configuration operations.
@@ -140,10 +143,10 @@ means `small` and `large`.
 | `reload_project` | All | Safely restart the configured project and optionally wait through reconnect |
 | `create_scene` | All | Create a scene with one built-in root node |
 | `open_scene` | All | Open an existing project scene |
-| `scene_tree` | All | Targeted, paginated edited-scene nodes with root, depth, and class filters |
+| `scene_tree` | All | Targeted, paginated edited or runtime nodes with root, depth, and class filters |
 | `add_node` | All | Add a built-in node through Godot's undo history |
 | `instantiate_scene` | All | Add a PackedScene instance through undo history |
-| `node_info` | All | Paginated editable properties with exact name/category filters |
+| `node_info` | All | Paginated edited or live runtime properties with exact name/category filters |
 | `set_property` | All | Change one property through Godot's undo history |
 | `scene_control` | All | Save or run the scene; stop the active run by its returned run ID |
 | `list_assets` | Small+ | Filtered, paginated project assets with filesystem snapshots |
@@ -158,19 +161,19 @@ means `small` and `large`.
 | `select_node` | Large | Select one node in the editor for coordinated desktop inspection |
 | `start_editor` | Large | Start Godot for the configured project using `GODOT_EXECUTABLE` |
 
-Node paths are relative to the edited scene root. Use `.` for the root and, for
+Node paths are relative to the selected edited or runtime scene root. Use `.` for the root and, for
 example, `Player/Camera2D` for a child. Vector and color property values use JSON
 number arrays such as `[100, 200]` or `[1, 0.5, 0, 1]`.
 
 ### Targeted inspection and pagination
 
-`scene_tree` defaults to root `.`, depth 3, and 50 results. Use `root` for a
+`scene_tree` defaults to `tree_scope: "edited"`, root `.`, depth 3, and 50 results. Use `root` for a
 known subtree, `max_depth` from 0 through 64, `class` for an exact Godot class,
 and `limit` up to 200. Returned paths always remain relative to the complete
-edited-scene root, even for a targeted subtree. The response explicitly says
-`scope: "edited"`.
+selected scene root, even for a targeted subtree. Both inspection tools return
+the selected `scope` explicitly.
 
-`node_info` defaults to 24 properties and accepts exact `property` and
+`node_info` defaults to edited scope and 24 properties and accepts exact `property` and
 `category` filters plus a limit up to 64. Every returned property includes its
 Godot category, name, type, and bounded encoded value, so a category discovered
 on one page can be used directly as a follow-up filter.
@@ -181,10 +184,39 @@ available. Repeat the same query with that cursor; changing the folder, root,
 filter, depth, or limit rejects the cursor. Filesystem changes invalidate only
 asset cursors, scene identity/UndoRedo/structure changes invalidate edited-tree
 cursors, and node replacement or property-list changes invalidate property
-cursors with `stale_cursor`. Cursors expire after two minutes, at most 128 are
+cursors with `stale_cursor`. Runtime cursors additionally bind the run,
+debugger session, and runtime-tree generation. Cursors expire after two minutes, at most 128 are
 retained, and their 48-character IDs contain neither project-token material nor
 Godot object references. A truncated result with no continuation indicates the
 bounded 5,000-item tree/asset or 1,024-entry property scan ceiling was reached.
+
+### Read-only runtime inspection
+
+Set `tree_scope` to `"runtime"` on `scene_tree` or `node_info` to observe the
+active debug run rather than the edited scene. Runtime tree records include a
+hashed `runtime_id`, scene-relative path, name, class, parent, script, source
+scene, up to eight public groups, process mode, visibility, and depth. Pass the
+returned path and optional `runtime_id` to `node_info`; including the identity
+prevents a follow-up read from silently targeting a replacement object at the
+same path.
+
+The editor plugin temporarily registers the reserved
+`GodotMCPRuntimeProbe` autoload from its own addon folder. It refuses to replace
+a conflicting autoload and removes only its matching registration when the
+plugin stops. The bundled probe communicates solely through Godot's public
+debugger channel: it opens no game-side network port, exposes no mutation or
+method-call command, and never evaluates client-provided GDScript. Without an
+active `EngineDebugger`—including ordinary non-debug runs and exports—the probe
+does not register a capture or process frames.
+
+One active debugger session is supported. Runtime requests validate the current
+run ID, editor debugger-session ID, project identity, probe protocol version,
+supported commands, limits, and a per-process nonce. A missing probe returns
+`runtime_probe_unavailable`, multiple sessions return
+`ambiguous_runtime_session`, an incompatible probe returns `version_mismatch`,
+and stopped/replaced runs or debugger reconnects reject stale runtime IDs and
+cursors. Runtime requests retain at most 16 pending responses, time out after
+two seconds, and remain inside the existing bridge response bound.
 
 Asset paths are relative to the Godot project and omit `res://`. Asset results
 include `res://` so they can be used directly in Godot properties. The asset
@@ -217,7 +249,9 @@ initialization, its result includes the negotiated protocol version and combines
 the Python MCP server's version, active mode, and exposed MCP tool names with
 the plugin's version, supported bridge commands, optional-feature flags, Godot
 version, and effective limits. Optional features currently reported as
-unsupported are runtime inspection, game-view capture, and input injection.
+unsupported are game-view capture and input injection. Runtime inspection is
+reported with probe protocol, autoload availability, commands, and active/ready
+debugger-session counts.
 Targeted inspection and stable pagination are reported as supported, along
 with tree depth/scan, property scan, cursor count/length, and lifetime limits.
 Diagnostics report separate GDScript, C#, and runtime capability flags because
@@ -506,6 +540,10 @@ Open the project in Godot 4.7, then enable **Project → Project Settings → Pl
 inside Godot's generated-data folder and should not be committed. Other Godot 4
 releases may work, but 4.7 stable is the currently verified version.
 
+While enabled, the plugin also persists its reserved runtime-probe autoload so
+new debug runs can load it, and removes that exact registration on clean plugin
+shutdown. A pre-existing autoload with the same name is never overwritten.
+
 When updating, replace the installed `addons/godot_mcp` folder and restart the
 plugin or editor along with the Python MCP process. Keep their versions aligned;
 `capabilities` reports both versions for verification.
@@ -647,7 +685,7 @@ Set-Location "C:\path\to\godot-editor-mcp"
 py -3 -m unittest discover -s tests -v
 ```
 
-The 69-test Python suite tests MCP initialization, end-to-end stdio initialization,
+The 70-test Python suite tests MCP initialization, end-to-end stdio initialization,
 tool listing and calls, per-mode dispatch, registry invariants, stable ordering,
 complete routes, path/wait policy, schema-to-limit alignment, release consistency,
 capability contracts, authentication, bounded transport behavior, staged imports,
@@ -687,10 +725,13 @@ Run the focused infrastructure and state-transition checks with:
 /path/to/Godot --headless --path plugin --script res://tests/phase6_state_trackers_test.gd
 /path/to/Godot --headless --path plugin --script res://tests/phase7_cursor_store_test.gd
 /path/to/Godot --headless --path plugin --script res://tests/phase8_service_boundary_test.gd
+/path/to/Godot --headless --path plugin --script res://tests/phase9_runtime_inspection_test.gd
 ```
 
 On the verified macOS platform, the opt-in subprocess check validates the live
-plugin capability contract before exercising authenticated reload/reconnect:
+plugin capability contract, editor/game debugger handshake, spawned-node and
+live-property reads, replacement-run staleness, and authenticated
+reload/reconnect:
 
 ```sh
 GODOT_RELOAD_INTEGRATION=1 python3 -m unittest tests.test_reload_integration -v
