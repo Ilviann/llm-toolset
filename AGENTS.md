@@ -79,3 +79,5 @@ Treat model-generated arguments as untrusted. Validate types, lengths, paths, an
 ## Contributions
 
 Use focused commits with imperative subjects, for example `Add bounded search results`. Pull requests should describe behavior, memory or context impact, dependencies, security implications, and tests.
+
+After completing changes, propose a focused commit message that describes the completed work.
