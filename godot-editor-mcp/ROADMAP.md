@@ -3,11 +3,14 @@
 ## Phase checklist
 
 - [x] Phase 3 — Reload the configured project and reconnect safely.
-- [ ] Phase 4 — Make edited-scene and asset inspection targeted and complete.
-- [ ] Phase 5 — Inspect the running scene through a read-only runtime probe.
-- [ ] Phase 6 — Capture, drive, and validate gameplay with a minimal fixed API.
-- [ ] Phase 7 — Author scenes through bounded atomic transactions.
-- [ ] Phase 8 — Add autoload helpers and finish proven project-workflow gaps.
+- [ ] Phase 4 — Consolidate tool contracts and add cross-language guardrails.
+- [ ] Phase 5 — Replace broad command inheritance with narrow services.
+- [ ] Phase 6 — Separate editor-state ownership and typed wait contracts.
+- [ ] Phase 7 — Make edited-scene and asset inspection targeted and complete.
+- [ ] Phase 8 — Inspect the running scene through a read-only runtime probe.
+- [ ] Phase 9 — Capture, drive, and validate gameplay with a minimal fixed API.
+- [ ] Phase 10 — Author scenes through bounded atomic transactions.
+- [ ] Phase 11 — Add autoload helpers and finish proven project-workflow gaps.
 
 ## Phase delivery contract
 
@@ -26,10 +29,12 @@ README, history, examples, and this checklist consistent.
 The roadmap prioritizes the shortest reliable LLM-to-Godot loop:
 
 1. Recover when a project-level change requires an editor restart.
-2. Read only the relevant editor state without wasting model context.
-3. Observe the running game rather than assuming it matches the edited scene.
-4. Exercise gameplay and verify the result.
-5. Apply larger authoring changes atomically and safely.
+2. Stabilize cross-language contracts and isolate responsibilities before the
+   command surface grows.
+3. Read only the relevant editor state without wasting model context.
+4. Observe the running game rather than assuming it matches the edited scene.
+5. Exercise gameplay and verify the result.
+6. Apply larger authoring changes atomically and safely.
 
 The server must remain offline-capable, dependency-free at runtime, portable
 across macOS, Linux, and Windows, and practical for small local models. New
@@ -81,7 +86,170 @@ wait through an authenticated project-scoped reconnect.
 - Restart behavior is covered by subprocess integration tests on the verified
   native platform; other platform claims remain explicit.
 
-## Phase 4 — Targeted inspection and stable pagination
+## Phase 4 — Contract registry and regression guardrails
+
+The current tool surface is intentionally small, but each tool's name, mode,
+bridge route, path policy, wait behavior, and editor-side registration are
+represented in several places. This phase makes those relationships explicit
+and testable before later phases add filters, cursors, runtime scopes, and new
+commands.
+
+### Python tool registry
+
+- Introduce one declarative tool specification per model-facing tool containing
+  its schema, minimum mode, execution target, bridge command where applicable,
+  project-path policy, and wait strategy.
+- Derive stable MCP tool ordering, mode subsets, bridge mappings, and wait-aware
+  tool sets from those specifications while preserving existing public exports
+  and mode nesting.
+- Keep execution collaborators outside the declarative registry; the registry
+  describes policy and routing rather than becoming a service locator.
+- Make `ToolDispatcher` resolve a specification and use focused local or bridge
+  handlers instead of repeating tool-name sets across branches.
+
+### Godot command registration
+
+- Have each Godot command service expose its owned command-to-handler mapping.
+- Register callables directly with the router and reject duplicate command
+  ownership during plugin startup instead of silently replacing a handler.
+- Remove duplicated service command arrays and `execute(command, arguments)`
+  switches after their handler mappings are covered by tests.
+- Keep `godot_mcp.gd` as the explicit composition root and lifecycle owner; do
+  not hide construction or dependencies behind global lookup.
+
+### Contract verification
+
+- Add Python registry invariants for unique names, stable order, nested modes,
+  complete routes, wait-field consistency, and schema-to-limit consistency.
+- Add a live bridge contract check that compares plugin `capabilities` with
+  Python expectations for command names, bridge and protocol versions, limits,
+  and editor-side error codes.
+- Add a dependency-free release consistency check for Python package metadata,
+  plugin metadata, runtime-reported versions, and documented version records.
+- Prefer verification over a runtime-loaded shared manifest. Consider
+  development-time generation only if later command growth makes the checked
+  duplication materially harder to maintain.
+
+### Completion gate
+
+- Each model-facing tool has one authoritative Python policy specification.
+- Each editor-side command has one authoritative Godot handler registration.
+- Duplicate, missing, or mismatched commands, modes, limits, versions, wait
+  fields, and error-code contracts fail an automated test.
+- MCP schemas, tool order, mode exposure, command behavior, and wire responses
+  remain backward compatible.
+- Initialization, `tools/list`, `tools/call`, and plugin loading pass end to end.
+
+## Phase 5 — Narrow command services and shared infrastructure
+
+The current command base provides every service with editor access, undo,
+operations, state callbacks, path checks, value conversion, node lookup, and
+input-event helpers. This phase replaces that inheritance surface with small
+collaborators and removes duplicated project identity and record handling.
+
+### Command boundaries
+
+- Replace `command_base.gd` with focused components for confined project paths,
+  scene-node lookup and node-name validation, the currently supported bounded
+  property value codec, and input-event normalization and decoding.
+- Inject editor, undo, operation, import-tracking, and project-file callbacks
+  only into services that use them.
+- Keep response envelopes explicit at command boundaries and avoid introducing
+  a generic utility module or service locator.
+- Preserve the existing model-facing value forms in this phase; Phase 10 may
+  expand the codec only for transaction workflows that prove a need.
+
+### Identity and bounded records
+
+- Extract one Godot project-identity helper for normalized project paths and
+  identity hashes used by discovery and reload recovery.
+- Extract bounded atomic JSON-record read/write behavior shared by discovery
+  and reload without weakening ownership checks or crash recovery.
+- Use distinct internal names for the project identity hash and the
+  `project.godot` content hash while preserving existing wire-field names for
+  compatibility.
+- Keep Windows case normalization and POSIX path behavior synchronized with
+  Python discovery logic and covered by platform-branch tests.
+
+### Python error boundary
+
+- Move asset, launcher, local validation, bridge, timeout, and cancellation
+  failures under the existing structured `DomainError` hierarchy.
+- Let the MCP server catch one public error boundary; unexpected programming
+  errors must remain internal errors rather than being flattened into ordinary
+  tool failures.
+- Replace broad exception suppression in optional follow-up reads with the
+  narrow expected bridge failures.
+- Preserve bounded messages, details, stable codes, and retryability.
+
+### Completion gate
+
+- No command service inherits helpers or receives collaborators it does not
+  use.
+- Project identity normalization and atomic record behavior each have one
+  editor-side implementation and focused tests.
+- Existing path confinement, symlink denial, undo behavior, import tracking,
+  settings rollback, and reload recovery remain unchanged.
+- Local and bridge failures use consistent structured MCP results without
+  exposing internal exceptions.
+- The complete Python suite and focused Godot command, discovery, and reload
+  checks pass on the verified native platform.
+
+## Phase 6 — State ownership and typed wait contracts
+
+Editor state currently combines scene, play, import, project-file, operation,
+event, and diagnostic transitions in one monitor, while Python waits interpret
+the resulting dictionaries directly. This phase separates temporal ownership
+without changing the concise public state response.
+
+### Editor-side state ownership
+
+- Keep `EditorStateMonitor` as the stable state-command facade while delegating
+  to focused scene, run, import, and project-file trackers.
+- Give scene state ownership of scene identity, selection, dirty baselines,
+  save detection, and scene events.
+- Give run state ownership of run IDs, start/stop transitions, run operations,
+  diagnostic association, and last-exit information.
+- Give import state ownership of filesystem signals, scan generation, pending
+  and recent imports, import operations, and import diagnostics.
+- Give project-file state ownership of content hashing, known writes, and
+  reload-required tracking.
+- Preserve bounded operation and event registries as injected shared services;
+  do not duplicate their identities inside the trackers.
+
+### Python wait boundary
+
+- Introduce tolerant validated payload views for editor-state and reload-status
+  responses so wire-field knowledge is centralized outside wait algorithms.
+- Separate common deadline, cancellation, polling, and diagnostic-settling
+  behavior from scene, import, run, stop, and reload completion predicates.
+- Preserve transitional behavior for compatible older plugins where fields are
+  optional, while rejecting malformed identity-bearing responses explicitly.
+- Inject the waiter or its factory into dispatch composition instead of
+  constructing it inside `ToolDispatcher`.
+
+### Characterization and transition tests
+
+- Add focused tests for scene changes and saves, run startup and stop, import
+  success and failure, project-file changes, operation completion, and emitted
+  event identities before extracting each responsibility.
+- Verify that the aggregated `editor_state` result remains concise, bounded,
+  and wire-compatible throughout the refactor.
+- Cover shutdown cancellation, diagnostic quiet periods, stale operations,
+  reload disconnect/reconnect, project mismatch, and version mismatch through
+  the typed payload boundary.
+
+### Completion gate
+
+- Each temporal state transition has one clear editor-side owner.
+- Command services depend on the narrow tracker or callback they require, not
+  on the complete editor-state facade.
+- Python wait algorithms no longer inspect unvalidated bridge dictionaries.
+- Existing editor-state fields and operation semantics remain compatible.
+- Headless transition tests, authenticated bridge checks, and the complete
+  Python suite pass without increased runtime dependencies or unbounded state.
+
+## Phase 7 — Targeted inspection and stable pagination
 
 Inspection result size is already a larger context cost than the tool schemas.
 This phase makes current edited-scene and asset reads useful on real projects
@@ -121,7 +289,7 @@ before runtime inspection adds another potentially large data source.
   invalidate only the relevant cursors.
 - Result and cursor sizes remain within configured limits.
 
-## Phase 5 — Read-only runtime inspection
+## Phase 8 — Read-only runtime inspection
 
 The edited scene cannot reveal nodes spawned, removed, or changed by scripts.
 This phase adds runtime observation without exposing runtime mutation or method
@@ -150,7 +318,7 @@ execution.
 - Encode identifiers from run, debugger session, and runtime object identity
   without exposing raw reusable object references.
 - Reject stale identifiers after stop, replacement run, or debugger reconnect.
-- Reuse Phase 4 targeting, filters, truncation metadata, and cursor semantics;
+- Reuse Phase 7 targeting, filters, truncation metadata, and cursor semantics;
   bind runtime cursors to run ID and runtime-tree generation.
 - Exclude the probe from ordinary runtime-tree results.
 - Support one active debug session initially. Return an explicit error for
@@ -167,7 +335,7 @@ execution.
 - A focused executable spike validates debugger messaging before the complete
   feature is treated as feasible.
 
-## Phase 6 — Minimal gameplay validation
+## Phase 9 — Minimal gameplay validation
 
 This phase completes the observe-act-verify loop. It deliberately starts with
 Input Map actions and a small declarative condition set instead of physical key
@@ -220,7 +388,7 @@ simulation or a general expression language.
 - Capture, input, renderer, and cleanup behavior are tested in live runtime
   fixtures, not only unit tests.
 
-## Phase 7 — Core scene transaction engine
+## Phase 10 — Core scene transaction engine
 
 Current focused mutations remain useful for tiny mode, but larger scene changes
 need one validated action, stable references between operations, and protection
@@ -281,7 +449,7 @@ against editing a scene that changed after inspection.
 - Property type mismatches, tagged references, bounds, and rollback paths are
   covered by GDScript and headless editor tests.
 
-## Phase 8 — Project workflow helpers
+## Phase 11 — Project workflow helpers
 
 Add only project-level helpers that close common workflows not safely handled
 by the existing focused settings tools.
