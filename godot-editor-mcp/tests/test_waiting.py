@@ -178,7 +178,7 @@ class OperationWaiterTests(unittest.TestCase):
                 ReloadBridge([{
                     **base,
                     "project_hash": "a" * 64,
-                    "bridge_version": "0.11.0",
+                    "bridge_version": "0.12.0",
                 }]),
                 clock=clock,
                 sleep=clock.sleep,

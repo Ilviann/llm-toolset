@@ -12,25 +12,31 @@ const CREATABLE_RESOURCE_TYPES := [
 var _editor_interface: EditorInterface
 var _operations: RefCounted
 var _track_import: Callable
+var _filesystem_generation: Callable
 var _project_paths: RefCounted
 var _scene_nodes: RefCounted
 var _property_values: RefCounted
+var _cursors: RefCounted
 
 
 func _init(
 	editor_interface: EditorInterface,
 	operations: RefCounted,
 	track_import: Callable,
+	filesystem_generation: Callable,
 	project_paths: RefCounted,
 	scene_nodes: RefCounted,
 	property_values: RefCounted,
+	cursors: RefCounted,
 ) -> void:
 	_editor_interface = editor_interface
 	_operations = operations
 	_track_import = track_import
+	_filesystem_generation = filesystem_generation
 	_project_paths = project_paths
 	_scene_nodes = scene_nodes
 	_property_values = property_values
+	_cursors = cursors
 
 
 func handlers() -> Dictionary:
@@ -57,8 +63,8 @@ func _list_assets(arguments: Dictionary) -> Dictionary:
 	if not asset_type is String or asset_type not in allowed_types:
 		return _failure("Type filter is invalid")
 	var limit_value = arguments.get("limit", 50)
-	if not limit_value is int and not limit_value is float:
-		return _failure("Limit must be a number")
+	if (not limit_value is int and not limit_value is float) or float(limit_value) != floorf(float(limit_value)):
+		return _failure("Limit must be an integer")
 	var limit := int(limit_value)
 	if limit < 1 or limit > MAX_ASSETS:
 		return _failure("Limit must be between 1 and 100")
@@ -67,25 +73,51 @@ func _list_assets(arguments: Dictionary) -> Dictionary:
 	var directory := filesystem.get_filesystem_path(folder_path)
 	if directory == null:
 		return _failure("Asset folder not found")
+	var generation := 0
+	if _filesystem_generation.is_valid():
+		generation = int(_filesystem_generation.call())
+	var query := [folder_path, asset_type, limit]
+	var snapshot: String = _cursors.snapshot_id("assets", generation)
+	var offset := 0
+	if arguments.has("cursor"):
+		var resumed: Dictionary = _cursors.resume(
+			arguments.cursor, "assets", query, snapshot,
+		)
+		if not resumed.ok:
+			return resumed
+		offset = int(resumed.result)
 	var output: Array[Dictionary] = []
-	var state := {"visited": 0, "truncated": false}
-	_collect_assets(directory, asset_type, limit, output, state)
-	return _success({"assets": output, "truncated": state.truncated})
+	var state := {
+		"visited": 0, "matched": 0, "has_more": false, "scan_exhausted": false,
+	}
+	_collect_assets(directory, asset_type, offset, limit, output, state)
+	var continuation_available: bool = state.has_more
+	var cursor: Variant = null
+	if continuation_available:
+		cursor = _cursors.issue("assets", query, snapshot, offset + output.size())
+	return _success({
+		"assets": output,
+		"truncated": continuation_available or state.scan_exhausted,
+		"snapshot_id": snapshot,
+		"continuation_available": continuation_available,
+		"cursor": cursor,
+	})
 
 
 func _collect_assets(
 	directory: EditorFileSystemDirectory,
 	asset_type: String,
+	offset: int,
 	limit: int,
 	output: Array[Dictionary],
 	state: Dictionary,
-) -> void:
+) -> bool:
 	var raw_directory := DirAccess.open(directory.get_path())
 	for index in directory.get_file_count():
+		if state.visited >= MAX_ASSET_SCAN:
+			state.scan_exhausted = true
+			return true
 		state.visited += 1
-		if state.visited > MAX_ASSET_SCAN:
-			state.truncated = true
-			return
 		var file_name := directory.get_file(index)
 		if raw_directory != null and raw_directory.is_link(file_name):
 			continue
@@ -93,17 +125,21 @@ func _collect_assets(
 		var resource_type := directory.get_file_type(index)
 		var category := _asset_category(path, resource_type)
 		if asset_type == "all" or category == asset_type or (asset_type == "resource" and category == "resource"):
-			if output.size() >= limit:
-				state.truncated = true
-				return
-			output.append({"path": path, "type": resource_type, "category": category})
+			if state.matched < offset:
+				state.matched += 1
+			elif output.size() < limit:
+				output.append({"path": path, "type": resource_type, "category": category})
+				state.matched += 1
+			else:
+				state.has_more = true
+				return true
 	for index in directory.get_subdir_count():
-		if state.truncated:
-			return
 		var subdirectory := directory.get_subdir(index)
 		if raw_directory != null and raw_directory.is_link(subdirectory.get_path().get_file()):
 			continue
-		_collect_assets(subdirectory, asset_type, limit, output, state)
+		if _collect_assets(subdirectory, asset_type, offset, limit, output, state):
+			return true
+	return false
 
 
 func _asset_info(arguments: Dictionary) -> Dictionary:

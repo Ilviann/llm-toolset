@@ -25,6 +25,10 @@ WAIT_PROPERTIES = {
         "type": "integer", "minimum": 1, "maximum": 120000, "default": 10000,
     },
 }
+CURSOR_PROPERTY = {
+    "type": "string", "minLength": 48, "maxLength": 48,
+    "description": "Opaque continuation cursor",
+}
 
 Mode = Literal["tiny", "small", "large"]
 MODES: tuple[Mode, ...] = ("tiny", "small", "large")
@@ -114,7 +118,7 @@ _TOOL_DEFINITIONS = [
     },
     {
         "name": "list_assets",
-        "description": "List project assets, limited to 100 results.",
+        "description": "List a bounded page of project assets with stable cursors.",
         "minimum_mode": "small", "mode_order": 12, "target": "bridge",
         "bridge_command": "assets", "path_kind": "folder", "path_field": "folder",
         "inputSchema": {
@@ -130,6 +134,7 @@ _TOOL_DEFINITIONS = [
                     "default": "all",
                 },
                 "limit": {"type": "integer", "minimum": 1, "maximum": 100, "default": 50},
+                "cursor": CURSOR_PROPERTY,
             },
             "additionalProperties": False,
         },
@@ -233,10 +238,24 @@ _TOOL_DEFINITIONS = [
     },
     {
         "name": "scene_tree",
-        "description": "List the edited scene tree, limited to 200 nodes.",
+        "description": "Read a targeted, paginated slice of the edited scene tree.",
         "minimum_mode": "tiny", "mode_order": 6, "target": "bridge",
         "bridge_command": "tree",
-        "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "root": {**PATH_PROPERTY["path"], "default": "."},
+                "max_depth": {
+                    "type": "integer", "minimum": 0, "maximum": 64, "default": 3,
+                },
+                "class": {
+                    "type": "string", "description": "Exact Godot node class filter",
+                },
+                "limit": {"type": "integer", "minimum": 1, "maximum": 200, "default": 50},
+                "cursor": CURSOR_PROPERTY,
+            },
+            "additionalProperties": False,
+        },
     },
     {
         "name": "add_node",
@@ -271,11 +290,19 @@ _TOOL_DEFINITIONS = [
     },
     {
         "name": "node_info",
-        "description": "Get editable properties of one scene node.",
+        "description": "Read filtered, categorized editable properties of one scene node.",
         "minimum_mode": "tiny", "mode_order": 9, "target": "bridge",
         "bridge_command": "inspect",
         "inputSchema": {
-            "type": "object", "properties": PATH_PROPERTY, "required": ["path"],
+            "type": "object",
+            "properties": {
+                **PATH_PROPERTY,
+                "property": {"type": "string", "description": "Exact property-name filter"},
+                "category": {"type": "string", "description": "Exact Godot category filter"},
+                "limit": {"type": "integer", "minimum": 1, "maximum": 64, "default": 24},
+                "cursor": CURSOR_PROPERTY,
+            },
+            "required": ["path"],
             "additionalProperties": False,
         },
     },
@@ -457,9 +484,15 @@ EXPECTED_BRIDGE_LIMITS = {
     "request_bytes": 64 * 1024,
     "response_bytes": 256 * 1024,
     "tree_nodes": 200,
+    "tree_depth": 64,
+    "tree_scan": 5000,
     "properties": 64,
+    "property_scan": 1024,
     "assets": 100,
     "asset_scan": 5000,
+    "active_cursors": 128,
+    "cursor_chars": 48,
+    "cursor_ttl_ms": 120000,
     "settings": 100,
     "setting_changes": 32,
     "input_events": 32,

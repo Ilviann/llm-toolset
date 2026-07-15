@@ -63,6 +63,10 @@ func state() -> Dictionary:
 	}
 
 
+func filesystem_generation() -> int:
+	return _filesystem_generation
+
+
 func track_import(path: String, operation_id: Variant) -> void:
 	if not operation_id is String or operation_id.is_empty():
 		return

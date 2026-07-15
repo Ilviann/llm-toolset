@@ -2,11 +2,12 @@
 
 ## Phase checklist
 
-- [ ] Phase 7 — Make edited-scene and asset inspection targeted and complete.
-- [ ] Phase 8 — Inspect the running scene through a read-only runtime probe.
-- [ ] Phase 9 — Capture, drive, and validate gameplay with a minimal fixed API.
-- [ ] Phase 10 — Author scenes through bounded atomic transactions.
-- [ ] Phase 11 — Add autoload helpers and finish proven project-workflow gaps.
+- [x] Phase 7 — Make edited-scene and asset inspection targeted and complete.
+- [ ] Phase 8 — Separate edited-scene inspection from mutation services.
+- [ ] Phase 9 — Inspect the running scene through a read-only runtime probe.
+- [ ] Phase 10 — Capture, drive, and validate gameplay with a minimal fixed API.
+- [ ] Phase 11 — Author scenes through bounded atomic transactions.
+- [ ] Phase 12 — Add autoload helpers and finish proven project-workflow gaps.
 
 ## Phase delivery contract
 
@@ -25,9 +26,10 @@ README, history, examples, and this checklist consistent.
 The remaining roadmap prioritizes the shortest reliable LLM-to-Godot loop:
 
 1. Read only the relevant editor state without wasting model context.
-2. Observe the running game rather than assuming it matches the edited scene.
-3. Exercise gameplay and verify the result.
-4. Apply larger authoring changes atomically and safely.
+2. Isolate edited-scene reads before adding a second runtime inspection plane.
+3. Observe the running game rather than assuming it matches the edited scene.
+4. Exercise gameplay and verify the result.
+5. Apply larger authoring changes atomically and safely.
 
 The server must remain offline-capable, dependency-free at runtime, portable
 across macOS, Linux, and Windows, and practical for small local models. New
@@ -44,6 +46,8 @@ and Python-side waits. Future work should reuse those contracts rather than
 introducing parallel lifecycle or error mechanisms.
 
 ## Phase 7 — Targeted inspection and stable pagination
+
+Completed in 0.11.0.
 
 Inspection result size is already a larger context cost than the tool schemas.
 This phase makes current edited-scene and asset reads useful on real projects
@@ -83,7 +87,54 @@ before runtime inspection adds another potentially large data source.
   invalidate only the relevant cursors.
 - Result and cursor sizes remain within configured limits.
 
-## Phase 8 — Read-only runtime inspection
+## Phase 8 — Edited-scene inspection service separation
+
+Phase 7 made `scene_commands.gd` the largest scene service by adding targeted
+tree traversal, structural snapshots, categorized property fingerprints, and
+pagination beside its existing undo-backed mutations. Separate those concerns
+before runtime inspection adds another read plane.
+
+### Service boundary
+
+- Add `edited_scene_inspector.gd` to own edited `scene_tree` and `node_info`
+  reads, query normalization, bounded traversal, property categories, snapshot
+  construction, and cursor continuation.
+- Leave `scene_commands.gd` responsible for add, instantiate, set-property, and
+  selection mutations through editor undo history.
+- Register the existing `tree` and `inspect` bridge commands from the new
+  inspector without changing model-facing tool names, schemas, modes, command
+  names, response fields, defaults, limits, or error codes.
+- Give each service only the editor, undo/version, node-access, value-codec, and
+  cursor collaborators it actually calls. Keep `cursor_store.gd` shared and do
+  not introduce a generic query framework before runtime requirements prove a
+  common abstraction.
+
+### Scope and tradeoffs
+
+- Update `godot_mcp.gd`, `CODE.md`, parser/load guards, and focused tests for
+  the new composition boundary; keep Python dispatch and schemas unchanged.
+- Preserve the Phase 7 snapshot rules and page ordering exactly, including
+  normalized paths and relevant-only cursor invalidation.
+- Accept one additional focused GDScript service and slightly more composition
+  wiring in exchange for lower mutation/read coupling and a smaller context
+  surface for future runtime-inspection work.
+- Treat handler ownership drift, constructor wiring, and accidental cursor or
+  result-shape changes as the main regression risks.
+
+### Completion gate
+
+- Existing Phase 7 requests return wire-compatible results with identical
+  ordering, defaults, pagination, snapshot, truncation, and error behavior.
+- The mutation service no longer owns inspection traversal, property-list
+  fingerprinting, or cursor logic; the inspector performs no mutation and
+  creates no UndoRedo action.
+- Focused tests cover each service independently, duplicate command ownership
+  remains impossible, and live capability/bridge contracts remain unchanged.
+- The complete Python suite, Phase 2–8 Godot checks, clean plugin load, and
+  native targeted-inspection integration pass without increased traversal or
+  response bounds.
+
+## Phase 9 — Read-only runtime inspection
 
 The edited scene cannot reveal nodes spawned, removed, or changed by scripts.
 This phase adds runtime observation without exposing runtime mutation or method
@@ -129,7 +180,7 @@ execution.
 - A focused executable spike validates debugger messaging before the complete
   feature is treated as feasible.
 
-## Phase 9 — Minimal gameplay validation
+## Phase 10 — Minimal gameplay validation
 
 This phase completes the observe-act-verify loop. It deliberately starts with
 Input Map actions and a small declarative condition set instead of physical key
@@ -182,7 +233,7 @@ simulation or a general expression language.
 - Capture, input, renderer, and cleanup behavior are tested in live runtime
   fixtures, not only unit tests.
 
-## Phase 10 — Core scene transaction engine
+## Phase 11 — Core scene transaction engine
 
 Current focused mutations remain useful for tiny mode, but larger scene changes
 need one validated action, stable references between operations, and protection
@@ -243,7 +294,7 @@ against editing a scene that changed after inspection.
 - Property type mismatches, tagged references, bounds, and rollback paths are
   covered by GDScript and headless editor tests.
 
-## Phase 11 — Project workflow helpers
+## Phase 12 — Project workflow helpers
 
 Add only project-level helpers that close common workflows not safely handled
 by the existing focused settings tools.

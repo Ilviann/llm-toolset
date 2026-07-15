@@ -4,6 +4,7 @@ extends EditorPlugin
 const AssetCommands := preload("asset_commands.gd")
 const BridgeServer := preload("bridge_server.gd")
 const CommandRouter := preload("command_router.gd")
+const CursorStore := preload("cursor_store.gd")
 const DiscoveryRecord := preload("discovery_record.gd")
 const DiagnosticStore := preload("diagnostic_store.gd")
 const EditorStateMonitor := preload("editor_state_monitor.gd")
@@ -24,7 +25,7 @@ const SceneCommands := preload("scene_commands.gd")
 const SceneNodeAccess := preload("scene_node_access.gd")
 const SceneStateTracker := preload("scene_state_tracker.gd")
 
-const BRIDGE_VERSION := "0.10.0"
+const BRIDGE_VERSION := "0.11.0"
 const BRIDGE_PROTOCOL_VERSION := "1"
 const DEFAULT_PORT := 6505
 const TOKEN_PATH := "res://.godot/godot_mcp_token"
@@ -33,6 +34,7 @@ var _bridge_server
 var _command_services: Array = []
 var _discovery
 var _diagnostics
+var _cursors
 var _events
 var _import_state
 var _operations
@@ -55,6 +57,7 @@ func _enter_tree() -> void:
 
 	_events = EventStore.new()
 	_operations = OperationRegistry.new()
+	_cursors = CursorStore.new()
 	_diagnostics = DiagnosticStore.new()
 	OS.add_logger(_diagnostics)
 	_scene_state = SceneStateTracker.new(
@@ -124,12 +127,13 @@ func _register_commands() -> bool:
 	var input_events = InputEventCodec.new()
 	var asset_commands = AssetCommands.new(
 		get_editor_interface(), _operations,
-		Callable(_import_state, "track_import"), project_paths, scene_nodes,
-		property_values,
+		Callable(_import_state, "track_import"),
+		Callable(_import_state, "filesystem_generation"),
+		project_paths, scene_nodes, property_values, _cursors,
 	)
 	var scene_commands = SceneCommands.new(
 		get_editor_interface(), get_undo_redo(), project_paths, scene_nodes,
-		property_values,
+		property_values, _cursors,
 	)
 	var settings_commands = ProjectSettingsCommands.new(
 		Callable(_project_file_state, "mark_saved"), input_events,
@@ -182,6 +186,8 @@ func _capabilities(_arguments: Dictionary) -> Dictionary:
 			"event_ids": true,
 			"project_discovery": true,
 			"project_reload": true,
+			"targeted_inspection": true,
+			"stable_pagination": true,
 		},
 		"error_codes": [
 			ErrorEnvelope.UNAUTHORIZED,
@@ -215,9 +221,15 @@ func _capabilities(_arguments: Dictionary) -> Dictionary:
 			"request_bytes": Limits.MAX_REQUEST_BYTES,
 			"response_bytes": Limits.MAX_RESPONSE_BYTES,
 			"tree_nodes": Limits.MAX_TREE_NODES,
+			"tree_depth": Limits.MAX_TREE_DEPTH,
+			"tree_scan": Limits.MAX_TREE_SCAN,
 			"properties": Limits.MAX_PROPERTIES,
+			"property_scan": Limits.MAX_PROPERTY_SCAN,
 			"assets": Limits.MAX_ASSETS,
 			"asset_scan": Limits.MAX_ASSET_SCAN,
+			"active_cursors": Limits.MAX_ACTIVE_CURSORS,
+			"cursor_chars": Limits.MAX_CURSOR_CHARS,
+			"cursor_ttl_ms": Limits.CURSOR_TTL_MSEC,
 			"settings": Limits.MAX_SETTINGS,
 			"setting_changes": Limits.MAX_SETTING_CHANGES,
 			"input_events": Limits.MAX_INPUT_EVENTS,
@@ -246,6 +258,9 @@ func _shutdown_services() -> void:
 	_command_services.clear()
 	_discovery = null
 	_diagnostics = null
+	if _cursors != null:
+		_cursors.clear()
+	_cursors = null
 	_events = null
 	_import_state = null
 	_operations = null

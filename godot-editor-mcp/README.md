@@ -139,13 +139,13 @@ means `small` and `large`.
 | `reload_project` | All | Safely restart the configured project and optionally wait through reconnect |
 | `create_scene` | All | Create a scene with one built-in root node |
 | `open_scene` | All | Open an existing project scene |
-| `scene_tree` | All | Scene-relative node list, limited to 200 nodes |
+| `scene_tree` | All | Targeted, paginated edited-scene nodes with root, depth, and class filters |
 | `add_node` | All | Add a built-in node through Godot's undo history |
 | `instantiate_scene` | All | Add a PackedScene instance through undo history |
-| `node_info` | All | Editable properties for one node, limited to 64 |
+| `node_info` | All | Paginated editable properties with exact name/category filters |
 | `set_property` | All | Change one property through Godot's undo history |
 | `scene_control` | All | Save or run the scene; stop the active run by its returned run ID |
-| `list_assets` | Small+ | Filtered project assets, limited to 100 results |
+| `list_assets` | Small+ | Filtered, paginated project assets with filesystem snapshots |
 | `asset_info` | Small+ | Type, category, size, import state, and dependencies |
 | `scan_asset` | Small+ | Queue a Godot filesystem scan for an existing project asset |
 | `import_asset` | Small+ | Copy one staged source file into the project and queue import |
@@ -160,6 +160,30 @@ means `small` and `large`.
 Node paths are relative to the edited scene root. Use `.` for the root and, for
 example, `Player/Camera2D` for a child. Vector and color property values use JSON
 number arrays such as `[100, 200]` or `[1, 0.5, 0, 1]`.
+
+### Targeted inspection and pagination
+
+`scene_tree` defaults to root `.`, depth 3, and 50 results. Use `root` for a
+known subtree, `max_depth` from 0 through 64, `class` for an exact Godot class,
+and `limit` up to 200. Returned paths always remain relative to the complete
+edited-scene root, even for a targeted subtree. The response explicitly says
+`scope: "edited"`.
+
+`node_info` defaults to 24 properties and accepts exact `property` and
+`category` filters plus a limit up to 64. Every returned property includes its
+Godot category, name, type, and bounded encoded value, so a category discovered
+on one page can be used directly as a follow-up filter.
+
+`list_assets`, `scene_tree`, and `node_info` return `snapshot_id`, `truncated`,
+`continuation_available`, and an opaque `cursor` when another page is
+available. Repeat the same query with that cursor; changing the folder, root,
+filter, depth, or limit rejects the cursor. Filesystem changes invalidate only
+asset cursors, scene identity/UndoRedo/structure changes invalidate edited-tree
+cursors, and node replacement or property-list changes invalidate property
+cursors with `stale_cursor`. Cursors expire after two minutes, at most 128 are
+retained, and their 48-character IDs contain neither project-token material nor
+Godot object references. A truncated result with no continuation indicates the
+bounded 5,000-item tree/asset or 1,024-entry property scan ceiling was reached.
 
 Asset paths are relative to the Godot project and omit `res://`. Asset results
 include `res://` so they can be used directly in Godot properties. The asset
@@ -193,6 +217,8 @@ the Python MCP server's version, active mode, and exposed MCP tool names with
 the plugin's version, supported bridge commands, optional-feature flags, Godot
 version, and effective limits. Optional features currently reported as
 unsupported are runtime inspection, game-view capture, and input injection.
+Targeted inspection and stable pagination are reported as supported, along
+with tree depth/scan, property scan, cursor count/length, and lifetime limits.
 Diagnostics report separate GDScript, C#, and runtime capability flags because
 complete C# compiler capture depends on the installed Godot build.
 
@@ -347,14 +373,15 @@ saved project state rather than carrying an ever-growing tool history.
 
 - **Below 8k (`tiny`):** Only narrowly scoped, short sequences are realistic, such as
   checking editor state, opening a known scene, changing one property, and
-  saving. Avoid `scene_tree` on large scenes and `node_info` unless necessary.
+  saving. Target `scene_tree` to a shallow subtree and filter `node_info` by an
+  exact property or category whenever possible.
   If GDScript editing requires a file server too, keep each session narrowly
   scoped because the combined tool and result context is tight.
 - **16k (`small`):** Suitable for a modest scene-building workflow involving
   assets, several nodes, property changes, and script or configuration edits
   through the file server. Work scene by scene, use targeted asset queries, and
-  checkpoint with `scene_control` after each logical unit; large trees and
-  repeated property dumps can still exhaust the context.
+  checkpoint with `scene_control` after each logical unit; follow cursors only
+  while the next page is relevant rather than dumping whole trees.
 - **Large hosted models (`large`):** Exposes the full MCP surface. Desktop-aware
   agents can use `select_node` to coordinate MCP edits with visual inspection.
 
@@ -657,6 +684,7 @@ Run the focused infrastructure and state-transition checks with:
 ```sh
 /path/to/Godot --headless --path plugin --script res://tests/phase5_infrastructure_test.gd
 /path/to/Godot --headless --path plugin --script res://tests/phase6_state_trackers_test.gd
+/path/to/Godot --headless --path plugin --script res://tests/phase7_cursor_store_test.gd
 ```
 
 On the verified macOS platform, the opt-in subprocess check validates the live

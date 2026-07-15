@@ -14,7 +14,12 @@ from pathlib import Path
 from godot_editor_mcp import __version__
 from godot_editor_mcp.bridge import GodotBridge
 from godot_editor_mcp.discovery import read_discovery_record
-from godot_editor_mcp.errors import EditorBusyError, SaveFailedError
+from godot_editor_mcp.errors import (
+    EditorBusyError,
+    InvalidArgumentError,
+    SaveFailedError,
+    StaleCursorError,
+)
 from godot_editor_mcp.tool_dispatch import ToolDispatcher
 from godot_editor_mcp.tool_catalog import bridge_contract_mismatches
 from godot_editor_mcp.waiting import OperationWaiter
@@ -42,6 +47,12 @@ class ReloadSubprocessIntegrationTests(unittest.TestCase):
             self.project / "addons",
         )
         (self.project / "scenes").mkdir()
+        assets = self.project / "assets"
+        assets.mkdir()
+        for name in ("one", "two", "three"):
+            (assets / f"{name}.gd").write_text(
+                f"extends Node\n# {name}\n", encoding="utf-8"
+            )
         self.port = self._free_port()
         (self.project / "project.godot").write_text(
             "; Phase 3 reload integration fixture.\n"
@@ -106,6 +117,131 @@ class ReloadSubprocessIntegrationTests(unittest.TestCase):
             {"path": "scenes/main.tscn", "root_type": "Node2D", "root_name": "Main"},
         )
         self.assertEqual(created["path"], "res://scenes/main.tscn")
+        bridge.call("open_scene", {"path": "scenes/main.tscn"})
+        self._wait_until(lambda: bridge.call("state", {}).get("scene") == "res://scenes/main.tscn")
+
+        asset_page = bridge.call(
+            "assets", {"folder": "assets", "type": "script", "limit": 1}
+        )
+        self.assertTrue(asset_page["truncated"])
+        self.assertTrue(asset_page["continuation_available"])
+        self.assertEqual(len(asset_page["assets"]), 1)
+        asset_cursor = asset_page["cursor"]
+        next_assets = bridge.call(
+            "assets",
+            {
+                "folder": "assets", "type": "script", "limit": 1,
+                "cursor": asset_cursor,
+            },
+        )
+        self.assertEqual(asset_page["snapshot_id"], next_assets["snapshot_id"])
+        self.assertNotEqual(
+            asset_page["assets"][0]["path"], next_assets["assets"][0]["path"]
+        )
+        asset_paths = [asset_page["assets"][0]["path"]]
+        current_assets = next_assets
+        while True:
+            asset_paths.extend(item["path"] for item in current_assets["assets"])
+            if not current_assets["continuation_available"]:
+                break
+            current_assets = bridge.call(
+                "assets",
+                {
+                    "folder": "assets", "type": "script", "limit": 1,
+                    "cursor": current_assets["cursor"],
+                },
+            )
+            self.assertEqual(asset_page["snapshot_id"], current_assets["snapshot_id"])
+        self.assertEqual(
+            set(asset_paths),
+            {"res://assets/one.gd", "res://assets/two.gd", "res://assets/three.gd"},
+        )
+        self.assertEqual(len(asset_paths), len(set(asset_paths)))
+        with self.assertRaises(InvalidArgumentError):
+            bridge.call(
+                "assets",
+                {"folder": "assets", "type": "all", "limit": 1,
+                 "cursor": asset_cursor},
+            )
+        generation = bridge.call("state", {})["filesystem_generation"]
+        bridge.call(
+            "create_resource",
+            {"path": "assets/generated.tres", "type": "Gradient"},
+        )
+        self._wait_until(
+            lambda: bridge.call("state", {})["filesystem_generation"] > generation
+        )
+        with self.assertRaises(StaleCursorError):
+            bridge.call(
+                "assets",
+                {"folder": "assets", "type": "script", "limit": 1,
+                 "cursor": asset_cursor},
+            )
+
+        for name in ("PageA", "PageB", "PageC"):
+            bridge.call("add_node", {"parent": ".", "type": "Node2D", "name": name})
+        tree_page = bridge.call("tree", {"max_depth": 4, "limit": 2})
+        self.assertEqual(tree_page["scope"], "edited")
+        self.assertTrue(tree_page["continuation_available"])
+        tree_cursor = tree_page["cursor"]
+        next_tree = bridge.call(
+            "tree", {"max_depth": 4, "limit": 2, "cursor": tree_cursor}
+        )
+        self.assertEqual(tree_page["snapshot_id"], next_tree["snapshot_id"])
+        self.assertTrue(
+            {node["path"] for node in tree_page["nodes"]}.isdisjoint(
+                node["path"] for node in next_tree["nodes"]
+            )
+        )
+        self.assertEqual(
+            {
+                node["path"]
+                for node in tree_page["nodes"] + next_tree["nodes"]
+            },
+            {".", "PageA", "PageB", "PageC"},
+        )
+        targeted = bridge.call(
+            "tree", {"root": "PageA", "max_depth": 0, "class": "Node2D"}
+        )
+        self.assertEqual([node["path"] for node in targeted["nodes"]], ["PageA"])
+        bridge.call("add_node", {"parent": ".", "type": "Node", "name": "NewEdit"})
+        with self.assertRaises(StaleCursorError):
+            bridge.call(
+                "tree", {"max_depth": 4, "limit": 2, "cursor": tree_cursor}
+            )
+
+        property_page = bridge.call("inspect", {"path": ".", "limit": 1})
+        self.assertTrue(property_page["continuation_available"])
+        self.assertIn("category", property_page["properties"][0])
+        property_cursor = property_page["cursor"]
+        next_properties = bridge.call(
+            "inspect", {"path": ".", "limit": 1, "cursor": property_cursor}
+        )
+        self.assertNotEqual(
+            property_page["properties"][0]["name"],
+            next_properties["properties"][0]["name"],
+        )
+        first_property = property_page["properties"][0]
+        filtered = bridge.call(
+            "inspect",
+            {
+                "path": ".", "property": first_property["name"],
+                "category": first_property["category"],
+            },
+        )
+        self.assertEqual(len(filtered["properties"]), 1)
+        bridge.call(
+            "create_scene",
+            {"path": "scenes/other.tscn", "root_type": "Node2D", "root_name": "Other"},
+        )
+        bridge.call("open_scene", {"path": "scenes/other.tscn"})
+        self._wait_until(
+            lambda: bridge.call("state", {}).get("scene") == "res://scenes/other.tscn"
+        )
+        with self.assertRaises(StaleCursorError):
+            bridge.call(
+                "inspect", {"path": ".", "limit": 1, "cursor": property_cursor}
+            )
         bridge.call("open_scene", {"path": "scenes/main.tscn"})
         self._wait_until(lambda: bridge.call("state", {}).get("scene") == "res://scenes/main.tscn")
 

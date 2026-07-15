@@ -3,6 +3,21 @@
 This file records released changes. Planned work is tracked separately in
 [`ROADMAP.md`](ROADMAP.md).
 
+## 0.11.0 — 2026-07-15
+
+- Added targeted edited-scene reads with root, depth, exact class, property,
+  and property-category filters plus concise default page sizes.
+- Added opaque, expiring, bounded server-side continuation cursors for assets,
+  edited trees, and node properties. Cursors bind normalized queries to
+  filesystem, scene/UndoRedo/structure, or node/property-list snapshots and
+  return `stale_cursor` after relevant changes.
+- Preserved property category and scene-relative path metadata on every page,
+  added explicit snapshot/truncation/continuation fields and cursor capability
+  limits, and kept cursor contents free of token or object-reference material.
+- Added focused cursor validation and a native Godot 4.7 authenticated workflow
+  covering pagination continuity, filters, stale snapshots, reload, and
+  reconnect on macOS.
+
 ## 0.10.0 — 2026-07-15
 
 - Split edited-scene, run, import/filesystem, and `project.godot` transitions
