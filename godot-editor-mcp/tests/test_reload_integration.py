@@ -7,6 +7,7 @@ import socket
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import unittest
 from pathlib import Path
@@ -22,6 +23,7 @@ from godot_editor_mcp.errors import (
     SaveFailedError,
     StaleCursorError,
     StaleRuntimeIdError,
+    UnsupportedCapabilityError,
 )
 from godot_editor_mcp.tool_dispatch import ToolDispatcher
 from godot_editor_mcp.tool_catalog import bridge_contract_mismatches
@@ -57,7 +59,12 @@ class ReloadSubprocessIntegrationTests(unittest.TestCase):
             '    spawned.name = "SpawnedAtRuntime"\n'
             "    spawned.process_priority = 73\n"
             '    spawned.add_to_group("runtime_enemies")\n'
-            "    add_child(spawned)\n",
+            "    add_child(spawned)\n\n"
+            "func _process(_delta):\n"
+            '    if Input.is_action_pressed("godot_mcp_test") and not has_node("InputObserved"):\n'
+            "        var observed = Node2D.new()\n"
+            '        observed.name = "InputObserved"\n'
+            "        add_child(observed)\n",
             encoding="utf-8",
         )
         (self.project / "scenes" / "runtime.tscn").write_text(
@@ -84,6 +91,8 @@ class ReloadSubprocessIntegrationTests(unittest.TestCase):
             'enabled=PackedStringArray("res://addons/godot_mcp/plugin.cfg")\n\n'
             "[godot_mcp]\n"
             f"port={self.port}\n\n"
+            "[input]\n"
+            'godot_mcp_test={"deadzone": 0.5, "events": []}\n\n'
             "[rendering]\n"
             'renderer/rendering_method="gl_compatibility"\n',
             encoding="utf-8",
@@ -179,8 +188,95 @@ class ReloadSubprocessIntegrationTests(unittest.TestCase):
         )
         self.assertEqual(runtime_info["scope"], "runtime")
         self.assertEqual(runtime_info["properties"][0]["value"], 73)
+        run_id = first_run["run_id"]
+        running = bridge.call(
+            "wait_runtime_condition",
+            {
+                "scope": "runtime", "run_id": run_id,
+                "condition": "play_state", "expected_state": "running",
+            },
+        )
+        self.assertTrue(running["matched"])
+        property_condition = self._runtime_call(
+            bridge,
+            "wait_runtime_condition",
+            {
+                "scope": "runtime", "run_id": run_id,
+                "condition": "property", "path": "SpawnedAtRuntime",
+                "property": "process_priority", "comparison": "gte", "value": 70,
+                "timeout_ms": 1000,
+            },
+        )
+        self.assertTrue(property_condition["matched"])
+        count_condition = self._runtime_call(
+            bridge,
+            "wait_runtime_condition",
+            {
+                "scope": "runtime", "run_id": run_id,
+                "condition": "node_count", "path": ".",
+                "group": "runtime_enemies", "comparison": "eq", "value": 1,
+                "timeout_ms": 1000,
+            },
+        )
+        self.assertTrue(count_condition["matched"])
+        injected = self._runtime_call(
+            bridge,
+            "send_input",
+            {"run_id": run_id, "action": "godot_mcp_test", "frames": 5},
+        )
+        self.assertTrue(injected["release_scheduled"])
+        input_observed = self._runtime_call(
+            bridge,
+            "wait_runtime_condition",
+            {
+                "scope": "runtime", "run_id": run_id,
+                "condition": "node_exists", "path": "InputObserved",
+                "exists": True, "timeout_ms": 2000,
+            },
+        )
+        self.assertTrue(input_observed["matched"])
+        try:
+            capture = bridge.call(
+                "capture_game_view", {"run_id": run_id, "max_width": 320, "max_height": 180}
+            )
+        except UnsupportedCapabilityError:
+            capture = None
+        if capture is not None:
+            self.assertLessEqual(capture["width"], 320)
+            self.assertLessEqual(capture["height"], 180)
+            capture_path = (
+                self.project / ".godot" / "godot_mcp" / "captures"
+                / f'{capture["capture_id"]}.png'
+            )
+            self.assertEqual(capture_path.read_bytes()[:8], b"\x89PNG\r\n\x1a\n")
+            capture_path.unlink()
+
+        stopped_results: list[dict] = []
+        stopped_errors: list[Exception] = []
+
+        def wait_for_stopped() -> None:
+            try:
+                stopped_results.append(GodotBridge(self.project, timeout=0.5).call(
+                    "wait_runtime_condition",
+                    {
+                        "scope": "runtime", "run_id": run_id,
+                        "condition": "play_state", "expected_state": "stopped",
+                        "timeout_ms": 3000,
+                    },
+                ))
+            except Exception as exc:
+                stopped_errors.append(exc)
+
+        stopped_thread = threading.Thread(target=wait_for_stopped)
+        stopped_thread.start()
+        time.sleep(0.1)
         bridge.call("control", {"action": "stop", "run_id": first_run["run_id"]})
         self._wait_until(lambda: bridge.call("state", {}).get("playing") is False)
+        stopped_thread.join(timeout=4)
+        self.assertFalse(stopped_thread.is_alive())
+        self.assertEqual(stopped_errors, [])
+        self.assertTrue(stopped_results[0]["matched"])
+        self.assertEqual(stopped_results[0]["evidence"]["play_state"], "stopped")
         second_run = bridge.call("control", {"action": "run"})
         self._wait_until(lambda: bridge.call("state", {}).get("playing") is True)
         self._runtime_call(bridge, "tree", {"tree_scope": "runtime", "limit": 1})

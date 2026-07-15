@@ -79,7 +79,9 @@ The dependency-free editor plugin is split by responsibility under
 - `edited_scene_inspector.gd` owns bounded edited-scene reads and scope routing;
   `runtime_scene_inspector.gd` adapts runtime reads to the same cursor contract.
 - `runtime_debugger_gateway.gd` and `runtime_probe.gd` own the validated
-  editor/game debugger handshake and read-only running-scene data plane.
+  editor/game debugger handshake and bounded running-game data plane;
+  `runtime_gameplay_commands.gd` exposes only the fixed capture, action-input,
+  and condition command family.
 - `scene_commands.gd` owns UndoRedo-backed node/property changes and selection.
 - `project_settings_commands.gd` and `input_map_commands.gd` handle their
   respective validated, atomic project configuration operations.
@@ -110,12 +112,12 @@ rejected even if a client retained an older `tools/list` response.
   edits, and save/run controls. It is intended for models with context windows
   below 8k. Pair it with a confined text-file MCP when GDScript itself must be
   edited; this server never exposes arbitrary file writes.
-- **`small`:** 21 tools for autonomous local agents around 16k context. It adds
+- **`small`:** 24 tools for autonomous local agents around 16k context. It adds
   bounded asset discovery, import scanning, staged imports, folders, and
   whitelisted resource creation, plus atomic project-setting and Input Map
-  editing. This is the appropriate mode when the agent must perform its own
-  unit-test-oriented setup and verification.
-- **`large`:** all 23 tools. It adds `select_node` and the opt-in
+  editing and the fixed gameplay validation loop. This is the appropriate mode
+  when the agent must perform its own unit-test-oriented setup and verification.
+- **`large`:** all 26 tools. It adds `select_node` and the opt-in
   `start_editor` launcher for models that also control the Godot desktop UI.
 
 Example:
@@ -158,6 +160,9 @@ means `small` and `large`.
 | `project_settings_get` | Small+ | Read one setting or up to 100 settings under a prefix |
 | `project_settings_patch` | Small+ | Atomically validate, compare, dry-run, and save up to 32 settings |
 | `input_map_patch` | Small+ | Add/remove key, mouse, and joypad bindings without duplicates |
+| `capture_game_view` | Small+ | Return the active run's bounded main viewport as MCP PNG image content |
+| `send_input` | Small+ | Inject one run-scoped Input Map action with automatic bounded release |
+| `wait_for_runtime_condition` | Small+ | Wait for one play, node, count, or built-in scalar property condition |
 | `select_node` | Large | Select one node in the editor for coordinated desktop inspection |
 | `start_editor` | Large | Start Godot for the configured project using `GODOT_EXECUTABLE` |
 
@@ -204,8 +209,9 @@ The editor plugin temporarily registers the reserved
 `GodotMCPRuntimeProbe` autoload from its own addon folder. It refuses to replace
 a conflicting autoload and removes only its matching registration when the
 plugin stops. The bundled probe communicates solely through Godot's public
-debugger channel: it opens no game-side network port, exposes no mutation or
-method-call command, and never evaluates client-provided GDScript. Without an
+debugger channel: it opens no game-side network port, exposes no arbitrary
+runtime mutation or method-call command, and never evaluates client-provided
+GDScript. Without an
 active `EngineDebugger`—including ordinary non-debug runs and exports—the probe
 does not register a capture or process frames.
 
@@ -215,8 +221,54 @@ supported commands, limits, and a per-process nonce. A missing probe returns
 `runtime_probe_unavailable`, multiple sessions return
 `ambiguous_runtime_session`, an incompatible probe returns `version_mismatch`,
 and stopped/replaced runs or debugger reconnects reject stale runtime IDs and
-cursors. Runtime requests retain at most 16 pending responses, time out after
-two seconds, and remain inside the existing bridge response bound.
+cursors. Runtime requests retain at most 16 pending responses. Inspection and
+capture use a two-second operation bound; condition waits are bounded to ten
+seconds and remain inside the existing bridge response bound.
+
+### Gameplay validation
+
+The three gameplay tools are available in `small` and `large` modes and require
+the exact active `run_id`. `capture_game_view` reads only the running project's
+main viewport, preserves its aspect ratio, and accepts output maxima up to
+2,048 by 2,048 and 4,194,304 pixels. Source viewports are capped at 8,192 per
+dimension and 33,554,432 pixels; staged PNG data is capped at 8 MiB and two
+seconds. The runtime can stage only
+`.godot/godot_mcp/captures/<capture-id>.png`. Python derives that path from the
+validated 32-character identity, rejects symlinks, checks file size, PNG
+signature, and IHDR dimensions, returns MCP image content, and deletes the
+file. The probe also removes abandoned captures after two minutes. A headless
+display server returns `unsupported_capability` because it has no game image.
+
+`send_input` accepts only an existing Input Map action, `strength` from 0 to 1,
+and an explicit `duration_ms` (up to 10,000) or `frames` (up to 600) for a
+press. At most eight injected actions may be held. Release is scheduled inside
+the game process, so it still occurs if the MCP connection closes; all held
+actions are also released when the probe or run shuts down. `pressed:false`
+releases an action immediately. Runtime output marks these records with
+`GodotMCPInjectedInput` so injected actions are distinguishable from physical
+input diagnostics.
+
+`wait_for_runtime_condition` requires `scope:"runtime"` and supports exactly
+four non-composable condition types: `play_state`, `node_exists`, `node_count`,
+and `property`. Play state accepts `expected_state:"running"|"stopped"`.
+Node existence accepts a scene-relative `path` and `exists`; node counts accept
+an optional exact `group`, depth up to 64, comparison, and non-negative count.
+Property conditions accept one scene-relative node, one built-in Godot scalar
+property, and `eq`, `ne`, `lt`, `lte`, `gt`, or `gte`. Restricting conditions
+to built-in scalar properties avoids invoking project-defined getters. Timeouts
+are at most ten seconds, traversal stops after 5,000 nodes, and evidence
+contains at most eight paths. There are no scripts, expressions, regexes,
+method calls, signals, nested property traversal, or `all`/`any` composition.
+
+Example observe-act-verify sequence after `scene_control` returns run ID 3:
+
+```json
+{"run_id":3,"action":"jump","strength":1,"frames":2}
+```
+
+```json
+{"scope":"runtime","run_id":3,"condition":"node_exists","path":"Player/Landed","exists":true,"timeout_ms":2000}
+```
 
 Asset paths are relative to the Godot project and omit `res://`. Asset results
 include `res://` so they can be used directly in Godot properties. The asset
@@ -237,8 +289,8 @@ started by this MCP server is still launching return `starting`. The plugin
 must already be installed and enabled in the project. The MCP server does not
 provide a tool to close the editor.
 
-The fixed context cost depends on the selected mode. `tiny` omits the nine
-asset and settings workflow schemas, while `small` omits the two desktop-only
+The fixed context cost depends on the selected mode. `tiny` omits the twelve
+asset, settings, and gameplay workflow schemas, while `small` omits the two desktop-only
 selection and launcher helpers.
 Exact token usage varies by model and by how the MCP client represents tool
 definitions. Enabling `rooted-files-mcp` alongside this server adds its own tool
@@ -248,10 +300,9 @@ definitions, so prefer `tiny` for tightly supervised GDScript and UI work.
 initialization, its result includes the negotiated protocol version and combines
 the Python MCP server's version, active mode, and exposed MCP tool names with
 the plugin's version, supported bridge commands, optional-feature flags, Godot
-version, and effective limits. Optional features currently reported as
-unsupported are game-view capture and input injection. Runtime inspection is
-reported with probe protocol, autoload availability, commands, and active/ready
-debugger-session counts.
+version, and effective limits. Runtime inspection, game-view capture, input
+injection, and runtime conditions are reported with probe protocol, autoload
+availability, commands, bounds, and active/ready debugger-session counts.
 Targeted inspection and stable pagination are reported as supported, along
 with tree depth/scan, property scan, cursor count/length, and lifetime limits.
 Diagnostics report separate GDScript, C#, and runtime capability flags because
@@ -685,7 +736,7 @@ Set-Location "C:\path\to\godot-editor-mcp"
 py -3 -m unittest discover -s tests -v
 ```
 
-The 70-test Python suite tests MCP initialization, end-to-end stdio initialization,
+The 74-test Python suite tests MCP initialization, end-to-end stdio initialization,
 tool listing and calls, per-mode dispatch, registry invariants, stable ordering,
 complete routes, path/wait policy, schema-to-limit alignment, release consistency,
 capability contracts, authentication, bounded transport behavior, staged imports,
@@ -726,12 +777,14 @@ Run the focused infrastructure and state-transition checks with:
 /path/to/Godot --headless --path plugin --script res://tests/phase7_cursor_store_test.gd
 /path/to/Godot --headless --path plugin --script res://tests/phase8_service_boundary_test.gd
 /path/to/Godot --headless --path plugin --script res://tests/phase9_runtime_inspection_test.gd
+/path/to/Godot --headless --path plugin --script res://tests/phase10_gameplay_validation_test.gd
 ```
 
 On the verified macOS platform, the opt-in subprocess check validates the live
 plugin capability contract, editor/game debugger handshake, spawned-node and
-live-property reads, replacement-run staleness, and authenticated
-reload/reconnect:
+live-property reads, action injection and release, runtime conditions,
+headless-renderer capture rejection, replacement-run staleness, and
+authenticated reload/reconnect:
 
 ```sh
 GODOT_RELOAD_INTEGRATION=1 python3 -m unittest tests.test_reload_integration -v

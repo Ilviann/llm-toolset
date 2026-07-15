@@ -24,7 +24,7 @@ class FakeSocket:
         return None
 
     def settimeout(self, _timeout: float) -> None:
-        pass
+        self.timeout = _timeout
 
     def sendall(self, data: bytes) -> None:
         self.sent += data
@@ -70,6 +70,15 @@ class BridgeTests(unittest.TestCase):
         with patch("socket.create_connection", return_value=peer) as connect:
             GodotBridge(self.root).call("state")
         connect.assert_called_once_with(("127.0.0.1", 6512), 3.0)
+
+    def test_runtime_condition_extends_only_its_bounded_socket_deadline(self) -> None:
+        peer = FakeSocket(b'{"ok":true,"result":{"matched":true}}\n')
+        with patch("socket.create_connection", return_value=peer) as connect:
+            GodotBridge(self.root).call(
+                "wait_runtime_condition", {"timeout_ms": 5000}
+            )
+        connect.assert_called_once_with(("127.0.0.1", 6505), 6.0)
+        self.assertEqual(peer.timeout, 6.0)
 
     def test_plugin_error_is_safe(self) -> None:
         peer = FakeSocket(b'{"ok":false,"error":"No scene is open"}\n')

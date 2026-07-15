@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+import base64
 import json
+import os
+import tempfile
 import unittest
+from pathlib import Path
 
 from godot_editor_mcp import __version__
 from godot_editor_mcp.bridge import BridgeError
@@ -23,6 +27,7 @@ class FakeBridge:
 class FakeAssets:
     def __init__(self) -> None:
         self.calls: list[tuple[str, object]] = []
+        self.project = Path(".")
 
     def import_asset(self, source, destination):
         self.calls.append(("import", (source, destination)))
@@ -110,6 +115,10 @@ class MCPServerTests(unittest.TestCase):
         self.assertIn("project_settings_patch", small)
         self.assertIn("input_map_patch", small)
         self.assertIn("reload_project", tiny)
+        self.assertNotIn("capture_game_view", tiny)
+        self.assertIn("capture_game_view", small)
+        self.assertIn("send_input", small)
+        self.assertIn("wait_for_runtime_condition", small)
 
     def test_tool_outside_mode_is_rejected_without_bridge_call(self) -> None:
         response = self.request("tools/call", {
@@ -246,6 +255,97 @@ class MCPServerTests(unittest.TestCase):
         self.assertEqual(self.bridge.calls, [
             ("tree", tree_arguments), ("inspect", info_arguments),
         ])
+
+    def test_gameplay_tools_route_with_explicit_run_identity(self) -> None:
+        self.server = MCPServer(self.bridge, self.assets, mode="small")  # type: ignore[arg-type]
+        calls = [
+            ("send_input", {
+                "run_id": 4, "action": "jump", "strength": 0.5, "frames": 2,
+            }),
+            ("wait_for_runtime_condition", {
+                "scope": "runtime", "run_id": 4, "condition": "node_exists",
+                "path": "Enemies/Boss", "exists": True, "timeout_ms": 500,
+            }),
+        ]
+        for name, arguments in calls:
+            response = self.request("tools/call", {"name": name, "arguments": arguments})
+            self.assertNotIn("isError", response["result"])
+        self.assertEqual(self.bridge.calls, [
+            ("send_input", calls[0][1]),
+            ("wait_runtime_condition", calls[1][1]),
+        ])
+
+    def test_capture_is_validated_returned_as_image_and_deleted(self) -> None:
+        png = base64.b64decode(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJ"
+            "AAAADUlEQVR42mNk+M/wHwAF/gL+MZ7Z4QAAAABJRU5ErkJggg=="
+        )
+        capture_id = "a" * 32
+        with tempfile.TemporaryDirectory() as folder:
+            project = Path(folder)
+            capture_folder = project / ".godot" / "godot_mcp" / "captures"
+            capture_folder.mkdir(parents=True)
+            capture_path = capture_folder / f"{capture_id}.png"
+
+            class CaptureBridge(FakeBridge):
+                def call(self, command: str, arguments: dict | None = None):
+                    self.calls.append((command, arguments or {}))
+                    capture_path.write_bytes(png)
+                    return {
+                        "capture_id": capture_id, "run_id": 4,
+                        "source_width": 1, "source_height": 1,
+                        "width": 1, "height": 1, "bytes": len(png),
+                        "format": "png",
+                    }
+
+            bridge = CaptureBridge()
+            self.assets.project = project
+            self.server = MCPServer(bridge, self.assets, mode="small")  # type: ignore[arg-type]
+            response = self.request("tools/call", {
+                "name": "capture_game_view", "arguments": {"run_id": 4},
+            })
+            content = response["result"]["content"]
+            self.assertEqual([item["type"] for item in content], ["text", "image"])
+            self.assertEqual(base64.b64decode(content[1]["data"]), png)
+            self.assertEqual(content[1]["mimeType"], "image/png")
+            self.assertFalse(capture_path.exists())
+            self.assertEqual(bridge.calls, [("capture_game_view", {"run_id": 4})])
+
+    def test_capture_folder_symlink_cannot_read_or_delete_outside_project(self) -> None:
+        png = base64.b64decode(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJ"
+            "AAAADUlEQVR42mNk+M/wHwAF/gL+MZ7Z4QAAAABJRU5ErkJggg=="
+        )
+        capture_id = "b" * 32
+        with tempfile.TemporaryDirectory() as folder, tempfile.TemporaryDirectory() as outside:
+            project = Path(folder)
+            staging_parent = project / ".godot" / "godot_mcp"
+            staging_parent.mkdir(parents=True)
+            outside_path = Path(outside) / f"{capture_id}.png"
+            outside_path.write_bytes(png)
+            try:
+                os.symlink(outside, staging_parent / "captures", target_is_directory=True)
+            except (OSError, NotImplementedError):
+                self.skipTest("directory symlinks are unavailable")
+
+            class UnsafeCaptureBridge(FakeBridge):
+                def call(self, command: str, arguments: dict | None = None):
+                    return {
+                        "capture_id": capture_id, "run_id": 4,
+                        "source_width": 1, "source_height": 1,
+                        "width": 1, "height": 1, "bytes": len(png),
+                        "format": "png",
+                    }
+
+            self.assets.project = project
+            self.server = MCPServer(  # type: ignore[arg-type]
+                UnsafeCaptureBridge(), self.assets, mode="small"
+            )
+            response = self.request("tools/call", {
+                "name": "capture_game_view", "arguments": {"run_id": 4},
+            })
+            self.assertTrue(response["result"]["isError"])
+            self.assertTrue(outside_path.exists())
 
     def test_create_resource_is_validated_then_sent_to_editor(self) -> None:
         self.server = MCPServer(self.bridge, self.assets, mode="small")  # type: ignore[arg-type]

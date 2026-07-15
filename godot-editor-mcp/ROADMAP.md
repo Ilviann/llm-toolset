@@ -5,7 +5,7 @@
 - [x] Phase 7 — Make edited-scene and asset inspection targeted and complete.
 - [x] Phase 8 — Separate edited-scene inspection from mutation services.
 - [x] Phase 9 — Inspect the running scene through a read-only runtime probe.
-- [ ] Phase 10 — Capture, drive, and validate gameplay with a minimal fixed API.
+- [x] Phase 10 — Capture, drive, and validate gameplay with a minimal fixed API.
 - [ ] Phase 11 — Author scenes through bounded atomic transactions.
 - [ ] Phase 12 — Add autoload helpers and finish proven project-workflow gaps.
 
@@ -185,6 +185,8 @@ execution.
   feature is treated as feasible.
 
 ## Phase 10 — Minimal gameplay validation
+
+Completed in 0.14.0.
 
 This phase completes the observe-act-verify loop. It deliberately starts with
 Input Map actions and a small declarative condition set instead of physical key

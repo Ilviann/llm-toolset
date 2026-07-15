@@ -29,7 +29,8 @@ EXPECTED_CATALOG_ORDER = (
     "list_assets", "asset_info", "scan_asset", "import_asset", "create_folder",
     "create_resource", "create_scene", "open_scene", "scene_tree", "add_node",
     "instantiate_scene", "node_info", "set_property", "select_node",
-    "scene_control", "project_settings_get", "project_settings_patch",
+    "scene_control", "capture_game_view", "send_input",
+    "wait_for_runtime_condition", "project_settings_get", "project_settings_patch",
     "input_map_patch", "start_editor",
 )
 EXPECTED_MODE_ORDER = {
@@ -44,7 +45,8 @@ EXPECTED_MODE_ORDER = {
         "instantiate_scene", "node_info", "set_property", "scene_control",
         "list_assets", "asset_info", "scan_asset", "import_asset",
         "create_folder", "create_resource", "project_settings_get",
-        "project_settings_patch", "input_map_patch",
+        "project_settings_patch", "input_map_patch", "capture_game_view",
+        "send_input", "wait_for_runtime_condition",
     ),
     "large": (
         "capabilities", "editor_state", "get_diagnostics", "reload_project",
@@ -52,7 +54,8 @@ EXPECTED_MODE_ORDER = {
         "instantiate_scene", "node_info", "set_property", "scene_control",
         "list_assets", "asset_info", "scan_asset", "import_asset",
         "create_folder", "create_resource", "project_settings_get",
-        "project_settings_patch", "input_map_patch", "select_node", "start_editor",
+        "project_settings_patch", "input_map_patch", "capture_game_view",
+        "send_input", "wait_for_runtime_condition", "select_node", "start_editor",
     ),
 }
 
@@ -119,6 +122,26 @@ class ToolRegistryContractTests(unittest.TestCase):
         self.assertEqual(
             schemas["node_info"]["properties"]["limit"]["maximum"],
             EXPECTED_BRIDGE_LIMITS["properties"],
+        )
+        self.assertEqual(
+            schemas["capture_game_view"]["properties"]["max_width"]["maximum"],
+            EXPECTED_BRIDGE_LIMITS["capture_output_width"],
+        )
+        self.assertEqual(
+            schemas["capture_game_view"]["properties"]["max_height"]["maximum"],
+            EXPECTED_BRIDGE_LIMITS["capture_output_height"],
+        )
+        self.assertEqual(
+            schemas["send_input"]["properties"]["duration_ms"]["maximum"],
+            EXPECTED_BRIDGE_LIMITS["input_duration_ms"],
+        )
+        self.assertEqual(
+            schemas["send_input"]["properties"]["frames"]["maximum"],
+            EXPECTED_BRIDGE_LIMITS["input_frames"],
+        )
+        self.assertEqual(
+            schemas["wait_for_runtime_condition"]["properties"]["timeout_ms"]["maximum"],
+            EXPECTED_BRIDGE_LIMITS["condition_timeout_ms"],
         )
 
         for name in ("scene_tree", "node_info"):

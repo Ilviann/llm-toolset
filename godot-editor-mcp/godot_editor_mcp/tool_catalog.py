@@ -335,7 +335,7 @@ _TOOL_DEFINITIONS = [
     {
         "name": "select_node",
         "description": "Select one node in the Godot editor.",
-        "minimum_mode": "large", "mode_order": 21, "target": "bridge",
+        "minimum_mode": "large", "mode_order": 24, "target": "bridge",
         "bridge_command": "select",
         "inputSchema": {
             "type": "object", "properties": PATH_PROPERTY, "required": ["path"],
@@ -363,6 +363,84 @@ _TOOL_DEFINITIONS = [
                 },
             },
             "required": ["action"], "additionalProperties": False,
+        },
+    },
+    {
+        "name": "capture_game_view",
+        "description": "Capture the active run's main viewport as a bounded PNG image.",
+        "minimum_mode": "small", "mode_order": 21, "target": "bridge",
+        "bridge_command": "capture_game_view",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "run_id": {"type": "integer", "minimum": 1},
+                "max_width": {
+                    "type": "integer", "minimum": 1, "maximum": 2048,
+                    "default": 1280,
+                },
+                "max_height": {
+                    "type": "integer", "minimum": 1, "maximum": 2048,
+                    "default": 720,
+                },
+            },
+            "required": ["run_id"], "additionalProperties": False,
+        },
+    },
+    {
+        "name": "send_input",
+        "description": "Inject one bounded Input Map action into the active run.",
+        "minimum_mode": "small", "mode_order": 22, "target": "bridge",
+        "bridge_command": "send_input",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "run_id": {"type": "integer", "minimum": 1},
+                "action": {"type": "string", "minLength": 1, "maxLength": 128},
+                "pressed": {"type": "boolean", "default": True},
+                "strength": {
+                    "type": "number", "minimum": 0, "maximum": 1,
+                    "default": 1,
+                },
+                "duration_ms": {"type": "integer", "minimum": 1, "maximum": 10000},
+                "frames": {"type": "integer", "minimum": 1, "maximum": 600},
+            },
+            "required": ["run_id", "action"], "additionalProperties": False,
+        },
+    },
+    {
+        "name": "wait_for_runtime_condition",
+        "description": "Wait for one bounded runtime play, node, count, or property condition.",
+        "minimum_mode": "small", "mode_order": 23, "target": "bridge",
+        "bridge_command": "wait_runtime_condition",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "scope": {"type": "string", "enum": ["runtime"]},
+                "run_id": {"type": "integer", "minimum": 1},
+                "condition": {
+                    "type": "string",
+                    "enum": ["play_state", "node_exists", "node_count", "property"],
+                },
+                "expected_state": {"type": "string", "enum": ["running", "stopped"]},
+                "path": {**PATH_PROPERTY["path"], "default": "."},
+                "exists": {"type": "boolean", "default": True},
+                "group": {"type": "string", "minLength": 1, "maxLength": 128},
+                "max_depth": {
+                    "type": "integer", "minimum": 0, "maximum": 64, "default": 64,
+                },
+                "property": {"type": "string", "minLength": 1, "maxLength": 128},
+                "comparison": {
+                    "type": "string", "enum": ["eq", "ne", "lt", "lte", "gt", "gte"],
+                    "default": "eq",
+                },
+                "value": {"description": "Scalar comparison value"},
+                "timeout_ms": {
+                    "type": "integer", "minimum": 1, "maximum": 10000,
+                    "default": 1000,
+                },
+            },
+            "required": ["scope", "run_id", "condition"],
+            "additionalProperties": False,
         },
     },
     {
@@ -454,7 +532,7 @@ _TOOL_DEFINITIONS = [
     {
         "name": "start_editor",
         "description": "Start the configured Godot editor for this project.",
-        "minimum_mode": "large", "mode_order": 22, "target": "launcher",
+        "minimum_mode": "large", "mode_order": 25, "target": "launcher",
         "local_handler": "start_editor",
         "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
     },
@@ -511,6 +589,19 @@ EXPECTED_BRIDGE_LIMITS = {
     "runtime_pending_requests": 16,
     "runtime_request_timeout_ms": 2000,
     "runtime_groups": 8,
+    "capture_source_width": 8192,
+    "capture_source_height": 8192,
+    "capture_source_pixels": 33554432,
+    "capture_output_width": 2048,
+    "capture_output_height": 2048,
+    "capture_output_pixels": 4194304,
+    "capture_bytes": 8388608,
+    "capture_timeout_ms": 2000,
+    "concurrent_inputs": 8,
+    "input_duration_ms": 10000,
+    "input_frames": 600,
+    "condition_timeout_ms": 10000,
+    "condition_evidence": 8,
 }
 EXPECTED_EDITOR_ERROR_CODES = (
     "unauthorized", "invalid_argument", "protected_path", "not_found",

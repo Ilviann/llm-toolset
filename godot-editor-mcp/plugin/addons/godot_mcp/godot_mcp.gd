@@ -24,18 +24,19 @@ const PropertyValueCodec := preload("property_value_codec.gd")
 const ReloadCommands := preload("reload_commands.gd")
 const RunStateTracker := preload("run_state_tracker.gd")
 const RuntimeDebuggerGateway := preload("runtime_debugger_gateway.gd")
+const RuntimeGameplayCommands := preload("runtime_gameplay_commands.gd")
 const RuntimeSceneInspector := preload("runtime_scene_inspector.gd")
 const SceneCommands := preload("scene_commands.gd")
 const SceneNodeAccess := preload("scene_node_access.gd")
 const SceneStateTracker := preload("scene_state_tracker.gd")
 
-const BRIDGE_VERSION := "0.13.0"
+const BRIDGE_VERSION := "0.14.0"
 const BRIDGE_PROTOCOL_VERSION := "1"
 const DEFAULT_PORT := 6505
 const TOKEN_PATH := "res://.godot/godot_mcp_token"
 const RUNTIME_PROBE_AUTOLOAD := "GodotMCPRuntimeProbe"
 const RUNTIME_PROBE_PATH := "res://addons/godot_mcp/runtime_probe.gd"
-const RUNTIME_PROBE_VERSION := "1"
+const RUNTIME_PROBE_VERSION := "2"
 
 var _bridge_server
 var _command_services: Array = []
@@ -129,6 +130,8 @@ func _process(_delta: float) -> void:
 		_state_monitor.poll()
 	if _bridge_server != null:
 		_bridge_server.poll()
+	if _runtime_debugger != null:
+		_runtime_debugger.poll()
 	if _discovery != null:
 		_discovery.poll()
 	if _reload_commands != null:
@@ -160,9 +163,12 @@ func _register_commands() -> bool:
 	var input_commands = InputMapCommands.new(
 		Callable(_project_file_state, "mark_saved"), input_events,
 	)
+	var gameplay_commands = RuntimeGameplayCommands.new(
+		_runtime_debugger, Callable(_run_state, "current_run_id"),
+	)
 	_command_services = [
 		asset_commands, edited_scene_inspector, scene_commands,
-		settings_commands, input_commands, _reload_commands,
+		settings_commands, input_commands, gameplay_commands, _reload_commands,
 	]
 	if not _register_handlers("plugin", {
 		"capabilities": Callable(self, "_capabilities"),
@@ -197,8 +203,9 @@ func _capabilities(_arguments: Dictionary) -> Dictionary:
 		"commands": _router.commands(),
 		"features": {
 			"runtime_inspection": _runtime_probe_available,
-			"game_view_capture": false,
-			"input_injection": false,
+			"game_view_capture": _runtime_probe_available,
+			"input_injection": _runtime_probe_available,
+			"runtime_conditions": _runtime_probe_available,
 			"diagnostics": true,
 			"gdscript_diagnostics": true,
 			"csharp_diagnostics": false,
@@ -265,6 +272,19 @@ func _capabilities(_arguments: Dictionary) -> Dictionary:
 			"runtime_pending_requests": Limits.MAX_RUNTIME_PENDING_REQUESTS,
 			"runtime_request_timeout_ms": Limits.RUNTIME_REQUEST_TIMEOUT_MSEC,
 			"runtime_groups": Limits.MAX_RUNTIME_GROUPS,
+			"capture_source_width": Limits.MAX_CAPTURE_SOURCE_WIDTH,
+			"capture_source_height": Limits.MAX_CAPTURE_SOURCE_HEIGHT,
+			"capture_source_pixels": Limits.MAX_CAPTURE_SOURCE_PIXELS,
+			"capture_output_width": Limits.MAX_CAPTURE_OUTPUT_WIDTH,
+			"capture_output_height": Limits.MAX_CAPTURE_OUTPUT_HEIGHT,
+			"capture_output_pixels": Limits.MAX_CAPTURE_OUTPUT_PIXELS,
+			"capture_bytes": Limits.MAX_CAPTURE_BYTES,
+			"capture_timeout_ms": Limits.CAPTURE_TIMEOUT_MSEC,
+			"concurrent_inputs": Limits.MAX_CONCURRENT_INPUTS,
+			"input_duration_ms": Limits.MAX_INPUT_DURATION_MSEC,
+			"input_frames": Limits.MAX_INPUT_FRAMES,
+			"condition_timeout_ms": Limits.MAX_CONDITION_TIMEOUT_MSEC,
+			"condition_evidence": Limits.MAX_CONDITION_EVIDENCE,
 		},
 	})
 

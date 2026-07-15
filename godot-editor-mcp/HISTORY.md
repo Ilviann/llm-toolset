@@ -3,6 +3,21 @@
 This file records released changes. Planned work is tracked separately in
 [`ROADMAP.md`](ROADMAP.md).
 
+## 0.14.0 — 2026-07-15
+
+- Added small/large-mode game viewport capture with fixed project-internal PNG
+  staging, source/output/pixel/byte/time bounds, Python signature and dimension
+  validation, MCP image content, immediate cleanup, and stale-capture cleanup.
+- Added run-scoped Input Map action injection with bounded strength and duration
+  or frame holds, concurrent-input limits, runtime-owned automatic release,
+  shutdown cleanup, and explicitly marked injected-input diagnostics.
+- Added a fixed, non-composable runtime condition API for play transitions,
+  node existence, bounded node counts, and built-in scalar property comparisons,
+  with explicit run/scope identity, bounded evidence, and stable timeouts.
+- Expanded the debugger handshake to probe protocol 2 and added Python,
+  headless runtime, renderer-failure, cleanup, schema/limit, and opt-in live
+  editor/game integration coverage for the observe-act-verify workflow.
+
 ## 0.13.0 — 2026-07-15
 
 - Added a debugger-only, read-only runtime probe and editor debugger gateway

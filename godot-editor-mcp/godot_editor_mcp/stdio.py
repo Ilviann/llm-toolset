@@ -2,9 +2,20 @@
 
 from __future__ import annotations
 
+import base64
 import json
 import sys
+from dataclasses import dataclass
 from typing import Any, Protocol, TextIO
+
+
+@dataclass(frozen=True)
+class ToolImageResult:
+    """Validated image bytes plus concise metadata for an MCP tool result."""
+
+    data: bytes
+    metadata: dict[str, Any]
+    mime_type: str = "image/png"
 
 
 class RequestHandler(Protocol):
@@ -28,6 +39,25 @@ def error(request_id: Any, code: int, message: str) -> dict[str, Any]:
 
 
 def tool_result(value: Any, *, is_error: bool = False) -> dict[str, Any]:
+    if isinstance(value, ToolImageResult):
+        return {
+            "content": [
+                {
+                    "type": "text",
+                    "text": json.dumps(
+                        value.metadata,
+                        ensure_ascii=False,
+                        separators=(",", ":"),
+                        sort_keys=True,
+                    ),
+                },
+                {
+                    "type": "image",
+                    "data": base64.b64encode(value.data).decode("ascii"),
+                    "mimeType": value.mime_type,
+                },
+            ]
+        }
     text = value if isinstance(value, str) else json.dumps(
         value, ensure_ascii=False, separators=(",", ":"), sort_keys=True
     )

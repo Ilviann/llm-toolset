@@ -6,13 +6,26 @@ const Limits := preload("command_limits.gd")
 
 const CAPTURE := "godot_mcp"
 const DEFERRED_RESPONSE_KEY := "__godot_mcp_deferred_response"
-const REQUIRED_COMMANDS := ["inspect", "tree"]
+const REQUIRED_COMMANDS := ["capture", "condition", "input", "inspect", "tree"]
 const REQUIRED_LIMITS := {
 	"tree_nodes": Limits.MAX_TREE_NODES,
 	"tree_depth": Limits.MAX_TREE_DEPTH,
 	"tree_scan": Limits.MAX_TREE_SCAN,
 	"properties": Limits.MAX_PROPERTIES,
 	"property_scan": Limits.MAX_PROPERTY_SCAN,
+	"capture_source_width": Limits.MAX_CAPTURE_SOURCE_WIDTH,
+	"capture_source_height": Limits.MAX_CAPTURE_SOURCE_HEIGHT,
+	"capture_source_pixels": Limits.MAX_CAPTURE_SOURCE_PIXELS,
+	"capture_output_width": Limits.MAX_CAPTURE_OUTPUT_WIDTH,
+	"capture_output_height": Limits.MAX_CAPTURE_OUTPUT_HEIGHT,
+	"capture_output_pixels": Limits.MAX_CAPTURE_OUTPUT_PIXELS,
+	"capture_bytes": Limits.MAX_CAPTURE_BYTES,
+	"capture_timeout_ms": Limits.CAPTURE_TIMEOUT_MSEC,
+	"concurrent_inputs": Limits.MAX_CONCURRENT_INPUTS,
+	"input_duration_ms": Limits.MAX_INPUT_DURATION_MSEC,
+	"input_frames": Limits.MAX_INPUT_FRAMES,
+	"condition_timeout_ms": Limits.MAX_CONDITION_TIMEOUT_MSEC,
+	"condition_evidence": Limits.MAX_CONDITION_EVIDENCE,
 }
 
 var _run_id_provider: Callable
@@ -25,6 +38,7 @@ var _known_sessions: Dictionary = {}
 var _handshakes: Dictionary = {}
 var _pending: Dictionary = {}
 var _ready: Dictionary = {}
+var _local_waits: Dictionary = {}
 
 
 func _init(
@@ -117,17 +131,24 @@ func begin_request(
 			"Runtime debugger identity is stale", ErrorEnvelope.STALE_RUNTIME_ID,
 			{"active_run_id": run_id}, false,
 		)
-	if _pending.size() >= Limits.MAX_RUNTIME_PENDING_REQUESTS:
+	if _pending.size() + _local_waits.size() >= Limits.MAX_RUNTIME_PENDING_REQUESTS:
 		return ErrorEnvelope.failure(
 			"Too many runtime inspection requests are pending",
 			ErrorEnvelope.EDITOR_BUSY,
 			{"limit": Limits.MAX_RUNTIME_PENDING_REQUESTS}, true,
 		)
 	var request_id := Crypto.new().generate_random_bytes(16).hex_encode()
+	var request_timeout := Limits.RUNTIME_REQUEST_TIMEOUT_MSEC
+	if command == "condition":
+		request_timeout = mini(
+			Limits.MAX_CONDITION_TIMEOUT_MSEC,
+			maxi(1, int(arguments.get("timeout_ms", 1000))),
+		) + 500
 	_pending[request_id] = {
 		"session_id": session_id,
 		"run_id": run_id,
-		"deadline_msec": _now_msec() + Limits.RUNTIME_REQUEST_TIMEOUT_MSEC,
+		"deadline_msec": _now_msec() + request_timeout,
+		"timeout_ms": request_timeout,
 		"completion": completion,
 	}
 	_send(session_id, CAPTURE + ":request", [{
@@ -142,6 +163,59 @@ func begin_request(
 	return {DEFERRED_RESPONSE_KEY: request_id}
 
 
+func begin_play_state_wait(arguments: Dictionary) -> Dictionary:
+	var expected = arguments.get("expected_state")
+	if expected != "running" and expected != "stopped":
+		return ErrorEnvelope.failure(
+			"play_state requires expected_state running or stopped",
+			ErrorEnvelope.INVALID_ARGUMENT,
+		)
+	var timeout = arguments.get("timeout_ms", 1000)
+	if (
+		(not timeout is int and not timeout is float)
+		or float(timeout) != floorf(float(timeout))
+		or int(timeout) < 1
+		or int(timeout) > Limits.MAX_CONDITION_TIMEOUT_MSEC
+	):
+		return ErrorEnvelope.failure(
+			"Condition timeout is out of bounds", ErrorEnvelope.INVALID_ARGUMENT,
+		)
+	var run_id = arguments.get("run_id")
+	if expected == "running":
+		return ErrorEnvelope.success({
+			"scope": "runtime", "run_id": run_id, "condition": "play_state",
+			"matched": true, "evidence": {"play_state": "running"},
+		})
+	if _pending.size() + _local_waits.size() >= Limits.MAX_RUNTIME_PENDING_REQUESTS:
+		return ErrorEnvelope.failure(
+			"Too many runtime requests are pending", ErrorEnvelope.EDITOR_BUSY,
+			{"limit": Limits.MAX_RUNTIME_PENDING_REQUESTS}, true,
+		)
+	var request_id := Crypto.new().generate_random_bytes(16).hex_encode()
+	_local_waits[request_id] = {
+		"run_id": run_id,
+		"deadline_msec": _now_msec() + int(timeout),
+	}
+	return {DEFERRED_RESPONSE_KEY: request_id}
+
+
+func poll() -> void:
+	_prune_ready()
+	var active = _run_id_provider.call() if _run_id_provider.is_valid() else null
+	var now := _now_msec()
+	for request_id in _local_waits.keys():
+		var wait: Dictionary = _local_waits[request_id]
+		if active != wait.run_id:
+			_store_ready(request_id, _play_state_stopped(int(wait.run_id)))
+			_local_waits.erase(request_id)
+		elif now >= int(wait.deadline_msec):
+			_store_ready(request_id, ErrorEnvelope.failure(
+				"Runtime condition timed out", ErrorEnvelope.TIMEOUT,
+				{"condition": "play_state"}, true,
+			))
+			_local_waits.erase(request_id)
+
+
 func take_response(request_id: Variant) -> Variant:
 	_prune_ready()
 	if not request_id is String:
@@ -153,6 +227,8 @@ func take_response(request_id: Variant) -> Variant:
 		_ready.erase(request_id)
 		return response
 	if not _pending.has(request_id):
+		if _local_waits.has(request_id):
+			return null
 		return ErrorEnvelope.failure(
 			"Runtime response identity is stale", ErrorEnvelope.STALE_RUNTIME_ID,
 		)
@@ -161,8 +237,8 @@ func take_response(request_id: Variant) -> Variant:
 		return null
 	_pending.erase(request_id)
 	return ErrorEnvelope.failure(
-		"Runtime inspection timed out", ErrorEnvelope.TIMEOUT,
-		{"timeout_ms": Limits.RUNTIME_REQUEST_TIMEOUT_MSEC}, true,
+		"Runtime request timed out", ErrorEnvelope.TIMEOUT,
+		{"timeout_ms": int(pending.timeout_ms)}, true,
 	)
 
 
@@ -172,6 +248,11 @@ func stop() -> void:
 			"Runtime debugger session stopped", ErrorEnvelope.STALE_RUNTIME_ID,
 		))
 	_pending.clear()
+	for request_id in _local_waits:
+		_store_ready(request_id, ErrorEnvelope.failure(
+			"Runtime debugger stopped", ErrorEnvelope.STALE_RUNTIME_ID,
+		))
+	_local_waits.clear()
 	_handshakes.clear()
 	_known_sessions.clear()
 
@@ -311,6 +392,10 @@ func _on_session_stopped(session_id: int) -> void:
 				"Runtime debugger session stopped", ErrorEnvelope.STALE_RUNTIME_ID,
 			))
 			_pending.erase(request_id)
+	for request_id in _local_waits.keys():
+		var wait: Dictionary = _local_waits[request_id]
+		_store_ready(request_id, _play_state_stopped(int(wait.run_id)))
+		_local_waits.erase(request_id)
 
 
 func _active_session_ids() -> Array[int]:
@@ -363,6 +448,13 @@ func _store_ready(request_id: String, response: Dictionary) -> void:
 		"response": response,
 		"deadline_msec": _now_msec() + Limits.RUNTIME_REQUEST_TIMEOUT_MSEC,
 	}
+
+
+func _play_state_stopped(run_id: int) -> Dictionary:
+	return ErrorEnvelope.success({
+		"scope": "runtime", "run_id": run_id, "condition": "play_state",
+		"matched": true, "evidence": {"play_state": "stopped"},
+	})
 
 
 func _prune_ready() -> void:

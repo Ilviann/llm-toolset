@@ -57,10 +57,11 @@ class GodotBridge:
         return token
 
     def call(self, command: str, arguments: dict[str, Any] | None = None) -> Any:
+        call_arguments = arguments or {}
         request = {
             "token": self._token(),
             "command": command,
-            "arguments": arguments or {},
+            "arguments": call_arguments,
         }
         encoded = json.dumps(
             request, ensure_ascii=False, separators=(",", ":")
@@ -69,10 +70,15 @@ class GodotBridge:
             raise BridgeError("Request is too large", code=ErrorCode.REQUEST_TOO_LARGE)
 
         port = self.port if self.port is not None else discovered_port(self.project, 6505)
+        socket_timeout = self.timeout
+        if command == "wait_runtime_condition":
+            condition_timeout = call_arguments.get("timeout_ms", 1000)
+            if type(condition_timeout) is int and 1 <= condition_timeout <= 10000:
+                socket_timeout = max(socket_timeout, condition_timeout / 1000.0 + 1.0)
 
         try:
-            with socket.create_connection((self.host, port), self.timeout) as peer:
-                peer.settimeout(self.timeout)
+            with socket.create_connection((self.host, port), socket_timeout) as peer:
+                peer.settimeout(socket_timeout)
                 peer.sendall(encoded)
                 response = self._read_line(peer)
         except (OSError, TimeoutError):
