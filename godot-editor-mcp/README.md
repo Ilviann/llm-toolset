@@ -28,9 +28,10 @@ The dependency-free Python package separates stable responsibilities so changes
 to one boundary do not require editing the entire server:
 
 - `server.py` validates MCP requests and preserves the package's public server API.
-- `tool_catalog.py` contains the static tool schemas, protocol versions, and mode policy.
-- `tool_dispatch.py` routes tool calls, performs project-path preflight checks,
-  and coordinates imports, scans, capabilities, and editor launch.
+- `tool_catalog.py` contains one typed specification per tool and derives schemas,
+  stable mode ordering, bridge routes, path/wait policy, and checked bridge contracts.
+- `tool_dispatch.py` resolves those specifications, applies project-path policy,
+  and coordinates focused bridge, import, folder, and editor-launch handlers.
 - `stdio.py` owns newline-delimited JSON-RPC input/output and stderr diagnostics.
 - `cli.py` parses arguments and composes the bridge, asset manager, launcher,
   and MCP server.
@@ -54,7 +55,7 @@ The dependency-free editor plugin is split by responsibility under
 
 - `godot_mcp.gd` owns only plugin lifecycle and service composition.
 - `bridge_server.gd` and `command_router.gd` own authenticated localhost
-  transport and command dispatch.
+  transport, direct-callable dispatch, and duplicate-safe command ownership.
 - `editor_state_monitor.gd`, `event_store.gd`, and `operation_registry.gd` own
   observed editor/import state, monotonic event IDs, and asynchronous operation IDs.
 - `diagnostic_store.gd` is a thread-safe bounded Godot logger and read API.
@@ -73,9 +74,11 @@ The dependency-free editor plugin is split by responsibility under
 - `command_limits.gd` is the single source for limits used by handlers and the
   `capabilities` response.
 
-Keep command names and wire responses stable when changing these modules. New
-command families should remain focused and inherit the shared validation base
-rather than duplicating path or result handling.
+Keep command names and wire responses stable when changing these modules. Each
+command service publishes its own handler mapping; the composition root retains
+the service and registers that mapping explicitly. New command families should
+remain focused and inherit the shared validation base rather than duplicating
+path or result handling.
 
 ## Tool modes
 
@@ -598,13 +601,13 @@ Set-Location "C:\path\to\godot-editor-mcp"
 py -3 -m unittest discover -s tests -v
 ```
 
-The 44-test Python suite tests MCP initialization, end-to-end stdio initialization,
-tool listing and calls, per-mode dispatch, capability augmentation, public scan
-route selection, Project Settings command routing, authentication, bounded transport
-behavior, staged imports, traversal and symlink denial, size limits,
-no-overwrite behavior, structured and legacy bridge errors, negotiated protocol
-reporting, discovery record validation, safe stdout/stderr error separation,
-wait completion and timeout behavior, diagnostic settling, and run startup health.
+The 56-test Python suite tests MCP initialization, end-to-end stdio initialization,
+tool listing and calls, per-mode dispatch, registry invariants, stable ordering,
+complete routes, path/wait policy, schema-to-limit alignment, release consistency,
+capability contracts, authentication, bounded transport behavior, staged imports,
+traversal and symlink denial, size limits, no-overwrite behavior, structured and
+legacy bridge errors, discovery, safe stdout/stderr error separation, waits,
+diagnostic settling, and run startup health.
 A live check in Godot is still required
 when claiming compatibility because editor plugin APIs are only available inside
 the editor. Symbolic-link tests are skipped when the current account cannot
@@ -621,6 +624,20 @@ Run the bounded diagnostic store checks with:
 
 ```sh
 /path/to/Godot --headless --path plugin --script res://tests/phase2_diagnostics_test.gd
+```
+
+Run the reload-record and duplicate-safe router checks with:
+
+```sh
+/path/to/Godot --headless --path plugin --script res://tests/phase3_reload_record_test.gd
+/path/to/Godot --headless --path plugin --script res://tests/phase4_command_router_test.gd
+```
+
+On the verified macOS platform, the opt-in subprocess check validates the live
+plugin capability contract before exercising authenticated reload/reconnect:
+
+```sh
+GODOT_RELOAD_INTEGRATION=1 python3 -m unittest tests.test_reload_integration -v
 ```
 
 Windows PowerShell uses the same arguments:

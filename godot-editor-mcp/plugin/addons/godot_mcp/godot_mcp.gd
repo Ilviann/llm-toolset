@@ -16,12 +16,13 @@ const ProjectSettingsCommands := preload("project_settings_commands.gd")
 const ReloadCommands := preload("reload_commands.gd")
 const SceneCommands := preload("scene_commands.gd")
 
-const BRIDGE_VERSION := "0.7.0"
+const BRIDGE_VERSION := "0.8.0"
 const BRIDGE_PROTOCOL_VERSION := "1"
 const DEFAULT_PORT := 6505
 const TOKEN_PATH := "res://.godot/godot_mcp_token"
 
 var _bridge_server
+var _command_services: Array = []
 var _discovery
 var _diagnostics
 var _events
@@ -53,7 +54,9 @@ func _enter_tree() -> void:
 	if not scene_saved.is_connected(_on_scene_saved):
 		scene_saved.connect(_on_scene_saved)
 	_router = CommandRouter.new()
-	_register_commands()
+	if not _register_commands():
+		_shutdown_services()
+		return
 
 	_bridge_server = BridgeServer.new()
 	var error: int = _bridge_server.start(_port, token, Callable(_router, "dispatch"))
@@ -91,12 +94,7 @@ func _process(_delta: float) -> void:
 		_reload_commands.poll()
 
 
-func _register_commands() -> void:
-	_router.register_handler("capabilities", Callable(self, "_capabilities"))
-	_router.register_handler("state", Callable(self, "_editor_state"))
-	_router.register_handler("diagnostics", Callable(_diagnostics, "read"))
-	_router.register_handler("control", Callable(_state_monitor, "scene_control"))
-
+func _register_commands() -> bool:
 	var asset_commands = AssetCommands.new(
 		get_editor_interface(), get_undo_redo(), _operations, _state_monitor,
 	)
@@ -107,19 +105,28 @@ func _register_commands() -> void:
 	var input_commands = InputMapCommands.new(
 		get_editor_interface(), get_undo_redo(), _operations, _state_monitor,
 	)
-	_router.register_service(
-		["assets", "asset_info", "scan_asset", "create_resource", "create_scene", "open_scene"],
-		asset_commands,
-	)
-	_router.register_service(
-		["tree", "inspect", "add_node", "instantiate_scene", "set_property", "select"],
-		scene_commands,
-	)
-	_router.register_service(
-		["project_settings_get", "project_settings_patch"], settings_commands,
-	)
-	_router.register_handler("input_map_patch", Callable(input_commands, "execute"))
-	_router.register_service(["reload_project", "reload_status"], _reload_commands)
+	_command_services = [
+		asset_commands, scene_commands, settings_commands, input_commands, _reload_commands,
+	]
+	if not _register_handlers("plugin", {
+		"capabilities": Callable(self, "_capabilities"),
+		"state": Callable(self, "_editor_state"),
+		"diagnostics": Callable(_diagnostics, "read"),
+		"control": Callable(_state_monitor, "scene_control"),
+	}):
+		return false
+	for service in _command_services:
+		if not _register_handlers(service.get_script().resource_path.get_file(), service.handlers()):
+			return false
+	return true
+
+
+func _register_handlers(owner: String, handlers: Dictionary) -> bool:
+	var registration: Dictionary = _router.register_handlers(owner, handlers)
+	if registration.ok:
+		return true
+	push_error("Godot MCP command registration failed: %s" % ErrorEnvelope.message(registration))
+	return false
 
 
 func _capabilities(_arguments: Dictionary) -> Dictionary:
@@ -204,6 +211,7 @@ func _shutdown_services() -> void:
 	if _diagnostics != null:
 		OS.remove_logger(_diagnostics)
 	_bridge_server = null
+	_command_services.clear()
 	_discovery = null
 	_diagnostics = null
 	_events = null

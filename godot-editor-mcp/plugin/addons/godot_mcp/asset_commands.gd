@@ -9,22 +9,15 @@ const CREATABLE_RESOURCE_TYPES := [
 ]
 
 
-func execute(command: String, arguments: Dictionary) -> Dictionary:
-	match command:
-		"assets":
-			return _list_assets(arguments)
-		"asset_info":
-			return _asset_info(arguments)
-		"scan_asset":
-			return _scan_asset(arguments)
-		"create_resource":
-			return _create_resource(arguments)
-		"create_scene":
-			return _create_scene(arguments)
-		"open_scene":
-			return _open_scene(arguments)
-		_:
-			return _failure("Unknown asset command")
+func handlers() -> Dictionary:
+	return {
+		"assets": Callable(self, "_list_assets"),
+		"asset_info": Callable(self, "_asset_info"),
+		"scan_asset": Callable(self, "_scan_asset"),
+		"create_resource": Callable(self, "_create_resource"),
+		"create_scene": Callable(self, "_create_scene"),
+		"open_scene": Callable(self, "_open_scene"),
+	}
 
 
 func _list_assets(arguments: Dictionary) -> Dictionary:

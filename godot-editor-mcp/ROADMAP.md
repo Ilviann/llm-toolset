@@ -3,7 +3,7 @@
 ## Phase checklist
 
 - [x] Phase 3 — Reload the configured project and reconnect safely.
-- [ ] Phase 4 — Consolidate tool contracts and add cross-language guardrails.
+- [x] Phase 4 — Consolidate tool contracts and add cross-language guardrails.
 - [ ] Phase 5 — Replace broad command inheritance with narrow services.
 - [ ] Phase 6 — Separate editor-state ownership and typed wait contracts.
 - [ ] Phase 7 — Make edited-scene and asset inspection targeted and complete.
@@ -93,6 +93,10 @@ bridge route, path policy, wait behavior, and editor-side registration are
 represented in several places. This phase makes those relationships explicit
 and testable before later phases add filters, cursors, runtime scopes, and new
 commands.
+
+Completed in 0.8.0. Model-facing policy now comes from one typed Python tool
+registry, Godot services publish their owned callables to a duplicate-safe
+router, and automated checks cover registry, live bridge, and release contracts.
 
 ### Python tool registry
 

@@ -29,14 +29,11 @@ func _init(
 	_recover_pending()
 
 
-func execute(command: String, arguments: Dictionary) -> Dictionary:
-	match command:
-		"reload_project":
-			return _schedule(arguments)
-		"reload_status":
-			return _status(arguments)
-		_:
-			return ErrorEnvelope.failure("Unknown reload command", ErrorEnvelope.INVALID_ARGUMENT)
+func handlers() -> Dictionary:
+	return {
+		"reload_project": Callable(self, "_schedule"),
+		"reload_status": Callable(self, "_status"),
+	}
 
 
 func poll() -> void:

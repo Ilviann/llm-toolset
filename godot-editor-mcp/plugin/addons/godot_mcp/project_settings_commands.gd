@@ -5,14 +5,11 @@ const MAX_SETTINGS := Limits.MAX_SETTINGS
 const MAX_SETTING_CHANGES := Limits.MAX_SETTING_CHANGES
 
 
-func execute(command: String, arguments: Dictionary) -> Dictionary:
-	match command:
-		"project_settings_get":
-			return _project_settings_get(arguments)
-		"project_settings_patch":
-			return _project_settings_patch(arguments)
-		_:
-			return _failure("Unknown project settings command")
+func handlers() -> Dictionary:
+	return {
+		"project_settings_get": Callable(self, "_project_settings_get"),
+		"project_settings_patch": Callable(self, "_project_settings_patch"),
+	}
 
 
 func _project_settings_get(arguments: Dictionary) -> Dictionary:
@@ -295,4 +292,3 @@ func _encode_setting_value(value: Variant, depth := 0) -> Variant:
 			return output
 		_:
 			return "<unsupported:%s>" % type_string(typeof(value))
-

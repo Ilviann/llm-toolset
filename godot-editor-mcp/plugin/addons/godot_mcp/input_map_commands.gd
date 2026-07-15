@@ -4,8 +4,8 @@ const Limits := preload("command_limits.gd")
 const MAX_INPUT_EVENTS := Limits.MAX_INPUT_EVENTS
 
 
-func execute(arguments: Dictionary) -> Dictionary:
-	return _input_map_patch(arguments)
+func handlers() -> Dictionary:
+	return {"input_map_patch": Callable(self, "_input_map_patch")}
 
 
 func _input_map_patch(arguments: Dictionary) -> Dictionary:
@@ -210,4 +210,3 @@ func _named_index(value: Variant, names: Dictionary) -> Dictionary:
 	if value is String and value.to_lower() in names:
 		return _success(names[value.to_lower()])
 	return _failure("Named index is invalid")
-

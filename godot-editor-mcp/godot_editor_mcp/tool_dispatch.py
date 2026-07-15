@@ -8,7 +8,7 @@ from . import __version__
 from .assets import AssetError
 from .bridge import BridgeError
 from .launcher import LauncherError
-from .tool_catalog import MODE_TOOL_NAMES, Mode
+from .tool_catalog import BRIDGE_COMMANDS, MODE_TOOL_NAMES, SPEC_BY_NAME, Mode, ToolSpec
 from .waiting import DEFAULT_STARTUP_WINDOW_MS, OperationWaiter
 
 
@@ -33,30 +33,6 @@ class EditorStarter(Protocol):
 
 TOOL_ERRORS = (AssetError, BridgeError, LauncherError, TypeError, ValueError)
 
-BRIDGE_COMMANDS = {
-    "capabilities": "capabilities",
-    "editor_state": "state",
-    "get_diagnostics": "diagnostics",
-    "reload_project": "reload_project",
-    "list_assets": "assets",
-    "asset_info": "asset_info",
-    "scan_asset": "scan_asset",
-    "create_resource": "create_resource",
-    "create_scene": "create_scene",
-    "open_scene": "open_scene",
-    "scene_tree": "tree",
-    "node_info": "inspect",
-    "add_node": "add_node",
-    "instantiate_scene": "instantiate_scene",
-    "set_property": "set_property",
-    "select_node": "select",
-    "scene_control": "control",
-    "project_settings_get": "project_settings_get",
-    "project_settings_patch": "project_settings_patch",
-    "input_map_patch": "input_map_patch",
-}
-
-
 class ToolDispatcher:
     """Execute tools exposed by one mode against injected local services."""
 
@@ -74,50 +50,64 @@ class ToolDispatcher:
         self.launcher = launcher
         self.tool_names = MODE_TOOL_NAMES[mode]
         self.waiter = OperationWaiter(bridge)
+        self._local_handlers = {
+            "start_editor": self._start_editor,
+            "import_asset": self._import_asset,
+            "create_folder": self._create_folder,
+        }
 
     def call(self, name: str, arguments: dict[str, Any]) -> Any:
-        if name == "start_editor":
-            return self._start_editor(arguments)
-        if name == "import_asset":
-            return self._import_asset(arguments)
-        if name == "create_folder":
-            return self._create_folder(arguments)
-
-        command = BRIDGE_COMMANDS.get(name)
-        if command is None:
+        spec = SPEC_BY_NAME.get(name)
+        if spec is None:
             raise ValueError("Unknown tool")
-        self._validate_project_path(name, arguments)
-        wait, timeout_ms = self.waiter.options(arguments) if name in {
-            "open_scene", "scan_asset", "scene_control", "reload_project"
-        } else (False, 0)
-        bridge_arguments = (
-            self.waiter.bridge_arguments(arguments) if name in {
-            "open_scene", "scan_asset", "scene_control", "reload_project"
-            } else arguments
+        if spec.target != "bridge":
+            handler = self._local_handlers.get(spec.local_handler or "")
+            if handler is None:
+                raise ValueError("Tool has no local execution handler")
+            return handler(arguments)
+        return self._call_bridge(spec, arguments)
+
+    def _call_bridge(self, spec: ToolSpec, arguments: dict[str, Any]) -> Any:
+        if spec.bridge_command is None:
+            raise ValueError("Tool has no bridge command")
+        self._validate_project_path(spec, arguments)
+        wait, timeout_ms = (
+            self.waiter.options(arguments)
+            if spec.wait_strategy != "none"
+            else (False, 0)
         )
-        output = self.bridge.call(command, bridge_arguments)
+        bridge_arguments = (
+            self.waiter.bridge_arguments(arguments)
+            if spec.wait_strategy != "none"
+            else arguments
+        )
+        output = self.bridge.call(spec.bridge_command, bridge_arguments)
         if wait and isinstance(output, dict):
             operation_id = output.get("operation_id")
-            if name == "open_scene":
+            if spec.wait_strategy == "scene":
                 output["wait"] = self.waiter.wait_for_scene(
                     str(arguments.get("path", "")), operation_id, timeout_ms
                 )
-            elif name == "scan_asset":
+            elif spec.wait_strategy == "asset":
                 output["wait"] = self.waiter.wait_for_asset(
                     str(arguments.get("path", "")), operation_id, timeout_ms
                 )
-            elif name == "scene_control":
+            elif spec.wait_strategy == "control":
                 output["wait"] = self._wait_for_control(
                     arguments, output, operation_id, timeout_ms
                 )
-            elif name == "reload_project":
+            elif spec.wait_strategy == "reload":
                 output["wait"] = self.waiter.wait_for_reload(
                     operation_id,
                     output.get("project_hash"),
                     output.get("bridge_version"),
                     timeout_ms,
                 )
-        return self._augment_capabilities(output) if name == "capabilities" else output
+        return (
+            self._augment_capabilities(output)
+            if spec.name == "capabilities"
+            else output
+        )
 
     def close(self) -> None:
         self.waiter.cancel()
@@ -151,21 +141,20 @@ class ToolDispatcher:
             raise AssetError(message)
         return self.assets
 
-    def _validate_project_path(self, name: str, arguments: dict[str, Any]) -> None:
-        if self.assets is None:
+    def _validate_project_path(
+        self, spec: ToolSpec, arguments: dict[str, Any]
+    ) -> None:
+        if self.assets is None or spec.path_kind == "none" or spec.path_field is None:
             return
-        if name == "list_assets":
-            self.assets.validate_folder(arguments.get("folder", "."))
-        elif name in {"asset_info", "scan_asset"}:
-            self.assets.validate_file(arguments.get("path"))
-        elif name == "create_scene":
-            self.assets.validate_new_file(arguments.get("path"), {".tscn"})
-        elif name == "create_resource":
-            self.assets.validate_new_file(arguments.get("path"), {".tres"})
-        elif name == "open_scene":
-            self.assets.validate_file(arguments.get("path"), {".tscn", ".scn"})
-        elif name == "instantiate_scene":
-            self.assets.validate_file(arguments.get("scene"), {".tscn", ".scn"})
+        value = arguments.get(spec.path_field, "." if spec.path_kind == "folder" else None)
+        extensions = set(spec.path_extensions) or None
+        if spec.path_kind == "folder":
+            self.assets.validate_folder(value)
+        elif spec.path_kind == "file":
+            self.assets.validate_file(value, extensions)
+        elif spec.path_kind == "new_file":
+            assert extensions is not None
+            self.assets.validate_new_file(value, extensions)
 
     def _augment_capabilities(self, output: Any) -> Any:
         if not isinstance(output, dict):

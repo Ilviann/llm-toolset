@@ -5,25 +5,18 @@ const MAX_TREE_NODES := Limits.MAX_TREE_NODES
 const MAX_PROPERTIES := Limits.MAX_PROPERTIES
 
 
-func execute(command: String, arguments: Dictionary) -> Dictionary:
-	match command:
-		"tree":
-			return _scene_tree()
-		"inspect":
-			return _inspect_node(arguments)
-		"add_node":
-			return _add_node(arguments)
-		"instantiate_scene":
-			return _instantiate_scene(arguments)
-		"set_property":
-			return _set_property(arguments)
-		"select":
-			return _select_node(arguments)
-		_:
-			return _failure("Unknown scene command")
+func handlers() -> Dictionary:
+	return {
+		"tree": Callable(self, "_scene_tree"),
+		"inspect": Callable(self, "_inspect_node"),
+		"add_node": Callable(self, "_add_node"),
+		"instantiate_scene": Callable(self, "_instantiate_scene"),
+		"set_property": Callable(self, "_set_property"),
+		"select": Callable(self, "_select_node"),
+	}
 
 
-func _scene_tree() -> Dictionary:
+func _scene_tree(_arguments: Dictionary) -> Dictionary:
 	var root := get_editor_interface().get_edited_scene_root()
 	if root == null:
 		return _failure("No scene is open")

@@ -11,10 +11,12 @@ import time
 import unittest
 from pathlib import Path
 
+from godot_editor_mcp import __version__
 from godot_editor_mcp.bridge import GodotBridge
 from godot_editor_mcp.discovery import read_discovery_record
 from godot_editor_mcp.errors import EditorBusyError, SaveFailedError
 from godot_editor_mcp.tool_dispatch import ToolDispatcher
+from godot_editor_mcp.tool_catalog import bridge_contract_mismatches
 
 
 RUN_INTEGRATION = os.environ.get("GODOT_RELOAD_INTEGRATION") == "1"
@@ -92,6 +94,12 @@ class ReloadSubprocessIntegrationTests(unittest.TestCase):
 
     def test_reload_safeguards_and_authenticated_reconnect(self) -> None:
         bridge = GodotBridge(self.project, timeout=0.5)
+        self.assertEqual(
+            bridge_contract_mismatches(
+                bridge.call("capabilities", {}), expected_version=__version__
+            ),
+            [],
+        )
         created = bridge.call(
             "create_scene",
             {"path": "scenes/main.tscn", "root_type": "Node2D", "root_name": "Main"},

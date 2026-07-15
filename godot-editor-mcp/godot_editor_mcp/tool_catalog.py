@@ -1,11 +1,12 @@
-"""Static MCP tool definitions and mode policy.
+"""Declarative MCP tool registry and cross-language contract policy.
 
-Keeping schemas in a data-only module makes the model-facing API easy to review
-without mixing it with transport or execution code.
+Keeping declarative policy separate makes the model-facing API easy to review
+without mixing it with transport or execution collaborators.
 """
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Literal
 
 
@@ -27,21 +28,57 @@ WAIT_PROPERTIES = {
 
 Mode = Literal["tiny", "small", "large"]
 MODES: tuple[Mode, ...] = ("tiny", "small", "large")
+ExecutionTarget = Literal["bridge", "assets", "launcher"]
+PathKind = Literal[
+    "none", "folder", "file", "new_file", "asset_import", "create_folder"
+]
+WaitStrategy = Literal["none", "scene", "asset", "control", "reload"]
 
-TOOLS = [
+
+@dataclass(frozen=True)
+class ToolSpec:
+    """One model-facing tool's schema, exposure, routing, and wait policy."""
+
+    name: str
+    description: str
+    inputSchema: dict[str, object]
+    minimum_mode: Mode
+    mode_order: int
+    target: ExecutionTarget
+    bridge_command: str | None = None
+    local_handler: str | None = None
+    path_kind: PathKind = "none"
+    path_field: str | None = None
+    path_extensions: tuple[str, ...] = ()
+    wait_strategy: WaitStrategy = "none"
+
+    def mcp_definition(self) -> dict[str, object]:
+        return {
+            "name": self.name,
+            "description": self.description,
+            "inputSchema": self.inputSchema,
+        }
+
+_TOOL_DEFINITIONS = [
     {
         "name": "capabilities",
         "description": "Get bridge versions, commands, features, and limits.",
+        "minimum_mode": "tiny", "mode_order": 0, "target": "bridge",
+        "bridge_command": "capabilities",
         "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
     },
     {
         "name": "editor_state",
         "description": "Get Godot version, current scene, selection, and play state.",
+        "minimum_mode": "tiny", "mode_order": 1, "target": "bridge",
+        "bridge_command": "state",
         "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
     },
     {
         "name": "get_diagnostics",
         "description": "Read bounded editor, parser, and runtime diagnostics.",
+        "minimum_mode": "tiny", "mode_order": 2, "target": "bridge",
+        "bridge_command": "diagnostics",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -63,6 +100,8 @@ TOOLS = [
     {
         "name": "reload_project",
         "description": "Safely restart this project and optionally wait for reconnect.",
+        "minimum_mode": "tiny", "mode_order": 3, "target": "bridge",
+        "bridge_command": "reload_project", "wait_strategy": "reload",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -76,6 +115,8 @@ TOOLS = [
     {
         "name": "list_assets",
         "description": "List project assets, limited to 100 results.",
+        "minimum_mode": "small", "mode_order": 12, "target": "bridge",
+        "bridge_command": "assets", "path_kind": "folder", "path_field": "folder",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -96,6 +137,8 @@ TOOLS = [
     {
         "name": "asset_info",
         "description": "Get one asset's type, size, import state, and dependencies.",
+        "minimum_mode": "small", "mode_order": 13, "target": "bridge",
+        "bridge_command": "asset_info", "path_kind": "file", "path_field": "path",
         "inputSchema": {
             "type": "object", "properties": {"path": RESOURCE_PATH},
             "required": ["path"], "additionalProperties": False,
@@ -104,6 +147,9 @@ TOOLS = [
     {
         "name": "scan_asset",
         "description": "Queue a Godot filesystem scan for one project asset.",
+        "minimum_mode": "small", "mode_order": 14, "target": "bridge",
+        "bridge_command": "scan_asset", "path_kind": "file", "path_field": "path",
+        "wait_strategy": "asset",
         "inputSchema": {
             "type": "object", "properties": {"path": RESOURCE_PATH, **WAIT_PROPERTIES},
             "required": ["path"], "additionalProperties": False,
@@ -112,6 +158,9 @@ TOOLS = [
     {
         "name": "import_asset",
         "description": "Copy one staged file into the project and queue Godot import.",
+        "minimum_mode": "small", "mode_order": 15, "target": "assets",
+        "local_handler": "import_asset", "path_kind": "asset_import",
+        "wait_strategy": "asset",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -125,6 +174,8 @@ TOOLS = [
     {
         "name": "create_folder",
         "description": "Create a folder inside the Godot project.",
+        "minimum_mode": "small", "mode_order": 16, "target": "assets",
+        "local_handler": "create_folder", "path_kind": "create_folder",
         "inputSchema": {
             "type": "object", "properties": {"path": RESOURCE_PATH},
             "required": ["path"], "additionalProperties": False,
@@ -133,6 +184,9 @@ TOOLS = [
     {
         "name": "create_resource",
         "description": "Create a whitelisted built-in resource as a text .tres file.",
+        "minimum_mode": "small", "mode_order": 17, "target": "bridge",
+        "bridge_command": "create_resource", "path_kind": "new_file", "path_field": "path",
+        "path_extensions": (".tres",),
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -153,6 +207,9 @@ TOOLS = [
     {
         "name": "create_scene",
         "description": "Create a scene with one built-in root node.",
+        "minimum_mode": "tiny", "mode_order": 4, "target": "bridge",
+        "bridge_command": "create_scene", "path_kind": "new_file", "path_field": "path",
+        "path_extensions": (".tscn",),
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -166,6 +223,9 @@ TOOLS = [
     {
         "name": "open_scene",
         "description": "Open a project scene in the Godot editor.",
+        "minimum_mode": "tiny", "mode_order": 5, "target": "bridge",
+        "bridge_command": "open_scene", "path_kind": "file", "path_field": "path",
+        "path_extensions": (".tscn", ".scn"), "wait_strategy": "scene",
         "inputSchema": {
             "type": "object", "properties": {"path": RESOURCE_PATH, **WAIT_PROPERTIES},
             "required": ["path"], "additionalProperties": False,
@@ -174,11 +234,15 @@ TOOLS = [
     {
         "name": "scene_tree",
         "description": "List the edited scene tree, limited to 200 nodes.",
+        "minimum_mode": "tiny", "mode_order": 6, "target": "bridge",
+        "bridge_command": "tree",
         "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
     },
     {
         "name": "add_node",
         "description": "Add a built-in node to the edited scene through undo history.",
+        "minimum_mode": "tiny", "mode_order": 7, "target": "bridge",
+        "bridge_command": "add_node",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -192,6 +256,9 @@ TOOLS = [
     {
         "name": "instantiate_scene",
         "description": "Instantiate a PackedScene under a node through undo history.",
+        "minimum_mode": "tiny", "mode_order": 8, "target": "bridge",
+        "bridge_command": "instantiate_scene", "path_kind": "file", "path_field": "scene",
+        "path_extensions": (".tscn", ".scn"),
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -205,6 +272,8 @@ TOOLS = [
     {
         "name": "node_info",
         "description": "Get editable properties of one scene node.",
+        "minimum_mode": "tiny", "mode_order": 9, "target": "bridge",
+        "bridge_command": "inspect",
         "inputSchema": {
             "type": "object", "properties": PATH_PROPERTY, "required": ["path"],
             "additionalProperties": False,
@@ -213,6 +282,8 @@ TOOLS = [
     {
         "name": "set_property",
         "description": "Set one node property through Godot undo history.",
+        "minimum_mode": "tiny", "mode_order": 10, "target": "bridge",
+        "bridge_command": "set_property",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -227,6 +298,8 @@ TOOLS = [
     {
         "name": "select_node",
         "description": "Select one node in the Godot editor.",
+        "minimum_mode": "large", "mode_order": 21, "target": "bridge",
+        "bridge_command": "select",
         "inputSchema": {
             "type": "object", "properties": PATH_PROPERTY, "required": ["path"],
             "additionalProperties": False,
@@ -235,6 +308,8 @@ TOOLS = [
     {
         "name": "scene_control",
         "description": "Save or run the scene; stop requires its current run ID.",
+        "minimum_mode": "tiny", "mode_order": 11, "target": "bridge",
+        "bridge_command": "control", "wait_strategy": "control",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -256,6 +331,8 @@ TOOLS = [
     {
         "name": "project_settings_get",
         "description": "Read one project setting or a bounded setting prefix.",
+        "minimum_mode": "small", "mode_order": 18, "target": "bridge",
+        "bridge_command": "project_settings_get",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -268,6 +345,8 @@ TOOLS = [
     {
         "name": "project_settings_patch",
         "description": "Atomically validate, compare, and patch project settings.",
+        "minimum_mode": "small", "mode_order": 19, "target": "bridge",
+        "bridge_command": "project_settings_patch",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -292,6 +371,8 @@ TOOLS = [
     {
         "name": "input_map_patch",
         "description": "Add or remove normalized Input Map bindings without duplicates.",
+        "minimum_mode": "small", "mode_order": 20, "target": "bridge",
+        "bridge_command": "input_map_patch",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -336,27 +417,81 @@ TOOLS = [
     {
         "name": "start_editor",
         "description": "Start the configured Godot editor for this project.",
+        "minimum_mode": "large", "mode_order": 22, "target": "launcher",
+        "local_handler": "start_editor",
         "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
     },
 ]
 
+TOOL_SPECS = tuple(ToolSpec(**definition) for definition in _TOOL_DEFINITIONS)
+SPEC_BY_NAME = {spec.name: spec for spec in TOOL_SPECS}
+
+# Preserve the original public schema exports while deriving them from the registry.
+TOOLS = [spec.mcp_definition() for spec in TOOL_SPECS]
 TOOL_BY_NAME = {tool["name"]: tool for tool in TOOLS}
 
-# Modes are strict supersets so clients can increase context without losing tools.
-TINY_TOOLS = (
-    "capabilities", "editor_state", "get_diagnostics", "reload_project", "create_scene", "open_scene", "scene_tree",
-    "add_node", "instantiate_scene", "node_info", "set_property", "scene_control",
-)
-SMALL_TOOLS = TINY_TOOLS + (
-    "list_assets", "asset_info", "scan_asset", "import_asset", "create_folder",
-    "create_resource", "project_settings_get", "project_settings_patch",
-    "input_map_patch",
-)
+_MODE_RANK = {mode: index for index, mode in enumerate(MODES)}
 MODE_TOOL_NAMES: dict[Mode, tuple[str, ...]] = {
-    "tiny": TINY_TOOLS,
-    "small": SMALL_TOOLS,
-    "large": SMALL_TOOLS + ("select_node", "start_editor"),
+    mode: tuple(
+        spec.name
+        for spec in sorted(TOOL_SPECS, key=lambda item: item.mode_order)
+        if _MODE_RANK[spec.minimum_mode] <= _MODE_RANK[mode]
+    )
+    for mode in MODES
 }
+TINY_TOOLS = MODE_TOOL_NAMES["tiny"]
+SMALL_TOOLS = MODE_TOOL_NAMES["small"]
+
+BRIDGE_COMMANDS = {
+    spec.name: spec.bridge_command
+    for spec in TOOL_SPECS
+    if spec.target == "bridge" and spec.bridge_command is not None
+}
+WAIT_AWARE_TOOLS = frozenset(
+    spec.name for spec in TOOL_SPECS if spec.wait_strategy != "none"
+)
+INTERNAL_BRIDGE_COMMANDS = ("reload_status",)
+EXPECTED_BRIDGE_COMMANDS = tuple(sorted({*BRIDGE_COMMANDS.values(), *INTERNAL_BRIDGE_COMMANDS}))
+BRIDGE_PROTOCOL_VERSION = "1"
+EXPECTED_BRIDGE_LIMITS = {
+    "request_bytes": 64 * 1024,
+    "response_bytes": 256 * 1024,
+    "tree_nodes": 200,
+    "properties": 64,
+    "assets": 100,
+    "asset_scan": 5000,
+    "settings": 100,
+    "setting_changes": 32,
+    "input_events": 32,
+    "diagnostics": 100,
+    "diagnostic_records": 256,
+}
+EXPECTED_EDITOR_ERROR_CODES = (
+    "unauthorized", "invalid_argument", "protected_path", "not_found",
+    "editor_busy", "import_pending", "no_active_run", "stale_runtime_id",
+    "timeout", "unsupported_capability", "stale_cursor", "project_mismatch",
+    "save_failed", "malformed_operation", "stale_operation", "version_mismatch",
+)
+
+
+def bridge_contract_mismatches(
+    capabilities: object, *, expected_version: str,
+) -> list[str]:
+    """Compare a live plugin capability response with the Python contract."""
+    if not isinstance(capabilities, dict):
+        return ["capabilities must be an object"]
+    expected = {
+        "bridge_version": expected_version,
+        "bridge_protocol_version": BRIDGE_PROTOCOL_VERSION,
+        "commands": list(EXPECTED_BRIDGE_COMMANDS),
+        "limits": EXPECTED_BRIDGE_LIMITS,
+        "error_codes": list(EXPECTED_EDITOR_ERROR_CODES),
+    }
+    return [
+        f"{field}: expected {value!r}, got {capabilities.get(field)!r}"
+        for field, value in expected.items()
+        if capabilities.get(field) != value
+    ]
 
 
 def tools_for_mode(mode: Mode) -> list[dict[str, object]]:

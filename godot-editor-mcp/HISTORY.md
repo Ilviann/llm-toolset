@@ -3,6 +3,16 @@
 This file records released changes. Planned work is tracked separately in
 [`ROADMAP.md`](ROADMAP.md).
 
+## 0.8.0 — 2026-07-15
+
+- Consolidated every model-facing schema, minimum mode, execution target,
+  bridge route, project-path policy, and wait strategy into one typed tool
+  registry while preserving tool schemas, ordering, modes, and wire behavior.
+- Made Godot command services publish direct handler mappings and made command
+  registration atomic and duplicate-safe with explicit ownership diagnostics.
+- Added registry, schema-limit, error-code, live capability, and release-version
+  contract checks, plus a focused headless-Godot router test.
+
 ## 0.7.0 — 2026-07-15
 
 - Added the all-mode `reload_project` tool with explicit run-stop and scene-save
