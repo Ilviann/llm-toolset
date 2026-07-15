@@ -3,6 +3,24 @@
 This file records released changes. Planned work is tracked separately in
 [`ROADMAP.md`](ROADMAP.md).
 
+## 0.16.0 — 2026-07-15
+
+- Added small/large-mode `list_autoloads` and atomic `autoload_patch` helpers
+  with bounded add/update/remove batches, optional compare-and-swap values,
+  dry runs, normalized diffs, and explicit project-reload requirements.
+- Validated singleton identifiers and existing `res://` Node-script or scene
+  paths, rejected class/engine/global-name conflicts, protected the Godot MCP
+  runtime-probe name and path, and restored the complete batch after save
+  failures.
+- Added read-only `list_editor_plugins` troubleshooting metadata for bounded
+  installed/enabled plugin records without exposing plugin mutation.
+- Expanded capabilities with project-workflow features, supported autoload
+  operations, exact runtime-condition vocabulary, and effective autoload/plugin
+  limits while preserving the 12-tool tiny mode.
+- Added focused Godot 4.7 workflow coverage and extended the native macOS
+  editor/reload integration to verify autoload persistence across authenticated
+  restart and reconnect.
+
 ## 0.15.0 — 2026-07-15
 
 - Added small/large-mode `scene_transaction` with bounded operation, created-node,

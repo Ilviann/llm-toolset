@@ -114,6 +114,10 @@ class MCPServerTests(unittest.TestCase):
         self.assertIn("project_settings_get", small)
         self.assertIn("project_settings_patch", small)
         self.assertIn("input_map_patch", small)
+        self.assertNotIn("list_autoloads", tiny)
+        self.assertIn("list_autoloads", small)
+        self.assertIn("autoload_patch", small)
+        self.assertIn("list_editor_plugins", small)
         self.assertIn("reload_project", tiny)
         self.assertNotIn("capture_game_view", tiny)
         self.assertIn("capture_game_view", small)
@@ -403,6 +407,24 @@ class MCPServerTests(unittest.TestCase):
                 "action": "ui_accept",
                 "add_events": [{"type": "joypad_button", "button": "a"}],
             }),
+        ]
+        for name, arguments in calls:
+            response = self.request("tools/call", {"name": name, "arguments": arguments})
+            self.assertNotIn("isError", response["result"])
+        self.assertEqual(self.bridge.calls, calls)
+
+    def test_project_workflow_tools_route_to_distinct_bridge_commands(self) -> None:
+        self.server = MCPServer(self.bridge, self.assets, mode="small")  # type: ignore[arg-type]
+        calls = [
+            ("list_autoloads", {}),
+            ("autoload_patch", {
+                "changes": [{
+                    "op": "add", "name": "GameState",
+                    "path": "res://scripts/game_state.gd", "expected": None,
+                }],
+                "dry_run": True,
+            }),
+            ("list_editor_plugins", {}),
         ]
         for name, arguments in calls:
             response = self.request("tools/call", {"name": name, "arguments": arguments})

@@ -20,6 +20,7 @@ const ProjectPathGuard := preload("project_path_guard.gd")
 const ProjectFileStateTracker := preload("project_file_state_tracker.gd")
 const ProjectIdentity := preload("project_identity.gd")
 const ProjectSettingsCommands := preload("project_settings_commands.gd")
+const ProjectWorkflowCommands := preload("project_workflow_commands.gd")
 const PropertyValueCodec := preload("property_value_codec.gd")
 const ReloadCommands := preload("reload_commands.gd")
 const RunStateTracker := preload("run_state_tracker.gd")
@@ -31,7 +32,7 @@ const SceneNodeAccess := preload("scene_node_access.gd")
 const SceneStateTracker := preload("scene_state_tracker.gd")
 const SceneTransaction := preload("scene_transaction.gd")
 
-const BRIDGE_VERSION := "0.15.0"
+const BRIDGE_VERSION := "0.16.0"
 const BRIDGE_PROTOCOL_VERSION := "1"
 const DEFAULT_PORT := 6505
 const TOKEN_PATH := "res://.godot/godot_mcp_token"
@@ -168,12 +169,20 @@ func _register_commands() -> bool:
 	var input_commands = InputMapCommands.new(
 		Callable(_project_file_state, "mark_saved"), input_events,
 	)
+	var project_workflow_commands = ProjectWorkflowCommands.new(
+		Callable(self, "add_autoload_singleton"),
+		Callable(self, "remove_autoload_singleton"),
+		Callable(_project_file_state, "mark_saved"),
+		project_paths,
+		Callable(ProjectSettings, "save"),
+	)
 	var gameplay_commands = RuntimeGameplayCommands.new(
 		_runtime_debugger, Callable(_run_state, "current_run_id"),
 	)
 	_command_services = [
 		asset_commands, edited_scene_inspector, scene_transaction, scene_commands,
-		settings_commands, input_commands, gameplay_commands, _reload_commands,
+		settings_commands, input_commands, project_workflow_commands,
+		gameplay_commands, _reload_commands,
 	]
 	if not _register_handlers("plugin", {
 		"capabilities": Callable(self, "_capabilities"),
@@ -217,6 +226,8 @@ func _capabilities(_arguments: Dictionary) -> Dictionary:
 			"runtime_diagnostics": true,
 			"project_settings": true,
 			"input_map_editing": true,
+			"autoload_management": true,
+			"editor_plugin_metadata": true,
 			"structured_errors": true,
 			"operation_ids": true,
 			"event_ids": true,
@@ -261,6 +272,17 @@ func _capabilities(_arguments: Dictionary) -> Dictionary:
 				"key", "mouse_button", "joypad_button", "joypad_motion",
 			],
 		},
+		"autoloads": {
+			"operations": ["add", "update", "remove"],
+			"compare_and_swap": true,
+			"protected": [RUNTIME_PROBE_AUTOLOAD],
+			"path_types": ["script", "scene"],
+		},
+		"runtime_conditions": {
+			"types": ["play_state", "node_exists", "node_count", "property"],
+			"comparisons": ["eq", "ne", "lt", "lte", "gt", "gte"],
+			"composition": false,
+		},
 		"scene_values": {
 			"forms": PropertyValueCodec.new().supported_forms(),
 			"resource_references_tagged": true,
@@ -282,6 +304,9 @@ func _capabilities(_arguments: Dictionary) -> Dictionary:
 			"settings": Limits.MAX_SETTINGS,
 			"setting_changes": Limits.MAX_SETTING_CHANGES,
 			"input_events": Limits.MAX_INPUT_EVENTS,
+			"autoloads": Limits.MAX_AUTOLOADS,
+			"autoload_changes": Limits.MAX_AUTOLOAD_CHANGES,
+			"editor_plugins": Limits.MAX_EDITOR_PLUGINS,
 			"diagnostics": Limits.MAX_DIAGNOSTICS,
 			"diagnostic_records": Limits.MAX_DIAGNOSTIC_RECORDS,
 			"runtime_pending_requests": Limits.MAX_RUNTIME_PENDING_REQUESTS,

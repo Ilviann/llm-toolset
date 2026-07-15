@@ -7,7 +7,7 @@
 - [x] Phase 9 — Inspect the running scene through a read-only runtime probe.
 - [x] Phase 10 — Capture, drive, and validate gameplay with a minimal fixed API.
 - [x] Phase 11 — Author scenes through bounded atomic transactions.
-- [ ] Phase 12 — Add autoload helpers and finish proven project-workflow gaps.
+- [x] Phase 12 — Add autoload helpers and finish proven project-workflow gaps.
 
 ## Phase delivery contract
 
@@ -30,6 +30,7 @@ The remaining roadmap prioritizes the shortest reliable LLM-to-Godot loop:
 3. Observe the running game rather than assuming it matches the edited scene.
 4. Exercise gameplay and verify the result.
 5. Apply larger authoring changes atomically and safely.
+6. Close the remaining proven project workflows with guarded autoload helpers.
 
 The server must remain offline-capable, dependency-free at runtime, portable
 across macOS, Linux, and Windows, and practical for small local models. New
@@ -303,6 +304,8 @@ against editing a scene that changed after inspection.
   covered by GDScript and headless editor tests.
 
 ## Phase 12 — Project workflow helpers
+
+Completed in 0.16.0.
 
 Add only project-level helpers that close common workflows not safely handled
 by the existing focused settings tools.

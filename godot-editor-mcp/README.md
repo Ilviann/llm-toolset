@@ -112,12 +112,13 @@ rejected even if a client retained an older `tools/list` response.
   edits, and save/run controls. It is intended for models with context windows
   below 8k. Pair it with a confined text-file MCP when GDScript itself must be
   edited; this server never exposes arbitrary file writes.
-- **`small`:** 24 tools for autonomous local agents around 16k context. It adds
+- **`small`:** 28 tools for autonomous local agents around 16k context. It adds
   bounded asset discovery, import scanning, staged imports, folders, and
   whitelisted resource creation, plus atomic project-setting and Input Map
-  editing and the fixed gameplay validation loop. This is the appropriate mode
-  when the agent must perform its own unit-test-oriented setup and verification.
-- **`large`:** all 26 tools. It adds `select_node` and the opt-in
+  editing, guarded autoload workflows, read-only editor-plugin metadata, and the
+  fixed gameplay validation loop. This is the appropriate mode when the agent
+  must perform its own unit-test-oriented setup and verification.
+- **`large`:** all 30 tools. It adds `select_node` and the opt-in
   `start_editor` launcher for models that also control the Godot desktop UI.
 
 Example:
@@ -160,6 +161,9 @@ means `small` and `large`.
 | `project_settings_get` | Small+ | Read one setting or up to 100 settings under a prefix |
 | `project_settings_patch` | Small+ | Atomically validate, compare, dry-run, and save up to 32 settings |
 | `input_map_patch` | Small+ | Add/remove key, mouse, and joypad bindings without duplicates |
+| `list_autoloads` | Small+ | List up to 64 autoloads with normalized paths and protected status |
+| `autoload_patch` | Small+ | Atomically compare, add, update, or remove up to 32 autoloads |
+| `list_editor_plugins` | Small+ | Read compact installed/enabled editor-plugin troubleshooting metadata |
 | `scene_transaction` | Small+ | Prevalidate and apply a bounded structural/property batch as one undo step |
 | `capture_game_view` | Small+ | Return the active run's bounded main viewport as MCP PNG image content |
 | `send_input` | Small+ | Inject one run-scoped Input Map action with automatic bounded release |
@@ -292,9 +296,9 @@ started by this MCP server is still launching return `starting`. The plugin
 must already be installed and enabled in the project. The MCP server does not
 provide a tool to close the editor.
 
-The fixed context cost depends on the selected mode. `tiny` omits the thirteen
-asset, settings, transaction, and gameplay workflow schemas, while `small` omits the two desktop-only
-selection and launcher helpers.
+The fixed context cost depends on the selected mode. `tiny` omits the sixteen
+asset, settings, autoload, plugin-metadata, transaction, and gameplay workflow
+schemas, while `small` omits the two desktop-only selection and launcher helpers.
 Exact token usage varies by model and by how the MCP client represents tool
 definitions. Enabling `rooted-files-mcp` alongside this server adds its own tool
 definitions, so prefer `tiny` for tightly supervised GDScript and UI work.
@@ -311,6 +315,9 @@ with tree depth/scan, property scan, cursor count/length, and lifetime limits.
 Scene transaction support reports its value forms and operation, created-node,
 tree-depth, retained-undo, nesting, element, string, packed-array, and encoded-byte
 limits. Tagged node and resource reference support is reported explicitly.
+Project-workflow support reports autoload operations, compare-and-swap support,
+the protected runtime-probe name, exact runtime-condition types/comparisons, and
+autoload, autoload-change, and editor-plugin result limits.
 Diagnostics report separate GDScript, C#, and runtime capability flags because
 complete C# compiler capture depends on the installed Godot build.
 
@@ -376,6 +383,45 @@ include `left`, `right`, `middle`, wheel directions, and `xbutton1/2`. Joypad
 axes are `left_x`, `left_y`, `right_x`, `right_y`, `trigger_left`, and
 `trigger_right`, with `direction` equal to `-1` or `1`. Each response reports
 whether an editor refresh, project reload, or editor restart is required.
+
+## Autoloads and editor plugins
+
+The three project-workflow helpers are available in `small` and `large` modes.
+`list_autoloads` returns at most 64 sorted records with name, normalized
+`res://` path, singleton state, and a `protected` flag. The reserved
+`GodotMCPRuntimeProbe` registration and its bundled script path cannot be
+changed through these tools.
+
+`autoload_patch` prevalidates the complete batch before using Godot's autoload
+APIs. Each change has `op` (`add`, `update`, or `remove`) and `name`; add/update
+also require an existing Node script or PackedScene `path`. Optional `expected`
+accepts `null` for an absent entry, a path string for a singleton, or the
+`{"path": ..., "singleton": ...}` object under a `list_autoloads` record's
+`value` field. A stale
+value rejects the full batch. Names must be valid identifiers and cannot
+conflict with built-in classes, engine singletons, or global script classes.
+
+```json
+{
+  "changes": [
+    {
+      "op": "add",
+      "name": "GameState",
+      "path": "res://scripts/game_state.gd",
+      "expected": null
+    }
+  ],
+  "save": true,
+  "dry_run": false
+}
+```
+
+Successful changes report `project_reload: true`; call `reload_project` to
+activate the saved project configuration. Failed saves restore every affected
+autoload. `list_editor_plugins` returns at most 64 compact installed/enabled
+records from plugin configuration and project settings. It is deliberately
+read-only: enabling, disabling, installing, and removing arbitrary plugins are
+not exposed.
 
 ## Editor state
 
@@ -830,7 +876,7 @@ Set-Location "C:\path\to\godot-editor-mcp"
 py -3 -m unittest discover -s tests -v
 ```
 
-The 75-test Python suite tests MCP initialization, end-to-end stdio initialization,
+The 76-test Python suite tests MCP initialization, end-to-end stdio initialization,
 tool listing and calls, per-mode dispatch, registry invariants, stable ordering,
 complete routes, path/wait policy, schema-to-limit alignment, release consistency,
 capability contracts, authentication, bounded transport behavior, staged imports,
@@ -873,10 +919,12 @@ Run the focused infrastructure and state-transition checks with:
 /path/to/Godot --headless --path plugin --script res://tests/phase9_runtime_inspection_test.gd
 /path/to/Godot --headless --path plugin --script res://tests/phase10_gameplay_validation_test.gd
 /path/to/Godot --headless --path plugin --script res://tests/phase11_scene_transaction_test.gd
+/path/to/Godot --headless --path plugin --script res://tests/phase12_project_workflow_test.gd
 ```
 
 On the verified macOS platform, the opt-in subprocess check validates the live
 plugin capability contract, atomic scene transactions and persistence,
+autoload compare-and-swap and reload persistence, editor-plugin metadata,
 editor/game debugger handshake, spawned-node and
 live-property reads, action injection and release, runtime conditions,
 headless-renderer capture rejection, replacement-run staleness, and

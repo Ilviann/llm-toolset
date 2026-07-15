@@ -376,7 +376,7 @@ _TOOL_DEFINITIONS = [
     {
         "name": "scene_transaction",
         "description": "Apply a bounded, prevalidated scene-edit batch as one undo step.",
-        "minimum_mode": "small", "mode_order": 21, "target": "bridge",
+        "minimum_mode": "small", "mode_order": 24, "target": "bridge",
         "bridge_command": "scene_transaction",
         "inputSchema": {
             "type": "object",
@@ -493,7 +493,7 @@ _TOOL_DEFINITIONS = [
     {
         "name": "select_node",
         "description": "Select one node in the Godot editor.",
-        "minimum_mode": "large", "mode_order": 25, "target": "bridge",
+        "minimum_mode": "large", "mode_order": 28, "target": "bridge",
         "bridge_command": "select",
         "inputSchema": {
             "type": "object", "properties": PATH_PROPERTY, "required": ["path"],
@@ -526,7 +526,7 @@ _TOOL_DEFINITIONS = [
     {
         "name": "capture_game_view",
         "description": "Capture the active run's main viewport as a bounded PNG image.",
-        "minimum_mode": "small", "mode_order": 22, "target": "bridge",
+        "minimum_mode": "small", "mode_order": 25, "target": "bridge",
         "bridge_command": "capture_game_view",
         "inputSchema": {
             "type": "object",
@@ -547,7 +547,7 @@ _TOOL_DEFINITIONS = [
     {
         "name": "send_input",
         "description": "Inject one bounded Input Map action into the active run.",
-        "minimum_mode": "small", "mode_order": 23, "target": "bridge",
+        "minimum_mode": "small", "mode_order": 26, "target": "bridge",
         "bridge_command": "send_input",
         "inputSchema": {
             "type": "object",
@@ -568,7 +568,7 @@ _TOOL_DEFINITIONS = [
     {
         "name": "wait_for_runtime_condition",
         "description": "Wait for one bounded runtime play, node, count, or property condition.",
-        "minimum_mode": "small", "mode_order": 24, "target": "bridge",
+        "minimum_mode": "small", "mode_order": 27, "target": "bridge",
         "bridge_command": "wait_runtime_condition",
         "inputSchema": {
             "type": "object",
@@ -688,9 +688,68 @@ _TOOL_DEFINITIONS = [
         },
     },
     {
+        "name": "list_autoloads",
+        "description": "List bounded project autoload singletons and protected entries.",
+        "minimum_mode": "small", "mode_order": 21, "target": "bridge",
+        "bridge_command": "list_autoloads",
+        "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
+    },
+    {
+        "name": "autoload_patch",
+        "description": "Atomically compare, add, update, or remove project autoloads.",
+        "minimum_mode": "small", "mode_order": 22, "target": "bridge",
+        "bridge_command": "autoload_patch",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "changes": {
+                    "type": "array", "minItems": 1, "maxItems": 32,
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "op": {"type": "string", "enum": ["add", "update", "remove"]},
+                            "name": {"type": "string", "minLength": 1, "maxLength": 128},
+                            "path": {
+                                "type": "string", "minLength": 7, "maxLength": 512,
+                                "pattern": "^res://",
+                                "description": "Existing res:// script or scene path",
+                            },
+                            "expected": {
+                                "description": "Optional compare-and-swap value; null means absent",
+                                "oneOf": [
+                                    {"type": "null"},
+                                    {"type": "string", "minLength": 7, "maxLength": 512},
+                                    {
+                                        "type": "object",
+                                        "properties": {
+                                            "path": {"type": "string", "minLength": 7, "maxLength": 512},
+                                            "singleton": {"type": "boolean", "default": True},
+                                        },
+                                        "required": ["path"], "additionalProperties": False,
+                                    },
+                                ],
+                            },
+                        },
+                        "required": ["op", "name"], "additionalProperties": False,
+                    },
+                },
+                "save": {"type": "boolean", "default": True},
+                "dry_run": {"type": "boolean", "default": False},
+            },
+            "required": ["changes"], "additionalProperties": False,
+        },
+    },
+    {
+        "name": "list_editor_plugins",
+        "description": "List compact read-only editor-plugin troubleshooting metadata.",
+        "minimum_mode": "small", "mode_order": 23, "target": "bridge",
+        "bridge_command": "list_editor_plugins",
+        "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
+    },
+    {
         "name": "start_editor",
         "description": "Start the configured Godot editor for this project.",
-        "minimum_mode": "large", "mode_order": 26, "target": "launcher",
+        "minimum_mode": "large", "mode_order": 29, "target": "launcher",
         "local_handler": "start_editor",
         "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
     },
@@ -742,6 +801,9 @@ EXPECTED_BRIDGE_LIMITS = {
     "settings": 100,
     "setting_changes": 32,
     "input_events": 32,
+    "autoloads": 64,
+    "autoload_changes": 32,
+    "editor_plugins": 64,
     "diagnostics": 100,
     "diagnostic_records": 256,
     "runtime_pending_requests": 16,

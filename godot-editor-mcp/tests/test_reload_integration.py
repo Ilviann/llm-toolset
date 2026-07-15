@@ -18,6 +18,7 @@ from godot_editor_mcp.discovery import read_discovery_record
 from godot_editor_mcp.errors import (
     EditorBusyError,
     InvalidArgumentError,
+    InvalidArgumentError,
     NoActiveRunError,
     RuntimeProbeUnavailableError,
     SaveFailedError,
@@ -67,6 +68,9 @@ class ReloadSubprocessIntegrationTests(unittest.TestCase):
             '        observed.name = "InputObserved"\n'
             "        add_child(observed)\n",
             encoding="utf-8",
+        )
+        (self.project / "scenes" / "workflow_autoload.gd").write_text(
+            "extends Node\n", encoding="utf-8",
         )
         (self.project / "scenes" / "runtime.tscn").write_text(
             '[gd_scene load_steps=2 format=3]\n\n'
@@ -163,6 +167,38 @@ class ReloadSubprocessIntegrationTests(unittest.TestCase):
             ),
             [],
         )
+        capabilities = bridge.call("capabilities", {})
+        self.assertTrue(capabilities["features"]["autoload_management"])
+        self.assertTrue(capabilities["features"]["editor_plugin_metadata"])
+        self.assertEqual(capabilities["limits"]["autoload_changes"], 32)
+        autoloads = bridge.call("list_autoloads", {})
+        self.assertTrue(any(
+            item["name"] == "GodotMCPRuntimeProbe" and item["protected"]
+            for item in autoloads["autoloads"]
+        ))
+        plugins = bridge.call("list_editor_plugins", {})
+        self.assertTrue(any(
+            item["path"] == "res://addons/godot_mcp/plugin.cfg"
+            and item["enabled"] and item["valid"]
+            for item in plugins["plugins"]
+        ))
+        patched_autoload = bridge.call("autoload_patch", {
+            "changes": [{
+                "op": "add", "name": "WorkflowFixture",
+                "path": "res://scenes/workflow_autoload.gd", "expected": None,
+            }],
+        })
+        self.assertTrue(patched_autoload["saved"])
+        self.assertTrue(patched_autoload["requirements"]["project_reload"])
+        with self.assertRaises(InvalidArgumentError):
+            bridge.call("autoload_patch", {
+                "changes": [{
+                    "op": "update", "name": "WorkflowFixture",
+                    "path": "res://scenes/workflow_autoload.gd",
+                    "expected": "res://scenes/runtime.gd",
+                }],
+                "dry_run": True,
+            })
         created = bridge.call(
             "create_scene",
             {"path": "scenes/main.tscn", "root_type": "Node2D", "root_name": "Main"},
@@ -686,6 +722,12 @@ class ReloadSubprocessIntegrationTests(unittest.TestCase):
         reloaded_capabilities = bridge.call("capabilities", {})
         self.assertTrue(reloaded_capabilities["features"]["runtime_inspection"])
         self.assertTrue(reloaded_capabilities["runtime_probe"]["available"])
+        reloaded_autoloads = bridge.call("list_autoloads", {})
+        self.assertTrue(any(
+            item["name"] == "WorkflowFixture"
+            and item["path"] == "res://scenes/workflow_autoload.gd"
+            for item in reloaded_autoloads["autoloads"]
+        ))
         tree = bridge.call("tree", {})
         self.assertTrue(any(node["path"] == "UnsavedChild" for node in tree["nodes"]))
 

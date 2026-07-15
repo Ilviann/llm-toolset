@@ -31,7 +31,8 @@ EXPECTED_CATALOG_ORDER = (
     "instantiate_scene", "node_info", "set_property", "scene_transaction",
     "select_node", "scene_control", "capture_game_view", "send_input",
     "wait_for_runtime_condition", "project_settings_get", "project_settings_patch",
-    "input_map_patch", "start_editor",
+    "input_map_patch", "list_autoloads", "autoload_patch",
+    "list_editor_plugins", "start_editor",
 )
 EXPECTED_MODE_ORDER = {
     "tiny": (
@@ -45,7 +46,8 @@ EXPECTED_MODE_ORDER = {
         "instantiate_scene", "node_info", "set_property", "scene_control",
         "list_assets", "asset_info", "scan_asset", "import_asset",
         "create_folder", "create_resource", "project_settings_get",
-        "project_settings_patch", "input_map_patch", "scene_transaction", "capture_game_view",
+        "project_settings_patch", "input_map_patch", "list_autoloads",
+        "autoload_patch", "list_editor_plugins", "scene_transaction", "capture_game_view",
         "send_input", "wait_for_runtime_condition",
     ),
     "large": (
@@ -54,7 +56,8 @@ EXPECTED_MODE_ORDER = {
         "instantiate_scene", "node_info", "set_property", "scene_control",
         "list_assets", "asset_info", "scan_asset", "import_asset",
         "create_folder", "create_resource", "project_settings_get",
-        "project_settings_patch", "input_map_patch", "scene_transaction", "capture_game_view",
+        "project_settings_patch", "input_map_patch", "list_autoloads",
+        "autoload_patch", "list_editor_plugins", "scene_transaction", "capture_game_view",
         "send_input", "wait_for_runtime_condition", "select_node", "start_editor",
     ),
 }
@@ -174,6 +177,10 @@ class ToolRegistryContractTests(unittest.TestCase):
         self.assertEqual(
             schemas["project_settings_patch"]["properties"]["changes"]["maxItems"],
             EXPECTED_BRIDGE_LIMITS["setting_changes"],
+        )
+        self.assertEqual(
+            schemas["autoload_patch"]["properties"]["changes"]["maxItems"],
+            EXPECTED_BRIDGE_LIMITS["autoload_changes"],
         )
         input_properties = schemas["input_map_patch"]["properties"]
         self.assertEqual(
