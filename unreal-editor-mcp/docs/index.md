@@ -4,6 +4,7 @@ This directory is the entry point for implementation knowledge. Start here befor
 
 ## Top-level contents
 
+- [`development-environment.md`](development-environment.md) — local Unreal, Xcode, Python, disposable-project, path-configuration, and native verification requirements.
 - [`workflow.md`](workflow.md) — feature implementation workflow, documentation update rules, and source-of-truth policy.
 - [`architecture/`](architecture/index.md) — component boundaries, ownership, dependencies, invariants, and verification guidance. Each implemented component has one file.
 - [`types/`](types/index.md) — custom data types, wire records, collaborator protocols, and reusable function libraries, grouped by owning component.

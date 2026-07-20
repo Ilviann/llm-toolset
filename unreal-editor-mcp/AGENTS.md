@@ -8,7 +8,8 @@ Use `docs/index.md` as the implementation-knowledge entry point. Use `README.md`
 - Update affected architecture/type/library references and their immediate indexes in the same change as source. Update `README.md` only for user-visible operation or setup. Do not create a `CODE.md` monolith.
 - Follow `docs/workflow.md` for working-set selection, Python/C++ contract review, verification, documentation, and release consistency.
 
-- Target Unreal Engine 5.7 and newer, with Blueprint game-logic authoring as the primary workflow.
+- Target Unreal Engine 5.8 and newer, with Blueprint game-logic authoring as the primary workflow.
+- Use `ue-test/` as the disposable local Unreal project for plugin compilation, Unreal Automation Tests, and headless bridge integration tests. Keep the entire directory ignored and do not rely on its generated state as a committed test fixture or behavior contract.
 - The first usable release must create Actor Blueprints from a selected valid Actor-derived base class and safely modify existing Actor Blueprints, including component hierarchies, component defaults, variables, and graph logic.
 - After Actor Blueprints, prioritize gameplay-framework Blueprint families such as GameMode, GameState, and GameInstance before other specialized Blueprint types.
 - Begin with small typed atomic mutations. Prevalidate targets, types, limits, and stale preconditions; use Unreal editor transactions and undo where supported; return bounded compile diagnostics; and keep compilation, saving, and read-back verification observable.

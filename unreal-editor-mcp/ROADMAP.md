@@ -1,6 +1,6 @@
 # Unreal Editor MCP Roadmap
 
-This roadmap turns the requirements in `docs/draft.md` into sequential, releasable implementation phases. The target is Unreal Engine 5.7 and newer. macOS is the first native development and validation host; native Windows qualification is mandatory before the first stable release.
+This roadmap turns the requirements in `docs/draft.md` into sequential, releasable implementation phases. The target is Unreal Engine 5.8 and newer. macOS is the first native development and validation host; native Windows qualification is mandatory before the first stable release.
 
 ## Top-level checklist
 
@@ -96,13 +96,13 @@ Start at `0.1.0` when Phase 1 is complete. Increment the minor version for each 
 
 ## Phase 1 — Secure foundation and verified Unreal API boundary
 
-**Outcome:** A releasable MCP/plugin pair can authenticate to one open Unreal 5.7 project and return `capabilities` and `editor_state`; it cannot mutate project content.
+**Outcome:** A releasable MCP/plugin pair can authenticate to one open Unreal 5.8 project and return `capabilities` and `editor_state`; it cannot mutate project content.
 
 ### Implementation
 
 - Create the Python package, CLI, stdio MCP transport, dependency-free schema validator, tool catalog, dispatcher, bridge client, discovery reader, structured errors, and bounded shutdown behavior.
 - Create the editor-only C++ plugin/module, version metadata, composition root, token store, authenticated startup gate, HTTP route owner, command router, error envelopes, limits, discovery heartbeat, and Game-thread request queue.
-- Before freezing bridge interfaces, compile small probes against the installed Unreal 5.7 public headers for `HttpServer`, `IHttpRouter`, `FScopedTransaction`, `FKismetEditorUtilities`, `FBlueprintEditorUtils`, `USubobjectDataSubsystem`, `UEdGraphSchema_K2`, `UBlueprintNodeSpawner`, `FCompilerResultsLog`, `FAssetRegistryModule`, and package saving.
+- Before freezing bridge interfaces, compile small probes against the installed Unreal 5.8 public headers for `HttpServer`, `IHttpRouter`, `FScopedTransaction`, `FKismetEditorUtilities`, `FBlueprintEditorUtils`, `USubobjectDataSubsystem`, `UEdGraphSchema_K2`, `UBlueprintNodeSpawner`, `FCompilerResultsLog`, `FAssetRegistryModule`, and package saving.
 - Do not include headers from Unreal `Private` directories or patch engine source. Isolate unavoidable Unreal-version differences behind one compatibility adapter with a test for every compiled branch.
 - Confirm empirically that Unreal's HTTP server can be constrained to loopback on macOS. If it cannot, stop the phase and replace only the listener adapter with a minimal loopback-only implementation; do not weaken the security requirement.
 - Make `capabilities` authoritative for versions, exact commands, optional features, request/response limits, platform, Unreal version, and bridge readiness.
@@ -117,7 +117,7 @@ Start at `0.1.0` when Phase 1 is complete. Increment the minor version for each 
 ### Documentation and release gate
 
 - Add `README.md`, `HISTORY.md`, source-backed architecture/type references under `docs/`, installation instructions, an LM Studio example, generated-state ignore guidance, and offline build/test instructions.
-- Release `0.1.0` only when the Python/plugin versions match, the macOS integration test passes with Unreal 5.7, and no mutation command is registered.
+- Release `0.1.0` only when the Python/plugin versions match, the macOS integration test passes with Unreal 5.8, and no mutation command is registered.
 
 ## Phase 2 — Bounded Actor Blueprint discovery and inspection
 
@@ -369,7 +369,7 @@ Start at `0.1.0` when Phase 1 is complete. Increment the minor version for each 
 
 ### Implementation
 
-- Build and package the exact Python/plugin pair with Unreal 5.7 on a native Windows host. Add only source-evidenced compatibility fixes behind narrow platform adapters or Unreal-version checks.
+- Build and package the exact Python/plugin pair with Unreal 5.8 on a native Windows host. Add only source-evidenced compatibility fixes behind narrow platform adapters or Unreal-version checks.
 - Validate token persistence and permissions, loopback binding, discovery, path casing and separators, JSON encoding, package paths, plugin loading, Game-thread dispatch, Blueprint transactions, compilation, saving, lifecycle processes, project-file generation, and editor-target builds.
 - Run the complete Python, Unreal Automation, headless bridge, Blueprint behavioral, restart, and build suites natively on both macOS and Windows.
 - Record platform and Unreal patch versions, package/install instructions, known limitations, performance/context measurements, and native results in README and history.
@@ -396,7 +396,7 @@ The following are not part of the committed roadmap unless separately authorized
 - Play-in-Editor input injection, screenshots, runtime object mutation, or automated gameplay assertions.
 - Cloud services, accounts, telemetry, dependency downloads, or a game-side network listener.
 
-## Primary Unreal 5.7 API references
+## Primary Unreal 5.8 API references
 
 These references establish feasibility, but the Phase 1 compiled probes and behavioral tests remain authoritative for the installed engine:
 
