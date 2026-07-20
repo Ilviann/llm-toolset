@@ -12,9 +12,9 @@ This repository contains lightweight, offline-first MCP tools for local LLM work
 
 ## Scope and Architecture
 
-Each application lives in its own top-level folder with source, tests, README, configuration examples, `CODE.md`, and `ROADMAP.md`. Current applications are `rooted-files-mcp/` and `godot-editor-mcp/`. Keep shared documentation at the repository root; introduce shared libraries only when multiple applications need them.
+Each application lives in its own top-level folder with source, tests, README, configuration examples, implementation knowledge, and `ROADMAP.md`. Current applications are `rooted-files-mcp/` and `godot-editor-mcp/`. Keep shared documentation at the repository root; introduce shared libraries only when multiple applications need them.
 
-Before inspecting or changing application source for a feature, read that application's `CODE.md`. Use its dependency map to select the smallest relevant working set: affected modules, their dependencies, tests, metadata, examples, history, roadmap, and documentation. Expand the set only when source evidence reveals an undocumented dependency, and update `CODE.md` when it does.
+Before inspecting or changing application source for a feature, follow that application's `AGENTS.md` and implementation-knowledge entry point. For `rooted-files-mcp/`, start with `CODE.md`; for `godot-editor-mcp/`, start with `docs/index.md` and follow its component/type indexes. Use the dependency map to select the smallest relevant working set: affected modules, their dependencies, tests, metadata, examples, history, roadmap, and documentation. Expand the set only when source evidence reveals an undocumented dependency, and update the affected application's knowledge files and immediate indexes when it does.
 
 Prefer narrow responsibilities, explicit interfaces, and low coupling. Broader refactoring is appropriate when it materially improves structure, maintainability, performance, security, or testability. If useful refactoring falls outside the requested scope, recommend it with affected modules, benefits, scope, risks, and tradeoffs; do not implement it without authorization.
 
