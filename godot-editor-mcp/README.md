@@ -7,6 +7,11 @@ small local models in LM Studio.
 See [`HISTORY.md`](HISTORY.md) for released changes and
 [`ROADMAP.md`](ROADMAP.md) for planned features.
 
+Programmers and coding agents should start with the indexed
+[`docs/`](docs/index.md) knowledge cache before changing source. It maps
+component ownership, dependency direction, custom data types, reusable
+libraries, invariants, and the required feature implementation workflow.
+
 ## Platform support
 
 The Python server and Godot plugin support macOS, Linux, and Windows with Python
@@ -21,88 +26,6 @@ The integration has two local parts:
 2. A short-lived stdio MCP process authenticates to it with a per-project token.
 
 No protocol data is written to the MCP process's stdout except JSON-RPC.
-
-## Python package layout
-
-The dependency-free Python package separates stable responsibilities so changes
-to one boundary do not require editing the entire server:
-
-- `server.py` validates MCP requests and preserves the package's public server API.
-- `tool_catalog.py` contains one typed specification per tool and derives schemas,
-  stable mode ordering, bridge routes, path/wait policy, and checked bridge contracts.
-- `schema_validation.py` enforces the published dependency-free JSON Schema
-  subset before any local or bridge-backed tool call is dispatched.
-- `tool_dispatch.py` resolves those specifications, applies project-path policy,
-  and coordinates focused bridge, import, folder, and editor-launch handlers.
-- `stdio.py` owns newline-delimited JSON-RPC input/output and stderr diagnostics.
-- `cli.py` parses arguments and composes the bridge, asset manager, launcher,
-  and MCP server.
-- `errors.py` defines bounded error envelopes and stable typed exceptions.
-- `state_payloads.py` validates the editor-state and reload-status fields used
-  by waits; `waiting.py` owns monotonic deadlines, polling, cancellation,
-  diagnostic quiet periods, completion predicates, and startup health windows.
-- `discovery.py` validates project-scoped bridge heartbeat records and selects a
-  live matching port when `--port` is omitted.
-- `assets.py`, `bridge.py`, and `launcher.py` remain focused adapters for their
-  filesystem, localhost transport, and process responsibilities.
-
-All expected asset, launcher, argument-validation, bridge, timeout, and
-cancellation failures inherit one structured domain-error boundary. Unexpected
-Python exceptions remain internal errors instead of being presented as normal
-tool failures.
-
-This organization keeps the model-facing schemas easy to audit, makes service
-dependencies replaceable in unit tests through small structural interfaces, and
-retains the existing `MCPServer`, mode/catalog constants, `run`, and `main`
-imports from `godot_editor_mcp.server` for compatibility.
-
-## Godot plugin layout
-
-The dependency-free editor plugin is split by responsibility under
-`plugin/addons/godot_mcp`:
-
-- `godot_mcp.gd` owns only plugin lifecycle and service composition.
-- `token_store.gd`, `authenticated_startup.gd`, `bridge_server.gd`, and
-  `command_router.gd` own fail-closed credential persistence, authenticated
-  startup, bounded localhost clients and request deadlines, immediate or
-  debugger-deferred dispatch, and duplicate-safe command ownership.
-- `editor_state_monitor.gd` is the stable state facade over focused scene, run,
-  import, and project-file trackers; `event_store.gd` and
-  `operation_registry.gd` retain shared monotonic identities.
-- `diagnostic_store.gd` is a thread-safe bounded Godot logger and read API.
-- `project_identity.gd` and `atomic_json_record.gd` provide the shared
-  cross-platform identity and bounded crash-safe record primitives used by
-  discovery and reload recovery.
-- `discovery_record.gd` publishes the project-scoped bridge heartbeat.
-- `reload_commands.gd` safeguards scene/run state, persists bounded pending
-  reloads, invokes the deferred restart, and validates startup recovery.
-- `error_envelope.gd` centralizes bounded bridge success and failure envelopes.
-- `asset_commands.gd` handles asset discovery, resource creation, and scene
-  file creation or opening.
-- `edited_scene_inspector.gd` owns bounded edited-scene reads and scope routing;
-  `runtime_scene_inspector.gd` adapts runtime reads to the same cursor contract.
-- `runtime_debugger_gateway.gd` and the compact `runtime_probe.gd` shell own the
-  validated editor/game debugger handshake and protocol. Focused runtime tree,
-  capture, input, and condition services share one confined identity/path
-  context; `runtime_gameplay_commands.gd` exposes only the fixed capture,
-  action-input, and condition command family.
-- `scene_commands.gd` owns UndoRedo-backed node/property changes and selection.
-- `project_settings_commands.gd` and `input_map_commands.gd` handle their
-  respective validated, atomic project configuration operations.
-- `project_path_guard.gd`, `scene_node_access.gd`, `property_value_codec.gd`,
-  and `input_event_codec.gd` are narrow collaborators injected only where used.
-- `command_limits.gd` is the single source for limits used by handlers and the
-  `capabilities` response.
-
-Keep command names and wire responses stable when changing these modules. Each
-command service publishes its own handler mapping; the composition root retains
-the service and registers that mapping explicitly. New command families should
-remain focused and receive only the narrow guards, codecs, state callbacks, and
-editor services they use.
-
-The Python server and installed Godot plugin are released and deployed
-together. Their versions must match exactly; wait payloads are validated as a
-lockstep contract rather than interpreted through an older-plugin fallback.
 
 ## Tool modes
 

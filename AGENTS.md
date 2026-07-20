@@ -12,9 +12,9 @@ This repository contains lightweight, offline-first MCP tools for local LLM work
 
 ## Scope and Architecture
 
-Each application lives in its own top-level folder with source, tests, README, configuration examples, `CODE.md`, and `ROADMAP.md`. Current applications are `rooted-files-mcp/` and `godot-editor-mcp/`. Keep shared documentation at the repository root; introduce shared libraries only when multiple applications need them.
+Each application lives in its own top-level folder with source, tests, README, configuration examples, implementation knowledge, and `ROADMAP.md`. Current applications are `rooted-files-mcp/` and `godot-editor-mcp/`. Keep shared documentation at the repository root; introduce shared libraries only when multiple applications need them.
 
-Before inspecting or changing application source for a feature, read that application's `CODE.md`. Use its dependency map to select the smallest relevant working set: affected modules, their dependencies, tests, metadata, examples, history, roadmap, and documentation. Expand the set only when source evidence reveals an undocumented dependency, and update `CODE.md` when it does.
+Before inspecting or changing application source for a feature, follow that application's `AGENTS.md`, start with its `docs/index.md`, and follow the relevant component/type indexes. Use the dependency map to select the smallest relevant working set: affected modules, their dependencies, tests, metadata, examples, history, roadmap, and documentation. Expand the set only when source evidence reveals an undocumented dependency, and update the affected application's knowledge files and immediate indexes when it does.
 
 Prefer narrow responsibilities, explicit interfaces, and low coupling. Broader refactoring is appropriate when it materially improves structure, maintainability, performance, security, or testability. If useful refactoring falls outside the requested scope, recommend it with affected modules, benefits, scope, risks, and tradeoffs; do not implement it without authorization.
 
@@ -39,28 +39,6 @@ Keep every roadmap phase usable and releasable: implementation, tests, documenta
 
 After each roadmap phase, update the application's version when it is versioned: patch for fixes, minor for features, and major only on explicit request. Keep executable/package/plugin metadata, runtime-reported versions, tests, README, examples, and history consistent. Update all affected documentation before handoff.
 
-## Godot Editor MCP Invariants
-
-Use `godot-editor-mcp/CODE.md`, `README.md`, executable metadata, and runtime `capabilities` as the current sources for architecture, tool modes, limits, compatibility, and behavior. Keep `AGENTS.md` limited to durable invariants:
-
-- Deploy the Python package and Godot plugin as an exact-version pair. Reject mismatches instead of adding compatibility paths.
-- Keep the editor bridge authenticated, localhost-only, bounded, and fail-closed when token persistence fails. Only one bridge may own a configured port.
-- Keep the runtime probe debugger-only with no game-side network listener, arbitrary mutation, arbitrary method calls, expressions, or supplied-code evaluation.
-- Preserve project confinement, bounded operations, stable error envelopes, and atomic no-overwrite asset publication across POSIX and Windows.
-- Imports are asynchronous and copy one file at a time; external `.gltf` dependencies must be imported separately, while `.glb` is self-contained.
-- Verify editor API changes with headless plugin/bridge checks. macOS is the currently validated platform; record native Linux and Windows results when performed.
-- A forced headless shutdown may emit the dummy-renderer `Parameter "t" is null` diagnostic after preview work. Treat it as a shutdown artifact only when plugin loading succeeded and no earlier script error exists.
-
-## Unreal Editor MCP Invariants
-
-- Target Unreal Engine 5.7 and newer, with Blueprint game-logic authoring as the primary workflow.
-- The first usable release must create Actor Blueprints from a selected valid Actor-derived base class and safely modify existing Actor Blueprints, including component hierarchies, component defaults, variables, and graph logic.
-- After Actor Blueprints, prioritize gameplay-framework Blueprint families such as GameMode, GameState, and GameInstance before other specialized Blueprint types.
-- Begin with small typed atomic mutations. Prevalidate targets, types, limits, and stale preconditions; use Unreal editor transactions and undo where supported; return bounded compile diagnostics; and keep compilation, saving, and read-back verification observable.
-- Later bounded logic-block replacement may update one event handler, function, macro, or selected graph region as a transaction, but must preserve unrelated Blueprint content and build on the atomic mutation primitives.
-- Keep the C++ editor bridge localhost-only and authenticate every request with a high-entropy per-project token. Fail closed when credentials cannot be read, generated, durably persisted, or re-read, and never expose the token through discovery or heartbeat data.
-- Validate natively on macOS first. Windows support is mandatory, so isolate and test platform-specific paths, editor discovery, plugin loading, and process behavior from the start; preserve Linux portability under the repository-wide policy.
-
 ## Contributions
 
-Use focused commits with imperative subjects, such as `Add bounded search results`. Pull requests should describe behavior, memory/context impact, dependencies, security implications, and tests. After completing changes, propose a focused commit message.
+Use focused commits with imperative subjects, such as `Add bounded search results`. Pull requests should describe behavior, memory/context impact, dependencies, security implications, and tests.

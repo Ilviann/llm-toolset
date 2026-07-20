@@ -3,6 +3,12 @@
 A small, dependency-free MCP server that exposes one folder as `root`. It uses
 relative paths, accepts text only, and communicates over stdio.
 
+Programmers and coding agents should start with the indexed
+[`docs/`](docs/index.md) knowledge cache before changing source. It maps
+component ownership, dependency direction, custom data types, reusable
+libraries, security invariants, and the required feature implementation
+workflow.
+
 ## Platform support
 
 The server supports Python 3.10 or newer on macOS, Linux, and Windows and has no
