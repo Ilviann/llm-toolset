@@ -35,7 +35,7 @@ Deploy the Python package and C++ plugin as an exact-version pair. Report both v
 
 ### Proposed source layout
 
-The first phase should establish this responsibility-oriented layout and document the final dependency map in `CODE.md`:
+The first phase should establish this responsibility-oriented layout and document the verified dependency map through the indexed component and type references under `docs/`:
 
 ```text
 unreal-editor-mcp/
@@ -44,8 +44,8 @@ unreal-editor-mcp/
   tests/                      Python unit and MCP integration tests
   plugin/Source/.../Tests/    Unreal automation and headless integration tests
   examples/                   LM Studio and project configuration examples
+  docs/                       Indexed architecture and type references
   README.md
-  CODE.md
   HISTORY.md
   ROADMAP.md
 ```
@@ -116,7 +116,7 @@ Start at `0.1.0` when Phase 1 is complete. Increment the minor version for each 
 
 ### Documentation and release gate
 
-- Add `README.md`, `CODE.md`, `HISTORY.md`, installation instructions, an LM Studio example, generated-state ignore guidance, and offline build/test instructions.
+- Add `README.md`, `HISTORY.md`, source-backed architecture/type references under `docs/`, installation instructions, an LM Studio example, generated-state ignore guidance, and offline build/test instructions.
 - Release `0.1.0` only when the Python/plugin versions match, the macOS integration test passes with Unreal 5.7, and no mutation command is registered.
 
 ## Phase 2 — Bounded Actor Blueprint discovery and inspection
