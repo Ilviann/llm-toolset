@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "unreal-editor": {
+      "command": "/absolute/path/to/venv/bin/unreal-editor-mcp",
+      "args": [
+        "/absolute/path/to/Project.uproject"
+      ]
+    }
+  }
+}

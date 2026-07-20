@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "unreal-editor-mcp"
+version = "0.1.0"
+description = "Offline-first MCP bridge for the Unreal Editor"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+classifiers = [
+    "Operating System :: MacOS",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
+]
+
+[project.scripts]
+unreal-editor-mcp = "unreal_editor_mcp.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["unreal_editor_mcp*"]

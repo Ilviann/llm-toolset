@@ -1,0 +1,276 @@
+#include "UnrealMCPBridge.h"
+
+#include "Async/Async.h"
+#include "Dom/JsonValue.h"
+#include "Editor.h"
+#include "HAL/PlatformProperties.h"
+#include "HttpPath.h"
+#include "HttpServerModule.h"
+#include "HttpServerRequest.h"
+#include "IHttpRouter.h"
+#include "Misc/App.h"
+#include "Misc/EngineVersion.h"
+#include "Misc/ScopeLock.h"
+#include "UnrealMCPDiscovery.h"
+#include "UnrealMCPProtocol.h"
+#include "UnrealMCPVersion.h"
+#include "UObject/GarbageCollection.h"
+#include "UObject/UObjectGlobals.h"
+
+namespace
+{
+const FHttpPath RoutePath(TEXT("/unreal-mcp/v1/command"));
+
+TArray<TSharedPtr<FJsonValue>> Strings(std::initializer_list<const TCHAR*> Values)
+{
+    TArray<TSharedPtr<FJsonValue>> Result;
+    Result.Reserve(static_cast<int32>(Values.size()));
+    for (const TCHAR* Value : Values)
+    {
+        Result.Add(MakeShared<FJsonValueString>(Value));
+    }
+    return Result;
+}
+
+FString Header(const FHttpServerRequest& Request, const TCHAR* LowercaseName)
+{
+    const TArray<FString>* Values = Request.Headers.Find(LowercaseName);
+    return Values != nullptr && Values->Num() == 1 ? (*Values)[0] : FString();
+}
+}
+
+FUnrealMCPBridge::FUnrealMCPBridge(FString InToken, FString InStateDirectory, FString InProjectHash, uint32 InPort)
+    : Token(MoveTemp(InToken)), StateDirectory(MoveTemp(InStateDirectory)), ProjectHash(MoveTemp(InProjectHash)), Port(InPort)
+{
+}
+
+FUnrealMCPBridge::~FUnrealMCPBridge()
+{
+    Stop();
+}
+
+bool FUnrealMCPBridge::Start(FString& OutError)
+{
+    check(IsInGameThread());
+    if (bReady)
+    {
+        OutError = TEXT("bridge is already running");
+        return false;
+    }
+    bStopping = false;
+    FHttpServerModule& Server = FHttpServerModule::Get();
+    Router = Server.GetHttpRouter(Port, false);
+    if (!Router.IsValid())
+    {
+        OutError = TEXT("could not create HTTP router");
+        return false;
+    }
+    Route = Router->BindRoute(
+        RoutePath,
+        EHttpServerRequestVerbs::VERB_POST,
+        FHttpRequestHandler::CreateSP(AsShared(), &FUnrealMCPBridge::HandleRequest));
+    if (!Route.IsValid())
+    {
+        Router.Reset();
+        OutError = TEXT("bridge route is already owned");
+        return false;
+    }
+    Server.StartAllListeners();
+    if (!Server.GetHttpRouter(Port, true).IsValid())
+    {
+        Router->UnbindRoute(Route);
+        Route.Reset();
+        Router.Reset();
+        OutError = TEXT("could not bind loopback listener");
+        return false;
+    }
+
+    Discovery = MakeUnique<FUnrealMCPDiscovery>(StateDirectory, ProjectHash, Port);
+    if (!Discovery->Write(OutError))
+    {
+        Router->UnbindRoute(Route);
+        Route.Reset();
+        Router.Reset();
+        Discovery.Reset();
+        return false;
+    }
+    bReady = true;
+    HeartbeatHandle = FTSTicker::GetCoreTicker().AddTicker(
+        TEXT("UnrealMCPHeartbeat"),
+        UnrealMCP::HeartbeatIntervalSeconds,
+        [Weak = TWeakPtr<FUnrealMCPBridge>(AsShared())](float DeltaTime)
+        {
+            const TSharedPtr<FUnrealMCPBridge> Pinned = Weak.Pin();
+            return Pinned.IsValid() && Pinned->Heartbeat(DeltaTime);
+        });
+    return true;
+}
+
+void FUnrealMCPBridge::Stop()
+{
+    if (bStopping.Exchange(true))
+    {
+        return;
+    }
+    bReady = false;
+    if (HeartbeatHandle.IsValid())
+    {
+        FTSTicker::GetCoreTicker().RemoveTicker(HeartbeatHandle);
+        HeartbeatHandle.Reset();
+    }
+    if (Discovery)
+    {
+        Discovery->Remove();
+        Discovery.Reset();
+    }
+    if (Router.IsValid() && Route.IsValid())
+    {
+        Router->UnbindRoute(Route);
+    }
+    Route.Reset();
+    Router.Reset();
+    Token.Reset();
+}
+
+bool FUnrealMCPBridge::HandleRequest(const FHttpServerRequest& Request, const FHttpResultCallback& Complete)
+{
+    if (bStopping || !bReady)
+    {
+        Complete(UnrealMCP::Protocol::Error(EHttpServerResponseCodes::ServiceUnavail, TEXT("editor_unavailable"), TEXT("Bridge is shutting down"), true));
+        return true;
+    }
+    const FString Authorization = Header(Request, TEXT("authorization"));
+    const FString Expected = FString(TEXT("Bearer ")) + Token;
+    if (!UnrealMCP::Protocol::ConstantTimeEquals(Authorization, Expected))
+    {
+        Complete(UnrealMCP::Protocol::Error(EHttpServerResponseCodes::Denied, TEXT("authentication_failed"), TEXT("Authentication failed")));
+        return true;
+    }
+    if (Request.Body.Num() <= 0 || Request.Body.Num() > UnrealMCP::MaxRequestBytes)
+    {
+        Complete(UnrealMCP::Protocol::Error(EHttpServerResponseCodes::RequestTooLarge, TEXT("request_too_large"), TEXT("Request body exceeds the configured limit")));
+        return true;
+    }
+    if (Pending.Load() >= UnrealMCP::MaxQueuedRequests)
+    {
+        Complete(UnrealMCP::Protocol::Error(EHttpServerResponseCodes::TooManyRequests, TEXT("busy"), TEXT("Bridge request queue is full"), true));
+        return true;
+    }
+    FString Command;
+    TSharedPtr<FJsonObject> Arguments;
+    FUnrealMCPError ParseError;
+    if (!UnrealMCP::Protocol::ParseCommand(Request.Body, Command, Arguments, ParseError))
+    {
+        Complete(UnrealMCP::Protocol::Error(EHttpServerResponseCodes::BadRequest, ParseError));
+        return true;
+    }
+    if (Command != TEXT("capabilities") && Command != TEXT("editor_state"))
+    {
+        Complete(UnrealMCP::Protocol::Error(EHttpServerResponseCodes::BadRequest, TEXT("invalid_argument"), TEXT("Unknown or unavailable command")));
+        return true;
+    }
+    ++Pending;
+    DispatchOnGameThread(MoveTemp(Command), Complete, FPlatformTime::Seconds());
+    return true;
+}
+
+void FUnrealMCPBridge::DispatchOnGameThread(FString Command, const FHttpResultCallback& Complete, double AcceptedAt)
+{
+    AsyncTask(ENamedThreads::GameThread, [Weak = TWeakPtr<FUnrealMCPBridge>(AsShared()), Command = MoveTemp(Command), Complete, AcceptedAt]() mutable
+    {
+        const TSharedPtr<FUnrealMCPBridge> Pinned = Weak.Pin();
+        if (!Pinned.IsValid())
+        {
+            Complete(UnrealMCP::Protocol::Error(EHttpServerResponseCodes::ServiceUnavail, TEXT("cancelled"), TEXT("Bridge unloaded before dispatch")));
+            return;
+        }
+        --Pinned->Pending;
+        if (Pinned->bStopping)
+        {
+            Complete(UnrealMCP::Protocol::Error(EHttpServerResponseCodes::ServiceUnavail, TEXT("cancelled"), TEXT("Bridge is shutting down")));
+            return;
+        }
+        if (FPlatformTime::Seconds() - AcceptedAt > UnrealMCP::CommandDeadlineSeconds)
+        {
+            Complete(UnrealMCP::Protocol::Error(EHttpServerResponseCodes::GatewayTimeout, TEXT("timeout"), TEXT("Command expired before Game-thread dispatch"), true));
+            return;
+        }
+        Complete(UnrealMCP::Protocol::Success(Pinned->Execute(Command)));
+    });
+}
+
+TSharedPtr<FJsonObject> FUnrealMCPBridge::Execute(const FString& Command) const
+{
+    check(IsInGameThread());
+    return Command == TEXT("capabilities") ? Capabilities() : EditorState();
+}
+
+TSharedPtr<FJsonObject> FUnrealMCPBridge::Capabilities() const
+{
+    const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+    Result->SetStringField(TEXT("project_hash"), ProjectHash);
+    Result->SetStringField(TEXT("bridge_version"), UnrealMCP::Version);
+    Result->SetStringField(TEXT("unreal_version"), FEngineVersion::Current().ToString(EVersionComponent::Changelist));
+    Result->SetStringField(TEXT("platform"), FPlatformProperties::PlatformName());
+    Result->SetStringField(TEXT("mode"), TEXT("read_only"));
+    Result->SetBoolField(TEXT("bridge_ready"), bReady);
+    Result->SetArrayField(TEXT("commands"), Strings({TEXT("capabilities"), TEXT("editor_state")}));
+
+    const TSharedRef<FJsonObject> Features = MakeShared<FJsonObject>();
+    Features->SetBoolField(TEXT("blueprint_inspection"), false);
+    Features->SetBoolField(TEXT("blueprint_mutation"), false);
+    Features->SetBoolField(TEXT("editor_lifecycle"), false);
+    Features->SetBoolField(TEXT("project_build"), false);
+    Result->SetObjectField(TEXT("features"), Features);
+
+    const TSharedRef<FJsonObject> Limits = MakeShared<FJsonObject>();
+    Limits->SetNumberField(TEXT("request_bytes"), UnrealMCP::MaxRequestBytes);
+    Limits->SetNumberField(TEXT("response_bytes"), UnrealMCP::MaxResponseBytes);
+    Limits->SetNumberField(TEXT("queued_requests"), UnrealMCP::MaxQueuedRequests);
+    Limits->SetNumberField(TEXT("json_depth"), UnrealMCP::MaxJsonDepth);
+    Limits->SetNumberField(TEXT("string_chars"), UnrealMCP::MaxStringLength);
+    Limits->SetNumberField(TEXT("command_deadline_ms"), static_cast<int32>(UnrealMCP::CommandDeadlineSeconds * 1000.0));
+    Result->SetObjectField(TEXT("limits"), Limits);
+
+    const TSharedRef<FJsonObject> Listener = MakeShared<FJsonObject>();
+    Listener->SetStringField(TEXT("host"), TEXT("127.0.0.1"));
+    Listener->SetNumberField(TEXT("port"), Port);
+    Listener->SetBoolField(TEXT("authenticated"), true);
+    Result->SetObjectField(TEXT("listener"), Listener);
+    return Result;
+}
+
+TSharedPtr<FJsonObject> FUnrealMCPBridge::EditorState() const
+{
+    const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+    Result->SetStringField(TEXT("project_hash"), ProjectHash);
+    Result->SetStringField(TEXT("project_name"), FApp::GetProjectName());
+    Result->SetBoolField(TEXT("bridge_ready"), bReady);
+    Result->SetStringField(TEXT("state"), IsEngineExitRequested() ? TEXT("shutting_down") : TEXT("ready"));
+    Result->SetBoolField(TEXT("is_playing"), GEditor != nullptr && GEditor->IsPlayingSessionInEditor());
+    Result->SetBoolField(TEXT("is_simulating"), GEditor != nullptr && GEditor->IsSimulatingInEditor());
+    Result->SetBoolField(TEXT("is_saving"), UE::IsSavingPackage());
+    Result->SetBoolField(TEXT("is_garbage_collecting"), IsGarbageCollecting());
+    Result->SetNumberField(TEXT("queued_requests"), Pending.Load());
+    const TSharedRef<FJsonObject> Operation = MakeShared<FJsonObject>();
+    Operation->SetStringField(TEXT("state"), Pending.Load() > 0 ? TEXT("queued") : TEXT("idle"));
+    Result->SetObjectField(TEXT("operation"), Operation);
+    return Result;
+}
+
+bool FUnrealMCPBridge::Heartbeat(float DeltaTime)
+{
+    if (bStopping || !Discovery)
+    {
+        return false;
+    }
+    FString Error;
+    if (!Discovery->Write(Error))
+    {
+        UE_LOG(LogTemp, Error, TEXT("Unreal MCP disabled after heartbeat failure: %s"), *Error);
+        bReady = false;
+        Discovery->Remove();
+        return false;
+    }
+    return true;
+}

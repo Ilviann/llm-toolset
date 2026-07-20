@@ -1,3 +1,9 @@
 # Test UE Project for development
 /ue-test/*
 
+__pycache__/
+*.py[cod]
+.venv/
+build/
+dist/
+*.egg-info/

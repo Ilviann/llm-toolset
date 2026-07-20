@@ -15,6 +15,8 @@ well with local models and limited context windows.
   bridge for controlling the Godot 4.7 editor. Its
   [release history](godot-editor-mcp/HISTORY.md) and
   [planned features](godot-editor-mcp/ROADMAP.md) are documented separately.
+- [`unreal-editor-mcp`](unreal-editor-mcp/README.md): an authenticated,
+  version-matched bridge for Unreal Engine 5.8+ editor workflows.
 
 Each project contains its own setup, usage, and test instructions. The tools are
 designed to run locally without cloud services, telemetry, accounts, or runtime

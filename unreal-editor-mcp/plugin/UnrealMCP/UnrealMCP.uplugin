@@ -1,0 +1,19 @@
+{
+  "FileVersion": 3,
+  "Version": 10000,
+  "VersionName": "0.1.0",
+  "FriendlyName": "Unreal Editor MCP",
+  "Description": "Authenticated localhost bridge for offline-first Unreal Editor MCP workflows.",
+  "Category": "Editor",
+  "CreatedBy": "LLMToolset",
+  "CanContainContent": false,
+  "IsBetaVersion": true,
+  "Installed": false,
+  "Modules": [
+    {
+      "Name": "UnrealMCP",
+      "Type": "Editor",
+      "LoadingPhase": "PostEngineInit"
+    }
+  ]
+}
