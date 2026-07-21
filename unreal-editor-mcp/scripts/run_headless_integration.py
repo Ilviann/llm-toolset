@@ -42,7 +42,7 @@ def wait_until_ready(layout: ProjectLayout, process: subprocess.Popen[bytes], de
         try:
             record = read_discovery(layout)
             result = UnrealBridge(layout, timeout=2.0).call("capabilities")
-            if result.get("bridge_ready") is True and record.bridge_version == "0.11.0":
+            if result.get("bridge_ready") is True and record.bridge_version == "0.12.0":
                 return
         except Exception as error:
             last_error = str(error)
@@ -97,7 +97,7 @@ def send_without_reading(layout: ProjectLayout, command: str, arguments: dict[st
         headers={
             "Authorization": "Bearer " + read_token(layout),
             "Content-Type": "application/json",
-            "X-Unreal-MCP-Version": "0.11.0",
+            "X-Unreal-MCP-Version": "0.12.0",
         },
     )
     connection.close()
@@ -114,6 +114,23 @@ def reconcile_operation(bridge: UnrealBridge, operation_id: str, bridge_instance
             return status
         time.sleep(0.05)
     raise TimeoutError("lost mutation response did not reach a retained terminal state")
+
+
+def collect_inspection(bridge: UnrealBridge, arguments: dict[str, object]) -> dict[str, object]:
+    """Consume one bounded inspection cursor chain without treating prose as a fixture."""
+    result = bridge.call("blueprint_inspect", arguments)
+    records = list(result.get("records", []))
+    cursor = result.get("next_cursor")
+    for _ in range(63):
+        if not isinstance(cursor, str):
+            merged = dict(result)
+            merged["records"] = records
+            merged.pop("next_cursor", None)
+            return merged
+        page = bridge.call("blueprint_inspect", {"cursor": cursor, "page_size": 100})
+        records.extend(page.get("records", []))
+        cursor = page.get("next_cursor")
+    raise AssertionError("inspection exceeded the retained cursor-page bound")
 
 
 def stop_editor(process: subprocess.Popen[bytes], timeout: float = 30.0) -> None:
@@ -154,6 +171,7 @@ def run_automation(executable: Path, project: Path, environment: dict[str, str],
         "ExpandedActionCatalog",
         "GraphNodeLifecycle",
         "PinDefaultsAndDirectConnections",
+        "WildcardsConversionsAndAtomicGraphEditing",
     )
     if test_filter == "UnrealMCP":
         expected = all_expected
@@ -175,6 +193,8 @@ def run_automation(executable: Path, project: Path, environment: dict[str, str],
         expected = tuple(name for name in all_expected if name == "GraphNodeLifecycle")
     elif test_filter == "UnrealMCP.Phase12":
         expected = tuple(name for name in all_expected if name == "PinDefaultsAndDirectConnections")
+    elif test_filter == "UnrealMCP.Phase13":
+        expected = tuple(name for name in all_expected if name == "WildcardsConversionsAndAtomicGraphEditing")
     else:
         leaf = test_filter.rsplit(".", 1)[-1]
         expected = (leaf,) if leaf in all_expected else ()
@@ -263,7 +283,7 @@ def main() -> int:
                 "blueprint_component_edit", "blueprint_default_edit", "blueprint_member_edit",
             ]:
                 raise AssertionError("released command catalog mismatch")
-            if capabilities.get("bridge_version") != "0.11.0" or state.get("bridge_ready") is not True:
+            if capabilities.get("bridge_version") != "0.12.0" or state.get("bridge_ready") is not True:
                 raise AssertionError("capability/state contract mismatch")
             if capabilities.get("features", {}).get("blueprint_mutation") is not True:
                 raise AssertionError("Phase 6 mutation capability is unavailable")
@@ -281,14 +301,15 @@ def main() -> int:
             for feature in ("blueprint_graph_pin_defaults", "blueprint_graph_direct_connections"):
                 if capabilities.get("features", {}).get(feature) is not True:
                     raise AssertionError(f"Phase 12 graph capability is unavailable: {feature}")
-            if capabilities.get("features", {}).get("blueprint_graph_automatic_conversion") is not False:
-                raise AssertionError("Phase 12 automatic conversion must remain disabled")
+            for feature in ("blueprint_graph_wildcard_specialization", "blueprint_graph_automatic_conversion"):
+                if capabilities.get("features", {}).get(feature) is not True:
+                    raise AssertionError(f"Phase 13 graph capability is unavailable: {feature}")
             expected_graph_limits = {
                 "graph_nodes": 2048, "graph_pins_per_node": 256, "graph_coordinate": 1000000,
-                "graph_links_per_pin": 64, "pin_default_chars": 512,
+                "graph_links_per_pin": 64, "graph_automatic_conversion_nodes": 1, "pin_default_chars": 512,
             }
             if any(capabilities.get("limits", {}).get(name) != value for name, value in expected_graph_limits.items()):
-                raise AssertionError(f"Phase 12 graph limits mismatch: {capabilities.get('limits')!r}")
+                raise AssertionError(f"Phase 13 graph limits mismatch: {capabilities.get('limits')!r}")
             if capabilities.get("asset_access") != {
                 "read_scope": "all_mounted_content",
                 "mutation_scope": "project_content_and_local_project_plugins",
@@ -697,10 +718,196 @@ def main() -> int:
             reconnected = reconnect_status.get("result") if reconnect_status.get("state") == "committed" else None
             if not isinstance(reconnected, dict) or reconnected.get("changed", {}).get("connection", {}).get("direct") is not True:
                 raise AssertionError(f"lost direct-reconnect response did not reconcile: {reconnect_status!r}")
+
+            def add_exact_action(snapshot: str, filters: dict[str, object], position: dict[str, int]) -> dict[str, object]:
+                catalog = bridge.call("blueprint_action_catalog", {
+                    "asset_path": asset_path,
+                    "graph_id": event_graph_id,
+                    "expected_snapshot": snapshot,
+                    **filters,
+                    "limit": 50,
+                })
+                actions = catalog.get("actions", [])
+                if not actions:
+                    raise AssertionError(f"Phase 13 action is unavailable for {filters!r}: {catalog!r}")
+                return bridge.call("blueprint_graph_edit", {
+                    "operation_id": uuid.uuid4().hex,
+                    "asset_path": asset_path,
+                    "expected_snapshot": snapshot,
+                    "operation": "add_node",
+                    "graph_id": event_graph_id,
+                    "action_id": actions[0]["action_id"],
+                    "position": position,
+                })
+
+            literal_add = add_exact_action(reconnected["snapshot_id"], {
+                "node_family": "literal", "function": "MakeLiteralInt",
+            }, {"x": 1120, "y": 240})
+            literal_node_id = literal_add.get("changed", {}).get("node", {}).get("id")
+            literal_output_pin_id = next((
+                pin.get("id") for pin in literal_add.get("changed", {}).get("node", {}).get("pins", [])
+                if pin.get("direction") == "output" and pin.get("type", {}).get("category") == "int"
+            ), None)
+            if not isinstance(literal_node_id, str) or not isinstance(literal_output_pin_id, str):
+                raise AssertionError(f"Phase 13 literal identities are unavailable: {literal_add!r}")
+
+            operator_catalog = bridge.call("blueprint_action_catalog", {
+                "asset_path": asset_path,
+                "graph_id": event_graph_id,
+                "expected_snapshot": literal_add["snapshot_id"],
+                "node_family": "operator",
+                "pin_context": {"node_id": literal_node_id, "pin_id": literal_output_pin_id},
+                "limit": 50,
+            })
+            wildcard_actions = [action for action in operator_catalog.get("actions", []) if action.get("wildcard") is True]
+            wildcard_action = next((
+                action for action in wildcard_actions
+                if str(action.get("member_name", "")).casefold().startswith("add_")
+                or str(action.get("title", "")).casefold().startswith("add")
+            ), None)
+            if wildcard_action is None:
+                raise AssertionError(f"Phase 13 wildcard Add action is unavailable: {operator_catalog!r}")
+            operator_add = bridge.call("blueprint_graph_edit", {
+                "operation_id": uuid.uuid4().hex,
+                "asset_path": asset_path,
+                "expected_snapshot": literal_add["snapshot_id"],
+                "operation": "add_node",
+                "graph_id": event_graph_id,
+                "action_id": wildcard_action["action_id"],
+                "position": {"x": 1360, "y": 240},
+            })
+            operator_node_id = operator_add.get("changed", {}).get("node", {}).get("id")
+            if not isinstance(operator_node_id, str):
+                raise AssertionError(f"Phase 13 operator identity is unavailable: {operator_add!r}")
+
+            print_add = add_exact_action(operator_add["snapshot_id"], {
+                "node_family": "function_call",
+                "owner_class": "/Script/Engine.KismetSystemLibrary",
+                "function": "PrintString",
+            }, {"x": 1840, "y": 240})
+            print_node_id = print_add.get("changed", {}).get("node", {}).get("id")
+            if not isinstance(print_node_id, str):
+                raise AssertionError(f"Phase 13 PrintString identity is unavailable: {print_add!r}")
+
+            existing_event_nodes = collect_inspection(bridge, {
+                "mode": "inspect", "asset_path": asset_path, "sections": ["nodes"],
+                "graph_id": event_graph_id, "page_size": 100,
+            })
+            begin_play_matches = [
+                record for record in existing_event_nodes.get("records", [])
+                if record.get("section") == "node"
+                and record.get("class_path") == "/Script/BlueprintGraph.K2Node_Event"
+                and "beginplay" in str(record.get("title", "")).replace(" ", "").casefold()
+            ]
+            if len(begin_play_matches) == 1:
+                begin_play_node_id = begin_play_matches[0].get("id")
+                begin_play_snapshot = print_add["snapshot_id"]
+            else:
+                begin_play_add = add_exact_action(print_add["snapshot_id"], {
+                    "node_family": "event",
+                    "owner_class": "/Script/Engine.Actor",
+                    "function": "ReceiveBeginPlay",
+                }, {"x": 1120, "y": 0})
+                begin_play_node_id = begin_play_add.get("changed", {}).get("node", {}).get("id")
+                begin_play_snapshot = begin_play_add["snapshot_id"]
+            if not isinstance(begin_play_node_id, str):
+                raise AssertionError(f"Phase 13 BeginPlay identity is unavailable: {begin_play_matches!r}")
+
+            phase13_pins = collect_inspection(bridge, {
+                "mode": "inspect", "asset_path": asset_path, "sections": ["pins"],
+                "graph_id": event_graph_id, "page_size": 100,
+            })
+            phase13_pin_records = [record for record in phase13_pins.get("records", []) if record.get("section") == "pin"]
+            def phase13_pin(node_id: str, direction: str, category: str, name: str | None = None) -> str:
+                matches = [record for record in phase13_pin_records
+                           if record.get("node_id") == node_id and record.get("direction") == direction
+                           and record.get("type", {}).get("category") == category
+                           and (name is None or record.get("name") == name)]
+                if len(matches) != 1 or not isinstance(matches[0].get("id"), str):
+                    raise AssertionError(f"Phase 13 pin is ambiguous: {node_id}/{direction}/{category}/{name}: {matches!r}")
+                return matches[0]["id"]
+            operator_input_pin_id = phase13_pin(operator_node_id, "input", "wildcard", "A")
+            print_exec_pin_id = phase13_pin(print_node_id, "input", "exec")
+            print_text_pin_id = phase13_pin(print_node_id, "input", "string", "InString")
+            begin_play_exec_pin_id = phase13_pin(begin_play_node_id, "output", "exec")
+
+            wildcard_operation = uuid.uuid4().hex
+            send_without_reading(layout, "blueprint_graph_edit", {
+                "operation_id": wildcard_operation,
+                "asset_path": asset_path,
+                "expected_snapshot": begin_play_snapshot,
+                "operation": "connect_pins",
+                "graph_id": event_graph_id,
+                "from_node_id": literal_node_id,
+                "from_pin_id": literal_output_pin_id,
+                "to_node_id": operator_node_id,
+                "to_pin_id": operator_input_pin_id,
+            })
+            wildcard_status = reconcile_operation(bridge, wildcard_operation, capabilities["bridge_instance_id"])
+            wildcard_connected = wildcard_status.get("result") if wildcard_status.get("state") == "committed" else None
+            wildcard_change = wildcard_connected.get("changed", {}).get("connection", {}) if isinstance(wildcard_connected, dict) else {}
+            if (wildcard_change.get("wildcard_specialized") is not True
+                    or not wildcard_connected.get("reconstructed_identities")):
+                raise AssertionError(f"lost wildcard-specialization response did not reconcile: {wildcard_status!r}")
+
+            specialized_pins = collect_inspection(bridge, {
+                "mode": "inspect", "asset_path": asset_path, "sections": ["pins"],
+                "graph_id": event_graph_id, "page_size": 100,
+            })
+            specialized_records = [record for record in specialized_pins.get("records", []) if record.get("section") == "pin"]
+            operator_output_matches = [record for record in specialized_records
+                                       if record.get("node_id") == operator_node_id and record.get("direction") == "output"
+                                       and record.get("type", {}).get("category") == "int"]
+            if len(operator_output_matches) != 1 or not isinstance(operator_output_matches[0].get("id"), str):
+                operator_records = [record for record in specialized_records if record.get("node_id") == operator_node_id]
+                raise AssertionError(f"specialized operator output is unavailable: {operator_records!r}")
+            operator_output_pin_id = operator_output_matches[0]["id"]
+
+            conversion_operation = uuid.uuid4().hex
+            send_without_reading(layout, "blueprint_graph_edit", {
+                "operation_id": conversion_operation,
+                "asset_path": asset_path,
+                "expected_snapshot": wildcard_connected["snapshot_id"],
+                "operation": "connect_pins",
+                "graph_id": event_graph_id,
+                "from_node_id": operator_node_id,
+                "from_pin_id": operator_output_pin_id,
+                "to_node_id": print_node_id,
+                "to_pin_id": print_text_pin_id,
+                "automatic_conversion": True,
+            })
+            conversion_status = reconcile_operation(bridge, conversion_operation, capabilities["bridge_instance_id"])
+            converted = conversion_status.get("result") if conversion_status.get("state") == "committed" else None
+            conversion_change = converted.get("changed", {}).get("connection", {}) if isinstance(converted, dict) else {}
+            conversion_nodes = converted.get("changed", {}).get("nodes", []) if isinstance(converted, dict) else []
+            if (conversion_change.get("automatic_conversion") is not True
+                    or conversion_change.get("conversion_node_count") != 1 or len(conversion_nodes) != 1
+                    or not converted.get("created_identities")):
+                raise AssertionError(f"lost automatic-conversion response did not reconcile: {conversion_status!r}")
+            conversion_node_id = conversion_nodes[0].get("id")
+            if not isinstance(conversion_node_id, str):
+                raise AssertionError(f"conversion node identity is unavailable: {converted!r}")
+
+            begin_play_operation = uuid.uuid4().hex
+            send_without_reading(layout, "blueprint_graph_edit", {
+                "operation_id": begin_play_operation,
+                "asset_path": asset_path,
+                "expected_snapshot": converted["snapshot_id"],
+                "operation": "connect_pins",
+                "graph_id": event_graph_id,
+                "from_node_id": begin_play_node_id,
+                "from_pin_id": begin_play_exec_pin_id,
+                "to_node_id": print_node_id,
+                "to_pin_id": print_exec_pin_id,
+            })
+            begin_play_status = reconcile_operation(bridge, begin_play_operation, capabilities["bridge_instance_id"])
+            begin_play_connected = begin_play_status.get("result") if begin_play_status.get("state") == "committed" else None
+            if not isinstance(begin_play_connected, dict) or begin_play_connected.get("changed", {}).get("connection", {}).get("direct") is not True:
+                raise AssertionError(f"lost BeginPlay direct-link response did not reconcile: {begin_play_status!r}")
             compiled = bridge.call("blueprint_compile", {
                 "operation_id": uuid.uuid4().hex,
                 "asset_path": asset_path,
-                "expected_snapshot": reconnected["snapshot_id"],
+                "expected_snapshot": begin_play_connected["snapshot_id"],
             })
             if compiled.get("compile_succeeded") is not True or compiled.get("saved") is not False:
                 raise AssertionError(f"explicit Blueprint compile contract mismatch: {compiled!r}")
@@ -727,7 +934,8 @@ def main() -> int:
         process = subprocess.Popen(command, cwd=ROOT, env=environment, stdout=log, stderr=subprocess.STDOUT)
         try:
             wait_until_ready(layout, process, time.monotonic() + 120.0)
-            reloaded = UnrealBridge(layout, timeout=3.0).call("blueprint_inspect", {
+            reloaded_bridge = UnrealBridge(layout, timeout=3.0)
+            reloaded = collect_inspection(reloaded_bridge, {
                 "mode": "inspect",
                 "asset_path": "/Game/UnrealMCPPhase4/BP_ComponentFixture.BP_ComponentFixture",
                 "sections": ["summary", "parent_class", "compile_state", "components", "class_defaults", "variables",
@@ -842,6 +1050,24 @@ def main() -> int:
             }
             if not any(all(record.get(key) == value for key, value in expected_connection.items()) for record in connections):
                 raise AssertionError(f"Phase 12 direct connection changed after restart: {connections!r}")
+            for node_id, label in {
+                literal_node_id: "literal",
+                operator_node_id: "specialized operator",
+                print_node_id: "PrintString",
+                begin_play_node_id: "BeginPlay",
+                conversion_node_id: "conversion",
+            }.items():
+                if node_id not in nodes:
+                    raise AssertionError(f"Phase 13 {label} node changed after restart: {node_id!r}")
+            def has_connection(from_node_id: str, to_node_id: str) -> bool:
+                return any(record.get("from_node_id") == from_node_id and record.get("to_node_id") == to_node_id
+                           for record in connections)
+            if not has_connection(literal_node_id, operator_node_id):
+                raise AssertionError("Phase 13 wildcard-specialized input link changed after restart")
+            if not has_connection(operator_node_id, conversion_node_id) or not has_connection(conversion_node_id, print_node_id):
+                raise AssertionError("Phase 13 explicit conversion path changed after restart")
+            if not has_connection(begin_play_node_id, print_node_id):
+                raise AssertionError("Phase 13 BeginPlay behavior link changed after restart")
             event_graphs = [
                 record for record in reloaded.get("records", [])
                 if record.get("section") == "graph" and record.get("kind") == "event" and record.get("inherited") is False
@@ -871,7 +1097,7 @@ def main() -> int:
                 "operator": {"node_family": "operator"},
             }
             for family, filters in expanded_queries.items():
-                catalog = UnrealBridge(layout, timeout=3.0).call("blueprint_action_catalog", {
+                catalog = reloaded_bridge.call("blueprint_action_catalog", {
                     **catalog_base, **filters, "limit": 10,
                 })
                 actions = catalog.get("actions", [])
@@ -879,7 +1105,7 @@ def main() -> int:
                     raise AssertionError(f"Phase 10 {family} action missing after restart: {catalog!r}")
                 if len(json.dumps(catalog, separators=(",", ":"))) > 32_768:
                     raise AssertionError(f"Phase 10 {family} catalog exceeded representative context budget")
-            operator_catalog = UnrealBridge(layout, timeout=3.0).call("blueprint_action_catalog", {
+            operator_catalog = reloaded_bridge.call("blueprint_action_catalog", {
                 **catalog_base, "node_family": "operator", "limit": 50,
             })
             if not any(action.get("wildcard") is True for action in operator_catalog.get("actions", [])):
@@ -900,7 +1126,7 @@ def main() -> int:
             pass
         else:
             raise AssertionError("a live discovery heartbeat remained after editor termination")
-    print("Phase 12 integration passed: reconciled pin defaults and direct connections, restart-stable graph behavior, complete Actor authoring, loopback binding, and clean unload")
+    print("Phase 13 integration passed: complete atomic graph editing, BeginPlay behavior, wildcard specialization, explicit conversion, reconciliation, restart, and clean unload")
     return 0
 
 

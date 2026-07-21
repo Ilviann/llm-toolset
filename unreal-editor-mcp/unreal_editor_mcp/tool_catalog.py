@@ -424,7 +424,7 @@ TOOLS: Final = (
     },
     {
         "name": "blueprint_graph_edit",
-        "description": "Create, move, remove, configure, or directly connect graph nodes and pins through a reconciled Blueprint mutation.",
+        "description": "Atomically create, move, remove, configure, or connect Blueprint graph nodes and pins, with opt-in bounded conversion insertion.",
         "inputSchema": {
             "oneOf": [
                 _graph_shape(
@@ -453,6 +453,7 @@ TOOLS: Final = (
                     from_pin_id=_PIN_ID,
                     to_node_id=_NODE_ID,
                     to_pin_id=_PIN_ID,
+                    automatic_conversion={"type": "boolean"},
                 ),
                 _graph_shape(
                     "disconnect_pins", ["from_node_id", "from_pin_id", "to_node_id", "to_pin_id"],

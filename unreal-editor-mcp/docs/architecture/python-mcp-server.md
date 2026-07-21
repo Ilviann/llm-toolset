@@ -2,7 +2,7 @@
 
 ## Ownership
 
-`unreal_editor_mcp/` owns the Python 3.10+ process. `stdio.py` bounds newline-delimited JSON-RPC and keeps stdout protocol-only. `server.py` negotiates MCP, publishes the twelve Phase 12 tools, validates arguments, and converts domain failures to MCP tool errors. `project.py`, `platforms.py`, and `discovery.py` resolve one project and validate generated state. `bridge.py` is the only HTTP client. `cli.py` composes these responsibilities.
+`unreal_editor_mcp/` owns the Python 3.10+ process. `stdio.py` bounds newline-delimited JSON-RPC and keeps stdout protocol-only. `server.py` negotiates MCP, publishes the twelve Phase 13 tools, validates arguments, and converts domain failures to MCP tool errors. `project.py`, `platforms.py`, and `discovery.py` resolve one project and validate generated state. `bridge.py` is the only HTTP client. `cli.py` composes these responsibilities.
 
 ## Dependency direction
 
@@ -14,7 +14,7 @@ The CLI constructs a `ProjectLayout`, `UnrealBridge`, and `MCPServer`; the trans
 - Tool arguments are exact objects with no additional fields.
 - `blueprint_inspect` has three mutually exclusive shapes: discovery, exact inspection, or cursor continuation; Python bounds paths, sections, cursor size, and page size before HTTP.
 - `blueprint_action_catalog` requires an exact asset, graph, and snapshot and bounds exact text/owner/function/member/family filters, optional node/pin context, and result count before HTTP.
-- `blueprint_graph_edit` has exact node-lifecycle, typed pin-default, and direct connect/disconnect shapes with stable graph/action/node/pin identities, bounded positions/defaults, and no conversion opt-in.
+- `blueprint_graph_edit` has exact node-lifecycle, typed pin-default, and connect/disconnect shapes with stable graph/action/node/pin identities and bounded positions/defaults. Only `connect_pins` accepts optional Boolean `automatic_conversion`.
 - Every mutation requires a caller-generated 32-lowercase-hex `operation_id`. Existing-asset mutations also require the current 40-lowercase-hex `expected_snapshot`.
 - Component operations use one exact discriminated shape; class/component property edits accept only the bounded shared value forms.
 - Member operations use exact add/rename/update/remove shapes with canonical K2 type/default records, stable identities, and reject-only signature/type/removal policies. Scoped discriminators cover functions, locals, macros, and custom events without adding another model-facing tool; custom-event add requires one stable event-graph identity.

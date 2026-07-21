@@ -9,7 +9,7 @@
 - [x] [Phase 10 — Expanded action-catalog families](docs/todo/phase-10.md) — Expand the action catalog to the remaining supported action families.
 - [x] [Phase 11 — Graph-node lifecycle](docs/todo/phase-11.md) — Add transactional graph-node creation, movement, and removal.
 - [x] [Phase 12 — Pin defaults and direct connections](docs/todo/phase-12.md) — Add pin defaults and direct graph connections without automatic conversion.
-- [ ] [Phase 13 — Wildcards, conversions, and complete atomic graph editing](docs/todo/phase-13.md) — Add wildcard specialization, explicit conversion insertion, and complete atomic graph editing.
+- [x] [Phase 13 — Wildcards, conversions, and complete atomic graph editing](docs/todo/phase-13.md) — Add wildcard specialization, explicit conversion insertion, and complete atomic graph editing.
 - [ ] [Phase 14 — GameMode and GameState families](docs/todo/phase-14.md) — Formalize GameMode and GameState family support.
 - [ ] [Phase 15 — GameInstance family](docs/todo/phase-15.md) — Add GameInstance family support.
 - [ ] [Phase 16 — Complete function replacement](docs/todo/phase-16.md) — Add transactional replacement of one complete user-owned function.

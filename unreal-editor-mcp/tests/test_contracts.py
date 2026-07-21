@@ -19,9 +19,9 @@ class ReleaseContractTests(unittest.TestCase):
         native = re.search(r'Version\[\].*TEXT\("([^"]+)"\)', header)
         self.assertIsNotNone(native)
         versions = {project["project"]["version"], plugin["VersionName"], native.group(1), unreal_editor_mcp.__version__}
-        self.assertEqual(versions, {"0.11.0"})
+        self.assertEqual(versions, {"0.12.0"})
 
-    def test_only_released_phase_twelve_commands_are_registered(self):
+    def test_only_released_phase_thirteen_commands_are_registered(self):
         names = [tool["name"] for tool in TOOLS]
         self.assertEqual(names, [
             "capabilities", "editor_state", "operation_status", "blueprint_inspect", "blueprint_action_catalog", "blueprint_graph_edit",

@@ -1,0 +1,89 @@
+{
+  "inspect_graph": {
+    "mode": "inspect",
+    "asset_path": "/Game/Actors/BP_Logic.BP_Logic",
+    "sections": ["graphs", "nodes", "pins", "connections"],
+    "graph_id": "11111111111111111111111111111111",
+    "page_size": 50
+  },
+  "catalog_integer_literal": {
+    "asset_path": "/Game/Actors/BP_Logic.BP_Logic",
+    "graph_id": "11111111111111111111111111111111",
+    "expected_snapshot": "0123456789abcdef0123456789abcdef01234567",
+    "node_family": "literal",
+    "function": "MakeLiteralInt",
+    "limit": 5
+  },
+  "catalog_wildcard_operator_for_literal_output": {
+    "asset_path": "/Game/Actors/BP_Logic.BP_Logic",
+    "graph_id": "11111111111111111111111111111111",
+    "expected_snapshot": "89abcdef0123456789abcdef0123456789abcdef",
+    "node_family": "operator",
+    "pin_context": {
+      "node_id": "22222222222222222222222222222222",
+      "pin_id": "33333333333333333333333333333333"
+    },
+    "limit": 10
+  },
+  "add_wildcard_operator": {
+    "operation_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "asset_path": "/Game/Actors/BP_Logic.BP_Logic",
+    "expected_snapshot": "89abcdef0123456789abcdef0123456789abcdef",
+    "operation": "add_node",
+    "graph_id": "11111111111111111111111111111111",
+    "action_id": "44444444444444444444444444444444",
+    "position": {"x": 480, "y": 160}
+  },
+  "specialize_wildcard": {
+    "operation_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "asset_path": "/Game/Actors/BP_Logic.BP_Logic",
+    "expected_snapshot": "fedcba9876543210fedcba9876543210fedcba98",
+    "operation": "connect_pins",
+    "graph_id": "11111111111111111111111111111111",
+    "from_node_id": "22222222222222222222222222222222",
+    "from_pin_id": "33333333333333333333333333333333",
+    "to_node_id": "55555555555555555555555555555555",
+    "to_pin_id": "66666666666666666666666666666666"
+  },
+  "reinspect_after_specialization": {
+    "mode": "inspect",
+    "asset_path": "/Game/Actors/BP_Logic.BP_Logic",
+    "sections": ["nodes", "pins", "connections"],
+    "graph_id": "11111111111111111111111111111111",
+    "page_size": 50
+  },
+  "connect_with_explicit_conversion": {
+    "operation_id": "cccccccccccccccccccccccccccccccc",
+    "asset_path": "/Game/Actors/BP_Logic.BP_Logic",
+    "expected_snapshot": "00112233445566778899aabbccddeeff00112233",
+    "operation": "connect_pins",
+    "graph_id": "11111111111111111111111111111111",
+    "from_node_id": "55555555555555555555555555555555",
+    "from_pin_id": "77777777777777777777777777777777",
+    "to_node_id": "88888888888888888888888888888888",
+    "to_pin_id": "99999999999999999999999999999999",
+    "automatic_conversion": true
+  },
+  "connect_begin_play_exec": {
+    "operation_id": "dddddddddddddddddddddddddddddddd",
+    "asset_path": "/Game/Actors/BP_Logic.BP_Logic",
+    "expected_snapshot": "11223344556677889900aabbccddeeff11223344",
+    "operation": "connect_pins",
+    "graph_id": "11111111111111111111111111111111",
+    "from_node_id": "abababababababababababababababab",
+    "from_pin_id": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+    "to_node_id": "88888888888888888888888888888888",
+    "to_pin_id": "efefefefefefefefefefefefefefefef"
+  },
+  "reconcile_lost_conversion_response": {
+    "operation_id": "cccccccccccccccccccccccccccccccc",
+    "bridge_instance_id": "01230123012301230123012301230123"
+  },
+  "final_reinspection": {
+    "mode": "inspect",
+    "asset_path": "/Game/Actors/BP_Logic.BP_Logic",
+    "sections": ["summary", "compile_state", "components", "variables", "graphs", "nodes", "pins", "connections"],
+    "graph_id": "11111111111111111111111111111111",
+    "page_size": 100
+  }
+}

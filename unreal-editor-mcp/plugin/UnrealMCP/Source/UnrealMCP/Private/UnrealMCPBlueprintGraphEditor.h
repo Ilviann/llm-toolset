@@ -9,6 +9,8 @@ class FUnrealMCPBlueprintInspector;
 class UBlueprint;
 class UEdGraph;
 class UEdGraphNode;
+class UEdGraphPin;
+class UEdGraphSchema_K2;
 
 class FUnrealMCPBlueprintGraphEditor
 {
@@ -26,12 +28,14 @@ public:
         const FUnrealMCPBlueprintActionCatalog::FResolvedAction&,
         UEdGraph*,
         const FVector2D&)>;
+    using FConnectionInvoker = TFunction<bool(const UEdGraphSchema_K2*, UEdGraphPin*, UEdGraphPin*)>;
 
     FUnrealMCPBlueprintGraphEditor(
         FUnrealMCPBlueprintInspector& InInspector,
         FUnrealMCPBlueprintActionCatalog& InActionCatalog,
         FActionResolver InActionResolver = {},
-        FNodeInvoker InNodeInvoker = {});
+        FNodeInvoker InNodeInvoker = {},
+        FConnectionInvoker InConnectionInvoker = {});
 
     bool Execute(
         const TSharedPtr<FJsonObject>& Arguments,
@@ -43,4 +47,5 @@ private:
     FUnrealMCPBlueprintActionCatalog& ActionCatalog;
     FActionResolver ActionResolver;
     FNodeInvoker NodeInvoker;
+    FConnectionInvoker ConnectionInvoker;
 };

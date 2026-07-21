@@ -1,5 +1,12 @@
 # Unreal Editor MCP history
 
+## 0.12.0 — 2026-07-22
+
+- Completed atomic Actor Blueprint graph editing with live-schema wildcard specialization, numeric promotion, pin/node reconstruction tracking, and directed-cycle rejection.
+- Added explicit per-connection `automatic_conversion` opt-in, disabled by omission, with one-node preflight capacity, transactional insertion, stable node/pin identities, conversion-path read-back, and rollback for unexpected insertions.
+- Standardized graph change records with operation discriminators, created/reconstructed identity arrays, changed-node records, direct/conversion/specialization flags, and published conversion limits.
+- Added exact schema coverage, Phase 13 native Automation coverage, and a lost-response/restart MCP acceptance workflow that authors and verifies BeginPlay-driven Actor behavior through components, a variable, direct links, a wildcard operator, and an explicit conversion.
+
 ## 0.11.0 — 2026-07-22
 
 - Added reconciled `blueprint_graph_edit` operations for typed pin defaults and schema-valid direct pin connection/disconnection by stable graph, node, and pin identities.

@@ -53,6 +53,8 @@ void RequirePublicTypes()
     (void)FBlueprintActionDatabase::Get;
     (void)&UEdGraphSchema_K2::CanCreateConnection;
     (void)&UEdGraphSchema_K2::TryCreateConnection;
+    (void)&UEdGraphSchema_K2::CreateAutomaticConversionNodeAndConnections;
+    (void)&UEdGraphSchema_K2::CreatePromotedConnection;
     (void)&UEdGraphSchema_K2::TrySetDefaultValue;
     (void)&UEdGraphSchema_K2::BreakSinglePinLink;
     (void)FEditorFileUtils::SaveDirtyPackages;

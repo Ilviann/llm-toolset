@@ -6,6 +6,6 @@ Each file in this directory documents one implemented cohesive component: what i
 - [`editor-bridge.md`](editor-bridge.md) — plugin composition, credentials, listener/route ownership, dispatch, commands, limits, and heartbeat.
 - [`blueprint-inspector.md`](blueprint-inspector.md) — bounded Asset Registry discovery, exact Actor Blueprint inspection, snapshots, identities, values, and cursors.
 - [`blueprint-action-catalog.md`](blueprint-action-catalog.md) — bounded live graph-action discovery, filters, opaque identities, caching, and invalidation.
-- [`blueprint-graph-editor.md`](blueprint-graph-editor.md) — transactional action-backed node lifecycle, typed pin defaults, direct schema-valid connections, identity completion, and read-back.
+- [`blueprint-graph-editor.md`](blueprint-graph-editor.md) — transactional action-backed node lifecycle, typed pin defaults, wildcard-aware connections, bounded conversions, identity completion, and read-back.
 - [`blueprint-mutator.md`](blueprint-mutator.md) — safe Actor Blueprint creation, compilation, package saving, diagnostics, cleanup, and read-back.
 - [`automated-verification.md`](automated-verification.md) — Python, native, public-API-probe, and cross-process verification boundaries.

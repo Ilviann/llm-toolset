@@ -11,7 +11,7 @@ from unreal_editor_mcp.errors import BridgeError, ErrorCode
 from unreal_editor_mcp.project import ProjectLayout
 
 
-RECORD = DiscoveryRecord("a" * 40, 123, 15485, "0.11.0", "5.8.0", 1)
+RECORD = DiscoveryRecord("a" * 40, 123, 15485, "0.12.0", "5.8.0", 1)
 
 
 class FakeResponse:

@@ -1,13 +1,13 @@
 # Unreal Editor MCP
 
-Unreal Editor MCP 0.11.0 is an offline-first MCP bridge for Unreal Engine 5.8+. It pairs a dependency-free Python 3.10+ stdio server with an editor-only C++ plugin. This release exposes exactly twelve tools:
+Unreal Editor MCP 0.12.0 is an offline-first MCP bridge for Unreal Engine 5.8+. It pairs a dependency-free Python 3.10+ stdio server with an editor-only C++ plugin. This release exposes exactly twelve tools:
 
 - `capabilities` reports the exact Python/plugin/Unreal versions, commands, features, listener state, and effective limits.
 - `editor_state` reports project identity, bridge readiness, play/simulate/save/GC state, and concise queued-operation state.
 - `operation_status` reconciles or safely cancels one retained mutation by operation and bridge identity.
 - `blueprint_inspect` discovers Actor Blueprints across mounted content and returns bounded pages of one selected Blueprint's structure.
 - `blueprint_action_catalog` discovers bounded context-valid function, variable, event, flow-control, cast, literal, and operator actions for one exact Blueprint graph snapshot.
-- `blueprint_graph_edit` creates, moves, removes, configures, or directly connects graph nodes and pins through a reconciled mutation.
+- `blueprint_graph_edit` creates, moves, removes, configures, or connects graph nodes and pins, including wildcard specialization and explicitly requested bounded conversions.
 - `blueprint_create` creates, compiles, saves, and verifies one new Actor Blueprint without overwriting content.
 - `blueprint_compile` explicitly compiles one mutable Actor Blueprint and returns bounded diagnostics.
 - `blueprint_save` explicitly saves one mutable Actor Blueprint package without interactive dialogs.
@@ -15,7 +15,7 @@ Unreal Editor MCP 0.11.0 is an offline-first MCP bridge for Unreal Engine 5.8+. 
 - `blueprint_default_edit` edits one supported Blueprint-generated class-default property.
 - `blueprint_member_edit` adds, renames, updates, or safely removes one typed Blueprint variable, function, local variable, macro, or custom-event shell.
 
-Phase 12 supports reliable Actor Blueprint creation, component hierarchy/default editing, typed variables, user-function shells, locals, macros, custom-event shells, RepNotify coupling, compilation, saving, action discovery, transactional node lifecycle, typed pin defaults, and direct schema-valid graph connections. Wildcard specialization, automatic conversions, editor lifecycle, builds, filesystem access, console access, unrestricted reflection, and code execution remain unavailable.
+Phase 13 completes atomic Actor Blueprint graph editing: reliable creation, components/defaults, typed variables, callable shells, compilation/saving, action discovery, node lifecycle, pin defaults, direct links, live wildcard specialization, and explicit bounded conversion insertion. Editor lifecycle, builds, filesystem access, console access, unrestricted reflection, and code execution remain unavailable.
 
 ## Security model
 
@@ -29,7 +29,7 @@ Treat the project `Saved/` directory as generated state and keep it out of sourc
 
 1. Copy [`plugin/UnrealMCP`](plugin/UnrealMCP) to `<YourProject>/Plugins/UnrealMCP` or add this repository's `plugin/` folder as an `AdditionalPluginDirectories` entry in a disposable development `.uproject`.
 2. Enable the `UnrealMCP` plugin and compile the project's Editor target with Unreal 5.8 or a newer version that passes the included public-API probes.
-3. Open the project. Look for `Unreal MCP 0.11.0 ready on 127.0.0.1:15485` in the editor log.
+3. Open the project. Look for `Unreal MCP 0.12.0 ready on 127.0.0.1:15485` in the editor log.
 4. Install the Python package offline from this folder:
 
    ```sh
@@ -169,7 +169,7 @@ Use the returned node ID and latest snapshot to move or remove it:
 
 Every accepted edit is one Unreal transaction and remains dirty until `blueprint_save`. Re-inspect after each edit, compile, Undo/Redo, save/reload, or bridge restart; never reuse a prior action ID or snapshot. See [`examples/graph-node-lifecycle-workflow.json`](examples/graph-node-lifecycle-workflow.json) for the complete three-operation flow.
 
-## Pin defaults and direct connections
+## Complete atomic pin and connection editing
 
 Inspect `pins` after creating nodes and target every pin by its stable node and pin identities. Set one unlinked supported input default with the same tagged K2 values used by members and parameters:
 
@@ -204,7 +204,26 @@ Create one direct output-to-input connection by supplying both node/pin identity
 }
 ```
 
-The live schema decides exact compatibility and whether an exclusive input or execution output replaces existing links; the result reports `replaced_link_count`. Each pin is limited to 64 links. Connections requiring a conversion node, numeric promotion, or wildcard specialization reject before mutation—Phase 12 never inserts an implicit node. `disconnect_pins` uses the same four identities and requires that exact direct link to exist. Re-inspect after every operation and after compile/Undo/Redo/reload because reconstruction may replace otherwise similar pins. See [`examples/pin-default-connection-workflow.json`](examples/pin-default-connection-workflow.json).
+The live schema decides exact compatibility and whether an exclusive input or execution output replaces existing links. Wildcard and numeric-promotion connections specialize through the schema without an extra flag; the result reports `wildcard_specialized` and every reconstructed node/pin identity. Directed cycles reject before a transaction.
+
+Conversion-node insertion is disabled by default. Add `"automatic_conversion": true` only when one specific connection may insert a schema-selected conversion:
+
+```json
+{
+  "operation_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "asset_path": "/Game/Actors/BP_Door.BP_Door",
+  "expected_snapshot": "0123456789abcdef0123456789abcdef01234567",
+  "operation": "connect_pins",
+  "graph_id": "11111111111111111111111111111111",
+  "from_node_id": "44444444444444444444444444444444",
+  "from_pin_id": "55555555555555555555555555555555",
+  "to_node_id": "22222222222222222222222222222222",
+  "to_pin_id": "66666666666666666666666666666666",
+  "automatic_conversion": true
+}
+```
+
+At most one conversion node may be inserted; its node and all pin IDs are returned in `created_identities` and `changed.nodes`. The connection record reports whether the result is `direct`, whether automatic conversion occurred, the conversion-node count, specialization, and replaced-link count. Each pin is limited to 64 links. `disconnect_pins` uses the same four identities, never accepts conversion opt-in, and requires the exact direct link. After every mutation or lost-response reconciliation, inspect the returned snapshot again before composing the next edit; also re-inspect after compile, Undo/Redo, reload, reconstruction, or bridge restart. See [`examples/complete-atomic-graph-workflow.json`](examples/complete-atomic-graph-workflow.json).
 
 ## Reliable Actor Blueprint mutation
 
@@ -427,4 +446,4 @@ Run the cross-process bridge acceptance test:
 python3 scripts/run_headless_integration.py
 ```
 
-The 0.11.0 native baseline is Unreal 5.8.0 on Apple Silicon macOS 26.5.2 with Xcode 26.1.1. Windows and Linux path/process branches are unit-tested through injected adapters; native Windows validation remains part of applicable feature work rather than a standalone roadmap gate.
+The 0.12.0 native baseline is Unreal 5.8.0 on Apple Silicon macOS 26.5.2 with Xcode 26.1.1. Windows and Linux path/process branches are unit-tested through injected adapters; native Windows validation remains part of applicable feature work rather than a standalone roadmap gate.
