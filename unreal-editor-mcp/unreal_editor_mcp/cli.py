@@ -12,7 +12,7 @@ from .stdio import serve
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Read-only Phase 1 MCP bridge for Unreal Editor 5.8+")
+    parser = argparse.ArgumentParser(description="Read-only Actor Blueprint MCP bridge for Unreal Editor 5.8+")
     parser.add_argument("project", help="Unreal .uproject file or its containing folder")
     parser.add_argument("--port", type=int, help="Require this active bridge port")
     parser.add_argument("--timeout", type=float, default=3.0, help="HTTP timeout in seconds (default: 3)")

@@ -22,6 +22,10 @@ class ErrorCode(str, Enum):
     VERSION_MISMATCH = "version_mismatch"
     INVALID_RESPONSE = "invalid_response"
     BUSY = "busy"
+    NOT_FOUND = "not_found"
+    WRONG_TYPE = "wrong_type"
+    CURSOR_EXPIRED = "cursor_expired"
+    STALE_PRECONDITION = "stale_precondition"
     INTERNAL_ERROR = "internal_error"
 
 

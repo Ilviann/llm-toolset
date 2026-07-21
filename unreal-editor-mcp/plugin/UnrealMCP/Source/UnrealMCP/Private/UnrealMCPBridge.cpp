@@ -12,6 +12,7 @@
 #include "Misc/EngineVersion.h"
 #include "Misc/ScopeLock.h"
 #include "UnrealMCPDiscovery.h"
+#include "UnrealMCPBlueprintInspector.h"
 #include "UnrealMCPProtocol.h"
 #include "UnrealMCPVersion.h"
 #include "UObject/GarbageCollection.h"
@@ -129,6 +130,7 @@ void FUnrealMCPBridge::Stop()
     }
     Route.Reset();
     Router.Reset();
+    BlueprintInspector.Reset();
     Token.Reset();
 }
 
@@ -164,19 +166,19 @@ bool FUnrealMCPBridge::HandleRequest(const FHttpServerRequest& Request, const FH
         Complete(UnrealMCP::Protocol::Error(EHttpServerResponseCodes::BadRequest, ParseError));
         return true;
     }
-    if (Command != TEXT("capabilities") && Command != TEXT("editor_state"))
+    if (Command != TEXT("capabilities") && Command != TEXT("editor_state") && Command != TEXT("blueprint_inspect"))
     {
         Complete(UnrealMCP::Protocol::Error(EHttpServerResponseCodes::BadRequest, TEXT("invalid_argument"), TEXT("Unknown or unavailable command")));
         return true;
     }
     ++Pending;
-    DispatchOnGameThread(MoveTemp(Command), Complete, FPlatformTime::Seconds());
+    DispatchOnGameThread(MoveTemp(Command), MoveTemp(Arguments), Complete, FPlatformTime::Seconds());
     return true;
 }
 
-void FUnrealMCPBridge::DispatchOnGameThread(FString Command, const FHttpResultCallback& Complete, double AcceptedAt)
+void FUnrealMCPBridge::DispatchOnGameThread(FString Command, TSharedPtr<FJsonObject> Arguments, const FHttpResultCallback& Complete, double AcceptedAt)
 {
-    AsyncTask(ENamedThreads::GameThread, [Weak = TWeakPtr<FUnrealMCPBridge>(AsShared()), Command = MoveTemp(Command), Complete, AcceptedAt]() mutable
+    AsyncTask(ENamedThreads::GameThread, [Weak = TWeakPtr<FUnrealMCPBridge>(AsShared()), Command = MoveTemp(Command), Arguments = MoveTemp(Arguments), Complete, AcceptedAt]() mutable
     {
         const TSharedPtr<FUnrealMCPBridge> Pinned = Weak.Pin();
         if (!Pinned.IsValid())
@@ -195,14 +197,35 @@ void FUnrealMCPBridge::DispatchOnGameThread(FString Command, const FHttpResultCa
             Complete(UnrealMCP::Protocol::Error(EHttpServerResponseCodes::GatewayTimeout, TEXT("timeout"), TEXT("Command expired before Game-thread dispatch"), true));
             return;
         }
-        Complete(UnrealMCP::Protocol::Success(Pinned->Execute(Command)));
+        TSharedPtr<FJsonObject> Result;
+        FUnrealMCPError Error;
+        if (!Pinned->Execute(Command, Arguments, Result, Error))
+        {
+            Complete(UnrealMCP::Protocol::Error(EHttpServerResponseCodes::BadRequest, Error));
+            return;
+        }
+        Complete(UnrealMCP::Protocol::Success(Result));
     });
 }
 
-TSharedPtr<FJsonObject> FUnrealMCPBridge::Execute(const FString& Command) const
+bool FUnrealMCPBridge::Execute(const FString& Command, const TSharedPtr<FJsonObject>& Arguments, TSharedPtr<FJsonObject>& OutResult, FUnrealMCPError& OutError)
 {
     check(IsInGameThread());
-    return Command == TEXT("capabilities") ? Capabilities() : EditorState();
+    if (Command == TEXT("capabilities"))
+    {
+        OutResult = Capabilities();
+        return true;
+    }
+    if (Command == TEXT("editor_state"))
+    {
+        OutResult = EditorState();
+        return true;
+    }
+    if (!BlueprintInspector)
+    {
+        BlueprintInspector = MakeUnique<FUnrealMCPBlueprintInspector>();
+    }
+    return BlueprintInspector->Execute(Arguments, OutResult, OutError);
 }
 
 TSharedPtr<FJsonObject> FUnrealMCPBridge::Capabilities() const
@@ -214,14 +237,19 @@ TSharedPtr<FJsonObject> FUnrealMCPBridge::Capabilities() const
     Result->SetStringField(TEXT("platform"), FPlatformProperties::PlatformName());
     Result->SetStringField(TEXT("mode"), TEXT("read_only"));
     Result->SetBoolField(TEXT("bridge_ready"), bReady);
-    Result->SetArrayField(TEXT("commands"), Strings({TEXT("capabilities"), TEXT("editor_state")}));
+    Result->SetArrayField(TEXT("commands"), Strings({TEXT("capabilities"), TEXT("editor_state"), TEXT("blueprint_inspect")}));
 
     const TSharedRef<FJsonObject> Features = MakeShared<FJsonObject>();
-    Features->SetBoolField(TEXT("blueprint_inspection"), false);
+    Features->SetBoolField(TEXT("blueprint_inspection"), true);
     Features->SetBoolField(TEXT("blueprint_mutation"), false);
     Features->SetBoolField(TEXT("editor_lifecycle"), false);
     Features->SetBoolField(TEXT("project_build"), false);
     Result->SetObjectField(TEXT("features"), Features);
+
+    const TSharedRef<FJsonObject> AssetAccess = MakeShared<FJsonObject>();
+    AssetAccess->SetStringField(TEXT("read_scope"), TEXT("all_mounted_content"));
+    AssetAccess->SetStringField(TEXT("mutation_scope"), TEXT("project_content_and_local_project_plugins"));
+    Result->SetObjectField(TEXT("asset_access"), AssetAccess);
 
     const TSharedRef<FJsonObject> Limits = MakeShared<FJsonObject>();
     Limits->SetNumberField(TEXT("request_bytes"), UnrealMCP::MaxRequestBytes);
@@ -230,6 +258,11 @@ TSharedPtr<FJsonObject> FUnrealMCPBridge::Capabilities() const
     Limits->SetNumberField(TEXT("json_depth"), UnrealMCP::MaxJsonDepth);
     Limits->SetNumberField(TEXT("string_chars"), UnrealMCP::MaxStringLength);
     Limits->SetNumberField(TEXT("command_deadline_ms"), static_cast<int32>(UnrealMCP::CommandDeadlineSeconds * 1000.0));
+    Limits->SetNumberField(TEXT("inspect_page_size"), UnrealMCP::MaxInspectPageSize);
+    Limits->SetNumberField(TEXT("discovery_scan"), UnrealMCP::MaxDiscoveryScan);
+    Limits->SetNumberField(TEXT("inspect_records"), UnrealMCP::MaxInspectRecords);
+    Limits->SetNumberField(TEXT("retained_cursors"), UnrealMCP::MaxRetainedCursors);
+    Limits->SetNumberField(TEXT("cursor_lifetime_ms"), static_cast<int32>(UnrealMCP::CursorLifetimeSeconds * 1000.0));
     Result->SetObjectField(TEXT("limits"), Limits);
 
     const TSharedRef<FJsonObject> Listener = MakeShared<FJsonObject>();

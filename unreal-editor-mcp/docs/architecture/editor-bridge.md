@@ -2,7 +2,7 @@
 
 ## Ownership
 
-`plugin/UnrealMCP/Source/UnrealMCP/` is one editor-only module. `UnrealMCPModule.cpp` is the composition root and owns configured-port validation, stale-record cleanup, token startup gating, project hashing, loopback listener configuration, and bridge lifetime. `UnrealMCPTokenStore` owns credential persistence. `UnrealMCPBridge` owns the HTTP route, authentication, request queue, Game-thread dispatch, commands, and heartbeat. `UnrealMCPProtocol` owns wire parsing and bounded envelopes. `UnrealMCPDiscovery` owns the non-secret heartbeat. `UnrealMCPCompatibility` contains platform and Unreal-version branches.
+`plugin/UnrealMCP/Source/UnrealMCP/` is one editor-only module. `UnrealMCPModule.cpp` is the composition root and owns configured-port validation, stale-record cleanup, token startup gating, project hashing, loopback listener configuration, and bridge lifetime. `UnrealMCPTokenStore` owns credential persistence. `UnrealMCPBridge` owns the HTTP route, authentication, request queue, Game-thread dispatch, command composition, and heartbeat. `UnrealMCPBlueprintInspector` owns bounded Actor Blueprint reads. `UnrealMCPProtocol` owns wire parsing and bounded envelopes. `UnrealMCPDiscovery` owns the non-secret heartbeat. `UnrealMCPCompatibility` contains platform and Unreal-version branches.
 
 ## Dependency direction
 
@@ -13,7 +13,7 @@ The module constructs the token store and bridge. The bridge calls the protocol 
 - Startup fails closed unless the token is valid, atomically persisted, permission-restricted where supported, and re-read exactly.
 - The per-port HTTPServer override binds `127.0.0.1`; startup verifies the listener became active.
 - Authentication uses a fixed-work comparison and precedes JSON parsing.
-- The route accepts POST at `/unreal-mcp/v1/command`; the command allowlist contains only `capabilities` and `editor_state`.
+- The route accepts POST at `/unreal-mcp/v1/command`; the command allowlist contains only `capabilities`, `editor_state`, and `blueprint_inspect`.
 - At most eight requests are queued, dispatch expires after five seconds, and responses are at most 256 KiB.
 - The discovery record never contains a token or project path and is atomically refreshed every two seconds.
 - Shutdown stops heartbeats, removes discovery, unbinds the route, releases the router, clears the in-memory token, and causes retained requests to return cancellation.

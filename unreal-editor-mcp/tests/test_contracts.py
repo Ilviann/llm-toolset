@@ -19,13 +19,13 @@ class ReleaseContractTests(unittest.TestCase):
         native = re.search(r'Version\[\].*TEXT\("([^"]+)"\)', header)
         self.assertIsNotNone(native)
         versions = {project["project"]["version"], plugin["VersionName"], native.group(1), unreal_editor_mcp.__version__}
-        self.assertEqual(versions, {"0.1.0"})
+        self.assertEqual(versions, {"0.2.1"})
 
-    def test_only_phase_one_commands_are_registered(self):
+    def test_only_released_read_only_commands_are_registered(self):
         names = [tool["name"] for tool in TOOLS]
-        self.assertEqual(names, ["capabilities", "editor_state"])
+        self.assertEqual(names, ["capabilities", "editor_state", "blueprint_inspect"])
         bridge_source = (ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private/UnrealMCPBridge.cpp").read_text(encoding="utf-8")
-        allowed = re.search(r'Strings\(\{TEXT\("capabilities"\), TEXT\("editor_state"\)\}\)', bridge_source)
+        allowed = re.search(r'Strings\(\{TEXT\("capabilities"\), TEXT\("editor_state"\), TEXT\("blueprint_inspect"\)\}\)', bridge_source)
         self.assertIsNotNone(allowed)
 
     def test_every_docs_directory_has_an_index(self):

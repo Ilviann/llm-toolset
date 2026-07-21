@@ -4,3 +4,4 @@ References in this directory are grouped by the component that owns the contract
 
 - [`python/`](python/index.md) — Python project, discovery, error, schema, and bridge-client contracts.
 - [`editor-bridge/`](editor-bridge/index.md) — native request, error, capability, state, discovery, and limit contracts.
+- [`blueprint-inspector/`](blueprint-inspector/index.md) — Actor Blueprint queries, pages, snapshots, identities, and bounded value encodings.

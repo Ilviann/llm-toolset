@@ -1,0 +1,35 @@
+{
+  "discover_exact": {
+    "mode": "discover",
+    "package_path": "/Game/Actors",
+    "asset_name": "BP_Door",
+    "page_size": 10
+  },
+  "discover_all_mounted_content": {
+    "mode": "discover",
+    "asset_name": "BP_Door",
+    "page_size": 10
+  },
+  "discover_plugin_content": {
+    "mode": "discover",
+    "package_path": "/MyGameplayPlugin",
+    "asset_name": "BP_PluginActor",
+    "page_size": 10
+  },
+  "inspect_shallow": {
+    "mode": "inspect",
+    "asset_path": "/Game/Actors/BP_Door.BP_Door"
+  },
+  "inspect_one_graph": {
+    "mode": "inspect",
+    "asset_path": "/Game/Actors/BP_Door.BP_Door",
+    "sections": ["graphs", "nodes", "pins", "connections"],
+    "graph_id": "0123456789abcdef0123456789abcdef",
+    "include_inherited": false,
+    "page_size": 50
+  },
+  "continue_page": {
+    "cursor": "0123456789abcdef0123456789abcdef",
+    "page_size": 50
+  }
+}

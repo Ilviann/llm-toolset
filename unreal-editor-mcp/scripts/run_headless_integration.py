@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Launch the disposable editor and verify the Phase 1 native boundary."""
+"""Launch the disposable editor and verify the released native boundary."""
 
 from __future__ import annotations
 
@@ -41,7 +41,7 @@ def wait_until_ready(layout: ProjectLayout, process: subprocess.Popen[bytes], de
         try:
             record = read_discovery(layout)
             result = UnrealBridge(layout, timeout=2.0).call("capabilities")
-            if result.get("bridge_ready") is True and record.bridge_version == "0.1.0":
+            if result.get("bridge_ready") is True and record.bridge_version == "0.2.1":
                 return
         except Exception as error:
             last_error = str(error)
@@ -106,11 +106,14 @@ def run_automation(executable: Path, project: Path, environment: dict[str, str])
         "ProtocolBounds",
         "RouteGuards",
         "TokenPersistence",
+        "CursorGuards",
+        "InspectionContracts",
+        "LiveFixture",
     )
     command = [
         str(executable), str(project), "-unattended", "-nop4", "-nosplash", "-nullrhi",
         "-stdout", "-FullStdOutLogOutput",
-        "-ExecCmds=Automation RunTests UnrealMCP.Phase1;Quit",
+        "-ExecCmds=Automation RunTests UnrealMCP;Quit",
         "-TestExit=Automation Test Queue Empty",
     ]
     with tempfile.TemporaryFile() as log:
@@ -128,8 +131,32 @@ def run_automation(executable: Path, project: Path, environment: dict[str, str])
         if missing:
             raise RuntimeError(f"Unreal Automation Tests did not pass: {', '.join(missing)}")
         raise RuntimeError(f"Unreal Automation Tests exited with status {return_code}")
-    print(f"Phase 1 Unreal Automation Tests passed: {len(expected)} native cases")
+    print(f"Unreal Automation Tests passed: {len(expected)} native cases")
     return 0
+
+
+def prepare_phase_two_fixture(executable: Path, project: Path, environment: dict[str, str]) -> str:
+    command = [
+        str(executable), str(project), "-unattended", "-nop4", "-nosplash", "-nullrhi",
+        "-stdout", "-FullStdOutLogOutput", "-NoAssetRegistryCache",
+        "-ExecCmds=Automation RunTests UnrealMCP.Phase2.LiveFixture;Quit",
+        "-TestExit=Automation Test Queue Empty",
+    ]
+    with tempfile.TemporaryFile() as log:
+        process = subprocess.Popen(command, cwd=ROOT, env=environment, stdout=log, stderr=subprocess.STDOUT)
+        try:
+            return_code = process.wait(timeout=180.0)
+        except subprocess.TimeoutExpired:
+            stop_editor(process)
+            raise RuntimeError("Phase 2 fixture preparation exceeded the three-minute deadline")
+        log.seek(0)
+        output = log.read().decode("utf-8", errors="replace")
+    marker = "UNREAL_MCP_PHASE2_SNAPSHOT="
+    snapshots = [line.split(marker, 1)[1].split()[0] for line in output.splitlines() if marker in line]
+    if return_code != 0 or "Result={Success} Name={LiveFixture}" not in output or not snapshots:
+        sys.stderr.write(output[-32_000:])
+        raise RuntimeError("Phase 2 saved fixture preparation failed")
+    return snapshots[-1]
 
 
 def main() -> int:
@@ -146,6 +173,7 @@ def main() -> int:
         return run_automation(executable, layout.descriptor, environment)
     if sys.argv[1:]:
         raise SystemExit("usage: run_headless_integration.py [--automation-only]")
+    expected_snapshot = prepare_phase_two_fixture(executable, layout.descriptor, environment)
     command = [
         str(executable), str(layout.descriptor), "-unattended", "-nop4", "-nosplash",
         "-nullrhi", "-nosound", "-NoAssetRegistryCache",
@@ -157,10 +185,33 @@ def main() -> int:
             bridge = UnrealBridge(layout, timeout=3.0)
             capabilities = bridge.call("capabilities")
             state = bridge.call("editor_state")
-            if capabilities.get("commands") != ["capabilities", "editor_state"]:
+            if capabilities.get("commands") != ["capabilities", "editor_state", "blueprint_inspect"]:
                 raise AssertionError("mutation or unknown command was registered")
-            if capabilities.get("bridge_version") != "0.1.0" or state.get("bridge_ready") is not True:
+            if capabilities.get("bridge_version") != "0.2.1" or state.get("bridge_ready") is not True:
                 raise AssertionError("capability/state contract mismatch")
+            if capabilities.get("asset_access") != {
+                "read_scope": "all_mounted_content",
+                "mutation_scope": "project_content_and_local_project_plugins",
+            }:
+                raise AssertionError("asset access policy contract mismatch")
+            discovery = bridge.call("blueprint_inspect", {
+                "mode": "discover",
+                "package_path": "/Game/UnrealMCPPhase2",
+                "asset_name": "BP_InspectionFixture",
+            })
+            if not any(record.get("section") == "asset" for record in discovery.get("records", [])):
+                raise AssertionError("saved Actor Blueprint was not discoverable after editor restart")
+            inspection = bridge.call("blueprint_inspect", {
+                "mode": "inspect",
+                "asset_path": "/Game/UnrealMCPPhase2/BP_InspectionFixture.BP_InspectionFixture",
+                "sections": ["summary", "parent_class", "compile_state", "components", "variables", "graphs", "nodes", "pins", "connections"],
+                "page_size": 100,
+            })
+            if inspection.get("snapshot_id") != expected_snapshot:
+                raise AssertionError("saved/reloaded Blueprint structural snapshot changed")
+            found = {record.get("section") for record in inspection.get("records", [])}
+            if not {"summary", "component", "variable", "graph", "node", "pin"}.issubset(found):
+                raise AssertionError(f"live inspection omitted required structure: {sorted(found)!r}")
             if os.name == "posix" and layout.token_file.stat().st_mode & 0o077:
                 raise AssertionError("bridge token permissions are broader than the owning user")
             reject_bad_token(layout)
@@ -181,7 +232,7 @@ def main() -> int:
             pass
         else:
             raise AssertionError("a live discovery heartbeat remained after editor termination")
-    print("Phase 1 integration passed: authenticated calls, bad-token rejection, loopback binding, and clean unload")
+    print("Phase 2 integration passed: authenticated discovery/inspection, save-reload snapshot, loopback binding, and clean unload")
     return 0
 
 

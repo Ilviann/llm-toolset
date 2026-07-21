@@ -5,7 +5,7 @@ This roadmap turns the requirements in `docs/draft.md` into sequential, releasab
 ## Top-level checklist
 
 - [x] Phase 1 — Establish the versioned Python/C++ foundation and authenticated bridge.
-- [ ] Phase 2 — Add bounded, read-only Actor Blueprint discovery and inspection.
+- [x] Phase 2 — Add bounded, read-only Actor Blueprint discovery and inspection.
 - [ ] Phase 3 — Create, compile, save, and verify new Actor Blueprints safely.
 - [ ] Phase 4 — Edit Actor Blueprint component hierarchies and component defaults.
 - [ ] Phase 5 — Edit Blueprint variables, functions, macros, and custom-event shells.
@@ -74,7 +74,7 @@ Lifecycle and build tools remain absent from the model context until their late 
 
 ### Cross-boundary contracts
 
-- Use `/Game/...` long package names and Unreal object/class paths at the model boundary; reject raw filesystem destinations, traversal, engine content, and unconfigured plugin mount points.
+- Use Unreal long package names and object/class paths at the model boundary; reject raw filesystem paths and traversal. Read-only operations may inspect any content mount visible to the project. Mutations must be confined to `/Game` and content mounts whose plugin base directory is physically inside the current project's local `Plugins/` directory; reject `/Engine`, engine/marketplace plugins outside the project, and other external mounts.
 - Give graphs, nodes, pins, components, and inspection snapshots explicit identities. A mutation based on stale structure must return `stale_precondition` rather than retargeting a replacement object.
 - Validate every MCP argument against its published schema in Python and again against the live Unreal object and schema in C++.
 - Use one stable bounded error envelope with `code`, `message`, `details`, and `retryable`. Never return C++ exceptions, assertions, addresses, tokens, or unbounded logs.
@@ -126,7 +126,7 @@ Start at `0.1.0` when Phase 1 is complete. Increment the minor version for each 
 ### Implementation
 
 - Add `blueprint_inspect` with explicit sections for summary, parent class, compile state, component hierarchy, variables, graphs, nodes, pins, and connections.
-- Use the Asset Registry for bounded `/Game` discovery and exact object-path resolution; load only a specifically requested Blueprint for deep graph inspection.
+- Use the Asset Registry for bounded discovery across all content mounts visible to the project and exact object-path resolution; load only a specifically requested Blueprint for deep graph inspection.
 - Add exact filters, shallow defaults, page limits, scan ceilings, opaque cursors, short cursor lifetime, and snapshot IDs. Bind every cursor to the normalized query and structural snapshot.
 - Define compact type and value encodings for common K2 pins and reflected component defaults. Mark unsupported types explicitly instead of serializing arbitrary UObject graphs.
 - Return stable graph, node, pin, and component identities where Unreal provides them; document and test identity behavior across compile, save, reload, undo, and node reconstruction.
@@ -148,7 +148,7 @@ Start at `0.1.0` when Phase 1 is complete. Increment the minor version for each 
 
 ### Implementation
 
-- Add `blueprint_create` using a `/Script/Module.Class` or validated Blueprint-generated parent reference and a confined `/Game/...` destination.
+- Add `blueprint_create` using a `/Script/Module.Class` or validated Blueprint-generated parent reference and a destination confined to `/Game` or a content mount physically owned by a plugin under the current project's local `Plugins/` directory.
 - Require an Actor-derived, Blueprint-compatible parent. Reject missing, abstract, deprecated, skeleton, reinstanced, editor-only, or otherwise unsuitable classes before package creation.
 - Enforce atomic no-overwrite behavior. Validate the destination and parent first, then create in a controlled package, register only the intended asset, compile, and save without interactive dialogs. Define deterministic cleanup for any failure before publication.
 - Add explicit `blueprint_compile` using a bounded compiler results log and `blueprint_save` using non-interactive package saving. Keep compile failure, save failure, source-control/read-only conflict, and transport failure distinct.
@@ -156,7 +156,7 @@ Start at `0.1.0` when Phase 1 is complete. Increment the minor version for each 
 
 ### Verification
 
-- Test native and Blueprint-generated Actor parents, invalid classes, invalid mount paths, case/path normalization, existing destinations, race-like duplicate creation, read-only destinations, compile failures, save failures, and cleanup.
+- Test native and Blueprint-generated Actor parents, invalid classes, invalid mount paths, case/path normalization, existing destinations, race-like duplicate creation, read-only destinations, local project-plugin destinations, engine/external-plugin mutation rejection, compile failures, save failures, and cleanup.
 - Restart the editor and confirm the asset loads, retains its parent, compiles, and produces the expected inspection snapshot.
 - Confirm that an existing asset is never overwritten or deleted during failed creation.
 

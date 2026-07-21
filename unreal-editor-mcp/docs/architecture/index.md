@@ -4,4 +4,5 @@ Each file in this directory documents one implemented cohesive component: what i
 
 - [`python-mcp-server.md`](python-mcp-server.md) — stdio protocol, schemas, discovery, authenticated bridge client, errors, and shutdown.
 - [`editor-bridge.md`](editor-bridge.md) — plugin composition, credentials, listener/route ownership, dispatch, commands, limits, and heartbeat.
+- [`blueprint-inspector.md`](blueprint-inspector.md) — bounded Asset Registry discovery, exact Actor Blueprint inspection, snapshots, identities, values, and cursors.
 - [`automated-verification.md`](automated-verification.md) — Python, native, public-API-probe, and cross-process verification boundaries.

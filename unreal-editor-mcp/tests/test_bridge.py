@@ -11,7 +11,7 @@ from unreal_editor_mcp.errors import BridgeError, ErrorCode
 from unreal_editor_mcp.project import ProjectLayout
 
 
-RECORD = DiscoveryRecord("a" * 40, 123, 15485, "0.1.0", "5.8.0", 1)
+RECORD = DiscoveryRecord("a" * 40, 123, 15485, "0.2.1", "5.8.0", 1)
 
 
 class FakeResponse:
@@ -65,6 +65,14 @@ class BridgeTests(unittest.TestCase):
         self.assertEqual(connection.request_data[3]["Authorization"], "Bearer " + "b" * 64)
         self.assertEqual(result["project_hash"], "a" * 40)
         self.assertTrue(connection.closed)
+
+    @patch("unreal_editor_mcp.bridge.read_token", return_value="b" * 64)
+    @patch("unreal_editor_mcp.bridge.read_discovery", return_value=RECORD)
+    def test_sends_bounded_inspection_arguments(self, _discovery, _token):
+        arguments = {"mode": "discover", "package_path": "/Game", "page_size": 5}
+        self._bridge().call("blueprint_inspect", arguments)
+        body = json.loads(FakeConnection.instances[-1].request_data[2])
+        self.assertEqual(body, {"command": "blueprint_inspect", "arguments": arguments})
 
     @patch("unreal_editor_mcp.bridge.read_token", return_value="b" * 64)
     @patch("unreal_editor_mcp.bridge.read_discovery", return_value=DiscoveryRecord("a" * 40, 1, 15485, "9.0.0", "5.8", 1))

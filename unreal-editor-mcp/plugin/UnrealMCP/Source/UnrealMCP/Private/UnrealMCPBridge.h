@@ -7,8 +7,10 @@
 #include "Templates/Atomic.h"
 
 struct FHttpServerRequest;
+struct FUnrealMCPError;
 class FJsonObject;
 class FUnrealMCPDiscovery;
+class FUnrealMCPBlueprintInspector;
 class IHttpRouter;
 
 class FUnrealMCPBridge : public TSharedFromThis<FUnrealMCPBridge>
@@ -24,8 +26,8 @@ public:
 
 private:
     bool HandleRequest(const FHttpServerRequest& Request, const FHttpResultCallback& Complete);
-    void DispatchOnGameThread(FString Command, const FHttpResultCallback& Complete, double AcceptedAt);
-    TSharedPtr<FJsonObject> Execute(const FString& Command) const;
+    void DispatchOnGameThread(FString Command, TSharedPtr<FJsonObject> Arguments, const FHttpResultCallback& Complete, double AcceptedAt);
+    bool Execute(const FString& Command, const TSharedPtr<FJsonObject>& Arguments, TSharedPtr<FJsonObject>& OutResult, FUnrealMCPError& OutError);
     TSharedPtr<FJsonObject> Capabilities() const;
     TSharedPtr<FJsonObject> EditorState() const;
     bool Heartbeat(float DeltaTime);
@@ -37,6 +39,7 @@ private:
     TSharedPtr<IHttpRouter> Router;
     FHttpRouteHandle Route;
     TUniquePtr<FUnrealMCPDiscovery> Discovery;
+    TUniquePtr<FUnrealMCPBlueprintInspector> BlueprintInspector;
     FTSTicker::FDelegateHandle HeartbeatHandle;
     TAtomic<int32> Pending{0};
     TAtomic<bool> bStopping{false};
