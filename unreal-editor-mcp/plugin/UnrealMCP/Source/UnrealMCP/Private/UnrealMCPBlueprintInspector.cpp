@@ -15,6 +15,8 @@
 #include "GameFramework/Actor.h"
 #include "HAL/PlatformTime.h"
 #include "K2Node.h"
+#include "K2Node_FunctionEntry.h"
+#include "K2Node_FunctionResult.h"
 #include "Kismet2/BlueprintEditorUtils.h"
 #include "Misc/PackageName.h"
 #include "Misc/SecureHash.h"
@@ -31,7 +33,8 @@ namespace
 {
 const TSet<FString> InspectSections = {
     TEXT("summary"), TEXT("parent_class"), TEXT("compile_state"), TEXT("components"),
-    TEXT("class_defaults"), TEXT("variables"), TEXT("graphs"), TEXT("nodes"), TEXT("pins"), TEXT("connections")};
+    TEXT("class_defaults"), TEXT("variables"), TEXT("functions"), TEXT("parameters"), TEXT("local_variables"),
+    TEXT("graphs"), TEXT("nodes"), TEXT("pins"), TEXT("connections")};
 
 const TSet<FString> SupportedPinCategories = {
     TEXT("exec"), TEXT("boolean"), TEXT("byte"), TEXT("int"), TEXT("int64"), TEXT("real"),
@@ -254,6 +257,137 @@ TSharedRef<FJsonObject> VariableReferences(UBlueprint* Blueprint, const FName Va
     return Summary;
 }
 
+TSharedRef<FJsonObject> NodeReferenceSummary(TArray<UK2Node*> Nodes, bool bReferenced)
+{
+    Nodes.Sort([](const UK2Node& Left, const UK2Node& Right)
+    {
+        const UEdGraph* LeftGraph = Left.GetGraph();
+        const UEdGraph* RightGraph = Right.GetGraph();
+        return (LeftGraph != nullptr ? GuidString(LeftGraph->GraphGuid) : FString()) + GuidString(Left.NodeGuid)
+            < (RightGraph != nullptr ? GuidString(RightGraph->GraphGuid) : FString()) + GuidString(Right.NodeGuid);
+    });
+    const TSharedRef<FJsonObject> Summary = MakeShared<FJsonObject>();
+    Summary->SetBoolField(TEXT("referenced"), bReferenced);
+    Summary->SetNumberField(TEXT("reference_count"), Nodes.Num());
+    Summary->SetBoolField(TEXT("unresolved_references"), bReferenced && Nodes.IsEmpty());
+    Summary->SetBoolField(TEXT("references_truncated"), Nodes.Num() > UnrealMCP::MaxVariableReferences);
+    TArray<TSharedPtr<FJsonValue>> References;
+    for (int32 Index = 0; Index < FMath::Min(Nodes.Num(), UnrealMCP::MaxVariableReferences); ++Index)
+    {
+        UK2Node* Node = Nodes[Index];
+        if (Node == nullptr) continue;
+        const TSharedRef<FJsonObject> Reference = MakeShared<FJsonObject>();
+        const UEdGraph* Graph = Node->GetGraph();
+        Reference->SetStringField(TEXT("graph_id"), Graph != nullptr ? GuidString(Graph->GraphGuid) : FString());
+        Reference->SetStringField(TEXT("node_id"), GuidString(Node->NodeGuid));
+        Reference->SetStringField(TEXT("node_class"), Node->GetClass()->GetPathName());
+        Reference->SetStringField(TEXT("title"), Node->GetNodeTitle(ENodeTitleType::ListView).ToString().Left(256));
+        References.Add(MakeShared<FJsonValueObject>(Reference));
+    }
+    Summary->SetArrayField(TEXT("references"), References);
+    return Summary;
+}
+
+TSharedRef<FJsonObject> FunctionReferences(UBlueprint* Blueprint, UEdGraph* FunctionGraph)
+{
+    TArray<UK2Node*> Nodes;
+    TArray<UEdGraph*> AllGraphs;
+    Blueprint->GetAllGraphs(AllGraphs);
+    const FName FunctionName = FunctionGraph->GetFName();
+    for (UEdGraph* Graph : AllGraphs)
+    {
+        if (Graph == nullptr) continue;
+        for (UEdGraphNode* GraphNode : Graph->Nodes)
+        {
+            UK2Node* Node = Cast<UK2Node>(GraphNode);
+            if (Node != nullptr && !Node->IsA<UK2Node_FunctionEntry>() && !Node->IsA<UK2Node_FunctionResult>()
+                && Node->ReferencesFunction(FunctionName, Blueprint->SkeletonGeneratedClass))
+            {
+                Nodes.Add(Node);
+            }
+        }
+    }
+    const bool bReferenced = !Nodes.IsEmpty() || FBlueprintEditorUtils::IsFunctionUsed(Blueprint, FunctionName);
+    return NodeReferenceSummary(MoveTemp(Nodes), bReferenced);
+}
+
+TSharedRef<FJsonObject> LocalReferences(UBlueprint* Blueprint, UEdGraph* FunctionGraph, const FName VariableName)
+{
+    TArray<UK2Node*> Nodes;
+    const UStruct* Scope = Blueprint->SkeletonGeneratedClass != nullptr
+        ? Blueprint->SkeletonGeneratedClass->FindFunctionByName(FunctionGraph->GetFName()) : nullptr;
+    for (UEdGraphNode* GraphNode : FunctionGraph->Nodes)
+    {
+        UK2Node* Node = Cast<UK2Node>(GraphNode);
+        if (Node != nullptr && Node->ReferencesVariable(VariableName, Scope)) Nodes.Add(Node);
+    }
+    const bool bReferenced = !Nodes.IsEmpty() || FBlueprintEditorUtils::IsVariableUsed(Blueprint, VariableName, FunctionGraph);
+    return NodeReferenceSummary(MoveTemp(Nodes), bReferenced);
+}
+
+UK2Node_FunctionEntry* FunctionEntry(UEdGraph* Graph)
+{
+    return Graph != nullptr ? Cast<UK2Node_FunctionEntry>(FBlueprintEditorUtils::GetEntryNode(Graph)) : nullptr;
+}
+
+FString FunctionOwnership(const UBlueprint* Blueprint, const UEdGraph* Graph)
+{
+    for (const FBPInterfaceDescription& Interface : Blueprint->ImplementedInterfaces)
+    {
+        if (Interface.Graphs.Contains(Graph)) return TEXT("interface");
+    }
+    UK2Node_FunctionEntry* Entry = FunctionEntry(const_cast<UEdGraph*>(Graph));
+    return Entry != nullptr && Entry->IsEditable() ? TEXT("user_owned") : TEXT("override");
+}
+
+FString FunctionAccess(int32 Flags)
+{
+    if ((Flags & FUNC_Private) != 0) return TEXT("private");
+    if ((Flags & FUNC_Protected) != 0) return TEXT("protected");
+    return TEXT("public");
+}
+
+TSharedRef<FJsonObject> FunctionMetadata(const UK2Node_FunctionEntry* Entry)
+{
+    const TSharedRef<FJsonObject> Metadata = MakeShared<FJsonObject>();
+    Metadata->SetStringField(TEXT("category"), Entry->MetaData.Category.ToString().Left(128));
+    Metadata->SetStringField(TEXT("tooltip"), Entry->MetaData.ToolTip.ToString().Left(512));
+    Metadata->SetStringField(TEXT("keywords"), Entry->MetaData.Keywords.ToString().Left(256));
+    Metadata->SetBoolField(TEXT("call_in_editor"), Entry->MetaData.bCallInEditor);
+    return Metadata;
+}
+
+TSharedRef<FJsonObject> FunctionSignature(const UK2Node_FunctionEntry* Entry, const TArray<UK2Node_FunctionResult*>& Results)
+{
+    const int32 Flags = Entry->GetFunctionFlags();
+    const TSharedRef<FJsonObject> Signature = MakeShared<FJsonObject>();
+    Signature->SetStringField(TEXT("access"), FunctionAccess(Flags));
+    Signature->SetBoolField(TEXT("pure"), (Flags & FUNC_BlueprintPure) != 0);
+    Signature->SetBoolField(TEXT("const"), (Flags & FUNC_Const) != 0);
+    TArray<TSharedPtr<FJsonValue>> Parameters;
+    auto Append = [&Parameters](const UK2Node_EditablePinBase* Node, const TCHAR* Direction)
+    {
+        if (Node == nullptr) return;
+        for (const TSharedPtr<FUserPinInfo>& Pin : Node->UserDefinedPins)
+        {
+            if (!Pin.IsValid()) continue;
+            const TSharedRef<FJsonObject> Parameter = MakeShared<FJsonObject>();
+            Parameter->SetStringField(TEXT("name"), Pin->PinName.ToString());
+            Parameter->SetStringField(TEXT("direction"), Direction);
+            Parameter->SetObjectField(TEXT("type"), UnrealMCP::K2TypeCodec::EncodeType(Pin->PinType));
+            if (FCString::Strcmp(Direction, TEXT("input")) == 0 && !Pin->PinType.bIsReference)
+            {
+                Parameter->SetObjectField(TEXT("default"), UnrealMCP::K2TypeCodec::EncodeDefault(Pin->PinType, Pin->PinDefaultValue));
+            }
+            Parameters.Add(MakeShared<FJsonValueObject>(Parameter));
+        }
+    };
+    Append(Entry, TEXT("input"));
+    if (!Results.IsEmpty()) Append(Results[0], TEXT("output"));
+    Signature->SetArrayField(TEXT("parameters"), Parameters);
+    return Signature;
+}
+
 TSharedRef<FJsonObject> VariableMetadata(const FBPVariableDescription& Variable)
 {
     const TSharedRef<FJsonObject> Metadata = MakeShared<FJsonObject>();
@@ -270,7 +404,7 @@ TSharedRef<FJsonObject> VariableMetadata(const FBPVariableDescription& Variable)
     return Metadata;
 }
 
-TSharedRef<FJsonObject> VariableReplication(const FBPVariableDescription& Variable)
+TSharedRef<FJsonObject> VariableReplication(UBlueprint* Blueprint, const FBPVariableDescription& Variable, const bool bMutable)
 {
     const TSharedRef<FJsonObject> Replication = MakeShared<FJsonObject>();
     const bool bRepNotify = !Variable.RepNotifyFunc.IsNone() || (Variable.PropertyFlags & CPF_RepNotify) != 0;
@@ -278,7 +412,25 @@ TSharedRef<FJsonObject> VariableReplication(const FBPVariableDescription& Variab
         : (Variable.PropertyFlags & CPF_Net) != 0 ? TEXT("replicated") : TEXT("none"));
     Replication->SetStringField(TEXT("condition"), StaticEnum<ELifetimeCondition>()->GetNameStringByValue(Variable.ReplicationCondition));
     Replication->SetStringField(TEXT("rep_notify_function"), Variable.RepNotifyFunc.ToString());
-    Replication->SetBoolField(TEXT("rep_notify_mutable"), false);
+    UEdGraph* NotifyGraph = nullptr;
+    if (Blueprint != nullptr && !Variable.RepNotifyFunc.IsNone())
+    {
+        for (UEdGraph* Graph : Blueprint->FunctionGraphs)
+        {
+            if (Graph != nullptr && Graph->GetFName() == Variable.RepNotifyFunc) { NotifyGraph = Graph; break; }
+        }
+    }
+    UK2Node_FunctionEntry* NotifyEntry = FunctionEntry(NotifyGraph);
+    TArray<UK2Node_FunctionResult*> NotifyResults;
+    if (NotifyGraph != nullptr) NotifyGraph->GetNodesOfClass(NotifyResults);
+    bool bHasOutputs = false;
+    for (UK2Node_FunctionResult* Result : NotifyResults) bHasOutputs |= Result != nullptr && !Result->UserDefinedPins.IsEmpty();
+    const bool bRelationshipValid = !bRepNotify || (NotifyGraph != nullptr && NotifyEntry != nullptr
+        && FunctionOwnership(Blueprint, NotifyGraph) == TEXT("user_owned")
+        && NotifyEntry->UserDefinedPins.IsEmpty() && !bHasOutputs && (NotifyEntry->GetFunctionFlags() & FUNC_BlueprintPure) == 0);
+    Replication->SetStringField(TEXT("rep_notify_function_id"), NotifyGraph != nullptr ? GuidString(NotifyGraph->GraphGuid) : FString());
+    Replication->SetBoolField(TEXT("relationship_valid"), bRelationshipValid);
+    Replication->SetBoolField(TEXT("rep_notify_mutable"), bMutable);
     return Replication;
 }
 
@@ -515,6 +667,7 @@ bool BuildInspection(
 {
     OutScanTruncated = false;
     if (!HasOnlyFields(Arguments, {TEXT("mode"), TEXT("asset_path"), TEXT("sections"), TEXT("graph_id"), TEXT("component_id"), TEXT("member_id"),
+        TEXT("function_id"), TEXT("local_id"),
         TEXT("property_names"), TEXT("include_inherited"), TEXT("page_size")}))
     {
         OutError = {TEXT("invalid_argument"), TEXT("Inspection arguments contain an unknown field")};
@@ -532,11 +685,12 @@ bool BuildInspection(
     {
         return false;
     }
-    TSet<FString> Sections = {TEXT("summary"), TEXT("parent_class"), TEXT("compile_state"), TEXT("components"), TEXT("variables"), TEXT("graphs")};
+    TSet<FString> Sections = {TEXT("summary"), TEXT("parent_class"), TEXT("compile_state"), TEXT("components"),
+        TEXT("variables"), TEXT("functions"), TEXT("local_variables"), TEXT("graphs")};
     if (Arguments.HasField(TEXT("sections")))
     {
         const TArray<TSharedPtr<FJsonValue>>* Values = nullptr;
-        if (!Arguments.TryGetArrayField(TEXT("sections"), Values) || Values == nullptr || Values->IsEmpty() || Values->Num() > 10)
+        if (!Arguments.TryGetArrayField(TEXT("sections"), Values) || Values == nullptr || Values->IsEmpty() || Values->Num() > 13)
         {
             OutError = {TEXT("invalid_argument"), TEXT("sections must be a non-empty bounded array")};
             return false;
@@ -572,6 +726,20 @@ bool BuildInspection(
         && (!Arguments.TryGetStringField(TEXT("member_id"), MemberFilter) || MemberFilter.Len() != 32))
     {
         OutError = {TEXT("invalid_argument"), TEXT("member_id must be a 32-character stable member identity")};
+        return false;
+    }
+    FString FunctionFilter;
+    if (Arguments.HasField(TEXT("function_id"))
+        && (!Arguments.TryGetStringField(TEXT("function_id"), FunctionFilter) || FunctionFilter.Len() != 32))
+    {
+        OutError = {TEXT("invalid_argument"), TEXT("function_id must be a 32-character stable function identity")};
+        return false;
+    }
+    FString LocalFilter;
+    if (Arguments.HasField(TEXT("local_id"))
+        && (!Arguments.TryGetStringField(TEXT("local_id"), LocalFilter) || LocalFilter.Len() != 32))
+    {
+        OutError = {TEXT("invalid_argument"), TEXT("local_id must be a 32-character stable local-variable identity")};
         return false;
     }
     TSet<FString> PropertyNames;
@@ -772,7 +940,7 @@ bool BuildInspection(
                 Value->SetObjectField(TEXT("type"), UnrealMCP::K2TypeCodec::EncodeType(Variable.VarType));
                 Value->SetObjectField(TEXT("default"), UnrealMCP::K2TypeCodec::EncodeDefault(Variable.VarType, EffectiveDefault));
                 Value->SetObjectField(TEXT("metadata"), VariableMetadata(Variable));
-                Value->SetObjectField(TEXT("replication"), VariableReplication(Variable));
+                Value->SetObjectField(TEXT("replication"), VariableReplication(Owner.Key, Variable, Owner.Key == Blueprint && !Id.IsEmpty()));
                 Value->SetObjectField(TEXT("reference_summary"), VariableReferences(Blueprint, Variable.VarName));
                 AddRecord(OutRecords, Value);
             }
@@ -792,6 +960,148 @@ bool BuildInspection(
     if (!bMemberFound)
     {
         OutError = {TEXT("not_found"), TEXT("The requested member identity was not found")};
+        return false;
+    }
+
+    bool bFunctionFound = FunctionFilter.IsEmpty();
+    bool bLocalFound = LocalFilter.IsEmpty();
+    for (const TPair<UBlueprint*, FString>& Owner : Owners)
+    {
+        for (UEdGraph* FunctionGraph : Owner.Key->FunctionGraphs)
+        {
+            if (FunctionGraph == nullptr) continue;
+            const FString FunctionId = GuidString(FunctionGraph->GraphGuid);
+            if (!FunctionFilter.IsEmpty() && FunctionId != FunctionFilter) continue;
+            bFunctionFound = true;
+            UK2Node_FunctionEntry* Entry = FunctionEntry(FunctionGraph);
+            TArray<UK2Node_FunctionResult*> Results;
+            FunctionGraph->GetNodesOfClass(Results);
+            Results.Sort([](const UK2Node_FunctionResult& Left, const UK2Node_FunctionResult& Right)
+            {
+                return GuidString(Left.NodeGuid) < GuidString(Right.NodeGuid);
+            });
+            const FString DeclarationKind = FunctionOwnership(Owner.Key, FunctionGraph);
+            const bool bLocalOwner = Owner.Key == Blueprint;
+            const bool bEditable = bLocalOwner && DeclarationKind == TEXT("user_owned") && Entry != nullptr && FunctionId.Len() == 32;
+            if (Entry == nullptr)
+            {
+                Fingerprint.Add(TEXT("function|missing_entry|") + Owner.Value + TEXT("|") + FunctionId + TEXT("|") + FunctionGraph->GetName());
+                continue;
+            }
+            const TSharedRef<FJsonObject> Signature = FunctionSignature(Entry, Results);
+            const TSharedRef<FJsonObject> References = FunctionReferences(Blueprint, FunctionGraph);
+            TArray<TSharedPtr<FJsonValue>> RepNotifyMembers;
+            for (const FBPVariableDescription& Variable : Owner.Key->NewVariables)
+            {
+                if (Variable.RepNotifyFunc == FunctionGraph->GetFName())
+                {
+                    RepNotifyMembers.Add(MakeShared<FJsonValueString>(GuidString(Variable.VarGuid)));
+                }
+            }
+            if (Sections.Contains(TEXT("functions")))
+            {
+                const TSharedRef<FJsonObject> Value = Record(TEXT("function"));
+                Value->SetStringField(TEXT("id"), FunctionId);
+                Value->SetBoolField(TEXT("identity_stable"), !FunctionId.IsEmpty());
+                Value->SetStringField(TEXT("name"), FunctionGraph->GetName());
+                Value->SetStringField(TEXT("owner_blueprint"), Owner.Value);
+                Value->SetBoolField(TEXT("inherited"), !bLocalOwner);
+                Value->SetStringField(TEXT("ownership"), bLocalOwner ? DeclarationKind : TEXT("inherited"));
+                Value->SetBoolField(TEXT("editable"), bEditable);
+                Value->SetObjectField(TEXT("signature"), Signature);
+                Value->SetObjectField(TEXT("metadata"), FunctionMetadata(Entry));
+                Value->SetObjectField(TEXT("reference_summary"), References);
+                const TSharedRef<FJsonObject> Required = MakeShared<FJsonObject>();
+                Required->SetStringField(TEXT("entry_node_id"), GuidString(Entry->NodeGuid));
+                Required->SetBoolField(TEXT("entry_present"), true);
+                Required->SetNumberField(TEXT("result_count"), Results.Num());
+                Required->SetStringField(TEXT("result_node_id"), !Results.IsEmpty() ? GuidString(Results[0]->NodeGuid) : FString());
+                Required->SetBoolField(TEXT("result_present"), !Results.IsEmpty());
+                Required->SetBoolField(TEXT("valid"), !Results.IsEmpty());
+                Value->SetObjectField(TEXT("required_nodes"), Required);
+                Value->SetArrayField(TEXT("rep_notify_member_ids"), RepNotifyMembers);
+                Value->SetNumberField(TEXT("local_variable_count"), Entry->LocalVariables.Num());
+                AddRecord(OutRecords, Value);
+            }
+
+            int32 ParameterIndex = 0;
+            auto AppendParameters = [&](UK2Node_EditablePinBase* Node, const TCHAR* Direction)
+            {
+                if (Node == nullptr) return;
+                for (const TSharedPtr<FUserPinInfo>& Pin : Node->UserDefinedPins)
+                {
+                    if (!Pin.IsValid()) continue;
+                    UEdGraphPin* LivePin = Node->FindPin(Pin->PinName);
+                    if (Sections.Contains(TEXT("parameters")))
+                    {
+                        const TSharedRef<FJsonObject> Value = Record(TEXT("parameter"));
+                        Value->SetStringField(TEXT("id"), LivePin != nullptr ? GuidString(LivePin->PinId) : FString());
+                        Value->SetBoolField(TEXT("identity_stable"), LivePin != nullptr && LivePin->PinId.IsValid());
+                        Value->SetStringField(TEXT("function_id"), FunctionId);
+                        Value->SetStringField(TEXT("function_name"), FunctionGraph->GetName());
+                        Value->SetNumberField(TEXT("index"), ParameterIndex);
+                        Value->SetStringField(TEXT("name"), Pin->PinName.ToString());
+                        Value->SetStringField(TEXT("direction"), Direction);
+                        Value->SetObjectField(TEXT("type"), UnrealMCP::K2TypeCodec::EncodeType(Pin->PinType));
+                        if (FCString::Strcmp(Direction, TEXT("input")) == 0 && !Pin->PinType.bIsReference)
+                        {
+                            Value->SetObjectField(TEXT("default"), UnrealMCP::K2TypeCodec::EncodeDefault(Pin->PinType, Pin->PinDefaultValue));
+                        }
+                        AddRecord(OutRecords, Value);
+                    }
+                    Fingerprint.Add(TEXT("parameter|") + FunctionId + TEXT("|") + LexToString(ParameterIndex) + TEXT("|")
+                        + Direction + TEXT("|") + Pin->PinName.ToString() + TEXT("|") + VariableTypeFingerprint(Pin->PinType)
+                        + TEXT("|") + LexToString(Pin->PinType.bIsReference) + TEXT("|") + LexToString(Pin->PinType.bIsConst)
+                        + TEXT("|") + Pin->PinDefaultValue);
+                    ++ParameterIndex;
+                }
+            };
+            AppendParameters(Entry, TEXT("input"));
+            if (!Results.IsEmpty()) AppendParameters(Results[0], TEXT("output"));
+
+            for (const FBPVariableDescription& Local : Entry->LocalVariables)
+            {
+                const FString LocalId = GuidString(Local.VarGuid);
+                if (!LocalFilter.IsEmpty() && LocalId != LocalFilter) continue;
+                bLocalFound = true;
+                const TSharedRef<FJsonObject> LocalReferenceSummary = LocalReferences(Blueprint, FunctionGraph, Local.VarName);
+                if (Sections.Contains(TEXT("local_variables")))
+                {
+                    const TSharedRef<FJsonObject> Value = Record(TEXT("local_variable"));
+                    Value->SetStringField(TEXT("id"), LocalId);
+                    Value->SetBoolField(TEXT("identity_stable"), !LocalId.IsEmpty());
+                    Value->SetStringField(TEXT("name"), Local.VarName.ToString());
+                    Value->SetStringField(TEXT("owner_blueprint"), Owner.Value);
+                    Value->SetBoolField(TEXT("inherited"), !bLocalOwner);
+                    Value->SetStringField(TEXT("ownership"), bLocalOwner ? TEXT("local") : TEXT("inherited"));
+                    Value->SetBoolField(TEXT("editable"), bEditable && !LocalId.IsEmpty());
+                    const TSharedRef<FJsonObject> Scope = MakeShared<FJsonObject>();
+                    Scope->SetStringField(TEXT("function_id"), FunctionId);
+                    Scope->SetStringField(TEXT("function_name"), FunctionGraph->GetName());
+                    Value->SetObjectField(TEXT("scope"), Scope);
+                    Value->SetObjectField(TEXT("type"), UnrealMCP::K2TypeCodec::EncodeType(Local.VarType));
+                    Value->SetObjectField(TEXT("default"), UnrealMCP::K2TypeCodec::EncodeDefault(Local.VarType, Local.DefaultValue));
+                    Value->SetObjectField(TEXT("reference_summary"), LocalReferenceSummary);
+                    AddRecord(OutRecords, Value);
+                }
+                Fingerprint.Add(TEXT("local|") + FunctionId + TEXT("|") + LocalId + TEXT("|") + Local.VarName.ToString()
+                    + TEXT("|") + VariableTypeFingerprint(Local.VarType) + TEXT("|") + Local.DefaultValue);
+            }
+            Fingerprint.Add(TEXT("function|") + Owner.Value + TEXT("|") + FunctionId + TEXT("|") + FunctionGraph->GetName()
+                + TEXT("|") + DeclarationKind + TEXT("|") + LexToString(Entry->GetFunctionFlags())
+                + TEXT("|") + Entry->MetaData.Category.ToString() + TEXT("|") + Entry->MetaData.ToolTip.ToString()
+                + TEXT("|") + Entry->MetaData.Keywords.ToString() + TEXT("|") + LexToString(Entry->MetaData.bCallInEditor)
+                + TEXT("|") + LexToString(Results.Num()));
+        }
+    }
+    if (!bFunctionFound)
+    {
+        OutError = {TEXT("not_found"), TEXT("The requested function identity was not found")};
+        return false;
+    }
+    if (!bLocalFound)
+    {
+        OutError = {TEXT("not_found"), TEXT("The requested local-variable identity was not found")};
         return false;
     }
 

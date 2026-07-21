@@ -1,4 +1,4 @@
-# Canonical K2 member type and default codec
+# Canonical K2 member, parameter, and local type/default codec
 
 Member-variable inspection and mutation share one bounded K2 vocabulary. A type record contains `category`, `container`, optional `subcategory`, optional `type_object`, and, for maps only, `value_type`. Supported categories are `boolean`, `byte`, `int`, `int64`, `real`, `name`, `string`, `text`, `enum`, `struct`, `object`, `class`, `softobject`, and `softclass`. Real values require `float` or `double`; enum, struct, object, and class families require one live compatible Unreal object path. Containers are `none`, `array`, `set`, or `map`; nested containers are unavailable.
 
@@ -11,3 +11,5 @@ Defaults are tagged objects rather than untyped Unreal serialization strings:
 - `{kind:"map",entries:[{key:...,value:...}]}` carries at most 64 scalar/reference pairs.
 
 The native codec resolves type objects and references against live K2 capabilities, rejects incompatible types/defaults, and converts accepted values to Unreal's canonical property text internally. Non-default arbitrary struct literals remain explicitly unsupported. Inspection reconstructs tagged defaults from the variable description before compile and from the generated-class CDO after Unreal migrates compiled defaults there.
+
+Phase 6 extends type records with optional `reference` and `const` flags. Member and local-variable types require both flags to be false. Function input parameters may be references; a const parameter must also be a reference. Function outputs cannot be reference or const. Parameter direction and local function scope are explicit in their owning records.

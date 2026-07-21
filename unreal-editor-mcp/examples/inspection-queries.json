@@ -45,6 +45,21 @@
     "include_inherited": true,
     "page_size": 10
   },
+  "inspect_one_function_signature_and_locals": {
+    "mode": "inspect",
+    "asset_path": "/Game/Actors/BP_Door.BP_Door",
+    "sections": ["functions", "parameters", "local_variables"],
+    "function_id": "11111111111111111111111111111111",
+    "include_inherited": true,
+    "page_size": 25
+  },
+  "inspect_one_local": {
+    "mode": "inspect",
+    "asset_path": "/Game/Actors/BP_Door.BP_Door",
+    "sections": ["local_variables"],
+    "local_id": "22222222222222222222222222222222",
+    "page_size": 10
+  },
   "continue_page": {
     "cursor": "0123456789abcdef0123456789abcdef",
     "page_size": 50

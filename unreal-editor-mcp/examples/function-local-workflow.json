@@ -1,0 +1,98 @@
+{
+  "inspect_before_edit": {
+    "mode": "inspect",
+    "asset_path": "/Game/Actors/BP_Door.BP_Door",
+    "sections": ["variables", "functions", "parameters", "local_variables"],
+    "include_inherited": true
+  },
+  "add_function_shell": {
+    "operation_id": "77777777777777777777777777777777",
+    "asset_path": "/Game/Actors/BP_Door.BP_Door",
+    "expected_snapshot": "0123456789abcdef0123456789abcdef01234567",
+    "target": "function",
+    "operation": "add",
+    "name": "ComputeHealth",
+    "signature": {
+      "access": "protected",
+      "pure": false,
+      "const": true,
+      "parameters": [
+        {
+          "name": "Delta",
+          "direction": "input",
+          "type": {"category": "int", "container": "none"},
+          "default": {"kind": "literal", "value": 0}
+        },
+        {
+          "name": "Label",
+          "direction": "input",
+          "type": {"category": "string", "container": "none", "reference": true, "const": true}
+        },
+        {
+          "name": "Result",
+          "direction": "output",
+          "type": {"category": "int", "container": "none"}
+        }
+      ]
+    },
+    "metadata": {
+      "category": "Stats",
+      "tooltip": "Computes a health value",
+      "keywords": "health stats"
+    }
+  },
+  "inspect_returned_function": {
+    "mode": "inspect",
+    "asset_path": "/Game/Actors/BP_Door.BP_Door",
+    "sections": ["functions", "parameters", "local_variables"],
+    "function_id": "11111111111111111111111111111111"
+  },
+  "add_local_using_returned_function_id_and_snapshot": {
+    "operation_id": "88888888888888888888888888888888",
+    "asset_path": "/Game/Actors/BP_Door.BP_Door",
+    "expected_snapshot": "89abcdef0123456789abcdef0123456789abcdef",
+    "target": "local_variable",
+    "operation": "add",
+    "function_id": "11111111111111111111111111111111",
+    "name": "WorkingValue",
+    "type": {"category": "int", "container": "none"},
+    "default": {"kind": "literal", "value": 0}
+  },
+  "add_rep_notify_function": {
+    "operation_id": "99999999999999999999999999999999",
+    "asset_path": "/Game/Actors/BP_Door.BP_Door",
+    "expected_snapshot": "fedcba9876543210fedcba9876543210fedcba98",
+    "target": "function",
+    "operation": "add",
+    "name": "OnRep_Health",
+    "signature": {
+      "access": "protected",
+      "pure": false,
+      "const": false,
+      "parameters": []
+    }
+  },
+  "couple_existing_member_to_rep_notify": {
+    "operation_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "asset_path": "/Game/Actors/BP_Door.BP_Door",
+    "expected_snapshot": "abcdef0123456789abcdef0123456789abcdef01",
+    "operation": "update",
+    "member_id": "33333333333333333333333333333333",
+    "field": "metadata",
+    "metadata": {
+      "replication": "rep_notify",
+      "rep_notify_function": "OnRep_Health",
+      "replication_condition": "COND_OwnerOnly"
+    }
+  },
+  "remove_local_only_if_unreferenced": {
+    "operation_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "asset_path": "/Game/Actors/BP_Door.BP_Door",
+    "expected_snapshot": "13579bdf02468ace13579bdf02468ace13579bdf",
+    "target": "local_variable",
+    "operation": "remove",
+    "function_id": "11111111111111111111111111111111",
+    "local_id": "22222222222222222222222222222222",
+    "policy": "reject_if_referenced"
+  }
+}

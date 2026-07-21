@@ -404,6 +404,8 @@ TSharedRef<FJsonObject> EncodeType(const FEdGraphPinType& Type)
         Result->SetObjectField(TEXT("value_type"), EncodeTerminal(
             Type.PinValueType.TerminalCategory, Type.PinValueType.TerminalSubCategory, Type.PinValueType.TerminalSubCategoryObject.Get()));
     }
+    Result->SetBoolField(TEXT("reference"), Type.bIsReference);
+    Result->SetBoolField(TEXT("const"), Type.bIsConst);
     const FString Category = Result->GetStringField(TEXT("category"));
     Result->SetBoolField(TEXT("supported"), Category == TEXT("boolean") || Category == TEXT("byte") || Category == TEXT("int")
         || Category == TEXT("int64") || Category == TEXT("real") || Category == TEXT("name") || Category == TEXT("string")
@@ -414,7 +416,7 @@ TSharedRef<FJsonObject> EncodeType(const FEdGraphPinType& Type)
 
 bool DecodeType(const TSharedPtr<FJsonObject>& Value, FEdGraphPinType& OutType, FUnrealMCPError& OutError)
 {
-    if (!Value.IsValid() || !HasOnlyFields(*Value, {TEXT("category"), TEXT("subcategory"), TEXT("type_object"), TEXT("container"), TEXT("value_type")}))
+    if (!Value.IsValid() || !HasOnlyFields(*Value, {TEXT("category"), TEXT("subcategory"), TEXT("type_object"), TEXT("container"), TEXT("value_type"), TEXT("reference"), TEXT("const")}))
     {
         OutError = {TEXT("invalid_argument"), TEXT("type must be one exact K2 type object")};
         return false;
@@ -423,9 +425,13 @@ bool DecodeType(const TSharedPtr<FJsonObject>& Value, FEdGraphPinType& OutType, 
     FString Subcategory;
     FString TypeObjectPath;
     FString Container;
+    bool bReference = false;
+    bool bConst = false;
     if (!Value->TryGetStringField(TEXT("category"), Category) || !Value->TryGetStringField(TEXT("container"), Container)
         || (Value->HasField(TEXT("subcategory")) && !Value->TryGetStringField(TEXT("subcategory"), Subcategory))
         || (Value->HasField(TEXT("type_object")) && !Value->TryGetStringField(TEXT("type_object"), TypeObjectPath))
+        || (Value->HasField(TEXT("reference")) && !Value->TryGetBoolField(TEXT("reference"), bReference))
+        || (Value->HasField(TEXT("const")) && !Value->TryGetBoolField(TEXT("const"), bConst))
         || !ReadContainer(Container, OutType.ContainerType))
     {
         OutError = {TEXT("invalid_argument"), TEXT("type contains invalid K2 type fields")};
@@ -445,8 +451,13 @@ bool DecodeType(const TSharedPtr<FJsonObject>& Value, FEdGraphPinType& OutType, 
         OutError = {TEXT("invalid_argument"), TEXT("value_type is accepted only for map variables")};
         return false;
     }
-    OutType.bIsReference = false;
-    OutType.bIsConst = false;
+    if (bConst && !bReference)
+    {
+        OutError = {TEXT("invalid_argument"), TEXT("const K2 parameters must also be passed by reference")};
+        return false;
+    }
+    OutType.bIsReference = bReference;
+    OutType.bIsConst = bConst;
     OutType.bIsWeakPointer = false;
     return true;
 }

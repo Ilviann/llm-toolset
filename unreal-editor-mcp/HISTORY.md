@@ -1,5 +1,12 @@
 # Unreal Editor MCP history
 
+## 0.6.0 — 2026-07-21
+
+- Added bounded function, ordered parameter, and function-local-variable inspection with stable graph/local GUIDs, ownership/editability, complete signatures, metadata, required nodes, RepNotify relationships, and reference summaries.
+- Extended `blueprint_member_edit` with transactional user-function shell/signature/metadata operations and function-local add/rename/type/default/remove operations while keeping the released ten-tool surface unchanged.
+- Added reference/const K2 parameter forms, complete preflight validation, reject-only policies for referenced signatures/locals, and RepNotify coupling with exact notification signatures and live lifetime conditions.
+- Added public-API probes, schemas, native Automation/Undo/Redo/compile/save coverage, documentation/examples, and cross-process restart proof for stable function/local identities and persisted RepNotify relationships.
+
 ## 0.5.0 — 2026-07-21
 
 - Added bounded typed Blueprint member-variable inspection with stable GUID identity, ownership/editability, canonical K2 types, tagged defaults, validated metadata, replication/RepNotify relationships, and reference summaries.

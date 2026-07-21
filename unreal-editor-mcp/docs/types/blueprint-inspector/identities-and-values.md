@@ -5,6 +5,8 @@ The inspector uses Unreal-provided persistent GUIDs where available:
 - SCS component `VariableGuid`
 - member variable `VarGuid`
 - graph `GraphGuid`
+- user function `GraphGuid`
+- function-local variable `VarGuid`
 - node `NodeGuid`
 - pin `PinId`
 
@@ -16,4 +18,6 @@ K2 types contain `category`, `subcategory`, `container`, `reference`, `const`, `
 
 Member-variable defaults use the tagged canonical K2 forms documented with the mutator and are reconstructed from the generated-class CDO after compile. Pin defaults remain bounded strings, with a bounded object path for a pin default object. Component and `class_default` records encode only requested properties or bounded changed defaults. Boolean, finite numeric, name/string/text, enum/flags, common math/color/transform structs, and compatible hard/soft object/class references use `{name,supported:true,type,value}`. Structs use Unreal's canonical bounded text form; references use visible packageable object/class paths. Other reflected types use `{name,supported:false,type:"unsupported"}`. Delegates, interfaces, transient/editor-only fields, and arbitrary UObject graphs are never writable or recursively serialized.
 
-Variable records additionally expose category/tooltip and supported metadata flags, local/inherited ownership, editability, replication mode/condition, RepNotify function identity, and a bounded reference summary. The summary lists at most 64 loaded graph/node relationships and separately flags references that Unreal reports but cannot identify in the loaded graph set.
+Variable records additionally expose category/tooltip and supported metadata flags, local/inherited ownership, editability, replication mode/condition, RepNotify function identity, relationship validity, and a bounded reference summary. The summary lists at most 64 loaded graph/node relationships and separately flags references that Unreal reports but cannot identify in the loaded graph set.
+
+Function records use the function graph GUID, distinguish user-owned functions from inherited, override, and interface functions, and report editability, complete signature, metadata, required entry/result nodes, RepNotify member relationships, and bounded call references. Separate parameter records preserve ordered input/output direction, type, reference/const qualifiers, and tagged defaults. Local-variable records use their `VarGuid`, carry the owning function ID/name, and expose canonical type/default data plus scope-aware reference summaries.

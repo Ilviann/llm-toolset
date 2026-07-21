@@ -42,7 +42,7 @@ def wait_until_ready(layout: ProjectLayout, process: subprocess.Popen[bytes], de
         try:
             record = read_discovery(layout)
             result = UnrealBridge(layout, timeout=2.0).call("capabilities")
-            if result.get("bridge_ready") is True and record.bridge_version == "0.5.0":
+            if result.get("bridge_ready") is True and record.bridge_version == "0.6.0":
                 return
         except Exception as error:
             last_error = str(error)
@@ -97,7 +97,7 @@ def send_without_reading(layout: ProjectLayout, command: str, arguments: dict[st
         headers={
             "Authorization": "Bearer " + read_token(layout),
             "Content-Type": "application/json",
-            "X-Unreal-MCP-Version": "0.5.0",
+            "X-Unreal-MCP-Version": "0.6.0",
         },
     )
     connection.close()
@@ -148,6 +148,7 @@ def run_automation(executable: Path, project: Path, environment: dict[str, str],
         "PropertyCodec",
         "K2TypeCodec",
         "MemberVariables",
+        "FunctionsAndLocals",
     )
     if test_filter == "UnrealMCP":
         expected = all_expected
@@ -157,6 +158,8 @@ def run_automation(executable: Path, project: Path, environment: dict[str, str],
         })
     elif test_filter == "UnrealMCP.Phase5":
         expected = tuple(name for name in all_expected if name in {"K2TypeCodec", "MemberVariables"})
+    elif test_filter == "UnrealMCP.Phase6":
+        expected = tuple(name for name in all_expected if name == "FunctionsAndLocals")
     else:
         leaf = test_filter.rsplit(".", 1)[-1]
         expected = (leaf,) if leaf in all_expected else ()
@@ -245,10 +248,13 @@ def main() -> int:
                 "blueprint_component_edit", "blueprint_default_edit", "blueprint_member_edit",
             ]:
                 raise AssertionError("released command catalog mismatch")
-            if capabilities.get("bridge_version") != "0.5.0" or state.get("bridge_ready") is not True:
+            if capabilities.get("bridge_version") != "0.6.0" or state.get("bridge_ready") is not True:
                 raise AssertionError("capability/state contract mismatch")
             if capabilities.get("features", {}).get("blueprint_mutation") is not True:
-                raise AssertionError("Phase 5 mutation capability is unavailable")
+                raise AssertionError("Phase 6 mutation capability is unavailable")
+            for feature in ("blueprint_functions", "blueprint_local_variables", "blueprint_rep_notify"):
+                if capabilities.get("features", {}).get(feature) is not True:
+                    raise AssertionError(f"Phase 6 capability is unavailable: {feature}")
             if capabilities.get("asset_access") != {
                 "read_scope": "all_mounted_content",
                 "mutation_scope": "project_content_and_local_project_plugins",
@@ -354,10 +360,71 @@ def main() -> int:
             member_id = member.get("member", {}).get("id")
             if not isinstance(member_id, str) or len(member_id) != 32:
                 raise AssertionError(f"member mutation omitted its stable identity: {member!r}")
-            compiled = bridge.call("blueprint_compile", {
+            function = bridge.call("blueprint_member_edit", {
                 "operation_id": uuid.uuid4().hex,
                 "asset_path": asset_path,
                 "expected_snapshot": member["snapshot_id"],
+                "target": "function",
+                "operation": "add",
+                "name": "ComputeHealth",
+                "signature": {
+                    "access": "public",
+                    "pure": False,
+                    "const": True,
+                    "parameters": [
+                        {"name": "Delta", "direction": "input", "type": {"category": "int", "container": "none"},
+                         "default": {"kind": "literal", "value": 1}},
+                        {"name": "Result", "direction": "output", "type": {"category": "int", "container": "none"}},
+                    ],
+                },
+                "metadata": {"category": "Stats", "tooltip": "Compute a health value"},
+            })
+            function_id = function.get("function", {}).get("id")
+            if not isinstance(function_id, str) or len(function_id) != 32:
+                raise AssertionError(f"function mutation omitted its stable identity: {function!r}")
+            local = bridge.call("blueprint_member_edit", {
+                "operation_id": uuid.uuid4().hex,
+                "asset_path": asset_path,
+                "expected_snapshot": function["snapshot_id"],
+                "target": "local_variable",
+                "operation": "add",
+                "function_id": function_id,
+                "name": "WorkingValue",
+                "type": {"category": "int", "container": "none"},
+                "default": {"kind": "literal", "value": 5},
+            })
+            local_id = local.get("local_variable", {}).get("id")
+            if not isinstance(local_id, str) or len(local_id) != 32:
+                raise AssertionError(f"local-variable mutation omitted its stable identity: {local!r}")
+            notify = bridge.call("blueprint_member_edit", {
+                "operation_id": uuid.uuid4().hex,
+                "asset_path": asset_path,
+                "expected_snapshot": local["snapshot_id"],
+                "target": "function",
+                "operation": "add",
+                "name": "OnRep_Health",
+                "signature": {"access": "private", "pure": False, "const": False, "parameters": []},
+            })
+            notify_id = notify.get("function", {}).get("id")
+            notified_member = bridge.call("blueprint_member_edit", {
+                "operation_id": uuid.uuid4().hex,
+                "asset_path": asset_path,
+                "expected_snapshot": notify["snapshot_id"],
+                "operation": "update",
+                "member_id": member_id,
+                "field": "metadata",
+                "metadata": {
+                    "replication": "rep_notify",
+                    "rep_notify_function": "OnRep_Health",
+                    "replication_condition": "COND_OwnerOnly",
+                },
+            })
+            if notified_member.get("member", {}).get("replication", {}).get("rep_notify_function_id") != notify_id:
+                raise AssertionError(f"RepNotify relationship did not bind the function identity: {notified_member!r}")
+            compiled = bridge.call("blueprint_compile", {
+                "operation_id": uuid.uuid4().hex,
+                "asset_path": asset_path,
+                "expected_snapshot": notified_member["snapshot_id"],
             })
             if compiled.get("compile_succeeded") is not True or compiled.get("saved") is not False:
                 raise AssertionError(f"explicit Blueprint compile contract mismatch: {compiled!r}")
@@ -387,7 +454,8 @@ def main() -> int:
             reloaded = UnrealBridge(layout, timeout=3.0).call("blueprint_inspect", {
                 "mode": "inspect",
                 "asset_path": "/Game/UnrealMCPPhase4/BP_ComponentFixture.BP_ComponentFixture",
-                "sections": ["summary", "parent_class", "compile_state", "components", "class_defaults", "variables", "graphs", "nodes", "pins", "connections"],
+                "sections": ["summary", "parent_class", "compile_state", "components", "class_defaults", "variables",
+                             "functions", "parameters", "local_variables", "graphs", "nodes", "pins", "connections"],
                 "property_names": ["InitialLifeSpan"],
                 "page_size": 100,
             })
@@ -427,8 +495,29 @@ def main() -> int:
                 raise AssertionError(f"member type/default changed after restart: {health!r}")
             if health.get("metadata", {}).get("category") != "Stats" or health.get("metadata", {}).get("save_game") is not True:
                 raise AssertionError(f"member metadata changed after restart: {health!r}")
-            if health.get("replication", {}).get("mode") != "replicated":
+            if health.get("replication", {}).get("mode") != "rep_notify" or health.get("replication", {}).get("relationship_valid") is not True:
                 raise AssertionError(f"member replication changed after restart: {health!r}")
+            functions = {
+                record.get("name"): record
+                for record in reloaded.get("records", [])
+                if record.get("section") == "function"
+            }
+            if functions.get("ComputeHealth", {}).get("id") != function_id:
+                raise AssertionError(f"function identity changed after restart: {functions!r}")
+            if functions.get("OnRep_Health", {}).get("id") != notify_id:
+                raise AssertionError(f"RepNotify function identity changed after restart: {functions!r}")
+            parameters = [
+                record for record in reloaded.get("records", [])
+                if record.get("section") == "parameter" and record.get("function_id") == function_id
+            ]
+            if [(item.get("name"), item.get("direction")) for item in parameters] != [("Delta", "input"), ("Result", "output")]:
+                raise AssertionError(f"function signature changed after restart: {parameters!r}")
+            locals_ = [
+                record for record in reloaded.get("records", [])
+                if record.get("section") == "local_variable" and record.get("id") == local_id
+            ]
+            if len(locals_) != 1 or locals_[0].get("scope", {}).get("function_id") != function_id:
+                raise AssertionError(f"local-variable scope changed after restart: {locals_!r}")
         except Exception:
             log.seek(0)
             sys.stderr.buffer.write(log.read()[-32_000:])
@@ -445,7 +534,7 @@ def main() -> int:
             pass
         else:
             raise AssertionError("a live discovery heartbeat remained after editor termination")
-    print("Phase 5 integration passed: typed members, components/defaults, lost-response reconciliation, restart inspection, loopback binding, and clean unload")
+    print("Phase 6 integration passed: functions/signatures/locals, RepNotify, typed members, components/defaults, reconciliation, restart inspection, loopback binding, and clean unload")
     return 0
 
 

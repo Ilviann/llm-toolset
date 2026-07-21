@@ -2,7 +2,7 @@
 
 ## Ownership
 
-`unreal_editor_mcp/` owns the Python 3.10+ process. `stdio.py` bounds newline-delimited JSON-RPC and keeps stdout protocol-only. `server.py` negotiates MCP, publishes the ten Phase 5 tools, validates arguments, and converts domain failures to MCP tool errors. `project.py`, `platforms.py`, and `discovery.py` resolve one project and validate generated state. `bridge.py` is the only HTTP client. `cli.py` composes these responsibilities.
+`unreal_editor_mcp/` owns the Python 3.10+ process. `stdio.py` bounds newline-delimited JSON-RPC and keeps stdout protocol-only. `server.py` negotiates MCP, publishes the ten Phase 6 tools, validates arguments, and converts domain failures to MCP tool errors. `project.py`, `platforms.py`, and `discovery.py` resolve one project and validate generated state. `bridge.py` is the only HTTP client. `cli.py` composes these responsibilities.
 
 ## Dependency direction
 
@@ -15,7 +15,7 @@ The CLI constructs a `ProjectLayout`, `UnrealBridge`, and `MCPServer`; the trans
 - `blueprint_inspect` has three mutually exclusive shapes: discovery, exact inspection, or cursor continuation; Python bounds paths, sections, cursor size, and page size before HTTP.
 - Every mutation requires a caller-generated 32-lowercase-hex `operation_id`. Existing-asset mutations also require the current 40-lowercase-hex `expected_snapshot`.
 - Component operations use one exact discriminated shape; class/component property edits accept only the bounded shared value forms.
-- Member operations use exact add/rename/update/remove shapes with canonical K2 type/default records, stable member identities, and reject-only type/removal policy.
+- Member operations use exact add/rename/update/remove shapes with canonical K2 type/default records, stable member identities, and reject-only type/removal policy. Scoped discriminators add exact function signature/metadata and function-local variable shapes without adding another model-facing tool.
 - HTTP always targets the literal IPv4 loopback address and authenticates with the generated token.
 - Generated records and HTTP messages are read with explicit byte limits and strict record shapes.
 - A stale heartbeat, dead process, unsafe token format, project identity change, timeout, or version mismatch produces a stable bounded error. A mutation HTTP timeout becomes `outcome_unknown`, prompting `operation_status` reconciliation.

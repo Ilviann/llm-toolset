@@ -349,6 +349,9 @@ TSharedPtr<FJsonObject> FUnrealMCPBridge::Capabilities() const
     Features->SetBoolField(TEXT("blueprint_components"), true);
     Features->SetBoolField(TEXT("blueprint_defaults"), true);
     Features->SetBoolField(TEXT("blueprint_member_variables"), true);
+    Features->SetBoolField(TEXT("blueprint_functions"), true);
+    Features->SetBoolField(TEXT("blueprint_local_variables"), true);
+    Features->SetBoolField(TEXT("blueprint_rep_notify"), true);
     Features->SetBoolField(TEXT("editor_lifecycle"), false);
     Features->SetBoolField(TEXT("project_build"), false);
     Result->SetObjectField(TEXT("features"), Features);

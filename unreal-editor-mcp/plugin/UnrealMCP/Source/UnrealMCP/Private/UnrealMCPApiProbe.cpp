@@ -10,6 +10,8 @@
 #include "Kismet2/BlueprintEditorUtils.h"
 #include "Kismet2/CompilerResultsLog.h"
 #include "Kismet2/KismetEditorUtilities.h"
+#include "K2Node_FunctionEntry.h"
+#include "K2Node_FunctionResult.h"
 #include "ScopedTransaction.h"
 #include "SubobjectDataSubsystem.h"
 
@@ -21,6 +23,8 @@ void RequirePublicTypes()
     static_assert(sizeof(FCompilerResultsLog) > 0);
     static_assert(TIsDerivedFrom<UEdGraphSchema_K2, UEdGraphSchema>::Value);
     static_assert(TIsDerivedFrom<UBlueprintNodeSpawner, UObject>::Value);
+    static_assert(TIsDerivedFrom<UK2Node_FunctionEntry, UK2Node>::Value);
+    static_assert(TIsDerivedFrom<UK2Node_FunctionResult, UK2Node>::Value);
     static_assert(TIsDerivedFrom<USubobjectDataSubsystem, UEngineSubsystem>::Value);
     (void)FHttpServerModule::IsAvailable;
     (void)FAssetRegistryModule::GetRegistry;

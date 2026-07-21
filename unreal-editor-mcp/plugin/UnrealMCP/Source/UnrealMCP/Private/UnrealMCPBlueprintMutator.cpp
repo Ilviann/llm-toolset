@@ -6,6 +6,7 @@
 #include "Engine/BlueprintGeneratedClass.h"
 #include "Engine/SCS_Node.h"
 #include "Engine/SimpleConstructionScript.h"
+#include "EdGraph/EdGraph.h"
 #include "EdGraphSchema_K2.h"
 #include "Components/ActorComponent.h"
 #include "Components/SceneComponent.h"
@@ -14,6 +15,8 @@
 #include "HAL/FileManager.h"
 #include "HAL/PlatformFileManager.h"
 #include "K2Node.h"
+#include "K2Node_FunctionEntry.h"
+#include "K2Node_FunctionResult.h"
 #include "Kismet2/CompilerResultsLog.h"
 #include "Kismet2/KismetEditorUtilities.h"
 #include "Kismet2/BlueprintEditorUtils.h"
@@ -696,6 +699,330 @@ TSharedRef<FJsonObject> MemberReferences(UBlueprint* Blueprint, const FName Vari
     return Summary;
 }
 
+UEdGraph* FindLocalFunction(UBlueprint* Blueprint, const FString& Identity)
+{
+    if (Blueprint == nullptr || Identity.Len() != 32) return nullptr;
+    for (UEdGraph* Graph : Blueprint->FunctionGraphs)
+    {
+        if (Graph != nullptr && GuidString(Graph->GraphGuid) == Identity) return Graph;
+    }
+    return nullptr;
+}
+
+UK2Node_FunctionEntry* FindFunctionEntry(UEdGraph* Graph)
+{
+    return Graph != nullptr ? Cast<UK2Node_FunctionEntry>(FBlueprintEditorUtils::GetEntryNode(Graph)) : nullptr;
+}
+
+bool IsUserOwnedFunction(UBlueprint* Blueprint, UEdGraph* Graph)
+{
+    if (Blueprint == nullptr || Graph == nullptr || !Blueprint->FunctionGraphs.Contains(Graph)) return false;
+    for (const FBPInterfaceDescription& Interface : Blueprint->ImplementedInterfaces)
+    {
+        if (Interface.Graphs.Contains(Graph)) return false;
+    }
+    UK2Node_FunctionEntry* Entry = FindFunctionEntry(Graph);
+    return Entry != nullptr && Entry->IsEditable();
+}
+
+TSharedRef<FJsonObject> FunctionReferences(UBlueprint* Blueprint, UEdGraph* FunctionGraph)
+{
+    TArray<UK2Node*> Nodes;
+    TArray<UEdGraph*> Graphs;
+    Blueprint->GetAllGraphs(Graphs);
+    for (UEdGraph* Graph : Graphs)
+    {
+        if (Graph == nullptr) continue;
+        for (UEdGraphNode* GraphNode : Graph->Nodes)
+        {
+            UK2Node* Node = Cast<UK2Node>(GraphNode);
+            if (Node != nullptr && !Node->IsA<UK2Node_FunctionEntry>() && !Node->IsA<UK2Node_FunctionResult>()
+                && Node->ReferencesFunction(FunctionGraph->GetFName(), Blueprint->SkeletonGeneratedClass)) Nodes.Add(Node);
+        }
+    }
+    const bool bReferenced = !Nodes.IsEmpty() || FBlueprintEditorUtils::IsFunctionUsed(Blueprint, FunctionGraph->GetFName());
+    const TSharedRef<FJsonObject> Summary = MakeShared<FJsonObject>();
+    Summary->SetBoolField(TEXT("referenced"), bReferenced);
+    Summary->SetNumberField(TEXT("reference_count"), Nodes.Num());
+    Summary->SetBoolField(TEXT("unresolved_references"), bReferenced && Nodes.IsEmpty());
+    Summary->SetBoolField(TEXT("references_truncated"), Nodes.Num() > UnrealMCP::MaxVariableReferences);
+    TArray<TSharedPtr<FJsonValue>> References;
+    for (int32 Index = 0; Index < FMath::Min(Nodes.Num(), UnrealMCP::MaxVariableReferences); ++Index)
+    {
+        UK2Node* Node = Nodes[Index];
+        const TSharedRef<FJsonObject> Reference = MakeShared<FJsonObject>();
+        Reference->SetStringField(TEXT("graph_id"), Node->GetGraph() != nullptr ? GuidString(Node->GetGraph()->GraphGuid) : FString());
+        Reference->SetStringField(TEXT("node_id"), GuidString(Node->NodeGuid));
+        Reference->SetStringField(TEXT("node_class"), Node->GetClass()->GetPathName());
+        Reference->SetStringField(TEXT("title"), Node->GetNodeTitle(ENodeTitleType::ListView).ToString().Left(256));
+        References.Add(MakeShared<FJsonValueObject>(Reference));
+    }
+    Summary->SetArrayField(TEXT("references"), References);
+    return Summary;
+}
+
+TSharedRef<FJsonObject> LocalReferences(UBlueprint* Blueprint, UEdGraph* FunctionGraph, const FName VariableName)
+{
+    TArray<UK2Node*> Nodes;
+    const UStruct* Scope = Blueprint->SkeletonGeneratedClass != nullptr
+        ? Blueprint->SkeletonGeneratedClass->FindFunctionByName(FunctionGraph->GetFName()) : nullptr;
+    for (UEdGraphNode* GraphNode : FunctionGraph->Nodes)
+    {
+        UK2Node* Node = Cast<UK2Node>(GraphNode);
+        if (Node != nullptr && Node->ReferencesVariable(VariableName, Scope)) Nodes.Add(Node);
+    }
+    const bool bReferenced = !Nodes.IsEmpty() || FBlueprintEditorUtils::IsVariableUsed(Blueprint, VariableName, FunctionGraph);
+    const TSharedRef<FJsonObject> Summary = MakeShared<FJsonObject>();
+    Summary->SetBoolField(TEXT("referenced"), bReferenced);
+    Summary->SetNumberField(TEXT("reference_count"), Nodes.Num());
+    Summary->SetBoolField(TEXT("unresolved_references"), bReferenced && Nodes.IsEmpty());
+    Summary->SetBoolField(TEXT("references_truncated"), Nodes.Num() > UnrealMCP::MaxVariableReferences);
+    TArray<TSharedPtr<FJsonValue>> References;
+    for (int32 Index = 0; Index < FMath::Min(Nodes.Num(), UnrealMCP::MaxVariableReferences); ++Index)
+    {
+        UK2Node* Node = Nodes[Index];
+        const TSharedRef<FJsonObject> Reference = MakeShared<FJsonObject>();
+        Reference->SetStringField(TEXT("graph_id"), GuidString(FunctionGraph->GraphGuid));
+        Reference->SetStringField(TEXT("node_id"), GuidString(Node->NodeGuid));
+        Reference->SetStringField(TEXT("node_class"), Node->GetClass()->GetPathName());
+        Reference->SetStringField(TEXT("title"), Node->GetNodeTitle(ENodeTitleType::ListView).ToString().Left(256));
+        References.Add(MakeShared<FJsonValueObject>(Reference));
+    }
+    Summary->SetArrayField(TEXT("references"), References);
+    return Summary;
+}
+
+struct FFunctionParameterSpec
+{
+    FName Name;
+    FString Direction;
+    FEdGraphPinType Type;
+    FString DefaultValue;
+};
+
+struct FFunctionSignatureSpec
+{
+    FString Access;
+    bool bPure = false;
+    bool bConst = false;
+    TArray<FFunctionParameterSpec> Parameters;
+};
+
+bool DecodeFunctionSignature(
+    const TSharedPtr<FJsonObject>& Signature,
+    FFunctionSignatureSpec& Out,
+    FUnrealMCPError& OutError)
+{
+    if (!Signature.IsValid() || !HasOnlyFields(*Signature, {TEXT("access"), TEXT("pure"), TEXT("const"), TEXT("parameters")})
+        || !Signature->TryGetStringField(TEXT("access"), Out.Access)
+        || !Signature->TryGetBoolField(TEXT("pure"), Out.bPure)
+        || !Signature->TryGetBoolField(TEXT("const"), Out.bConst)
+        || (Out.Access != TEXT("public") && Out.Access != TEXT("protected") && Out.Access != TEXT("private")))
+    {
+        OutError = {TEXT("invalid_argument"), TEXT("signature requires exact access, pure, const, and parameters fields")};
+        return false;
+    }
+    const TArray<TSharedPtr<FJsonValue>>* Parameters = nullptr;
+    if (!Signature->TryGetArrayField(TEXT("parameters"), Parameters) || Parameters == nullptr || Parameters->Num() > 32)
+    {
+        OutError = {TEXT("invalid_argument"), TEXT("signature parameters must be one bounded array")};
+        return false;
+    }
+    TSet<FName> Names;
+    for (const TSharedPtr<FJsonValue>& Value : *Parameters)
+    {
+        const TSharedPtr<FJsonObject>* Parameter = nullptr;
+        if (!Value.IsValid() || !Value->TryGetObject(Parameter) || Parameter == nullptr
+            || !HasOnlyFields(**Parameter, {TEXT("name"), TEXT("direction"), TEXT("type"), TEXT("default")}))
+        {
+            OutError = {TEXT("invalid_argument"), TEXT("Each function parameter must be one exact object")};
+            return false;
+        }
+        FString Name;
+        FFunctionParameterSpec Spec;
+        const TSharedPtr<FJsonObject>* Type = nullptr;
+        if (!(*Parameter)->TryGetStringField(TEXT("name"), Name) || Name.IsEmpty() || Name.Len() > 128
+            || FName(*Name).IsNone() || !FName(*Name).IsValidXName() || Names.Contains(FName(*Name))
+            || !(*Parameter)->TryGetStringField(TEXT("direction"), Spec.Direction)
+            || (Spec.Direction != TEXT("input") && Spec.Direction != TEXT("output"))
+            || !(*Parameter)->TryGetObjectField(TEXT("type"), Type) || Type == nullptr
+            || !UnrealMCP::K2TypeCodec::DecodeType(*Type, Spec.Type, OutError))
+        {
+            if (OutError.Code.IsEmpty()) OutError = {TEXT("invalid_member"), TEXT("Function parameter names and directions must be legal and unique")};
+            return false;
+        }
+        Spec.Name = FName(*Name);
+        if (Spec.Direction == TEXT("output") && (Spec.Type.bIsReference || Spec.Type.bIsConst || (*Parameter)->HasField(TEXT("default"))))
+        {
+            OutError = {TEXT("invalid_argument"), TEXT("Output parameters cannot be reference, const, or have defaults")};
+            return false;
+        }
+        if (Spec.Direction == TEXT("input") && Spec.Type.bIsReference && (*Parameter)->HasField(TEXT("default")))
+        {
+            OutError = {TEXT("invalid_argument"), TEXT("Reference input parameters cannot have defaults")};
+            return false;
+        }
+        if ((*Parameter)->HasField(TEXT("default")))
+        {
+            const TSharedPtr<FJsonObject>* Default = nullptr;
+            if (!(*Parameter)->TryGetObjectField(TEXT("default"), Default) || Default == nullptr
+                || !UnrealMCP::K2TypeCodec::DecodeDefault(Spec.Type, *Default, Spec.DefaultValue, OutError)) return false;
+        }
+        Names.Add(Spec.Name);
+        Out.Parameters.Add(MoveTemp(Spec));
+    }
+    return true;
+}
+
+bool ValidateFunctionMetadata(const TSharedPtr<FJsonObject>& Metadata, FUnrealMCPError& OutError)
+{
+    if (!Metadata.IsValid() || Metadata->Values.IsEmpty()
+        || !HasOnlyFields(*Metadata, {TEXT("category"), TEXT("tooltip"), TEXT("keywords"), TEXT("call_in_editor")}))
+    {
+        OutError = {TEXT("invalid_argument"), TEXT("function metadata must contain supported exact fields")};
+        return false;
+    }
+    FString Text;
+    bool Flag = false;
+    if ((Metadata->HasField(TEXT("category")) && (!Metadata->TryGetStringField(TEXT("category"), Text) || Text.Len() > 128))
+        || (Metadata->HasField(TEXT("tooltip")) && (!Metadata->TryGetStringField(TEXT("tooltip"), Text) || Text.Len() > 512))
+        || (Metadata->HasField(TEXT("keywords")) && (!Metadata->TryGetStringField(TEXT("keywords"), Text) || Text.Len() > 256))
+        || (Metadata->HasField(TEXT("call_in_editor")) && !Metadata->TryGetBoolField(TEXT("call_in_editor"), Flag)))
+    {
+        OutError = {TEXT("invalid_argument"), TEXT("function metadata contains an invalid bounded value")};
+        return false;
+    }
+    return true;
+}
+
+void ApplyFunctionMetadata(UK2Node_FunctionEntry* Entry, const TSharedPtr<FJsonObject>& Metadata)
+{
+    FString Text;
+    bool Flag = false;
+    Entry->Modify();
+    if (Metadata->TryGetStringField(TEXT("category"), Text)) Entry->MetaData.Category = FText::FromString(Text);
+    if (Metadata->TryGetStringField(TEXT("tooltip"), Text)) Entry->MetaData.ToolTip = FText::FromString(Text);
+    if (Metadata->TryGetStringField(TEXT("keywords"), Text)) Entry->MetaData.Keywords = FText::FromString(Text);
+    if (Metadata->TryGetBoolField(TEXT("call_in_editor"), Flag)) Entry->MetaData.bCallInEditor = Flag;
+}
+
+bool ApplyFunctionSignature(
+    UBlueprint* Blueprint,
+    UEdGraph* Graph,
+    const FFunctionSignatureSpec& Signature,
+    FUnrealMCPError& OutError)
+{
+    UK2Node_FunctionEntry* Entry = FindFunctionEntry(Graph);
+    if (Entry == nullptr)
+    {
+        OutError = {TEXT("invalid_member"), TEXT("The function graph has no required entry node")};
+        return false;
+    }
+    UK2Node_FunctionResult* PrimaryResult = FBlueprintEditorUtils::FindOrCreateFunctionResultNode(Entry);
+    if (PrimaryResult == nullptr)
+    {
+        OutError = {TEXT("invalid_member"), TEXT("Unreal could not create the required function result node")};
+        return false;
+    }
+    TArray<UK2Node_FunctionResult*> Results;
+    Graph->GetNodesOfClass(Results);
+    Entry->Modify();
+    for (UK2Node_FunctionResult* Result : Results) Result->Modify();
+    for (const TSharedPtr<FUserPinInfo>& Pin : TArray<TSharedPtr<FUserPinInfo>>(Entry->UserDefinedPins)) Entry->RemoveUserDefinedPin(Pin);
+    for (UK2Node_FunctionResult* Result : Results)
+    {
+        for (const TSharedPtr<FUserPinInfo>& Pin : TArray<TSharedPtr<FUserPinInfo>>(Result->UserDefinedPins)) Result->RemoveUserDefinedPin(Pin);
+    }
+    int32 Flags = Entry->GetExtraFlags();
+    Flags &= ~(FUNC_Public | FUNC_Protected | FUNC_Private | FUNC_BlueprintPure | FUNC_Const);
+    Flags |= Signature.Access == TEXT("private") ? FUNC_Private : Signature.Access == TEXT("protected") ? FUNC_Protected : FUNC_Public;
+    if (Signature.bPure) Flags |= FUNC_BlueprintPure;
+    if (Signature.bConst) Flags |= FUNC_Const;
+    Entry->SetExtraFlags(Flags);
+    for (const FFunctionParameterSpec& Parameter : Signature.Parameters)
+    {
+        if (Parameter.Direction == TEXT("input"))
+        {
+            FText Reason;
+            if (!Entry->CanCreateUserDefinedPin(Parameter.Type, EGPD_Output, Reason)
+                || Entry->CreateUserDefinedPin(Parameter.Name, Parameter.Type, EGPD_Output, false) == nullptr)
+            {
+                OutError = {TEXT("unsupported_type"), Reason.IsEmpty() ? TEXT("The live function entry rejected a parameter type") : Reason.ToString().Left(512)};
+                return false;
+            }
+            if (!Parameter.DefaultValue.IsEmpty() && !Entry->UserDefinedPins.IsEmpty()
+                && !Entry->ModifyUserDefinedPinDefaultValue(Entry->UserDefinedPins.Last(), Parameter.DefaultValue))
+            {
+                OutError = {TEXT("invalid_argument"), TEXT("The live function entry rejected a parameter default")};
+                return false;
+            }
+        }
+        else
+        {
+            for (UK2Node_FunctionResult* Result : Results)
+            {
+                FText Reason;
+                if (!Result->CanCreateUserDefinedPin(Parameter.Type, EGPD_Input, Reason)
+                    || Result->CreateUserDefinedPin(Parameter.Name, Parameter.Type, EGPD_Input, false) == nullptr)
+                {
+                    OutError = {TEXT("unsupported_type"), Reason.IsEmpty() ? TEXT("The live function result rejected a parameter type") : Reason.ToString().Left(512)};
+                    return false;
+                }
+            }
+        }
+    }
+    Entry->ReconstructNode();
+    for (UK2Node_FunctionResult* Result : Results) Result->ReconstructNode();
+    FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(Blueprint);
+    return true;
+}
+
+FBPVariableDescription* FindLocalById(UK2Node_FunctionEntry* Entry, const FString& Identity)
+{
+    if (Entry == nullptr || Identity.Len() != 32) return nullptr;
+    for (FBPVariableDescription& Variable : Entry->LocalVariables)
+    {
+        if (GuidString(Variable.VarGuid) == Identity) return &Variable;
+    }
+    return nullptr;
+}
+
+FBPVariableDescription* FindLocalByName(UK2Node_FunctionEntry* Entry, const FString& Name)
+{
+    if (Entry == nullptr) return nullptr;
+    for (FBPVariableDescription& Variable : Entry->LocalVariables)
+    {
+        if (Variable.VarName.ToString() == Name) return &Variable;
+    }
+    return nullptr;
+}
+
+bool ValidateLocalName(UBlueprint* Blueprint, UK2Node_FunctionEntry* Entry, const FString& Name, const FName Existing, FUnrealMCPError& OutError)
+{
+    if (Name.IsEmpty() || Name.Len() > 128 || FName(*Name).IsNone() || !FName(*Name).IsValidXName())
+    {
+        OutError = {TEXT("invalid_member"), TEXT("The local-variable name is not one legal bounded Blueprint name")};
+        return false;
+    }
+    for (const FBPVariableDescription& Local : Entry->LocalVariables)
+    {
+        if (Local.VarName == FName(*Name) && Local.VarName != Existing)
+        {
+            OutError = {TEXT("invalid_member"), TEXT("The local-variable name collides in its function scope")};
+            return false;
+        }
+    }
+    for (const TSharedPtr<FUserPinInfo>& Parameter : Entry->UserDefinedPins)
+    {
+        if (Parameter.IsValid() && Parameter->PinName == FName(*Name))
+        {
+            OutError = {TEXT("invalid_member"), TEXT("The local-variable name collides with a function parameter")};
+            return false;
+        }
+    }
+    return ValidateMemberName(Blueprint, Name, Existing, OutError);
+}
+
 void SetPropertyFlag(uint64& Flags, EPropertyFlags Flag, bool bEnabled)
 {
     if (bEnabled) Flags |= static_cast<uint64>(Flag);
@@ -714,6 +1041,7 @@ bool ReadMetadataBool(const FJsonObject& Metadata, const TCHAR* Name, bool& InOu
 }
 
 bool ValidateAndApplyMetadata(
+    UBlueprint* Blueprint,
     FBPVariableDescription& Variable,
     const TSharedPtr<FJsonObject>& Metadata,
     bool bApply,
@@ -721,7 +1049,8 @@ bool ValidateAndApplyMetadata(
 {
     if (!Metadata.IsValid() || Metadata->Values.IsEmpty()
         || !HasOnlyFields(*Metadata, {TEXT("category"), TEXT("tooltip"), TEXT("instance_editable"), TEXT("blueprint_visible"),
-            TEXT("blueprint_read_only"), TEXT("expose_on_spawn"), TEXT("private"), TEXT("save_game"), TEXT("advanced_display"), TEXT("replication")}))
+            TEXT("blueprint_read_only"), TEXT("expose_on_spawn"), TEXT("private"), TEXT("save_game"), TEXT("advanced_display"), TEXT("replication"),
+            TEXT("rep_notify_function"), TEXT("replication_condition")}))
     {
         OutError = {TEXT("invalid_argument"), TEXT("metadata must contain one or more supported exact fields")};
         return false;
@@ -729,6 +1058,8 @@ bool ValidateAndApplyMetadata(
     FString Category = Variable.Category.ToString();
     FString Tooltip = Variable.HasMetaData(TEXT("tooltip")) ? Variable.GetMetaData(TEXT("tooltip")) : FString();
     FString Replication;
+    FString RepNotifyFunction = Variable.RepNotifyFunc.ToString();
+    FString ReplicationCondition = StaticEnum<ELifetimeCondition>()->GetNameStringByValue(Variable.ReplicationCondition);
     bool bInstanceEditable = (Variable.PropertyFlags & CPF_Edit) != 0 && (Variable.PropertyFlags & CPF_DisableEditOnInstance) == 0;
     bool bBlueprintVisible = (Variable.PropertyFlags & CPF_BlueprintVisible) != 0;
     bool bBlueprintReadOnly = (Variable.PropertyFlags & CPF_BlueprintReadOnly) != 0;
@@ -745,7 +1076,11 @@ bool ValidateAndApplyMetadata(
         || !ReadMetadataBool(*Metadata, TEXT("private"), bPrivate, OutError)
         || !ReadMetadataBool(*Metadata, TEXT("save_game"), bSaveGame, OutError)
         || !ReadMetadataBool(*Metadata, TEXT("advanced_display"), bAdvancedDisplay, OutError)
-        || (Metadata->HasField(TEXT("replication")) && !Metadata->TryGetStringField(TEXT("replication"), Replication)))
+        || (Metadata->HasField(TEXT("replication")) && !Metadata->TryGetStringField(TEXT("replication"), Replication))
+        || (Metadata->HasField(TEXT("rep_notify_function"))
+            && (!Metadata->TryGetStringField(TEXT("rep_notify_function"), RepNotifyFunction) || RepNotifyFunction.IsEmpty() || RepNotifyFunction.Len() > 128))
+        || (Metadata->HasField(TEXT("replication_condition"))
+            && (!Metadata->TryGetStringField(TEXT("replication_condition"), ReplicationCondition) || ReplicationCondition.IsEmpty() || ReplicationCondition.Len() > 64)))
     {
         if (OutError.Code.IsEmpty()) OutError = {TEXT("invalid_argument"), TEXT("metadata contains an invalid bounded value")};
         return false;
@@ -755,20 +1090,56 @@ bool ValidateAndApplyMetadata(
         OutError = {TEXT("invalid_member"), TEXT("Expose-on-spawn requires a visible, non-private, instance-editable variable")};
         return false;
     }
-    if (!Replication.IsEmpty() && Replication != TEXT("none") && Replication != TEXT("replicated"))
+    const FString FinalReplication = !Replication.IsEmpty() ? Replication
+        : !Variable.RepNotifyFunc.IsNone() ? TEXT("rep_notify")
+        : (Variable.PropertyFlags & CPF_Net) != 0 ? TEXT("replicated") : TEXT("none");
+    if (FinalReplication != TEXT("none") && FinalReplication != TEXT("replicated") && FinalReplication != TEXT("rep_notify"))
     {
-        OutError = {TEXT("invalid_argument"), TEXT("replication must be none or replicated; RepNotify changes are deferred")};
+        OutError = {TEXT("invalid_argument"), TEXT("replication must be none, replicated, or rep_notify")};
         return false;
     }
-    if (!Replication.IsEmpty() && !Variable.RepNotifyFunc.IsNone())
+    if (FinalReplication != TEXT("rep_notify") && Metadata->HasField(TEXT("rep_notify_function")))
     {
-        OutError = {TEXT("invalid_member"), TEXT("RepNotify relationships are inspectable but immutable until Phase 6")};
+        OutError = {TEXT("invalid_argument"), TEXT("rep_notify_function is accepted only with rep_notify replication")};
         return false;
     }
-    if (Replication == TEXT("replicated") && (Variable.VarType.IsSet() || Variable.VarType.IsMap()))
+    if (FinalReplication != TEXT("none") && (Variable.VarType.IsSet() || Variable.VarType.IsMap()))
     {
         OutError = {TEXT("invalid_member"), TEXT("The live Blueprint capability does not support replicated set or map variables")};
         return false;
+    }
+    const int64 ConditionValue = StaticEnum<ELifetimeCondition>()->GetValueByNameString(ReplicationCondition);
+    if (ConditionValue == INDEX_NONE || ConditionValue < 0 || ConditionValue > MAX_uint8)
+    {
+        OutError = {TEXT("invalid_argument"), TEXT("replication_condition is not one exact live lifetime condition")};
+        return false;
+    }
+    if (FinalReplication == TEXT("none") && Metadata->HasField(TEXT("replication_condition")) && ConditionValue != COND_None)
+    {
+        OutError = {TEXT("invalid_argument"), TEXT("Non-replicated variables require condition COND_None")};
+        return false;
+    }
+    if (FinalReplication == TEXT("rep_notify"))
+    {
+        UEdGraph* NotifyGraph = nullptr;
+        if (Blueprint != nullptr)
+        {
+            for (UEdGraph* Candidate : Blueprint->FunctionGraphs)
+            {
+                if (Candidate != nullptr && Candidate->GetName() == RepNotifyFunction) { NotifyGraph = Candidate; break; }
+            }
+        }
+        UK2Node_FunctionEntry* NotifyEntry = FindFunctionEntry(NotifyGraph);
+        TArray<UK2Node_FunctionResult*> NotifyResults;
+        if (NotifyGraph != nullptr) NotifyGraph->GetNodesOfClass(NotifyResults);
+        bool bHasOutputs = false;
+        for (UK2Node_FunctionResult* Result : NotifyResults) bHasOutputs |= Result != nullptr && !Result->UserDefinedPins.IsEmpty();
+        if (NotifyGraph == nullptr || NotifyEntry == nullptr || !IsUserOwnedFunction(Blueprint, NotifyGraph)
+            || !NotifyEntry->UserDefinedPins.IsEmpty() || bHasOutputs || (NotifyEntry->GetFunctionFlags() & FUNC_BlueprintPure) != 0)
+        {
+            OutError = {TEXT("invalid_member"), TEXT("rep_notify_function must identify an impure user-owned function with no parameters or return values")};
+            return false;
+        }
     }
     if (!bApply) return true;
     Variable.Category = FText::FromString(Category);
@@ -783,12 +1154,12 @@ bool ValidateAndApplyMetadata(
     else Variable.RemoveMetaData(FBlueprintMetadata::MD_ExposeOnSpawn);
     if (bPrivate) Variable.SetMetaData(FBlueprintMetadata::MD_Private, TEXT("true"));
     else Variable.RemoveMetaData(FBlueprintMetadata::MD_Private);
-    if (!Replication.IsEmpty())
+    if (!Replication.IsEmpty() || Metadata->HasField(TEXT("rep_notify_function")) || Metadata->HasField(TEXT("replication_condition")))
     {
-        SetPropertyFlag(Variable.PropertyFlags, CPF_Net, Replication == TEXT("replicated"));
-        SetPropertyFlag(Variable.PropertyFlags, CPF_RepNotify, false);
-        Variable.RepNotifyFunc = NAME_None;
-        Variable.ReplicationCondition = COND_None;
+        SetPropertyFlag(Variable.PropertyFlags, CPF_Net, FinalReplication != TEXT("none"));
+        SetPropertyFlag(Variable.PropertyFlags, CPF_RepNotify, FinalReplication == TEXT("rep_notify"));
+        Variable.RepNotifyFunc = FinalReplication == TEXT("rep_notify") ? FName(*RepNotifyFunction) : NAME_None;
+        Variable.ReplicationCondition = FinalReplication == TEXT("none") ? COND_None : static_cast<ELifetimeCondition>(ConditionValue);
     }
     return true;
 }
@@ -821,6 +1192,40 @@ bool ReadInspectedMember(
         return false;
     }
     OutMember = *Record;
+    return true;
+}
+
+
+bool ReadInspectedScopedRecord(
+    FUnrealMCPBlueprintInspector& Inspector,
+    const FString& ObjectPath,
+    const TCHAR* FilterName,
+    const FString& Identity,
+    const TCHAR* Section,
+    TSharedPtr<FJsonObject>& OutRecord,
+    FUnrealMCPError& OutError)
+{
+    const TSharedRef<FJsonObject> Arguments = MakeShared<FJsonObject>();
+    Arguments->SetStringField(TEXT("mode"), TEXT("inspect"));
+    Arguments->SetStringField(TEXT("asset_path"), ObjectPath);
+    Arguments->SetStringField(FilterName, Identity);
+    Arguments->SetArrayField(TEXT("sections"), {MakeShared<FJsonValueString>(Section)});
+    Arguments->SetNumberField(TEXT("page_size"), 1);
+    TSharedPtr<FJsonObject> Inspection;
+    if (!Inspector.Execute(Arguments, Inspection, OutError) || !Inspection.IsValid()) return false;
+    const TArray<TSharedPtr<FJsonValue>>* Records = nullptr;
+    if (!Inspection->TryGetArrayField(TEXT("records"), Records) || Records == nullptr || Records->Num() != 1)
+    {
+        OutError = {TEXT("internal_error"), TEXT("Scoped member read-back did not return one exact record")};
+        return false;
+    }
+    const TSharedPtr<FJsonObject>* Record = nullptr;
+    if (!(*Records)[0].IsValid() || !(*Records)[0]->TryGetObject(Record) || Record == nullptr || !Record->IsValid())
+    {
+        OutError = {TEXT("internal_error"), TEXT("Scoped member read-back returned an invalid record")};
+        return false;
+    }
+    OutRecord = *Record;
     return true;
 }
 }
@@ -1367,6 +1772,14 @@ bool FUnrealMCPBlueprintMutator::MemberEdit(
     FUnrealMCPError& OutError)
 {
     if (!RequireMutationPreconditions(*Arguments, OutError)) return false;
+    FString Target;
+    if (Arguments->TryGetStringField(TEXT("target"), Target))
+    {
+        if (Target == TEXT("function")) return FunctionEdit(Arguments, OutResult, OutError);
+        if (Target == TEXT("local_variable")) return LocalVariableEdit(Arguments, OutResult, OutError);
+        OutError = {TEXT("invalid_argument"), TEXT("target must be function or local_variable when supplied")};
+        return false;
+    }
     FString Operation;
     if (!Arguments->TryGetStringField(TEXT("operation"), Operation))
     {
@@ -1429,6 +1842,11 @@ bool FUnrealMCPBlueprintMutator::MemberEdit(
         if (!Arguments->TryGetStringField(TEXT("name"), Name) || !ValidateMemberName(Blueprint, Name, NAME_None, OutError)
             || !Arguments->TryGetObjectField(TEXT("type"), TypeObject) || TypeObject == nullptr
             || !UnrealMCP::K2TypeCodec::DecodeType(*TypeObject, NewType, OutError)) return false;
+        if (NewType.bIsReference || NewType.bIsConst)
+        {
+            OutError = {TEXT("invalid_argument"), TEXT("Member-variable types cannot be reference or const")};
+            return false;
+        }
         if (Arguments->HasField(TEXT("default")))
         {
             if (!Arguments->TryGetObjectField(TEXT("default"), DefaultObject) || DefaultObject == nullptr
@@ -1440,7 +1858,7 @@ bool FUnrealMCPBlueprintMutator::MemberEdit(
             FBPVariableDescription Preview;
             Preview.VarType = NewType;
             Preview.PropertyFlags = CPF_Edit | CPF_BlueprintVisible | CPF_DisableEditOnInstance;
-            if (!ValidateAndApplyMetadata(Preview, *MetadataObject, false, OutError)) return false;
+            if (!ValidateAndApplyMetadata(Blueprint, Preview, *MetadataObject, false, OutError)) return false;
         }
     }
     else
@@ -1475,13 +1893,6 @@ bool FUnrealMCPBlueprintMutator::MemberEdit(
                 return false;
             }
         }
-        if ((Operation == TEXT("rename") || Operation == TEXT("remove")
-            || (Operation == TEXT("update") && Field == TEXT("type")))
-            && !Variable->RepNotifyFunc.IsNone())
-        {
-            OutError = {TEXT("invalid_member"), TEXT("RepNotify relationships are inspectable but immutable until Phase 6")};
-            return false;
-        }
     }
 
     if (Operation == TEXT("rename"))
@@ -1497,6 +1908,11 @@ bool FUnrealMCPBlueprintMutator::MemberEdit(
                     TEXT("member_id"), TEXT("field"), TEXT("type"), TEXT("policy")})
                 || !Arguments->TryGetObjectField(TEXT("type"), TypeObject) || TypeObject == nullptr
                 || !UnrealMCP::K2TypeCodec::DecodeType(*TypeObject, NewType, OutError)) return false;
+            if (NewType.bIsReference || NewType.bIsConst)
+            {
+                OutError = {TEXT("invalid_argument"), TEXT("Member-variable types cannot be reference or const")};
+                return false;
+            }
             if ((NewType.IsSet() || NewType.IsMap()) && (Variable->PropertyFlags & CPF_Net) != 0)
             {
                 OutError = {TEXT("invalid_member"), TEXT("Replicated members cannot change to a live K2 set or map type")};
@@ -1515,7 +1931,7 @@ bool FUnrealMCPBlueprintMutator::MemberEdit(
             if (!HasOnlyFields(*Arguments, {TEXT("operation_id"), TEXT("asset_path"), TEXT("expected_snapshot"), TEXT("operation"),
                     TEXT("member_id"), TEXT("field"), TEXT("metadata")})
                 || !Arguments->TryGetObjectField(TEXT("metadata"), MetadataObject) || MetadataObject == nullptr
-                || !ValidateAndApplyMetadata(*Variable, *MetadataObject, false, OutError)) return false;
+                || !ValidateAndApplyMetadata(Blueprint, *Variable, *MetadataObject, false, OutError)) return false;
         }
         else
         {
@@ -1533,9 +1949,15 @@ bool FUnrealMCPBlueprintMutator::MemberEdit(
     bool bApplied = false;
     if (Operation == TEXT("rename"))
     {
+        const FScopedTransaction Transaction(FText::FromString(TEXT("Unreal MCP member rename")));
+        Blueprint->Modify();
+        const FName RepNotifyFunction = Variable->RepNotifyFunc;
+        Variable->RepNotifyFunc = NAME_None;
         FBlueprintEditorUtils::RenameMemberVariable(Blueprint, Variable->VarName, FName(*NewName));
         Variable = FindLocalMember(Blueprint, MemberId);
+        if (Variable != nullptr) Variable->RepNotifyFunc = RepNotifyFunction;
         bApplied = Variable != nullptr && Variable->VarName.ToString() == NewName;
+        if (bApplied) FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(Blueprint);
     }
     else
     {
@@ -1548,7 +1970,7 @@ bool FUnrealMCPBlueprintMutator::MemberEdit(
             bApplied = bApplied && Variable != nullptr && Variable->VarGuid.IsValid();
             if (bApplied && MetadataObject != nullptr)
             {
-                bApplied = ValidateAndApplyMetadata(*Variable, *MetadataObject, true, OutError);
+                bApplied = ValidateAndApplyMetadata(Blueprint, *Variable, *MetadataObject, true, OutError);
                 if (bApplied) FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(Blueprint);
             }
             if (bApplied) MemberId = GuidString(Variable->VarGuid);
@@ -1578,7 +2000,7 @@ bool FUnrealMCPBlueprintMutator::MemberEdit(
         }
         else
         {
-            bApplied = ValidateAndApplyMetadata(*Variable, *MetadataObject, true, OutError);
+            bApplied = ValidateAndApplyMetadata(Blueprint, *Variable, *MetadataObject, true, OutError);
             if (bApplied)
             {
                 FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(Blueprint);
@@ -1625,6 +2047,494 @@ bool FUnrealMCPBlueprintMutator::MemberEdit(
     OutResult = BuildEditResult(Blueprint, ObjectPath, Snapshot, Operation, Member,
         Operation == TEXT("add") ? TArray<FString>{MemberId} : TArray<FString>{});
     OutResult->SetObjectField(TEXT("member"), Member);
+    OutResult->SetObjectField(TEXT("reference_summary"), ResultReferences);
+    return true;
+}
+
+bool FUnrealMCPBlueprintMutator::FunctionEdit(
+    const TSharedPtr<FJsonObject>& Arguments,
+    TSharedPtr<FJsonObject>& OutResult,
+    FUnrealMCPError& OutError)
+{
+    FString Operation;
+    FString Target;
+    if (!Arguments->TryGetStringField(TEXT("target"), Target) || Target != TEXT("function")
+        || !Arguments->TryGetStringField(TEXT("operation"), Operation))
+    {
+        OutError = {TEXT("invalid_argument"), TEXT("Function edits require target function and one typed operation")};
+        return false;
+    }
+    TSet<FString> Allowed = {TEXT("operation_id"), TEXT("asset_path"), TEXT("expected_snapshot"), TEXT("target"), TEXT("operation")};
+    if (Operation == TEXT("add")) Allowed.Append({TEXT("name"), TEXT("signature"), TEXT("metadata")});
+    else if (Operation == TEXT("rename")) Allowed.Append({TEXT("function_id"), TEXT("new_name")});
+    else if (Operation == TEXT("update")) Allowed.Append({TEXT("function_id"), TEXT("field"), TEXT("signature"), TEXT("metadata"), TEXT("policy")});
+    else if (Operation == TEXT("remove")) Allowed.Append({TEXT("function_id"), TEXT("policy")});
+    else
+    {
+        OutError = {TEXT("invalid_argument"), TEXT("Unknown function edit operation")};
+        return false;
+    }
+    for (const TPair<FString, TSharedPtr<FJsonValue>>& Pair : Arguments->Values)
+    {
+        if (!Allowed.Contains(Pair.Key))
+        {
+            OutError = {TEXT("invalid_argument"), TEXT("The function edit contains a field not accepted by its operation")};
+            return false;
+        }
+    }
+
+    FString RawAsset;
+    if (!Arguments->TryGetStringField(TEXT("asset_path"), RawAsset))
+    {
+        OutError = {TEXT("invalid_argument"), TEXT("asset_path must identify one exact Blueprint asset")};
+        return false;
+    }
+    const TSharedRef<FJsonObject> AssetOnly = MakeShared<FJsonObject>();
+    AssetOnly->SetStringField(TEXT("asset_path"), RawAsset);
+    UBlueprint* Blueprint = nullptr;
+    FString ObjectPath;
+    FString PackageName;
+    if (!ResolveMutableBlueprint(*AssetOnly, Blueprint, ObjectPath, PackageName, OutError)
+        || !ValidateExpectedSnapshot(Inspector, *Arguments, ObjectPath, OutError)) return false;
+    if (Blueprint->BlueprintType != BPTYPE_Normal)
+    {
+        OutError = {TEXT("unsupported_type"), TEXT("This live Blueprint kind does not support user function editing")};
+        return false;
+    }
+
+    FString FunctionId;
+    FString Name;
+    FString NewName;
+    FString Field;
+    FString Policy;
+    UEdGraph* Graph = nullptr;
+    UK2Node_FunctionEntry* Entry = nullptr;
+    FFunctionSignatureSpec Signature;
+    const TSharedPtr<FJsonObject>* SignatureObject = nullptr;
+    const TSharedPtr<FJsonObject>* MetadataObject = nullptr;
+    TSharedRef<FJsonObject> References = MakeShared<FJsonObject>();
+    References->SetBoolField(TEXT("referenced"), false);
+    References->SetNumberField(TEXT("reference_count"), 0);
+    References->SetBoolField(TEXT("unresolved_references"), false);
+    References->SetBoolField(TEXT("references_truncated"), false);
+    References->SetArrayField(TEXT("references"), {});
+
+    if (Operation == TEXT("add"))
+    {
+        if (!HasOnlyFields(*Arguments, {TEXT("operation_id"), TEXT("asset_path"), TEXT("expected_snapshot"), TEXT("target"), TEXT("operation"),
+                TEXT("name"), TEXT("signature"), TEXT("metadata")})
+            || !Arguments->TryGetStringField(TEXT("name"), Name) || !ValidateMemberName(Blueprint, Name, NAME_None, OutError)
+            || !Arguments->TryGetObjectField(TEXT("signature"), SignatureObject) || SignatureObject == nullptr
+            || !DecodeFunctionSignature(*SignatureObject, Signature, OutError)) return false;
+        if (Arguments->HasField(TEXT("metadata"))
+            && (!Arguments->TryGetObjectField(TEXT("metadata"), MetadataObject) || MetadataObject == nullptr
+                || !ValidateFunctionMetadata(*MetadataObject, OutError))) return false;
+    }
+    else
+    {
+        if (!Arguments->TryGetStringField(TEXT("function_id"), FunctionId)
+            || (Graph = FindLocalFunction(Blueprint, FunctionId)) == nullptr || !IsUserOwnedFunction(Blueprint, Graph)
+            || (Entry = FindFunctionEntry(Graph)) == nullptr)
+        {
+            OutError = {TEXT("stale_precondition"), TEXT("The requested stable user-owned function identity is unavailable")};
+            return false;
+        }
+        Name = Graph->GetName();
+        References = FunctionReferences(Blueprint, Graph);
+        if (Operation == TEXT("rename"))
+        {
+            if (!HasOnlyFields(*Arguments, {TEXT("operation_id"), TEXT("asset_path"), TEXT("expected_snapshot"), TEXT("target"), TEXT("operation"),
+                    TEXT("function_id"), TEXT("new_name")})
+                || !Arguments->TryGetStringField(TEXT("new_name"), NewName) || NewName == Name
+                || !ValidateMemberName(Blueprint, NewName, Graph->GetFName(), OutError)) return false;
+        }
+        else if (Operation == TEXT("update"))
+        {
+            if (!Arguments->TryGetStringField(TEXT("field"), Field))
+            {
+                OutError = {TEXT("invalid_argument"), TEXT("Function update requires field signature or metadata")};
+                return false;
+            }
+            if (Field == TEXT("signature"))
+            {
+                if (!HasOnlyFields(*Arguments, {TEXT("operation_id"), TEXT("asset_path"), TEXT("expected_snapshot"), TEXT("target"), TEXT("operation"),
+                        TEXT("function_id"), TEXT("field"), TEXT("signature"), TEXT("policy")})
+                    || !Arguments->TryGetStringField(TEXT("policy"), Policy) || Policy != TEXT("reject_if_referenced")
+                    || !Arguments->TryGetObjectField(TEXT("signature"), SignatureObject) || SignatureObject == nullptr
+                    || !DecodeFunctionSignature(*SignatureObject, Signature, OutError)) return false;
+                if (References->GetBoolField(TEXT("referenced")))
+                {
+                    OutError = {TEXT("referenced_member"), TEXT("The function is referenced and the reject-only policy forbids a signature change")};
+                    OutError.Details->SetStringField(TEXT("function_id"), FunctionId);
+                    OutError.Details->SetNumberField(TEXT("reference_count"), References->GetNumberField(TEXT("reference_count")));
+                    return false;
+                }
+                bool bRepNotify = false;
+                for (const FBPVariableDescription& Variable : Blueprint->NewVariables) bRepNotify |= Variable.RepNotifyFunc == Graph->GetFName();
+                if (bRepNotify && (Signature.bPure || !Signature.Parameters.IsEmpty()))
+                {
+                    OutError = {TEXT("invalid_member"), TEXT("A RepNotify function must remain impure with no inputs or outputs")};
+                    return false;
+                }
+            }
+            else if (Field == TEXT("metadata"))
+            {
+                if (!HasOnlyFields(*Arguments, {TEXT("operation_id"), TEXT("asset_path"), TEXT("expected_snapshot"), TEXT("target"), TEXT("operation"),
+                        TEXT("function_id"), TEXT("field"), TEXT("metadata")})
+                    || !Arguments->TryGetObjectField(TEXT("metadata"), MetadataObject) || MetadataObject == nullptr
+                    || !ValidateFunctionMetadata(*MetadataObject, OutError)) return false;
+            }
+            else
+            {
+                OutError = {TEXT("invalid_argument"), TEXT("Function update field must be signature or metadata")};
+                return false;
+            }
+        }
+        else if (Operation == TEXT("remove"))
+        {
+            if (!HasOnlyFields(*Arguments, {TEXT("operation_id"), TEXT("asset_path"), TEXT("expected_snapshot"), TEXT("target"), TEXT("operation"),
+                    TEXT("function_id"), TEXT("policy")})
+                || !Arguments->TryGetStringField(TEXT("policy"), Policy) || Policy != TEXT("reject_if_referenced"))
+            {
+                OutError = {TEXT("invalid_argument"), TEXT("Function removal requires policy reject_if_referenced")};
+                return false;
+            }
+            if (References->GetBoolField(TEXT("referenced")))
+            {
+                OutError = {TEXT("referenced_member"), TEXT("The function is referenced and the reject-only policy forbids removal")};
+                OutError.Details->SetStringField(TEXT("function_id"), FunctionId);
+                OutError.Details->SetNumberField(TEXT("reference_count"), References->GetNumberField(TEXT("reference_count")));
+                return false;
+            }
+            for (const FBPVariableDescription& Variable : Blueprint->NewVariables)
+            {
+                if (Variable.RepNotifyFunc == Graph->GetFName())
+                {
+                    OutError = {TEXT("referenced_member"), TEXT("The function is coupled to a RepNotify member and cannot be removed")};
+                    return false;
+                }
+            }
+        }
+    }
+
+    bool bApplied = false;
+    {
+        const FScopedTransaction Transaction(FText::FromString(TEXT("Unreal MCP function edit")));
+        Blueprint->Modify();
+        if (Operation == TEXT("add"))
+        {
+            Graph = FBlueprintEditorUtils::CreateNewGraph(Blueprint, FName(*Name), UEdGraph::StaticClass(), UEdGraphSchema_K2::StaticClass());
+            if (Graph != nullptr)
+            {
+                FBlueprintEditorUtils::AddFunctionGraph<UClass>(Blueprint, Graph, true, nullptr);
+                Entry = FindFunctionEntry(Graph);
+                bApplied = Entry != nullptr && ApplyFunctionSignature(Blueprint, Graph, Signature, OutError);
+                if (bApplied && MetadataObject != nullptr) ApplyFunctionMetadata(Entry, *MetadataObject);
+                if (bApplied)
+                {
+                    FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(Blueprint);
+                    FunctionId = GuidString(Graph->GraphGuid);
+                    bApplied = FunctionId.Len() == 32;
+                }
+            }
+        }
+        else if (Operation == TEXT("rename"))
+        {
+            Graph->Modify();
+            FBlueprintEditorUtils::RenameGraph(Graph, NewName);
+            bApplied = Graph->GetName() == NewName;
+            if (bApplied)
+            {
+                for (FBPVariableDescription& Variable : Blueprint->NewVariables)
+                {
+                    if (Variable.RepNotifyFunc == FName(*Name)) Variable.RepNotifyFunc = FName(*NewName);
+                }
+                FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(Blueprint);
+            }
+        }
+        else if (Operation == TEXT("remove"))
+        {
+            FBlueprintEditorUtils::RemoveGraph(Blueprint, Graph);
+            bApplied = FindLocalFunction(Blueprint, FunctionId) == nullptr;
+        }
+        else if (Field == TEXT("signature"))
+        {
+            Graph->Modify();
+            bApplied = ApplyFunctionSignature(Blueprint, Graph, Signature, OutError);
+        }
+        else
+        {
+            ApplyFunctionMetadata(Entry, *MetadataObject);
+            FBlueprintEditorUtils::MarkBlueprintAsModified(Blueprint);
+            bApplied = true;
+        }
+    }
+    if (!bApplied)
+    {
+        RestoreFailedTransaction(OutError);
+        if (OutError.Code.IsEmpty()) OutError = {TEXT("invalid_member"), TEXT("Unreal rejected the function edit without a committed change")};
+        return false;
+    }
+
+    TSharedPtr<FJsonObject> Function;
+    if (Operation == TEXT("remove"))
+    {
+        Function = MakeShared<FJsonObject>();
+        Function->SetStringField(TEXT("id"), FunctionId);
+        Function->SetStringField(TEXT("name"), Name);
+        Function->SetBoolField(TEXT("removed"), true);
+    }
+    else if (!ReadInspectedScopedRecord(Inspector, ObjectPath, TEXT("function_id"), FunctionId, TEXT("functions"), Function, OutError))
+    {
+        RestoreFailedTransaction(OutError);
+        return false;
+    }
+    FString Snapshot;
+    if (!ReadSnapshot(Inspector, ObjectPath, Snapshot, OutError))
+    {
+        RestoreFailedTransaction(OutError);
+        return false;
+    }
+    OutResult = BuildEditResult(Blueprint, ObjectPath, Snapshot, Operation, Function,
+        Operation == TEXT("add") ? TArray<FString>{FunctionId} : TArray<FString>{});
+    OutResult->SetObjectField(TEXT("function"), Function);
+    OutResult->SetObjectField(TEXT("reference_summary"), Operation == TEXT("remove") ? References : Function->GetObjectField(TEXT("reference_summary")));
+    return true;
+}
+
+bool FUnrealMCPBlueprintMutator::LocalVariableEdit(
+    const TSharedPtr<FJsonObject>& Arguments,
+    TSharedPtr<FJsonObject>& OutResult,
+    FUnrealMCPError& OutError)
+{
+    FString Target;
+    FString Operation;
+    FString FunctionId;
+    if (!Arguments->TryGetStringField(TEXT("target"), Target) || Target != TEXT("local_variable")
+        || !Arguments->TryGetStringField(TEXT("operation"), Operation)
+        || !Arguments->TryGetStringField(TEXT("function_id"), FunctionId))
+    {
+        OutError = {TEXT("invalid_argument"), TEXT("Local-variable edits require a function scope and one typed operation")};
+        return false;
+    }
+    TSet<FString> Allowed = {TEXT("operation_id"), TEXT("asset_path"), TEXT("expected_snapshot"), TEXT("target"), TEXT("operation"), TEXT("function_id")};
+    if (Operation == TEXT("add")) Allowed.Append({TEXT("name"), TEXT("type"), TEXT("default")});
+    else if (Operation == TEXT("rename")) Allowed.Append({TEXT("local_id"), TEXT("new_name")});
+    else if (Operation == TEXT("update")) Allowed.Append({TEXT("local_id"), TEXT("field"), TEXT("type"), TEXT("default"), TEXT("policy")});
+    else if (Operation == TEXT("remove")) Allowed.Append({TEXT("local_id"), TEXT("policy")});
+    else
+    {
+        OutError = {TEXT("invalid_argument"), TEXT("Unknown local-variable edit operation")};
+        return false;
+    }
+    for (const TPair<FString, TSharedPtr<FJsonValue>>& Pair : Arguments->Values)
+    {
+        if (!Allowed.Contains(Pair.Key))
+        {
+            OutError = {TEXT("invalid_argument"), TEXT("The local-variable edit contains a field not accepted by its operation")};
+            return false;
+        }
+    }
+
+    FString RawAsset;
+    if (!Arguments->TryGetStringField(TEXT("asset_path"), RawAsset))
+    {
+        OutError = {TEXT("invalid_argument"), TEXT("asset_path must identify one exact Blueprint asset")};
+        return false;
+    }
+    const TSharedRef<FJsonObject> AssetOnly = MakeShared<FJsonObject>();
+    AssetOnly->SetStringField(TEXT("asset_path"), RawAsset);
+    UBlueprint* Blueprint = nullptr;
+    FString ObjectPath;
+    FString PackageName;
+    if (!ResolveMutableBlueprint(*AssetOnly, Blueprint, ObjectPath, PackageName, OutError)
+        || !ValidateExpectedSnapshot(Inspector, *Arguments, ObjectPath, OutError)) return false;
+    UEdGraph* Graph = FindLocalFunction(Blueprint, FunctionId);
+    UK2Node_FunctionEntry* Entry = FindFunctionEntry(Graph);
+    if (Graph == nullptr || Entry == nullptr || !IsUserOwnedFunction(Blueprint, Graph)
+        || !FBlueprintEditorUtils::DoesSupportLocalVariables(Graph))
+    {
+        OutError = {TEXT("unsupported_type"), TEXT("The requested function does not support editable local variables")};
+        return false;
+    }
+
+    FString LocalId;
+    FString Name;
+    FString NewName;
+    FString Field;
+    FString Policy;
+    FBPVariableDescription* Variable = nullptr;
+    FEdGraphPinType NewType;
+    FString NewDefault;
+    const TSharedPtr<FJsonObject>* TypeObject = nullptr;
+    const TSharedPtr<FJsonObject>* DefaultObject = nullptr;
+    TSharedRef<FJsonObject> References = MakeShared<FJsonObject>();
+    References->SetBoolField(TEXT("referenced"), false);
+    References->SetNumberField(TEXT("reference_count"), 0);
+    References->SetBoolField(TEXT("unresolved_references"), false);
+    References->SetBoolField(TEXT("references_truncated"), false);
+    References->SetArrayField(TEXT("references"), {});
+
+    if (Operation == TEXT("add"))
+    {
+        if (!HasOnlyFields(*Arguments, {TEXT("operation_id"), TEXT("asset_path"), TEXT("expected_snapshot"), TEXT("target"), TEXT("operation"),
+                TEXT("function_id"), TEXT("name"), TEXT("type"), TEXT("default")})
+            || !Arguments->TryGetStringField(TEXT("name"), Name) || !ValidateLocalName(Blueprint, Entry, Name, NAME_None, OutError)
+            || !Arguments->TryGetObjectField(TEXT("type"), TypeObject) || TypeObject == nullptr
+            || !UnrealMCP::K2TypeCodec::DecodeType(*TypeObject, NewType, OutError)) return false;
+        if (NewType.bIsReference || NewType.bIsConst)
+        {
+            OutError = {TEXT("invalid_argument"), TEXT("Local-variable types cannot be reference or const")};
+            return false;
+        }
+        if (Arguments->HasField(TEXT("default"))
+            && (!Arguments->TryGetObjectField(TEXT("default"), DefaultObject) || DefaultObject == nullptr
+                || !UnrealMCP::K2TypeCodec::DecodeDefault(NewType, *DefaultObject, NewDefault, OutError))) return false;
+    }
+    else
+    {
+        if (!Arguments->TryGetStringField(TEXT("local_id"), LocalId) || (Variable = FindLocalById(Entry, LocalId)) == nullptr)
+        {
+            OutError = {TEXT("stale_precondition"), TEXT("The requested stable local-variable identity is unavailable")};
+            return false;
+        }
+        Name = Variable->VarName.ToString();
+        References = LocalReferences(Blueprint, Graph, Variable->VarName);
+        if (Operation == TEXT("rename"))
+        {
+            if (!HasOnlyFields(*Arguments, {TEXT("operation_id"), TEXT("asset_path"), TEXT("expected_snapshot"), TEXT("target"), TEXT("operation"),
+                    TEXT("function_id"), TEXT("local_id"), TEXT("new_name")})
+                || !Arguments->TryGetStringField(TEXT("new_name"), NewName) || NewName == Name
+                || !ValidateLocalName(Blueprint, Entry, NewName, Variable->VarName, OutError)) return false;
+        }
+        else if (Operation == TEXT("update"))
+        {
+            if (!Arguments->TryGetStringField(TEXT("field"), Field) || (Field != TEXT("type") && Field != TEXT("default")))
+            {
+                OutError = {TEXT("invalid_argument"), TEXT("Local-variable update field must be type or default")};
+                return false;
+            }
+            if (Field == TEXT("type"))
+            {
+                if (!HasOnlyFields(*Arguments, {TEXT("operation_id"), TEXT("asset_path"), TEXT("expected_snapshot"), TEXT("target"), TEXT("operation"),
+                        TEXT("function_id"), TEXT("local_id"), TEXT("field"), TEXT("type"), TEXT("policy")})
+                    || !Arguments->TryGetStringField(TEXT("policy"), Policy) || Policy != TEXT("reject_if_referenced")
+                    || !Arguments->TryGetObjectField(TEXT("type"), TypeObject) || TypeObject == nullptr
+                    || !UnrealMCP::K2TypeCodec::DecodeType(*TypeObject, NewType, OutError)) return false;
+                if (NewType.bIsReference || NewType.bIsConst)
+                {
+                    OutError = {TEXT("invalid_argument"), TEXT("Local-variable types cannot be reference or const")};
+                    return false;
+                }
+                if (References->GetBoolField(TEXT("referenced")))
+                {
+                    OutError = {TEXT("referenced_member"), TEXT("The local variable is referenced and the reject-only policy forbids a type change")};
+                    OutError.Details->SetStringField(TEXT("local_id"), LocalId);
+                    return false;
+                }
+            }
+            else if (!HasOnlyFields(*Arguments, {TEXT("operation_id"), TEXT("asset_path"), TEXT("expected_snapshot"), TEXT("target"), TEXT("operation"),
+                    TEXT("function_id"), TEXT("local_id"), TEXT("field"), TEXT("default")})
+                || !Arguments->TryGetObjectField(TEXT("default"), DefaultObject) || DefaultObject == nullptr
+                || !UnrealMCP::K2TypeCodec::DecodeDefault(Variable->VarType, *DefaultObject, NewDefault, OutError)) return false;
+        }
+        else if (Operation == TEXT("remove"))
+        {
+            if (!HasOnlyFields(*Arguments, {TEXT("operation_id"), TEXT("asset_path"), TEXT("expected_snapshot"), TEXT("target"), TEXT("operation"),
+                    TEXT("function_id"), TEXT("local_id"), TEXT("policy")})
+                || !Arguments->TryGetStringField(TEXT("policy"), Policy) || Policy != TEXT("reject_if_referenced"))
+            {
+                OutError = {TEXT("invalid_argument"), TEXT("Local-variable removal requires policy reject_if_referenced")};
+                return false;
+            }
+            if (References->GetBoolField(TEXT("referenced")))
+            {
+                OutError = {TEXT("referenced_member"), TEXT("The local variable is referenced and the reject-only policy forbids removal")};
+                OutError.Details->SetStringField(TEXT("local_id"), LocalId);
+                return false;
+            }
+        }
+    }
+
+    UStruct* Scope = Blueprint->SkeletonGeneratedClass != nullptr
+        ? Blueprint->SkeletonGeneratedClass->FindFunctionByName(Graph->GetFName()) : nullptr;
+    if (Operation != TEXT("add") && Scope == nullptr)
+    {
+        OutError = {TEXT("busy"), TEXT("The live generated function scope is unavailable; compile and inspect before retrying"), MakeShared<FJsonObject>(), true};
+        return false;
+    }
+    bool bApplied = false;
+    {
+        const FScopedTransaction Transaction(FText::FromString(TEXT("Unreal MCP local variable edit")));
+        Blueprint->Modify();
+        Entry->Modify();
+        if (Operation == TEXT("add"))
+        {
+            bApplied = FBlueprintEditorUtils::AddLocalVariable(Blueprint, Graph, FName(*Name), NewType, NewDefault);
+            Variable = FindLocalByName(FindFunctionEntry(Graph), Name);
+            bApplied = bApplied && Variable != nullptr && Variable->VarGuid.IsValid();
+            if (bApplied) LocalId = GuidString(Variable->VarGuid);
+        }
+        else if (Operation == TEXT("rename"))
+        {
+            FBlueprintEditorUtils::RenameLocalVariable(Blueprint, Scope, Variable->VarName, FName(*NewName));
+            Variable = FindLocalById(FindFunctionEntry(Graph), LocalId);
+            bApplied = Variable != nullptr && Variable->VarName == FName(*NewName);
+        }
+        else if (Operation == TEXT("remove"))
+        {
+            FBlueprintEditorUtils::RemoveLocalVariable(Blueprint, Scope, Variable->VarName);
+            bApplied = FindLocalById(FindFunctionEntry(Graph), LocalId) == nullptr;
+        }
+        else if (Field == TEXT("type"))
+        {
+            FBlueprintEditorUtils::ChangeLocalVariableType(Blueprint, Scope, Variable->VarName, NewType);
+            Variable = FindLocalById(FindFunctionEntry(Graph), LocalId);
+            bApplied = Variable != nullptr && Variable->VarType == NewType;
+        }
+        else
+        {
+            Variable->DefaultValue = NewDefault;
+            FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(Blueprint);
+            Variable = FindLocalById(FindFunctionEntry(Graph), LocalId);
+            bApplied = Variable != nullptr && Variable->DefaultValue == NewDefault;
+        }
+    }
+    if (!bApplied)
+    {
+        RestoreFailedTransaction(OutError);
+        if (OutError.Code.IsEmpty()) OutError = {TEXT("invalid_member"), TEXT("Unreal rejected the local-variable edit without a committed change")};
+        return false;
+    }
+
+    TSharedPtr<FJsonObject> Local;
+    TSharedPtr<FJsonObject> ResultReferences = References;
+    if (Operation == TEXT("remove"))
+    {
+        Local = MakeShared<FJsonObject>();
+        Local->SetStringField(TEXT("id"), LocalId);
+        Local->SetStringField(TEXT("name"), Name);
+        Local->SetBoolField(TEXT("removed"), true);
+    }
+    else
+    {
+        if (!ReadInspectedScopedRecord(Inspector, ObjectPath, TEXT("local_id"), LocalId, TEXT("local_variables"), Local, OutError))
+        {
+            RestoreFailedTransaction(OutError);
+            return false;
+        }
+        const TSharedPtr<FJsonObject>* ReadReferences = nullptr;
+        if (Local->TryGetObjectField(TEXT("reference_summary"), ReadReferences) && ReadReferences != nullptr) ResultReferences = *ReadReferences;
+    }
+    FString Snapshot;
+    if (!ReadSnapshot(Inspector, ObjectPath, Snapshot, OutError))
+    {
+        RestoreFailedTransaction(OutError);
+        return false;
+    }
+    OutResult = BuildEditResult(Blueprint, ObjectPath, Snapshot, Operation, Local,
+        Operation == TEXT("add") ? TArray<FString>{LocalId} : TArray<FString>{});
+    OutResult->SetObjectField(TEXT("local_variable"), Local);
     OutResult->SetObjectField(TEXT("reference_summary"), ResultReferences);
     return true;
 }

@@ -33,6 +33,8 @@ _COMPONENT_ID = {
     "pattern": "^[0-9a-f]{32}$",
 }
 _MEMBER_ID = _COMPONENT_ID
+_FUNCTION_ID = _COMPONENT_ID
+_LOCAL_ID = _COMPONENT_ID
 _PROPERTY_VALUE = {
     "oneOf": [
         {"type": "boolean"},
@@ -68,6 +70,8 @@ _K2_TYPE = {
         **_K2_TERMINAL["properties"],
         "container": {"type": "string", "enum": ["none", "array", "set", "map"]},
         "value_type": _K2_TERMINAL,
+        "reference": {"type": "boolean"},
+        "const": {"type": "boolean"},
     },
     "required": ["category", "container"],
     "additionalProperties": False,
@@ -144,7 +148,43 @@ _MEMBER_METADATA = {
         "private": {"type": "boolean"},
         "save_game": {"type": "boolean"},
         "advanced_display": {"type": "boolean"},
-        "replication": {"type": "string", "enum": ["none", "replicated"]},
+        "replication": {"type": "string", "enum": ["none", "replicated", "rep_notify"]},
+        "rep_notify_function": {"type": "string", "minLength": 1, "maxLength": 128},
+        "replication_condition": {"type": "string", "minLength": 1, "maxLength": 64},
+    },
+    "minProperties": 1,
+    "additionalProperties": False,
+}
+
+_FUNCTION_PARAMETER = {
+    "type": "object",
+    "properties": {
+        "name": {"type": "string", "minLength": 1, "maxLength": 128},
+        "direction": {"type": "string", "enum": ["input", "output"]},
+        "type": _K2_TYPE,
+        "default": _K2_DEFAULT,
+    },
+    "required": ["name", "direction", "type"],
+    "additionalProperties": False,
+}
+_FUNCTION_SIGNATURE = {
+    "type": "object",
+    "properties": {
+        "access": {"type": "string", "enum": ["public", "protected", "private"]},
+        "pure": {"type": "boolean"},
+        "const": {"type": "boolean"},
+        "parameters": {"type": "array", "maxItems": 32, "items": _FUNCTION_PARAMETER},
+    },
+    "required": ["access", "pure", "const", "parameters"],
+    "additionalProperties": False,
+}
+_FUNCTION_METADATA = {
+    "type": "object",
+    "properties": {
+        "category": {"type": "string", "maxLength": 128},
+        "tooltip": {"type": "string", "maxLength": 512},
+        "keywords": {"type": "string", "maxLength": 256},
+        "call_in_editor": {"type": "boolean"},
     },
     "minProperties": 1,
     "additionalProperties": False,
@@ -174,6 +214,17 @@ def _member_shape(operation: str, required: list[str], **extra: object) -> dict[
         "type": "object",
         "properties": _mutation_properties(operation={"const": operation}, **extra),
         "required": ["operation_id", "asset_path", "expected_snapshot", "operation", *required],
+        "additionalProperties": False,
+    }
+
+
+def _scoped_member_shape(target: str, operation: str, required: list[str], **extra: object) -> dict[str, object]:
+    return {
+        "type": "object",
+        "properties": _mutation_properties(
+            target={"const": target}, operation={"const": operation}, **extra
+        ),
+        "required": ["operation_id", "asset_path", "expected_snapshot", "target", "operation", *required],
         "additionalProperties": False,
     }
 
@@ -232,18 +283,21 @@ TOOLS: Final = (
                         "sections": {
                             "type": "array",
                             "minItems": 1,
-                            "maxItems": 10,
+                            "maxItems": 13,
                             "items": {
                                 "type": "string",
                                 "enum": [
                                     "summary", "parent_class", "compile_state", "components",
-                                    "class_defaults", "variables", "graphs", "nodes", "pins", "connections",
+                                    "class_defaults", "variables", "functions", "parameters", "local_variables",
+                                    "graphs", "nodes", "pins", "connections",
                                 ],
                             },
                         },
                         "graph_id": _COMPONENT_ID,
                         "component_id": _COMPONENT_ID,
                         "member_id": _MEMBER_ID,
+                        "function_id": _FUNCTION_ID,
+                        "local_id": _LOCAL_ID,
                         "property_names": {
                             "type": "array",
                             "minItems": 1,
@@ -352,7 +406,7 @@ TOOLS: Final = (
     },
     {
         "name": "blueprint_member_edit",
-        "description": "Add, rename, update, or safely remove one typed Actor Blueprint member variable.",
+        "description": "Safely edit one Actor Blueprint member variable, user function shell/signature, or function-local variable.",
         "inputSchema": {
             "oneOf": [
                 _member_shape(
@@ -389,6 +443,69 @@ TOOLS: Final = (
                 _member_shape(
                     "remove", ["member_id", "policy"],
                     member_id=_MEMBER_ID,
+                    policy={"const": "reject_if_referenced"},
+                ),
+                _scoped_member_shape(
+                    "function", "add", ["name", "signature"],
+                    name={"type": "string", "minLength": 1, "maxLength": 128},
+                    signature=_FUNCTION_SIGNATURE,
+                    metadata=_FUNCTION_METADATA,
+                ),
+                _scoped_member_shape(
+                    "function", "rename", ["function_id", "new_name"],
+                    function_id=_FUNCTION_ID,
+                    new_name={"type": "string", "minLength": 1, "maxLength": 128},
+                ),
+                _scoped_member_shape(
+                    "function", "update", ["function_id", "field", "signature", "policy"],
+                    function_id=_FUNCTION_ID,
+                    field={"const": "signature"},
+                    signature=_FUNCTION_SIGNATURE,
+                    policy={"const": "reject_if_referenced"},
+                ),
+                _scoped_member_shape(
+                    "function", "update", ["function_id", "field", "metadata"],
+                    function_id=_FUNCTION_ID,
+                    field={"const": "metadata"},
+                    metadata=_FUNCTION_METADATA,
+                ),
+                _scoped_member_shape(
+                    "function", "remove", ["function_id", "policy"],
+                    function_id=_FUNCTION_ID,
+                    policy={"const": "reject_if_referenced"},
+                ),
+                _scoped_member_shape(
+                    "local_variable", "add", ["function_id", "name", "type"],
+                    function_id=_FUNCTION_ID,
+                    name={"type": "string", "minLength": 1, "maxLength": 128},
+                    type=_K2_TYPE,
+                    default=_K2_DEFAULT,
+                ),
+                _scoped_member_shape(
+                    "local_variable", "rename", ["function_id", "local_id", "new_name"],
+                    function_id=_FUNCTION_ID,
+                    local_id=_LOCAL_ID,
+                    new_name={"type": "string", "minLength": 1, "maxLength": 128},
+                ),
+                _scoped_member_shape(
+                    "local_variable", "update", ["function_id", "local_id", "field", "type", "policy"],
+                    function_id=_FUNCTION_ID,
+                    local_id=_LOCAL_ID,
+                    field={"const": "type"},
+                    type=_K2_TYPE,
+                    policy={"const": "reject_if_referenced"},
+                ),
+                _scoped_member_shape(
+                    "local_variable", "update", ["function_id", "local_id", "field", "default"],
+                    function_id=_FUNCTION_ID,
+                    local_id=_LOCAL_ID,
+                    field={"const": "default"},
+                    default=_K2_DEFAULT,
+                ),
+                _scoped_member_shape(
+                    "local_variable", "remove", ["function_id", "local_id", "policy"],
+                    function_id=_FUNCTION_ID,
+                    local_id=_LOCAL_ID,
                     policy={"const": "reject_if_referenced"},
                 ),
             ]

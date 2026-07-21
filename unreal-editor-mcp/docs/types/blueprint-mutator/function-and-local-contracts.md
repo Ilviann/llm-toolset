@@ -1,0 +1,13 @@
+# Function-signature and local-variable contracts
+
+`blueprint_member_edit` uses `target: "function"` or `target: "local_variable"` for Phase 6 scoped members. Every operation keeps the common operation ID, exact Actor Blueprint asset path, and expected structural snapshot contract.
+
+User functions are selected by the stable 32-character `GraphGuid`. Only locally owned editable function graphs are mutable; inherited functions, parent overrides, and interface implementations remain separately inspectable and read-only. Function `add` creates a function graph with the requested complete signature and preserves its required entry and at least one result node. `rename` preserves the graph identity and updates Unreal function references plus any RepNotify relationship. `remove` and complete-signature `update` require `reject_if_referenced`; no call nodes are deleted or repaired.
+
+A complete signature contains access (`public`, `protected`, or `private`), pure/const flags, and at most 32 ordered parameters. Every parameter has one legal unique name, direction (`input` or `output`), and canonical K2 type. Input parameters may carry tagged defaults; reference inputs cannot. Const parameters must be references. Outputs cannot be reference/const and have no defaults. The mutator validates the whole signature before opening a transaction, applies it to the entry and every result node, reconstructs those required nodes, and verifies exact inspection afterward.
+
+Function metadata updates support category, tooltip, keywords, and call-in-editor. Inspection returns ownership, editability, complete signature, separate parameter records, metadata, required-node identities/counts, RepNotify member relationships, and at most 64 exact call references.
+
+Local variables are scoped by function graph identity and selected by stable `VarGuid`. `add`, identity-preserving `rename`, tagged-default `update`, reject-only type `update`, and reject-only `remove` use Unreal's public local-variable utilities. Local types use the canonical K2 vocabulary but cannot be reference or const. Inspection returns the exact function scope, type/default, ownership/editability, and a bounded scope-aware reference summary.
+
+RepNotify metadata accepts `replication: "rep_notify"`, one exact user-owned notification-function name, and an exact live `ELifetimeCondition` name such as `COND_OwnerOnly`. The notification function must be impure and have no inputs or outputs. Inspection publishes the related function identity and relationship validity. A coupled function cannot gain a parameter/return, become pure, or be removed; renaming it updates the relationship transactionally.
