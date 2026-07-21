@@ -42,7 +42,7 @@ def wait_until_ready(layout: ProjectLayout, process: subprocess.Popen[bytes], de
         try:
             record = read_discovery(layout)
             result = UnrealBridge(layout, timeout=2.0).call("capabilities")
-            if result.get("bridge_ready") is True and record.bridge_version == "0.8.0":
+            if result.get("bridge_ready") is True and record.bridge_version == "0.8.1":
                 return
         except Exception as error:
             last_error = str(error)
@@ -97,7 +97,7 @@ def send_without_reading(layout: ProjectLayout, command: str, arguments: dict[st
         headers={
             "Authorization": "Bearer " + read_token(layout),
             "Content-Type": "application/json",
-            "X-Unreal-MCP-Version": "0.8.0",
+            "X-Unreal-MCP-Version": "0.8.1",
         },
     )
     connection.close()
@@ -254,7 +254,7 @@ def main() -> int:
                 "blueprint_component_edit", "blueprint_default_edit", "blueprint_member_edit",
             ]:
                 raise AssertionError("released command catalog mismatch")
-            if capabilities.get("bridge_version") != "0.8.0" or state.get("bridge_ready") is not True:
+            if capabilities.get("bridge_version") != "0.8.1" or state.get("bridge_ready") is not True:
                 raise AssertionError("capability/state contract mismatch")
             if capabilities.get("features", {}).get("blueprint_mutation") is not True:
                 raise AssertionError("Phase 6 mutation capability is unavailable")

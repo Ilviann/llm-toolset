@@ -1,165 +1,9 @@
 #include "UnrealMCPBlueprintActionCatalog.h"
 
-#include "AssetRegistry/AssetRegistryModule.h"
-#include "AssetRegistry/IAssetRegistry.h"
-#include "BlueprintActionDatabase.h"
-#include "BlueprintActionFilter.h"
-#include "BlueprintFunctionNodeSpawner.h"
-#include "BlueprintVariableNodeSpawner.h"
-#include "Dom/JsonValue.h"
-#include "EdGraph/EdGraph.h"
-#include "EdGraph/EdGraphNode.h"
-#include "EdGraph/EdGraphPin.h"
-#include "Editor.h"
-#include "Engine/Blueprint.h"
-#include "Engine/Selection.h"
-#include "GameFramework/Actor.h"
-#include "HAL/PlatformTime.h"
-#include "K2Node_CallFunction.h"
-#include "K2Node_VariableGet.h"
-#include "K2Node_VariableSet.h"
-#include "EdGraphSchema_K2.h"
-#include "Kismet2/BlueprintEditorUtils.h"
-#include "Misc/PackageName.h"
-#include "Misc/SecureHash.h"
-#include "UnrealMCPBlueprintInspector.h"
-#include "UnrealMCPVersion.h"
-#include "UObject/Package.h"
-#include "UObject/SoftObjectPath.h"
+#include "UnrealMCPBlueprintActionCatalogSupport.h"
+#include "UnrealMCPBlueprintActionCatalogQuery.h"
+#include "UnrealMCPBlueprintActionCatalogScanner.h"
 
-namespace
-{
-bool HasOnlyFields(const FJsonObject& Object, std::initializer_list<const TCHAR*> Allowed)
-{
-    TSet<FString> Names;
-    for (const TCHAR* Name : Allowed) Names.Add(Name);
-    for (const TPair<FString, TSharedPtr<FJsonValue>>& Pair : Object.Values)
-        if (!Names.Contains(Pair.Key)) return false;
-    return true;
-}
-
-FString GuidString(const FGuid& Guid)
-{
-    return Guid.IsValid() ? Guid.ToString(EGuidFormats::Digits).ToLower() : FString();
-}
-
-bool IsGuidString(const FString& Value, int32 Digits)
-{
-    if (Value.Len() != Digits) return false;
-    for (TCHAR Character : Value)
-        if (!FChar::IsHexDigit(Character) || FChar::IsUpper(Character)) return false;
-    return true;
-}
-
-bool NormalizeAssetPath(const FString& Input, FString& OutObjectPath)
-{
-    if (!Input.StartsWith(TEXT("/")) || Input.StartsWith(TEXT("//")) || Input.Contains(TEXT("..")) || Input.Contains(TEXT("\\")))
-        return false;
-    const FString PackageName = FPackageName::ObjectPathToPackageName(Input);
-    if (!FPackageName::IsValidLongPackageName(PackageName, true)) return false;
-    if (Input.Contains(TEXT(".")))
-    {
-        if (!FPackageName::IsValidObjectPath(Input)) return false;
-        OutObjectPath = Input;
-        return true;
-    }
-    const FString AssetName = FPackageName::GetLongPackageAssetName(PackageName);
-    OutObjectPath = PackageName + TEXT(".") + AssetName;
-    return FPackageName::IsValidObjectPath(OutObjectPath);
-}
-
-bool ReadOptionalString(
-    const FJsonObject& Object,
-    const TCHAR* Name,
-    int32 MaxLength,
-    FString& OutValue,
-    FUnrealMCPError& OutError)
-{
-    OutValue.Reset();
-    if (!Object.HasField(Name)) return true;
-    if (!Object.TryGetStringField(Name, OutValue) || OutValue.IsEmpty() || OutValue.Len() > MaxLength)
-    {
-        OutError = {TEXT("invalid_argument"), FString::Printf(TEXT("%s must be a non-empty bounded string"), Name)};
-        return false;
-    }
-    return true;
-}
-
-FString CanonicalOwnerPath(const UClass* OwnerClass, const UBlueprint* Blueprint)
-{
-    if (OwnerClass == nullptr) return FString();
-    if (Blueprint != nullptr && OwnerClass == Blueprint->SkeletonGeneratedClass && Blueprint->GeneratedClass != nullptr)
-        return Blueprint->GeneratedClass->GetPathName();
-    return OwnerClass->GetPathName();
-}
-
-FString QueryDigest(const FString& Material)
-{
-    FTCHARToUTF8 Encoded(*Material);
-    uint8 Digest[FSHA1::DigestSize];
-    FSHA1::HashBuffer(Encoded.Get(), Encoded.Length(), Digest);
-    return BytesToHex(Digest, FSHA1::DigestSize).ToLower();
-}
-
-bool IsCoreFamily(const UBlueprintNodeSpawner* Spawner, FString& OutFamily)
-{
-    if (Cast<UBlueprintFunctionNodeSpawner>(Spawner) != nullptr)
-    {
-        OutFamily = TEXT("function_call");
-        return true;
-    }
-    if (const UBlueprintVariableNodeSpawner* Variable = Cast<UBlueprintVariableNodeSpawner>(Spawner))
-    {
-        const UClass* NodeClass = Variable->NodeClass.Get();
-        if (NodeClass != nullptr && NodeClass->IsChildOf(UK2Node_VariableGet::StaticClass()))
-        {
-            OutFamily = TEXT("variable_get");
-            return true;
-        }
-        if (NodeClass != nullptr && NodeClass->IsChildOf(UK2Node_VariableSet::StaticClass()))
-        {
-            OutFamily = TEXT("variable_set");
-            return true;
-        }
-    }
-    return false;
-}
-
-FString ActionSignature(
-    const FString& Family,
-    const FString& OwnerClass,
-    const FString& MemberName,
-    const UBlueprintNodeSpawner* Spawner)
-{
-    return Family + TEXT("|") + OwnerClass + TEXT("|") + MemberName + TEXT("|")
-        + (Spawner != nullptr && Spawner->NodeClass != nullptr ? Spawner->NodeClass->GetPathName() : FString());
-}
-
-TSharedRef<FJsonObject> MakeResult(
-    const FString& BridgeInstanceId,
-    const FString& AssetPath,
-    const FString& GraphId,
-    const FString& SnapshotId,
-    const TArray<TSharedPtr<FJsonValue>>& Actions,
-    int32 ScannedCount,
-    bool bTruncated,
-    bool bTimedOut,
-    int32 ExpiresInMs)
-{
-    const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-    Result->SetStringField(TEXT("bridge_instance_id"), BridgeInstanceId);
-    Result->SetStringField(TEXT("asset_path"), AssetPath);
-    Result->SetStringField(TEXT("graph_id"), GraphId);
-    Result->SetStringField(TEXT("snapshot_id"), SnapshotId);
-    Result->SetArrayField(TEXT("actions"), Actions);
-    Result->SetNumberField(TEXT("returned_count"), Actions.Num());
-    Result->SetNumberField(TEXT("scanned_count"), ScannedCount);
-    Result->SetBoolField(TEXT("truncated"), bTruncated);
-    Result->SetBoolField(TEXT("timed_out"), bTimedOut);
-    Result->SetNumberField(TEXT("action_expires_in_ms"), ExpiresInMs);
-    return Result;
-}
-}
 
 FUnrealMCPBlueprintActionCatalog::FUnrealMCPBlueprintActionCatalog(
     FUnrealMCPBlueprintInspector& InInspector,
@@ -172,6 +16,7 @@ FUnrealMCPBlueprintActionCatalog::FUnrealMCPBlueprintActionCatalog(
 
 void FUnrealMCPBlueprintActionCatalog::RemoveExpired(double CurrentTime)
 {
+    using namespace UnrealMCP::BlueprintActionCatalogPrivate;
     for (auto It = RetainedActions.CreateIterator(); It; ++It)
         if (It.Value().ExpiresAt <= CurrentTime) It.RemoveCurrent();
     for (auto It = Catalogs.CreateIterator(); It; ++It)
@@ -184,6 +29,7 @@ void FUnrealMCPBlueprintActionCatalog::RemoveExpired(double CurrentTime)
 
 void FUnrealMCPBlueprintActionCatalog::EvictFor(int32 IncomingCount)
 {
+    using namespace UnrealMCP::BlueprintActionCatalogPrivate;
     while (!RetainedActions.IsEmpty() && RetainedActions.Num() + IncomingCount > UnrealMCP::MaxRetainedActions)
     {
         FString OldestId;
@@ -208,6 +54,7 @@ bool FUnrealMCPBlueprintActionCatalog::BuildCachedResult(
     const FCachedCatalog& Cache,
     TSharedPtr<FJsonObject>& OutResult) const
 {
+    using namespace UnrealMCP::BlueprintActionCatalogPrivate;
     TArray<TSharedPtr<FJsonValue>> Actions;
     for (const FString& Id : Cache.ActionIds)
     {
@@ -226,59 +73,19 @@ bool FUnrealMCPBlueprintActionCatalog::Execute(
     TSharedPtr<FJsonObject>& OutResult,
     FUnrealMCPError& OutError)
 {
+    using namespace UnrealMCP::BlueprintActionCatalogPrivate;
     check(IsInGameThread());
-    if (!Arguments.IsValid() || !HasOnlyFields(*Arguments, {TEXT("asset_path"), TEXT("graph_id"), TEXT("expected_snapshot"),
-        TEXT("text"), TEXT("owner_class"), TEXT("function"), TEXT("member"), TEXT("node_family"), TEXT("pin_context"), TEXT("limit")}))
-    {
-        OutError = {TEXT("invalid_argument"), TEXT("Action catalog arguments have an invalid shape")};
-        return false;
-    }
-    FString RawAssetPath;
-    FString AssetPath;
-    FString GraphId;
-    FString ExpectedSnapshot;
-    if (!Arguments->TryGetStringField(TEXT("asset_path"), RawAssetPath) || !NormalizeAssetPath(RawAssetPath, AssetPath)
-        || !Arguments->TryGetStringField(TEXT("graph_id"), GraphId) || !IsGuidString(GraphId, 32)
-        || !Arguments->TryGetStringField(TEXT("expected_snapshot"), ExpectedSnapshot) || !IsGuidString(ExpectedSnapshot, 40))
-    {
-        OutError = {TEXT("invalid_argument"), TEXT("asset_path, graph_id, or expected_snapshot is invalid")};
-        return false;
-    }
-    FString Text;
-    FString OwnerClassFilter;
-    FString FunctionFilter;
-    FString MemberFilter;
-    FString FamilyFilter;
-    if (!ReadOptionalString(*Arguments, TEXT("text"), 128, Text, OutError)
-        || !ReadOptionalString(*Arguments, TEXT("owner_class"), 512, OwnerClassFilter, OutError)
-        || !ReadOptionalString(*Arguments, TEXT("function"), 128, FunctionFilter, OutError)
-        || !ReadOptionalString(*Arguments, TEXT("member"), 128, MemberFilter, OutError)
-        || !ReadOptionalString(*Arguments, TEXT("node_family"), 32, FamilyFilter, OutError)) return false;
-    if (!OwnerClassFilter.IsEmpty() && (!OwnerClassFilter.StartsWith(TEXT("/")) || OwnerClassFilter.Contains(TEXT("..")) || OwnerClassFilter.Contains(TEXT("\\"))))
-    {
-        OutError = {TEXT("invalid_argument"), TEXT("owner_class must be an exact class path")};
-        return false;
-    }
-    if ((!FunctionFilter.IsEmpty() && !MemberFilter.IsEmpty())
-        || (!FunctionFilter.IsEmpty() && !FamilyFilter.IsEmpty() && FamilyFilter != TEXT("function_call"))
-        || (!MemberFilter.IsEmpty() && FamilyFilter == TEXT("function_call"))
-        || (!FamilyFilter.IsEmpty() && FamilyFilter != TEXT("function_call") && FamilyFilter != TEXT("variable_get") && FamilyFilter != TEXT("variable_set")))
-    {
-        OutError = {TEXT("invalid_argument"), TEXT("Function, member, and node-family filters conflict")};
-        return false;
-    }
-    int32 Limit = UnrealMCP::DefaultActionResults;
-    if (Arguments->HasField(TEXT("limit")))
-    {
-        double Number = 0.0;
-        if (!Arguments->TryGetNumberField(TEXT("limit"), Number) || !FMath::IsNearlyEqual(Number, FMath::RoundToDouble(Number))
-            || Number < 1 || Number > UnrealMCP::MaxActionResults)
-        {
-            OutError = {TEXT("invalid_argument"), TEXT("limit is outside the supported range")};
-            return false;
-        }
-        Limit = static_cast<int32>(Number);
-    }
+    FActionCatalogQuery Query;
+    if (!DecodeActionCatalogQuery(Arguments, Query, OutError)) return false;
+    const FString& AssetPath = Query.AssetPath;
+    const FString& GraphId = Query.GraphId;
+    const FString& ExpectedSnapshot = Query.ExpectedSnapshot;
+    const FString& Text = Query.Text;
+    const FString& OwnerClassFilter = Query.OwnerClass;
+    const FString& FunctionFilter = Query.Function;
+    const FString& MemberFilter = Query.Member;
+    const FString& FamilyFilter = Query.Family;
+    const int32 Limit = Query.Limit;
 
     const TSharedRef<FJsonObject> InspectArguments = MakeShared<FJsonObject>();
     InspectArguments->SetStringField(TEXT("mode"), TEXT("inspect"));
@@ -385,96 +192,13 @@ bool FUnrealMCPBlueprintActionCatalog::Execute(
         }
     }
 
-    FBlueprintActionFilter Filter;
-    Filter.Context.Blueprints.Add(Blueprint);
-    Filter.Context.Graphs.Add(Graph);
-    if (ContextPin != nullptr) Filter.Context.Pins.Add(ContextPin);
-    const double StartedAt = ScanNow();
-    FBlueprintActionDatabase& Database = FBlueprintActionDatabase::Get();
-    const FBlueprintActionDatabase::FActionRegistry& RegistryActions = Database.GetAllActions();
-    TArray<TSharedPtr<FJsonObject>> CandidateRecords;
-    TSet<FString> Signatures;
-    int32 ScannedCount = 0;
-    bool bTimedOut = false;
-    bool bScanLimited = false;
-    auto ProcessActions = [&](UObject* ActionOwner, const FBlueprintActionDatabase::FActionList& ActionList)
-    {
-        if (ActionOwner == nullptr) return;
-        for (const UBlueprintNodeSpawner* Spawner : ActionList)
-        {
-            if (++ScannedCount > UnrealMCP::MaxActionScan) { bScanLimited = true; break; }
-            if (ScanNow() - StartedAt > UnrealMCP::ActionScanSeconds) { bTimedOut = true; break; }
-            FString Family;
-            if (Spawner == nullptr || !IsCoreFamily(Spawner, Family) || (!FamilyFilter.IsEmpty() && Family != FamilyFilter)) continue;
-            FBlueprintActionInfo ActionInfo(ActionOwner, Spawner);
-            if (Filter.IsFiltered(ActionInfo)) continue;
-            const UFunction* Function = ActionInfo.GetAssociatedFunction();
-            const FProperty* Property = ActionInfo.GetAssociatedProperty();
-            if (Family == TEXT("function_call") && Function == nullptr) continue;
-            if (Family != TEXT("function_call") && Property == nullptr) continue;
-            const FString MemberName = Function != nullptr ? Function->GetName() : Property->GetName();
-            const UClass* OwnerClass = Function != nullptr ? Function->GetOwnerClass() : Property->GetOwnerClass();
-            const FString OwnerPath = CanonicalOwnerPath(OwnerClass, Blueprint);
-            if (!OwnerClassFilter.IsEmpty() && OwnerPath != OwnerClassFilter) continue;
-            if (!FunctionFilter.IsEmpty() && (Function == nullptr || !MemberName.Equals(FunctionFilter, ESearchCase::IgnoreCase))) continue;
-            if (!MemberFilter.IsEmpty() && (Property == nullptr || !MemberName.Equals(MemberFilter, ESearchCase::IgnoreCase))) continue;
-            const FBlueprintActionUiSpec Ui = Spawner->GetUiSpec(Filter.Context, ActionInfo.GetBindings());
-            const FString Title = Ui.MenuName.ToString().Left(256);
-            if (!Text.IsEmpty() && !Title.Equals(Text, ESearchCase::IgnoreCase) && !MemberName.Equals(Text, ESearchCase::IgnoreCase)) continue;
-            const FString Signature = ActionSignature(Family, OwnerPath, MemberName, Spawner);
-            if (Signatures.Contains(Signature)) continue;
-            Signatures.Add(Signature);
-            const TSharedRef<FJsonObject> Record = MakeShared<FJsonObject>();
-            Record->SetStringField(TEXT("_rebuild_signature"), Signature);
-            Record->SetStringField(TEXT("node_family"), Family);
-            Record->SetStringField(TEXT("title"), Title);
-            Record->SetStringField(TEXT("category"), Ui.Category.ToString().Left(256));
-            Record->SetStringField(TEXT("owner_class"), OwnerPath);
-            Record->SetStringField(TEXT("member_name"), MemberName);
-            Record->SetStringField(TEXT("member_kind"), Function != nullptr ? TEXT("function") : TEXT("variable"));
-            if (Function != nullptr)
-            {
-                Record->SetBoolField(TEXT("pure"), Function->HasAnyFunctionFlags(FUNC_BlueprintPure));
-                Record->SetBoolField(TEXT("static"), Function->HasAnyFunctionFlags(FUNC_Static));
-                Record->SetBoolField(TEXT("const"), Function->HasAnyFunctionFlags(FUNC_Const));
-            }
-            CandidateRecords.Add(Record);
-        }
-    };
-    TSet<FObjectKey> ProcessedOwners;
-    TArray<UObject*> PriorityOwners = {Blueprint, Blueprint->SkeletonGeneratedClass, Blueprint->GeneratedClass};
-    for (UClass* Class = Blueprint->GeneratedClass; Class != nullptr; Class = Class->GetSuperClass()) PriorityOwners.AddUnique(Class);
-    for (UClass* Class = Blueprint->SkeletonGeneratedClass; Class != nullptr; Class = Class->GetSuperClass()) PriorityOwners.AddUnique(Class);
-    for (UObject* Owner : PriorityOwners)
-    {
-        if (Owner == nullptr) continue;
-        const FObjectKey Key(Owner);
-        if (const FBlueprintActionDatabase::FActionList* Actions = RegistryActions.Find(Key))
-        {
-            ProcessedOwners.Add(Key);
-            ProcessActions(Owner, *Actions);
-        }
-        if (bScanLimited || bTimedOut) break;
-    }
-    if (!bScanLimited && !bTimedOut)
-    {
-        for (auto It = RegistryActions.CreateConstIterator(); It; ++It)
-        {
-            if (ProcessedOwners.Contains(It.Key())) continue;
-            ProcessActions(It.Key().ResolveObjectPtr(), It.Value());
-            if (bScanLimited || bTimedOut) break;
-        }
-    }
-    CandidateRecords.Sort([](const TSharedPtr<FJsonObject>& Left, const TSharedPtr<FJsonObject>& Right)
-    {
-        const FString A = Left->GetStringField(TEXT("node_family")) + TEXT("|") + Left->GetStringField(TEXT("owner_class"))
-            + TEXT("|") + Left->GetStringField(TEXT("member_name")) + TEXT("|") + Left->GetStringField(TEXT("title"));
-        const FString B = Right->GetStringField(TEXT("node_family")) + TEXT("|") + Right->GetStringField(TEXT("owner_class"))
-            + TEXT("|") + Right->GetStringField(TEXT("member_name")) + TEXT("|") + Right->GetStringField(TEXT("title"));
-        return A < B;
-    });
-    const bool bResultLimited = CandidateRecords.Num() > Limit;
-    if (CandidateRecords.Num() > Limit) CandidateRecords.SetNum(Limit);
+    FActionScanResult Scan = ScanActions(Blueprint, Graph, ContextPin, Text, OwnerClassFilter,
+        FunctionFilter, MemberFilter, FamilyFilter, Limit, ScanNow);
+    TArray<TSharedPtr<FJsonObject>>& CandidateRecords = Scan.CandidateRecords;
+    const int32 ScannedCount = Scan.ScannedCount;
+    const bool bTimedOut = Scan.bTimedOut;
+    const bool bScanLimited = Scan.bScanLimited;
+    const bool bResultLimited = Scan.bResultLimited;
     if ((Package != nullptr && Package->IsDirty() != bDirtyBefore) || Blueprint->Status != StatusBefore
         || (GEditor != nullptr && GEditor->GetSelectedObjects() != nullptr && GEditor->GetSelectedObjects()->Num() != SelectedObjectsBefore)
         || (GEditor != nullptr && GEditor->GetSelectedActors() != nullptr && GEditor->GetSelectedActors()->Num() != SelectedActorsBefore))

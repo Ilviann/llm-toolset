@@ -2,11 +2,11 @@
 
 ## Ownership
 
-`UnrealMCPBlueprintInspector` owns the read-only `blueprint_inspect` command after the bridge dispatches it to the Game thread. It validates the native argument shape, performs bounded Asset Registry discovery across project-visible content mounts, resolves one exact mounted asset, loads only that requested asset for deep inspection, encodes Blueprint structure, computes structural snapshots, and owns short-lived cursor state.
+`FUnrealMCPBlueprintInspector` remains the read-only `blueprint_inspect` facade and owns only paging/cursor retention plus orchestration into the private builder. `FInspectionQuery` normalizes and validates initial requests. Discovery, overview/component/default, member, function/local, macro, custom-event, and graph collectors feed one bounded record/fingerprint sink so every requested section is emitted from one structural snapshot.
 
 ## Dependency direction
 
-The HTTP bridge owns one inspector and supplies already-authenticated JSON arguments. The inspector depends on the Asset Registry, public Blueprint/SCS/graph APIs, reflected property metadata, the shared property codec, and executable limits. It has no dependency on MCP framing, discovery files, editor UI, transactions, compilation, or package saving. Python publishes the same exact query shapes before forwarding them.
+The HTTP bridge owns one inspector and supplies already-authenticated JSON arguments. The facade depends on the private inspection builder; the builder depends on its normalized query and focused collectors, the Asset Registry, public Blueprint/SCS/graph APIs, reflected property metadata, the shared property/K2 codecs, and the shared typed Blueprint-reference scanner. Collectors never depend on cursor state. The component has no dependency on MCP framing, discovery files, editor UI, transactions, compilation, or package saving.
 
 ## Invariants
 
@@ -19,6 +19,7 @@ The HTTP bridge owns one inspector and supplies already-authenticated JSON argum
 - At most 4,096 structural records, 100 records per page, 32 cursors, and 16 changed component defaults per component are retained or encoded. The shared 256 KiB response bound still applies.
 - Inspection never opens a transaction, compiles, saves, changes selection, or intentionally marks a package dirty. The inspector checks package dirty state and compile status before returning.
 - Variable records expose canonical K2 types/tagged defaults, metadata, ownership/editability, replication and validated mutable RepNotify relationships, plus at most 64 exact loaded graph/node references and an unresolved-reference signal.
+- Variables, functions, locals, macros, and custom events obtain reference summaries from the same typed bounded scanner used by mutation preflight; collectors encode that result only when producing records.
 - Function records distinguish user-owned, inherited, override, and interface functions. Macro records expose pure/impure signatures, metadata, required tunnel identities, graph relationships, and macro-instance references. Custom-event records remain distinct from custom-event overrides, inherited events, and native override events and expose exact event-graph placement. Parameter records preserve order/direction/reference/const/default forms. Local records carry stable GUIDs, exact function scope, type/default, editability, and scope-aware references.
 
 ## Verification

@@ -2,11 +2,11 @@
 
 ## Ownership
 
-`UnrealMCPBlueprintMutator` owns the six released mutation commands after operation admission and Game-thread dispatch. It validates exact native shapes and live preconditions, resolves Actor Blueprint assets plus stable component/member/callable identities, edits the local SCS hierarchy, defaults, typed variables, user functions/locals, macro graphs/tunnels, and event-graph custom-event shells, captures compiler diagnostics, saves without dialogs, cleans up failed unpublished creations, and asks `UnrealMCPBlueprintInspector` for authoritative read-back snapshots.
+`FUnrealMCPBlueprintMutator` remains the bridge-facing facade for the six released mutation commands after operation admission and Game-thread dispatch. Lifecycle/create/compile/save, component/default, member-variable, function, local-variable, macro, and custom-event behavior live in separate `UnrealMCPBlueprintMutator*.cpp` translation units. Private mutation-common and callable-support headers own shared target, scope, snapshot, result, signature, metadata, and read-back helpers without expanding the module API.
 
 ## Dependency direction
 
-The HTTP bridge owns one inspector and constructs the mutator with a reference to it. The mutator depends on public Kismet creation/compiler/member APIs, Subobject Data and SCS APIs, the shared reflected-property and K2 type/default codecs, transactions, package saving, the Asset Registry, mounted-package conversion, project/plugin paths, and platform file metadata. The inspector does not depend on the mutator. Compile and save collaborators are injectable only for deterministic native failure tests; production composition uses the public Unreal implementations.
+The HTTP bridge owns one inspector and constructs the mutator facade with a reference to it. Family units depend inward on the private mutation support layer, shared reflected-property and K2 type/default codecs, and `UnrealMCPBlueprintReferenceScanner`; the inspector does not depend on the mutator. Compile and save collaborators remain injected only through the facade for deterministic native failure tests; production composition uses the public Unreal implementations.
 
 ## Invariants
 
@@ -19,10 +19,11 @@ The HTTP bridge owns one inspector and constructs the mutator with a reference t
 - Component edits add/remove/rename/reparent/set-root/set-property one local editable component by stable ID. Native and inherited components remain inspectable but immutable. Class defaults edit one supported property on the generated CDO.
 - Member edits add, identity-preserving rename, update, or safely remove one local `VarGuid` member. Types/defaults use the canonical K2 codec; metadata and replication are live-validated; type changes and removals use only `reject_if_referenced`.
 - Scoped member edits add/rename/update/remove one user-owned function, local variable, macro, or custom event. Complete signatures are prevalidated; function entry/results, macro tunnels, and custom-event event-graph placement are preserved. Call/macro references reject signature change/removal, and locals use public scope-aware Blueprint utilities.
+- Reference safety uses one typed bounded scanner for member variables, functions, locals, macros, and custom events. Mutation policy reads the typed result directly; JSON reference summaries are created only for returned wire records.
 - RepNotify changes require one valid impure zero-parameter/zero-return user function and live lifetime condition. Coupled signature/removal changes reject; function rename preserves the relationship.
 - Each accepted edit uses one editor transaction, checks its structural snapshot before mutation, verifies the postcondition through authoritative inspection, and explicitly undoes an unexpected failure. Compilation and saving remain separate operations.
 - Every mutation result reports operation identity/state, the exact asset, new snapshot, dirty state, and a concise change record; creation/compile/save also return bounded diagnostics.
 
 ## Verification
 
-Run the Python suite, compile the disposable Editor target, run all `UnrealMCP` Automation Tests, and run the complete cross-process script. Phase 4 covers component/default behavior, Phase 5 variables, Phase 6 functions/locals/RepNotify, and Phase 7 macro/custom-event signatures, tunnel/event-graph restrictions, collisions, reference rejection, Undo/Redo, compile/save, and restart read-back. The cross-process test deliberately loses one component response, reconciles it, then verifies the complete saved authoring contract after restart.
+Run the Python suite, compile the disposable Editor target with normal/adaptive unity and forced unity, run all `UnrealMCP` Automation Tests, and run the complete cross-process script. Phase 4 covers component/default behavior, Phase 5 variables, Phase 6 functions/locals/RepNotify, and Phase 7 macro/custom-event signatures, tunnel/event-graph restrictions, collisions, reference rejection, Undo/Redo, compile/save, and restart read-back. The cross-process test deliberately loses one component response, reconciles it, then verifies the complete saved authoring contract after restart.

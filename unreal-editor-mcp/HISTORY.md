@@ -1,5 +1,13 @@
 # Unreal Editor MCP history
 
+## 0.8.1 — 2026-07-21
+
+- Split the native Blueprint mutator into lifecycle, component/default, member, function, local-variable, macro, and custom-event translation units while preserving its bridge-facing facade and injected compile/save seams.
+- Added one bounded typed Blueprint-reference scanner shared by inspection and mutation decisions, with JSON encoding confined to inspection and mutation result boundaries.
+- Decomposed inspection into a typed normalized query, focused overview/member/callable/macro/custom-event/graph collectors, one snapshot fingerprint flow, and a cursor-only inspector facade.
+- Separated action-catalog query decoding, family classification/scanning, result encoding, and retained-cache orchestration to provide the Phase 10 family extension seam.
+- Split native Automation Tests by phase with shared fixture and argument support, and verified normal/adaptive and forced-unity builds, all native cases, and the cross-process workflow.
+
 ## 0.8.0 — 2026-07-21
 
 - Added read-only `blueprint_action_catalog` for context-valid pure/impure, static/instance function calls and variable get/set actions in one exact Actor Blueprint graph snapshot.

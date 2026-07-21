@@ -21,7 +21,7 @@ bool IsOperationId(const FString& Value)
     return true;
 }
 
-FString Quote(const FString& Value)
+FString QuoteJsonString(const FString& Value)
 {
     FString Output;
     const TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Output);
@@ -43,7 +43,7 @@ FString CanonicalObject(const TSharedPtr<FJsonObject>& Object)
     Fields.Reserve(Values.Num());
     for (const auto& Pair : Values)
     {
-        Fields.Add(Quote(Pair.Key) + TEXT(":") + CanonicalValue(Pair.Value));
+        Fields.Add(QuoteJsonString(Pair.Key) + TEXT(":") + CanonicalValue(Pair.Value));
     }
     return TEXT("{") + FString::Join(Fields, TEXT(",")) + TEXT("}");
 }
@@ -54,7 +54,7 @@ FString CanonicalValue(const TSharedPtr<FJsonValue>& Value)
     switch (Value->Type)
     {
     case EJson::Null: return TEXT("null");
-    case EJson::String: return Quote(Value->AsString());
+    case EJson::String: return QuoteJsonString(Value->AsString());
     case EJson::Boolean: return Value->AsBool() ? TEXT("true") : TEXT("false");
     case EJson::Number: return FString::Printf(TEXT("%.17g"), Value->AsNumber());
     case EJson::Object: return CanonicalObject(Value->AsObject());

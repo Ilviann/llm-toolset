@@ -6,7 +6,9 @@
 
 ## Native boundary
 
-`Private/Tests/UnrealMCPAutomationTests.cpp` compiles into development Editor builds. Seven `UnrealMCP.Phase1` cases cover the authenticated foundation. Three `UnrealMCP.Phase2` cases cover inspection. Three `UnrealMCP.Phase3` cases cover creation. Three `UnrealMCP.Phase4` cases cover the ledger, property codec, and components/defaults. Two `UnrealMCP.Phase5` cases cover K2 types and variables. `UnrealMCP.Phase6.FunctionsAndLocals` covers functions, locals, and RepNotify. `UnrealMCP.Phase7.MacrosAndCustomEvents` covers signatures, metadata, tunnels, event-graph restrictions, collisions, references, Undo/Redo, compile, and save. `UnrealMCP.Phase8.ActionCatalog` covers action families, context filters, limits, identity invalidation, and non-mutation. `UnrealMCPApiProbe.cpp` makes public-header compatibility a normal compilation requirement. Run all 21 cases through `scripts/run_headless_integration.py --automation-only`.
+`Private/Tests/UnrealMCPAutomationTestSupport.h` owns shared fixture construction, argument builders, inspection helpers, snapshot tracking, save support, and cleanup conventions. `UnrealMCPAutomationTestsPhase1.cpp` through `Phase8.cpp` contain the independently registered cases under their existing `UnrealMCP.PhaseN` filters. Seven Phase 1 cases cover the authenticated foundation; three Phase 2 inspection; three Phase 3 creation; three Phase 4 ledger/property/component-default; two Phase 5 K2/member; and the focused Phase 6, 7, and 8 scenarios cover functions/locals/RepNotify, macros/custom events, and action catalog behavior. `UnrealMCPApiProbe.cpp` keeps public-header compatibility a normal compilation requirement. Run all 21 cases through `scripts/run_headless_integration.py --automation-only`.
+
+Normal/adaptive and forced-unity module builds are both required. Private implementation headers include their explicit Unreal dependencies, use named internal namespaces, and remain valid when Unreal Build Tool combines family translation units.
 
 ## Cross-process boundary
 

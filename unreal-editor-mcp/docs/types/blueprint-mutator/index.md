@@ -7,3 +7,4 @@
 - [`member-variable-contracts.md`](member-variable-contracts.md) — stable member identities, operations, metadata, replication, references, and reject-only safety.
 - [`function-and-local-contracts.md`](function-and-local-contracts.md) — user-function ownership, complete signatures, required nodes, locals, RepNotify coupling, and reject-only reference safety.
 - [`macro-and-custom-event-contracts.md`](macro-and-custom-event-contracts.md) — macro tunnels/signatures and event-graph-bound custom-event shells, identities, metadata, ownership, and reject-only reference safety.
+- [`blueprint-reference-scanner.md`](blueprint-reference-scanner.md) — typed bounded variable/function/local/macro/custom-event reference scans shared by inspection and mutation.

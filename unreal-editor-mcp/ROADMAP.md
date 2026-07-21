@@ -5,7 +5,7 @@
 - [x] [Phase 6 — Function signatures and local variables](docs/todo/phase-06.md) — Add function signatures, function shells, and local variables.
 - [x] [Phase 7 — Macros and custom events](docs/todo/phase-07.md) — Add macro and custom-event shells with matching inspection.
 - [x] [Phase 8 — Action-catalog infrastructure and core actions](docs/todo/phase-08.md) — Add the bounded action-catalog infrastructure and core actions.
-- [ ] [Phase 9 — C++ architecture and test decomposition](docs/todo/phase-09.md) — Split oversized native components and Automation Tests along cohesive internal boundaries without changing behavior.
+- [x] [Phase 9 — C++ architecture and test decomposition](docs/todo/phase-09.md) — Split oversized native components and Automation Tests along cohesive internal boundaries without changing behavior.
 - [ ] [Phase 10 — Expanded action-catalog families](docs/todo/phase-10.md) — Expand the action catalog to the remaining supported action families.
 - [ ] [Phase 11 — Graph-node lifecycle](docs/todo/phase-11.md) — Add transactional graph-node creation, movement, and removal.
 - [ ] [Phase 12 — Pin defaults and direct connections](docs/todo/phase-12.md) — Add pin defaults and direct graph connections without automatic conversion.

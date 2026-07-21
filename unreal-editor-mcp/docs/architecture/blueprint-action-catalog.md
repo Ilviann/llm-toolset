@@ -2,11 +2,11 @@
 
 ## Ownership
 
-`UnrealMCPBlueprintActionCatalog` owns the read-only `blueprint_action_catalog` command after Game-thread dispatch. It resolves one exact Actor Blueprint graph and structural snapshot, scans Unreal's public `FBlueprintActionDatabase`, applies a live `FBlueprintActionFilter` for the Blueprint, graph, and optional pin, and returns only supported function-call and variable get/set spawners. The target Blueprint and its class hierarchy are scanned first so useful local and inherited actions remain available within the global scan budget.
+`FUnrealMCPBlueprintActionCatalog` remains the read-only `blueprint_action_catalog` facade after Game-thread dispatch. A typed query decoder owns exact filter normalization, a focused scanner owns target-first database traversal plus family classification/record encoding, and the facade owns live Blueprint/graph/pin resolution plus retained catalog/action identity. The scanner currently releases only function-call and variable get/set families; its classifier is the focused Phase 10 extension point.
 
 ## Dependency direction
 
-The editor bridge constructs the catalog with the bridge-instance identity and shared inspector. The inspector supplies the authoritative structural snapshot. The catalog depends on public Blueprint action database/filter/spawner APIs and live K2 graph objects; it does not depend on the mutator, transactions, compilation, saving, selection, or editor UI.
+The editor bridge constructs the catalog facade with the bridge-instance identity and shared inspector. The inspector supplies the authoritative structural snapshot. Query decoding has no live-object dependency; live resolution precedes scanning; scanning depends on public Blueprint action database/filter/spawner APIs and resolved K2 context; retained-cache management consumes encoded candidate records. The catalog does not depend on the mutator, transactions, compilation, saving, selection, or editor UI.
 
 ## Invariants
 
