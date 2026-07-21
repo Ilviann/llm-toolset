@@ -1,25 +1,24 @@
-# Phase 19 — Event, custom-event, and macro replacement
+# Phase 19 — Optional configured editor launch
 
-**Outcome:** Agents can replace one complete supported event implementation, custom-event handler, or user-owned macro while preserving unrelated Blueprint content.
+**Outcome:** Agents can opt in to launching only the configured Unreal project/editor instance and wait for its exact authenticated bridge.
 
 ### Implementation
 
-- Extend `blueprint_block_replace` to one user-owned macro, one custom-event handler, or one event-rooted implementation with bounded declared external links.
-- Define ownership and boundary rules for event roots, custom events, macro tunnels, locals, latent nodes, and allowed external data or control links.
-- Reuse the Phase 18 scratch preflight, compilation, fingerprint, operation reconciliation, transaction, rollback, and preservation engine without introducing family-specific mutation paths.
-- Preserve unrelated graphs, nodes, variables, metadata, links, positions, bookmarks, comments, and prior dirty state.
-- Continue requiring explicit positions for changed nodes. Automatic layout remains unsupported until Phase 20.
+- Add the single `editor_lifecycle` tool only in opt-in large mode with a typed `launch` operation. Keep normal state reporting in the existing editor-state surface.
+- Accept no executable path, project path, environment variable, or arbitrary process argument from the model. Configure and validate absolute editor and `.uproject` paths at MCP startup and expose only bounded availability information.
+- Launch one detached configured editor instance through narrow platform adapters.
+- Detect the exact project-specific authenticated bridge and distinguish `starting`, `ready`, `already_running`, cancelled, timed out, and failed startup.
+- Bound concurrent launches, startup duration, retained results, discovery work, diagnostics, and child-process cleanup.
 
 ### Verification
 
-- Replace representative event implementations, macros, and custom-event handlers with internal and declared external links.
-- Test invalid boundaries, cycles, latent nodes, locals, macro tunnels, stale snapshots, expired actions, compile failure, timeout, lost response, rollback, undo/redo, save/reload, and unchanged-content fingerprints.
-- Prove scratch preflight/live parity and exact restoration for every added logic-unit family.
-- Run the complete replacement and preservation suites natively on macOS and Windows.
+- Test missing and malformed configuration, paths with spaces, another project or process on the port, repeated launches, version mismatch, timeout, cancellation, and abnormal startup.
+- Run launch, readiness, cancellation, and recovery natively on macOS and Windows. Unit test Linux command construction without claiming native support.
+- Prove the model cannot substitute executables, projects, environment values, shell fragments, or arbitrary arguments.
 
 ### Documentation and completion gate
 
-- Document logic-unit ownership, boundary links, macro tunnels, event-root rules, explicit positions, preservation guarantees, limits, and recovery.
-- Complete the phase only when unrelated-content fingerprints remain stable across all supported logic-unit families on both native platforms.
+- Document opt-in launch configuration, platform paths, states, cancellation, recovery, limits, and default-mode exclusion.
+- Complete the phase only when configured launch reaches the exact authenticated bridge without arbitrary process execution on native macOS and Windows.
 
 [Back to roadmap](../../ROADMAP.md) · [Shared roadmap contracts](index.md)

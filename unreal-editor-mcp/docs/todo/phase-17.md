@@ -1,23 +1,25 @@
-# Phase 17 — GameInstance family
+# Phase 17 — Event, custom-event, and macro replacement
 
-**Outcome:** The established workflow supports UObject-based GameInstance Blueprints without weakening Actor-family restrictions or assuming component support.
+**Outcome:** Agents can replace one complete supported event implementation, custom-event handler, or user-owned macro while preserving unrelated Blueprint content.
 
 ### Implementation
 
-- Add the `UGameInstance` family through the Phase 16 family-policy and capability-matrix contracts.
-- Evaluate live GameInstance capabilities for defaults, components, event graphs, local variables, overrides, graph types, and supported actions. Reject component operations and every other unsupported operation before mutation.
-- Reuse inspection, class defaults, members, action catalog, graph editing, compile, save, diagnostics, operation reconciliation, and security contracts without introducing a separate mutation path.
-- Add GameInstance-specific default properties, callbacks, override functions, and graph-action coverage. Keep every output family-aware.
+- Extend `blueprint_block_replace` to one user-owned macro, one custom-event handler, or one event-rooted implementation with bounded declared external links.
+- Define ownership and boundary rules for event roots, custom events, macro tunnels, locals, latent nodes, and allowed external data or control links.
+- Reuse the Phase 16 scratch preflight, compilation, fingerprint, operation reconciliation, transaction, rollback, and preservation engine without introducing family-specific mutation paths.
+- Preserve unrelated graphs, nodes, variables, metadata, links, positions, bookmarks, comments, and prior dirty state.
+- Continue requiring explicit positions for changed nodes. Automatic layout remains unsupported until Phase 18.
 
 ### Verification
 
-- Create, inspect, edit defaults and logic, compile, save, restart, and read back representative GameInstance Blueprints.
-- Test callbacks, inherited functions, class defaults, explicit component-operation rejection, local-variable and graph capabilities, parent changes outside scope, and manual project-settings assignment.
-- Run the complete shared and GameInstance-specific suites natively on macOS and Windows and require identical normal model-facing contracts.
+- Replace representative event implementations, macros, and custom-event handlers with internal and declared external links.
+- Test invalid boundaries, cycles, latent nodes, locals, macro tunnels, stale snapshots, expired actions, compile failure, timeout, lost response, rollback, undo/redo, save/reload, and unchanged-content fingerprints.
+- Prove scratch preflight/live parity and exact restoration for every added logic-unit family.
+- Run the complete replacement and preservation suites natively on macOS and Windows.
 
 ### Documentation and completion gate
 
-- Document GameInstance capabilities, component differences, default-property use cases, callbacks, and focused examples. Do not add project-settings mutation.
-- Complete the phase only when GameInstance passes the shared contract and its family-specific restrictions on both native platforms.
+- Document logic-unit ownership, boundary links, macro tunnels, event-root rules, explicit positions, preservation guarantees, limits, and recovery.
+- Complete the phase only when unrelated-content fingerprints remain stable across all supported logic-unit families on both native platforms.
 
 [Back to roadmap](../../ROADMAP.md) · [Shared roadmap contracts](index.md)

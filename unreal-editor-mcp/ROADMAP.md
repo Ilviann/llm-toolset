@@ -10,16 +10,13 @@
 - [x] [Phase 11 — Graph-node lifecycle](docs/todo/phase-11.md) — Add transactional graph-node creation, movement, and removal.
 - [x] [Phase 12 — Pin defaults and direct connections](docs/todo/phase-12.md) — Add pin defaults and direct graph connections without automatic conversion.
 - [ ] [Phase 13 — Wildcards, conversions, and complete atomic graph editing](docs/todo/phase-13.md) — Add wildcard specialization, explicit conversion insertion, and complete atomic graph editing.
-- [ ] [Phase 14 — Actor workflow hardening on macOS](docs/todo/phase-14.md) — Harden the complete Actor workflow natively on macOS.
-- [ ] [Phase 15 — Native Windows Actor beta](docs/todo/phase-15.md) — Qualify and publish the Actor Blueprint beta on native Windows.
-- [ ] [Phase 16 — GameMode and GameState families](docs/todo/phase-16.md) — Formalize GameMode and GameState family support.
-- [ ] [Phase 17 — GameInstance family](docs/todo/phase-17.md) — Add GameInstance family support.
-- [ ] [Phase 18 — Complete function replacement](docs/todo/phase-18.md) — Add transactional replacement of one complete user-owned function.
-- [ ] [Phase 19 — Event, custom-event, and macro replacement](docs/todo/phase-19.md) — Extend bounded replacement to events, custom events, and macros.
-- [ ] [Phase 20 — Deterministic changed-node layout](docs/todo/phase-20.md) — Add deterministic layout for changed nodes.
-- [ ] [Phase 21 — Cross-platform qualification and stable release](docs/todo/phase-21.md) — Complete cross-platform qualification and publish the first stable-tagged release.
-- [ ] [Phase 22 — Optional configured editor launch](docs/todo/phase-22.md) — Add optional configured editor launch.
-- [ ] [Phase 23 — Optional graceful editor shutdown](docs/todo/phase-23.md) — Add optional graceful editor shutdown.
-- [ ] [Phase 24 — Optional durable editor restart](docs/todo/phase-24.md) — Add optional durable editor restart.
-- [ ] [Phase 25 — Optional editor-offline project-file generation](docs/todo/phase-25.md) — Add optional editor-offline project-file generation.
-- [ ] [Phase 26 — Optional editor-target builds](docs/todo/phase-26.md) — Add optional editor-target builds.
+- [ ] [Phase 14 — GameMode and GameState families](docs/todo/phase-14.md) — Formalize GameMode and GameState family support.
+- [ ] [Phase 15 — GameInstance family](docs/todo/phase-15.md) — Add GameInstance family support.
+- [ ] [Phase 16 — Complete function replacement](docs/todo/phase-16.md) — Add transactional replacement of one complete user-owned function.
+- [ ] [Phase 17 — Event, custom-event, and macro replacement](docs/todo/phase-17.md) — Extend bounded replacement to events, custom events, and macros.
+- [ ] [Phase 18 — Deterministic changed-node layout](docs/todo/phase-18.md) — Add deterministic layout for changed nodes.
+- [ ] [Phase 19 — Optional configured editor launch](docs/todo/phase-19.md) — Add optional configured editor launch.
+- [ ] [Phase 20 — Optional graceful editor shutdown](docs/todo/phase-20.md) — Add optional graceful editor shutdown.
+- [ ] [Phase 21 — Optional durable editor restart](docs/todo/phase-21.md) — Add optional durable editor restart.
+- [ ] [Phase 22 — Optional editor-offline project-file generation](docs/todo/phase-22.md) — Add optional editor-offline project-file generation.
+- [ ] [Phase 23 — Optional editor-target builds](docs/todo/phase-23.md) — Add optional editor-target builds.

@@ -4,7 +4,7 @@ This directory contains the detailed implementation, verification, documentation
 
 ## Roadmap workflow
 
-The target is Unreal Engine 5.8 and newer. macOS remains the primary development host. Native Windows validation begins with the Actor beta and becomes a release gate for every later feature phase. Linux remains source-portable with unit-tested platform branches until a native host is available.
+The target is Unreal Engine 5.8 and newer. macOS remains the primary development host. Platform validation belongs to each applicable feature phase rather than separate roadmap phases. Linux remains source-portable with unit-tested platform branches until a native host is available.
 
 Keep the authoritative checklist in [`ROADMAP.md`](../../ROADMAP.md) synchronized one-for-one with the phase documents below. Complete phases in order unless a phase explicitly permits parallel platform validation. Every phase must include implementation, tests, documentation, examples, and a releasable completion gate.
 
@@ -20,19 +20,16 @@ Keep the authoritative checklist in [`ROADMAP.md`](../../ROADMAP.md) synchronize
 - [Phase 11 — Graph-node lifecycle](phase-11.md) — Add transactional graph-node creation, movement, and removal.
 - [Phase 12 — Pin defaults and direct connections](phase-12.md) — Add pin defaults and direct graph connections without automatic conversion.
 - [Phase 13 — Wildcards, conversions, and complete atomic graph editing](phase-13.md) — Add wildcard specialization, explicit conversion insertion, and complete atomic graph editing.
-- [Phase 14 — Actor workflow hardening on macOS](phase-14.md) — Harden the complete Actor workflow natively on macOS.
-- [Phase 15 — Native Windows Actor beta](phase-15.md) — Qualify and publish the Actor Blueprint beta on native Windows.
-- [Phase 16 — GameMode and GameState families](phase-16.md) — Formalize GameMode and GameState family support.
-- [Phase 17 — GameInstance family](phase-17.md) — Add GameInstance family support.
-- [Phase 18 — Complete function replacement](phase-18.md) — Add transactional replacement of one complete user-owned function.
-- [Phase 19 — Event, custom-event, and macro replacement](phase-19.md) — Extend bounded replacement to events, custom events, and macros.
-- [Phase 20 — Deterministic changed-node layout](phase-20.md) — Add deterministic layout for changed nodes.
-- [Phase 21 — Cross-platform qualification and stable release](phase-21.md) — Complete cross-platform qualification and publish the first stable-tagged release.
-- [Phase 22 — Optional configured editor launch](phase-22.md) — Add optional configured editor launch.
-- [Phase 23 — Optional graceful editor shutdown](phase-23.md) — Add optional graceful editor shutdown.
-- [Phase 24 — Optional durable editor restart](phase-24.md) — Add optional durable editor restart.
-- [Phase 25 — Optional editor-offline project-file generation](phase-25.md) — Add optional editor-offline project-file generation.
-- [Phase 26 — Optional editor-target builds](phase-26.md) — Add optional editor-target builds.
+- [Phase 14 — GameMode and GameState families](phase-14.md) — Formalize GameMode and GameState family support.
+- [Phase 15 — GameInstance family](phase-15.md) — Add GameInstance family support.
+- [Phase 16 — Complete function replacement](phase-16.md) — Add transactional replacement of one complete user-owned function.
+- [Phase 17 — Event, custom-event, and macro replacement](phase-17.md) — Extend bounded replacement to events, custom events, and macros.
+- [Phase 18 — Deterministic changed-node layout](phase-18.md) — Add deterministic layout for changed nodes.
+- [Phase 19 — Optional configured editor launch](phase-19.md) — Add optional configured editor launch.
+- [Phase 20 — Optional graceful editor shutdown](phase-20.md) — Add optional graceful editor shutdown.
+- [Phase 21 — Optional durable editor restart](phase-21.md) — Add optional durable editor restart.
+- [Phase 22 — Optional editor-offline project-file generation](phase-22.md) — Add optional editor-offline project-file generation.
+- [Phase 23 — Optional editor-target builds](phase-23.md) — Add optional editor-target builds.
 
 ## Shared roadmap contracts
 
@@ -59,9 +56,9 @@ Keep the public surface compact. Add typed operations to these remaining tool fa
 | `blueprint_member_edit` | 5 | Perform one typed variable, function, macro, or custom-event mutation |
 | `blueprint_action_catalog` | 8 | Discover a bounded set of context-valid graph actions without mutation |
 | `blueprint_graph_edit` | 11 | Perform one typed node, pin, connection, position, or removal mutation |
-| `blueprint_block_replace` | 18 | Replace one complete bounded logic unit as a prevalidated transaction |
-| `editor_lifecycle` | 22 | Run one opt-in configured launch, restart, or graceful-shutdown operation |
-| `project_build` | 25 | Run one opt-in configured project-generation or editor-target build operation |
+| `blueprint_block_replace` | 16 | Replace one complete bounded logic unit as a prevalidated transaction |
+| `editor_lifecycle` | 19 | Run one opt-in configured launch, restart, or graceful-shutdown operation |
+| `project_build` | 22 | Run one opt-in configured project-generation or editor-target build operation |
 
 Lifecycle and build tools remain absent from the default model context. Use an opt-in large mode for them. Measure the Blueprint schemas and use nested operation discriminators if context cost becomes excessive; the default mode must still support the complete Blueprint-authoring workflow.
 
@@ -103,7 +100,7 @@ Increment the minor version after each completed feature phase and the patch ver
 
 The following are not part of the committed remaining roadmap unless separately authorized:
 
-- Arbitrary selected-region block replacement beyond the complete logic-unit boundaries supported in Phases 18 and 19.
+- Arbitrary selected-region block replacement beyond the complete logic-unit boundaries supported in Phases 16 and 17.
 - General filesystem access or C++ source modification.
 - Arbitrary shell commands, compiler arguments, console commands, UObject calls, unrestricted reflection mutation, expressions, or supplied-code evaluation.
 - Unrestricted whole-Blueprint text import/export or wholesale Blueprint replacement.

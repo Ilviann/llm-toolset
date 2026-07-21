@@ -1,25 +1,23 @@
-# Phase 15 — Native Windows Actor beta
+# Phase 15 — GameInstance family
 
-**Outcome:** The hardened Actor Blueprint workflow passes its first native Windows qualification and is ready for a supervised cross-platform beta.
-
-Native Windows build preparation and environment setup may proceed in parallel with late Phase 14 work after the model-facing contracts from Phase 13 are frozen. Qualification and release remain ordered after Phase 14.
+**Outcome:** The established workflow supports UObject-based GameInstance Blueprints without weakening Actor-family restrictions or assuming component support.
 
 ### Implementation
 
-- Build the plugin and run the complete Actor acceptance workflow on native Windows.
-- Fix only source-evidenced platform differences behind narrow compatibility or platform adapters with tests.
-- Keep published schemas, errors, limits, operation semantics, Blueprint results, and exact Python/plugin matching identical across macOS and Windows.
-- Add Windows setup and troubleshooting material without weakening the offline-first or security contracts.
+- Add the `UGameInstance` family through the Phase 14 family-policy and capability-matrix contracts.
+- Evaluate live GameInstance capabilities for defaults, components, event graphs, local variables, overrides, graph types, and supported actions. Reject component operations and every other unsupported operation before mutation.
+- Reuse inspection, class defaults, members, action catalog, graph editing, compile, save, diagnostics, operation reconciliation, and security contracts without introducing a separate mutation path.
+- Add GameInstance-specific default properties, callbacks, override functions, and graph-action coverage. Keep every output family-aware.
 
 ### Verification
 
-- On native Windows, verify credentials and permissions, loopback binding, discovery, paths and casing, plugin loading, Game-thread dispatch, component/member/graph transactions, compilation, saving, restart read-back, and exact model-facing contracts.
-- Run the complete Python, Unreal Automation, cross-process, clean-project, and existing-Blueprint beta suites.
-- Record peak request/response bytes, retained state, startup time, schema size, and typical operation latency on the Windows qualification host and compare them with the macOS baseline.
+- Create, inspect, edit defaults and logic, compile, save, restart, and read back representative GameInstance Blueprints.
+- Test callbacks, inherited functions, class defaults, explicit component-operation rejection, local-variable and graph capabilities, parent changes outside scope, and manual project-settings assignment.
+- Run the complete shared and GameInstance-specific suites natively on macOS and Windows and require identical normal model-facing contracts.
 
 ### Documentation and completion gate
 
-- Complete Windows installation, configuration, troubleshooting, limits, recovery, and end-to-end workflow documentation.
-- Publish the Actor Blueprint beta only when the native macOS acceptance workflows remain green and the defined native Windows beta suite passes.
+- Document GameInstance capabilities, component differences, default-property use cases, callbacks, and focused examples. Do not add project-settings mutation.
+- Complete the phase only when GameInstance passes the shared contract and its family-specific restrictions on both native platforms.
 
 [Back to roadmap](../../ROADMAP.md) · [Shared roadmap contracts](index.md)

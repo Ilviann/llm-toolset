@@ -1,23 +1,23 @@
-# Phase 20 — Deterministic changed-node layout
+# Phase 20 — Optional graceful editor shutdown
 
-**Outcome:** Block replacement can lay out changed nodes predictably without moving or otherwise altering untouched Blueprint content.
+**Outcome:** Agents can opt in to gracefully shutting down only the configured authenticated editor instance without forced termination or data loss.
 
 ### Implementation
 
-- Add a deterministic bounded layout option to `blueprint_block_replace`; keep explicit caller-supplied positions supported.
-- Lay out changed nodes only. Preserve untouched positions and handle execution flow, data dependencies, cycles, comments, graph bounds, macro tunnels, and inserted conversion nodes predictably.
-- Include layout inputs and policy in preflight, operation identity, limits, expected fingerprints, transaction application, and postcondition verification.
-- Reject layouts that exceed graph, node, iteration, coordinate, transaction-work, or Game-thread limits before touching the live Blueprint.
+- Extend `editor_lifecycle` with a typed `shutdown` operation while keeping the tool in opt-in large mode.
+- Implement bridge-owned graceful shutdown with bounded dirty-package summaries and explicit refusal while unsafe editor work is active.
+- Refuse shutdown during active compilation, save, PIE, transaction, or other live state that cannot be proven safe. Do not provide forced process termination.
+- Reconcile the accepted shutdown operation across the expected bridge disconnect and return a bounded terminal outcome.
 
 ### Verification
 
-- Test deterministic placement across functions, event handlers, custom events, and macros with branches, joins, cycles, comments, external links, and inserted conversion nodes.
-- Prove repeated equivalent plans produce identical changed-node positions and preserve all untouched positions and unrelated-content fingerprints.
-- Test bounds, timeout, rollback, undo/redo, save/reload, replay, and lost-response recovery natively on macOS and Windows.
+- Test clean and dirty packages, active compilation/save/PIE, repeated shutdown, timeout, cancellation before acceptance, disconnect reconciliation, and abnormal termination.
+- Run graceful shutdown and recovery natively on macOS and Windows.
+- Prove no tool argument can select another process or request forced termination.
 
 ### Documentation and completion gate
 
-- Document the layout policy, determinism, bounds, preservation guarantees, explicit-position alternative, and recovery behavior.
-- Complete the phase only when layout is deterministic and unrelated-content fingerprints remain stable across success, rejection, failure, timeout, and replay on both native platforms.
+- Document dirty-content policy, refusal states, disconnect semantics, cancellation, recovery, and default-mode exclusion.
+- Complete the phase only when configured graceful shutdown succeeds or refuses safely without arbitrary process control or data loss on native macOS and Windows.
 
 [Back to roadmap](../../ROADMAP.md) · [Shared roadmap contracts](index.md)

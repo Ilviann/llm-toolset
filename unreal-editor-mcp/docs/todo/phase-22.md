@@ -1,24 +1,26 @@
-# Phase 22 — Optional configured editor launch
+# Phase 22 — Optional editor-offline project-file generation
 
-**Outcome:** Agents can opt in to launching only the configured Unreal project/editor instance and wait for its exact authenticated bridge.
+**Outcome:** Agents can opt in to narrowly configured project-file generation only while the configured project editor is stopped.
 
 ### Implementation
 
-- Add the single `editor_lifecycle` tool only in opt-in large mode with a typed `launch` operation. Keep normal state reporting in the existing editor-state surface.
-- Accept no executable path, project path, environment variable, or arbitrary process argument from the model. Configure and validate absolute editor and `.uproject` paths at MCP startup and expose only bounded availability information.
-- Launch one detached configured editor instance through narrow platform adapters.
-- Detect the exact project-specific authenticated bridge and distinguish `starting`, `ready`, `already_running`, cancelled, timed out, and failed startup.
-- Bound concurrent launches, startup duration, retained results, discovery work, diagnostics, and child-process cleanup.
+- Keep C++ source editing outside this application. Pair with `rooted-files-mcp` for separately configured confined text edits.
+- Add the single `project_build` tool in opt-in large mode with a typed `generate_project_files` operation.
+- Resolve Unreal Build Tool or platform scripts from validated startup configuration and the installed engine layout. Use fixed templates owned by narrow platform adapters.
+- Accept no executable path, project path, shell fragment, environment variable, compiler flag, linker flag, working directory, or arbitrary argument from a tool call.
+- Refuse generation while the authenticated configured editor is running or its lifecycle state is uncertain. Reconcile with durable lifecycle operations before starting.
+- Bound process count, queueing, duration, output capture, diagnostic count and size, retained operation results, cancellation escalation, and child-process cleanup.
+- Keep subprocess output off MCP stdout except inside valid bounded tool results.
 
 ### Verification
 
-- Test missing and malformed configuration, paths with spaces, another project or process on the port, repeated launches, version mismatch, timeout, cancellation, and abnormal startup.
-- Run launch, readiness, cancellation, and recovery natively on macOS and Windows. Unit test Linux command construction without claiming native support.
-- Prove the model cannot substitute executables, projects, environment values, shell fragments, or arbitrary arguments.
+- Test fixed command construction, paths with spaces, missing tools, editor-running and uncertain-state rejection, timeout, cancellation, nonzero exit, oversized logs, retained-result replay, and process-tree cleanup.
+- Run native offline project generation from packaged configuration on macOS and Windows without network access or runtime downloads. Unit test Linux construction separately.
+- Prove that tool arguments cannot alter the executable, project, environment, working directory, command template, or fixed arguments.
 
 ### Documentation and completion gate
 
-- Document opt-in launch configuration, platform paths, states, cancellation, recovery, limits, and default-mode exclusion.
-- Complete the phase only when configured launch reaches the exact authenticated bridge without arbitrary process execution on native macOS and Windows.
+- Document offline engine/tool preparation, lifecycle interaction, bounded output, cancellation, platform behavior, default-mode exclusion, and use with the confined file MCP.
+- Complete the phase only when fixed native project generation is reproducible from clean documented configuration on macOS and Windows.
 
 [Back to roadmap](../../ROADMAP.md) · [Shared roadmap contracts](index.md)
