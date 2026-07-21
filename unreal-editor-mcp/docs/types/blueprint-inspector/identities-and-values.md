@@ -6,8 +6,10 @@ The inspector uses Unreal-provided persistent GUIDs where available:
 - member variable `VarGuid`
 - graph `GraphGuid`
 - user function `GraphGuid`
+- macro graph `GraphGuid`
 - function-local variable `VarGuid`
 - node `NodeGuid`
+- custom-event node `NodeGuid`
 - pin `PinId`
 
 Each identity-bearing record contains `id` and `identity_stable`. If Unreal provides no valid GUID, `id` is empty and `identity_stable` is false; the inspector does not invent a mutable-object identity. Connection records reference graph, node, and pin IDs. Component records publish `ownership` (`local`, `inherited`, or `native`), owning class/Blueprint, `editable`, `scene_component`, and `root`; native and inherited components remain read-only.
@@ -20,4 +22,4 @@ Member-variable defaults use the tagged canonical K2 forms documented with the m
 
 Variable records additionally expose category/tooltip and supported metadata flags, local/inherited ownership, editability, replication mode/condition, RepNotify function identity, relationship validity, and a bounded reference summary. The summary lists at most 64 loaded graph/node relationships and separately flags references that Unreal reports but cannot identify in the loaded graph set.
 
-Function records use the function graph GUID, distinguish user-owned functions from inherited, override, and interface functions, and report editability, complete signature, metadata, required entry/result nodes, RepNotify member relationships, and bounded call references. Separate parameter records preserve ordered input/output direction, type, reference/const qualifiers, and tagged defaults. Local-variable records use their `VarGuid`, carry the owning function ID/name, and expose canonical type/default data plus scope-aware reference summaries.
+Function records use the function graph GUID, distinguish user-owned functions from inherited, override, and interface functions, and report editability, complete signature, metadata, required entry/result nodes, RepNotify relationships, and bounded call references. Macro records use their graph GUID and expose pure/impure signatures, editable tunnel identities, graph relationships, metadata, and macro-instance references. Custom-event records use the event-node GUID, distinguish local, inherited, and custom-event override ownership, and report the exact containing event graph. Separate parameter records preserve callable owner kind/identity, order, direction, type, reference/const qualifiers, and tagged defaults. Local-variable records use their `VarGuid`, carry the owning function ID/name, and expose canonical type/default data plus scope-aware reference summaries.

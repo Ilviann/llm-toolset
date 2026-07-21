@@ -15,8 +15,11 @@
 #include "HAL/FileManager.h"
 #include "HAL/PlatformFileManager.h"
 #include "K2Node.h"
+#include "K2Node_CustomEvent.h"
 #include "K2Node_FunctionEntry.h"
 #include "K2Node_FunctionResult.h"
+#include "K2Node_MacroInstance.h"
+#include "K2Node_Tunnel.h"
 #include "Kismet2/CompilerResultsLog.h"
 #include "Kismet2/KismetEditorUtilities.h"
 #include "Kismet2/BlueprintEditorUtils.h"
@@ -761,6 +764,113 @@ TSharedRef<FJsonObject> FunctionReferences(UBlueprint* Blueprint, UEdGraph* Func
     return Summary;
 }
 
+UEdGraph* FindLocalMacro(UBlueprint* Blueprint, const FString& Identity)
+{
+    if (Blueprint == nullptr || Identity.Len() != 32) return nullptr;
+    for (UEdGraph* Graph : Blueprint->MacroGraphs)
+    {
+        if (Graph != nullptr && GuidString(Graph->GraphGuid) == Identity) return Graph;
+    }
+    return nullptr;
+}
+
+UEdGraph* FindLocalEventGraph(UBlueprint* Blueprint, const FString& Identity)
+{
+    if (Blueprint == nullptr || Identity.Len() != 32) return nullptr;
+    for (UEdGraph* Graph : Blueprint->UbergraphPages)
+    {
+        if (Graph != nullptr && GuidString(Graph->GraphGuid) == Identity
+            && FBlueprintEditorUtils::IsEventGraph(Graph)) return Graph;
+    }
+    return nullptr;
+}
+
+UK2Node_CustomEvent* FindLocalCustomEvent(UBlueprint* Blueprint, const FString& Identity)
+{
+    if (Blueprint == nullptr || Identity.Len() != 32) return nullptr;
+    for (UEdGraph* Graph : Blueprint->UbergraphPages)
+    {
+        if (Graph == nullptr || !FBlueprintEditorUtils::IsEventGraph(Graph)) continue;
+        TArray<UK2Node_CustomEvent*> Events;
+        Graph->GetNodesOfClass(Events);
+        for (UK2Node_CustomEvent* Event : Events)
+        {
+            if (Event != nullptr && GuidString(Event->NodeGuid) == Identity) return Event;
+        }
+    }
+    return nullptr;
+}
+
+TSharedRef<FJsonObject> MacroReferences(UBlueprint* Blueprint, UEdGraph* MacroGraph)
+{
+    TArray<UK2Node*> Nodes;
+    TArray<UEdGraph*> Graphs;
+    Blueprint->GetAllGraphs(Graphs);
+    for (UEdGraph* Graph : Graphs)
+    {
+        if (Graph == nullptr) continue;
+        for (UEdGraphNode* GraphNode : Graph->Nodes)
+        {
+            UK2Node_MacroInstance* Instance = Cast<UK2Node_MacroInstance>(GraphNode);
+            if (Instance != nullptr && Instance->GetMacroGraph() == MacroGraph) Nodes.Add(Instance);
+        }
+    }
+    const TSharedRef<FJsonObject> Summary = MakeShared<FJsonObject>();
+    Summary->SetBoolField(TEXT("referenced"), !Nodes.IsEmpty());
+    Summary->SetNumberField(TEXT("reference_count"), Nodes.Num());
+    Summary->SetBoolField(TEXT("unresolved_references"), false);
+    Summary->SetBoolField(TEXT("references_truncated"), Nodes.Num() > UnrealMCP::MaxVariableReferences);
+    TArray<TSharedPtr<FJsonValue>> References;
+    for (int32 Index = 0; Index < FMath::Min(Nodes.Num(), UnrealMCP::MaxVariableReferences); ++Index)
+    {
+        UK2Node* Node = Nodes[Index];
+        const TSharedRef<FJsonObject> Reference = MakeShared<FJsonObject>();
+        Reference->SetStringField(TEXT("graph_id"), Node->GetGraph() != nullptr ? GuidString(Node->GetGraph()->GraphGuid) : FString());
+        Reference->SetStringField(TEXT("node_id"), GuidString(Node->NodeGuid));
+        Reference->SetStringField(TEXT("node_class"), Node->GetClass()->GetPathName());
+        Reference->SetStringField(TEXT("title"), Node->GetNodeTitle(ENodeTitleType::ListView).ToString().Left(256));
+        References.Add(MakeShared<FJsonValueObject>(Reference));
+    }
+    Summary->SetArrayField(TEXT("references"), References);
+    return Summary;
+}
+
+TSharedRef<FJsonObject> CustomEventReferences(UBlueprint* Blueprint, UK2Node_CustomEvent* Event)
+{
+    TArray<UK2Node*> Nodes;
+    TArray<UEdGraph*> Graphs;
+    Blueprint->GetAllGraphs(Graphs);
+    for (UEdGraph* Graph : Graphs)
+    {
+        if (Graph == nullptr) continue;
+        for (UEdGraphNode* GraphNode : Graph->Nodes)
+        {
+            UK2Node* Node = Cast<UK2Node>(GraphNode);
+            if (Node != nullptr && Node != Event && !Node->IsA<UK2Node_CustomEvent>()
+                && Node->ReferencesFunction(Event->CustomFunctionName, Blueprint->SkeletonGeneratedClass)) Nodes.Add(Node);
+        }
+    }
+    const bool bReferenced = !Nodes.IsEmpty() || FBlueprintEditorUtils::IsFunctionUsed(Blueprint, Event->CustomFunctionName);
+    const TSharedRef<FJsonObject> Summary = MakeShared<FJsonObject>();
+    Summary->SetBoolField(TEXT("referenced"), bReferenced);
+    Summary->SetNumberField(TEXT("reference_count"), Nodes.Num());
+    Summary->SetBoolField(TEXT("unresolved_references"), bReferenced && Nodes.IsEmpty());
+    Summary->SetBoolField(TEXT("references_truncated"), Nodes.Num() > UnrealMCP::MaxVariableReferences);
+    TArray<TSharedPtr<FJsonValue>> References;
+    for (int32 Index = 0; Index < FMath::Min(Nodes.Num(), UnrealMCP::MaxVariableReferences); ++Index)
+    {
+        UK2Node* Node = Nodes[Index];
+        const TSharedRef<FJsonObject> Reference = MakeShared<FJsonObject>();
+        Reference->SetStringField(TEXT("graph_id"), Node->GetGraph() != nullptr ? GuidString(Node->GetGraph()->GraphGuid) : FString());
+        Reference->SetStringField(TEXT("node_id"), GuidString(Node->NodeGuid));
+        Reference->SetStringField(TEXT("node_class"), Node->GetClass()->GetPathName());
+        Reference->SetStringField(TEXT("title"), Node->GetNodeTitle(ENodeTitleType::ListView).ToString().Left(256));
+        References.Add(MakeShared<FJsonValueObject>(Reference));
+    }
+    Summary->SetArrayField(TEXT("references"), References);
+    return Summary;
+}
+
 TSharedRef<FJsonObject> LocalReferences(UBlueprint* Blueprint, UEdGraph* FunctionGraph, const FName VariableName)
 {
     TArray<UK2Node*> Nodes;
@@ -874,6 +984,130 @@ bool DecodeFunctionSignature(
     return true;
 }
 
+struct FMacroSignatureSpec
+{
+    bool bPure = false;
+    TArray<FFunctionParameterSpec> Parameters;
+};
+
+struct FCustomEventSignatureSpec
+{
+    TArray<FFunctionParameterSpec> Parameters;
+};
+
+bool DecodeMacroSignature(const TSharedPtr<FJsonObject>& Signature, FMacroSignatureSpec& Out, FUnrealMCPError& OutError)
+{
+    if (!Signature.IsValid() || !HasOnlyFields(*Signature, {TEXT("pure"), TEXT("parameters")})
+        || !Signature->TryGetBoolField(TEXT("pure"), Out.bPure))
+    {
+        OutError = {TEXT("invalid_argument"), TEXT("Macro signature requires exact pure and parameters fields")};
+        return false;
+    }
+    const TArray<TSharedPtr<FJsonValue>>* Parameters = nullptr;
+    if (!Signature->TryGetArrayField(TEXT("parameters"), Parameters) || Parameters == nullptr || Parameters->Num() > 32)
+    {
+        OutError = {TEXT("invalid_argument"), TEXT("Macro signature parameters must be one bounded array")};
+        return false;
+    }
+    TSet<FName> Names;
+    for (const TSharedPtr<FJsonValue>& Value : *Parameters)
+    {
+        const TSharedPtr<FJsonObject>* Parameter = nullptr;
+        if (!Value.IsValid() || !Value->TryGetObject(Parameter) || Parameter == nullptr
+            || !HasOnlyFields(**Parameter, {TEXT("name"), TEXT("direction"), TEXT("type"), TEXT("default")}))
+        {
+            OutError = {TEXT("invalid_argument"), TEXT("Each macro parameter must be one exact object")};
+            return false;
+        }
+        FString Name;
+        FFunctionParameterSpec Spec;
+        const TSharedPtr<FJsonObject>* Type = nullptr;
+        if (!(*Parameter)->TryGetStringField(TEXT("name"), Name) || Name.IsEmpty() || Name.Len() > 128
+            || FName(*Name).IsNone() || !FName(*Name).IsValidXName() || Names.Contains(FName(*Name))
+            || !(*Parameter)->TryGetStringField(TEXT("direction"), Spec.Direction)
+            || (Spec.Direction != TEXT("input") && Spec.Direction != TEXT("output"))
+            || !(*Parameter)->TryGetObjectField(TEXT("type"), Type) || Type == nullptr
+            || !UnrealMCP::K2TypeCodec::DecodeType(*Type, Spec.Type, OutError))
+        {
+            if (OutError.Code.IsEmpty()) OutError = {TEXT("invalid_member"), TEXT("Macro parameter names and directions must be legal and unique")};
+            return false;
+        }
+        Spec.Name = FName(*Name);
+        if ((Spec.Type.bIsConst && !Spec.Type.bIsReference)
+            || (Spec.Direction == TEXT("output") && (Spec.Type.bIsReference || Spec.Type.bIsConst || (*Parameter)->HasField(TEXT("default"))))
+            || (Spec.Direction == TEXT("input") && Spec.Type.bIsReference && (*Parameter)->HasField(TEXT("default"))))
+        {
+            OutError = {TEXT("invalid_argument"), TEXT("Macro parameter direction, reference, const, or default combination is unsupported")};
+            return false;
+        }
+        if ((*Parameter)->HasField(TEXT("default")))
+        {
+            const TSharedPtr<FJsonObject>* Default = nullptr;
+            if (!(*Parameter)->TryGetObjectField(TEXT("default"), Default) || Default == nullptr
+                || !UnrealMCP::K2TypeCodec::DecodeDefault(Spec.Type, *Default, Spec.DefaultValue, OutError)) return false;
+        }
+        Names.Add(Spec.Name);
+        Out.Parameters.Add(MoveTemp(Spec));
+    }
+    return true;
+}
+
+bool DecodeCustomEventSignature(
+    const TSharedPtr<FJsonObject>& Signature,
+    FCustomEventSignatureSpec& Out,
+    FUnrealMCPError& OutError)
+{
+    if (!Signature.IsValid() || !HasOnlyFields(*Signature, {TEXT("parameters")}))
+    {
+        OutError = {TEXT("invalid_argument"), TEXT("Custom-event signature requires one exact parameters field")};
+        return false;
+    }
+    const TArray<TSharedPtr<FJsonValue>>* Parameters = nullptr;
+    if (!Signature->TryGetArrayField(TEXT("parameters"), Parameters) || Parameters == nullptr || Parameters->Num() > 32)
+    {
+        OutError = {TEXT("invalid_argument"), TEXT("Custom-event signature parameters must be one bounded array")};
+        return false;
+    }
+    TSet<FName> Names;
+    for (const TSharedPtr<FJsonValue>& Value : *Parameters)
+    {
+        const TSharedPtr<FJsonObject>* Parameter = nullptr;
+        if (!Value.IsValid() || !Value->TryGetObject(Parameter) || Parameter == nullptr
+            || !HasOnlyFields(**Parameter, {TEXT("name"), TEXT("type"), TEXT("default")}))
+        {
+            OutError = {TEXT("invalid_argument"), TEXT("Each custom-event parameter must be one exact object")};
+            return false;
+        }
+        FString Name;
+        FFunctionParameterSpec Spec;
+        const TSharedPtr<FJsonObject>* Type = nullptr;
+        if (!(*Parameter)->TryGetStringField(TEXT("name"), Name) || Name.IsEmpty() || Name.Len() > 128
+            || FName(*Name).IsNone() || !FName(*Name).IsValidXName() || Names.Contains(FName(*Name))
+            || !(*Parameter)->TryGetObjectField(TEXT("type"), Type) || Type == nullptr
+            || !UnrealMCP::K2TypeCodec::DecodeType(*Type, Spec.Type, OutError))
+        {
+            if (OutError.Code.IsEmpty()) OutError = {TEXT("invalid_member"), TEXT("Custom-event parameter names must be legal and unique")};
+            return false;
+        }
+        Spec.Name = FName(*Name);
+        Spec.Direction = TEXT("input");
+        if ((Spec.Type.bIsConst && !Spec.Type.bIsReference) || (Spec.Type.bIsReference && (*Parameter)->HasField(TEXT("default"))))
+        {
+            OutError = {TEXT("invalid_argument"), TEXT("Custom-event reference/const parameters cannot carry defaults")};
+            return false;
+        }
+        if ((*Parameter)->HasField(TEXT("default")))
+        {
+            const TSharedPtr<FJsonObject>* Default = nullptr;
+            if (!(*Parameter)->TryGetObjectField(TEXT("default"), Default) || Default == nullptr
+                || !UnrealMCP::K2TypeCodec::DecodeDefault(Spec.Type, *Default, Spec.DefaultValue, OutError)) return false;
+        }
+        Names.Add(Spec.Name);
+        Out.Parameters.Add(MoveTemp(Spec));
+    }
+    return true;
+}
+
 bool ValidateFunctionMetadata(const TSharedPtr<FJsonObject>& Metadata, FUnrealMCPError& OutError)
 {
     if (!Metadata.IsValid() || Metadata->Values.IsEmpty()
@@ -895,6 +1129,25 @@ bool ValidateFunctionMetadata(const TSharedPtr<FJsonObject>& Metadata, FUnrealMC
     return true;
 }
 
+bool ValidateMacroMetadata(const TSharedPtr<FJsonObject>& Metadata, FUnrealMCPError& OutError)
+{
+    if (!Metadata.IsValid() || Metadata->Values.IsEmpty()
+        || !HasOnlyFields(*Metadata, {TEXT("category"), TEXT("tooltip"), TEXT("keywords")}))
+    {
+        OutError = {TEXT("invalid_argument"), TEXT("Macro metadata must contain supported exact fields")};
+        return false;
+    }
+    FString Text;
+    if ((Metadata->HasField(TEXT("category")) && (!Metadata->TryGetStringField(TEXT("category"), Text) || Text.Len() > 128))
+        || (Metadata->HasField(TEXT("tooltip")) && (!Metadata->TryGetStringField(TEXT("tooltip"), Text) || Text.Len() > 512))
+        || (Metadata->HasField(TEXT("keywords")) && (!Metadata->TryGetStringField(TEXT("keywords"), Text) || Text.Len() > 256)))
+    {
+        OutError = {TEXT("invalid_argument"), TEXT("Macro metadata contains an invalid bounded value")};
+        return false;
+    }
+    return true;
+}
+
 void ApplyFunctionMetadata(UK2Node_FunctionEntry* Entry, const TSharedPtr<FJsonObject>& Metadata)
 {
     FString Text;
@@ -904,6 +1157,16 @@ void ApplyFunctionMetadata(UK2Node_FunctionEntry* Entry, const TSharedPtr<FJsonO
     if (Metadata->TryGetStringField(TEXT("tooltip"), Text)) Entry->MetaData.ToolTip = FText::FromString(Text);
     if (Metadata->TryGetStringField(TEXT("keywords"), Text)) Entry->MetaData.Keywords = FText::FromString(Text);
     if (Metadata->TryGetBoolField(TEXT("call_in_editor"), Flag)) Entry->MetaData.bCallInEditor = Flag;
+}
+
+void ApplyCallableMetadata(FKismetUserDeclaredFunctionMetadata& Target, bool* bCallInEditor, const TSharedPtr<FJsonObject>& Metadata)
+{
+    FString Text;
+    bool Flag = false;
+    if (Metadata->TryGetStringField(TEXT("category"), Text)) Target.Category = FText::FromString(Text);
+    if (Metadata->TryGetStringField(TEXT("tooltip"), Text)) Target.ToolTip = FText::FromString(Text);
+    if (Metadata->TryGetStringField(TEXT("keywords"), Text)) Target.Keywords = FText::FromString(Text);
+    if (bCallInEditor != nullptr && Metadata->TryGetBoolField(TEXT("call_in_editor"), Flag)) *bCallInEditor = Flag;
 }
 
 bool ApplyFunctionSignature(
@@ -973,6 +1236,90 @@ bool ApplyFunctionSignature(
     }
     Entry->ReconstructNode();
     for (UK2Node_FunctionResult* Result : Results) Result->ReconstructNode();
+    FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(Blueprint);
+    return true;
+}
+
+bool ApplyMacroSignature(UBlueprint* Blueprint, UEdGraph* Graph, const FMacroSignatureSpec& Signature, FUnrealMCPError& OutError)
+{
+    UK2Node_Tunnel* Entry = nullptr;
+    UK2Node_Tunnel* Exit = nullptr;
+    bool bWasPure = false;
+    FKismetEditorUtilities::GetInformationOnMacro(Graph, Entry, Exit, bWasPure);
+    if (Entry == nullptr || Exit == nullptr)
+    {
+        OutError = {TEXT("invalid_member"), TEXT("The macro graph is missing its required tunnel nodes")};
+        return false;
+    }
+    Entry->Modify();
+    Exit->Modify();
+    for (const TSharedPtr<FUserPinInfo>& Pin : TArray<TSharedPtr<FUserPinInfo>>(Entry->UserDefinedPins)) Entry->RemoveUserDefinedPin(Pin);
+    for (const TSharedPtr<FUserPinInfo>& Pin : TArray<TSharedPtr<FUserPinInfo>>(Exit->UserDefinedPins)) Exit->RemoveUserDefinedPin(Pin);
+    if (!Signature.bPure)
+    {
+        FEdGraphPinType ExecType;
+        ExecType.PinCategory = UEdGraphSchema_K2::PC_Exec;
+        FText Reason;
+        if (!Entry->CanCreateUserDefinedPin(ExecType, EGPD_Output, Reason)
+            || Entry->CreateUserDefinedPin(UEdGraphSchema_K2::PN_Execute, ExecType, EGPD_Output, false) == nullptr
+            || !Exit->CanCreateUserDefinedPin(ExecType, EGPD_Input, Reason)
+            || Exit->CreateUserDefinedPin(UEdGraphSchema_K2::PN_Then, ExecType, EGPD_Input, false) == nullptr)
+        {
+            OutError = {TEXT("unsupported_type"), Reason.IsEmpty() ? TEXT("The live macro tunnels rejected execution pins") : Reason.ToString().Left(512)};
+            return false;
+        }
+    }
+    for (const FFunctionParameterSpec& Parameter : Signature.Parameters)
+    {
+        UK2Node_Tunnel* Node = Parameter.Direction == TEXT("input") ? Entry : Exit;
+        const EEdGraphPinDirection Direction = Parameter.Direction == TEXT("input") ? EGPD_Output : EGPD_Input;
+        FText Reason;
+        if (Node->FindPin(Parameter.Name) != nullptr
+            || !Node->CanCreateUserDefinedPin(Parameter.Type, Direction, Reason)
+            || Node->CreateUserDefinedPin(Parameter.Name, Parameter.Type, Direction, false) == nullptr)
+        {
+            OutError = {TEXT("unsupported_type"), Reason.IsEmpty() ? TEXT("The live macro tunnel rejected a parameter type") : Reason.ToString().Left(512)};
+            return false;
+        }
+        if (!Parameter.DefaultValue.IsEmpty() && !Node->UserDefinedPins.IsEmpty()
+            && !Node->ModifyUserDefinedPinDefaultValue(Node->UserDefinedPins.Last(), Parameter.DefaultValue))
+        {
+            OutError = {TEXT("invalid_argument"), TEXT("The live macro tunnel rejected a parameter default")};
+            return false;
+        }
+    }
+    Entry->ReconstructNode();
+    Exit->ReconstructNode();
+    FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(Blueprint);
+    return true;
+}
+
+bool ApplyCustomEventSignature(
+    UBlueprint* Blueprint,
+    UK2Node_CustomEvent* Event,
+    const FCustomEventSignatureSpec& Signature,
+    FUnrealMCPError& OutError)
+{
+    Event->Modify();
+    for (const TSharedPtr<FUserPinInfo>& Pin : TArray<TSharedPtr<FUserPinInfo>>(Event->UserDefinedPins)) Event->RemoveUserDefinedPin(Pin);
+    for (const FFunctionParameterSpec& Parameter : Signature.Parameters)
+    {
+        FText Reason;
+        if (Event->FindPin(Parameter.Name) != nullptr
+            || !Event->CanCreateUserDefinedPin(Parameter.Type, EGPD_Output, Reason)
+            || Event->CreateUserDefinedPin(Parameter.Name, Parameter.Type, EGPD_Output, false) == nullptr)
+        {
+            OutError = {TEXT("unsupported_type"), Reason.IsEmpty() ? TEXT("The live custom event rejected a parameter type") : Reason.ToString().Left(512)};
+            return false;
+        }
+        if (!Parameter.DefaultValue.IsEmpty() && !Event->UserDefinedPins.IsEmpty()
+            && !Event->ModifyUserDefinedPinDefaultValue(Event->UserDefinedPins.Last(), Parameter.DefaultValue))
+        {
+            OutError = {TEXT("invalid_argument"), TEXT("The live custom event rejected a parameter default")};
+            return false;
+        }
+    }
+    Event->ReconstructNode();
     FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(Blueprint);
     return true;
 }
@@ -1777,7 +2124,9 @@ bool FUnrealMCPBlueprintMutator::MemberEdit(
     {
         if (Target == TEXT("function")) return FunctionEdit(Arguments, OutResult, OutError);
         if (Target == TEXT("local_variable")) return LocalVariableEdit(Arguments, OutResult, OutError);
-        OutError = {TEXT("invalid_argument"), TEXT("target must be function or local_variable when supplied")};
+        if (Target == TEXT("macro")) return MacroEdit(Arguments, OutResult, OutError);
+        if (Target == TEXT("custom_event")) return CustomEventEdit(Arguments, OutResult, OutError);
+        OutError = {TEXT("invalid_argument"), TEXT("target must be function, local_variable, macro, or custom_event when supplied")};
         return false;
     }
     FString Operation;
@@ -2536,5 +2885,481 @@ bool FUnrealMCPBlueprintMutator::LocalVariableEdit(
         Operation == TEXT("add") ? TArray<FString>{LocalId} : TArray<FString>{});
     OutResult->SetObjectField(TEXT("local_variable"), Local);
     OutResult->SetObjectField(TEXT("reference_summary"), ResultReferences);
+    return true;
+}
+
+bool FUnrealMCPBlueprintMutator::MacroEdit(
+    const TSharedPtr<FJsonObject>& Arguments,
+    TSharedPtr<FJsonObject>& OutResult,
+    FUnrealMCPError& OutError)
+{
+    FString Target;
+    FString Operation;
+    if (!Arguments->TryGetStringField(TEXT("target"), Target) || Target != TEXT("macro")
+        || !Arguments->TryGetStringField(TEXT("operation"), Operation))
+    {
+        OutError = {TEXT("invalid_argument"), TEXT("Macro edits require target macro and one typed operation")};
+        return false;
+    }
+    TSet<FString> Allowed = {TEXT("operation_id"), TEXT("asset_path"), TEXT("expected_snapshot"), TEXT("target"), TEXT("operation")};
+    if (Operation == TEXT("add")) Allowed.Append({TEXT("name"), TEXT("signature"), TEXT("metadata")});
+    else if (Operation == TEXT("rename")) Allowed.Append({TEXT("macro_id"), TEXT("new_name")});
+    else if (Operation == TEXT("update")) Allowed.Append({TEXT("macro_id"), TEXT("field"), TEXT("signature"), TEXT("metadata"), TEXT("policy")});
+    else if (Operation == TEXT("remove")) Allowed.Append({TEXT("macro_id"), TEXT("policy")});
+    else
+    {
+        OutError = {TEXT("invalid_argument"), TEXT("Unknown macro edit operation")};
+        return false;
+    }
+    for (const TPair<FString, TSharedPtr<FJsonValue>>& Pair : Arguments->Values)
+    {
+        if (!Allowed.Contains(Pair.Key))
+        {
+            OutError = {TEXT("invalid_argument"), TEXT("The macro edit contains a field not accepted by its operation")};
+            return false;
+        }
+    }
+
+    FString RawAsset;
+    if (!Arguments->TryGetStringField(TEXT("asset_path"), RawAsset))
+    {
+        OutError = {TEXT("invalid_argument"), TEXT("asset_path must identify one exact Blueprint asset")};
+        return false;
+    }
+    const TSharedRef<FJsonObject> AssetOnly = MakeShared<FJsonObject>();
+    AssetOnly->SetStringField(TEXT("asset_path"), RawAsset);
+    UBlueprint* Blueprint = nullptr;
+    FString ObjectPath;
+    FString PackageName;
+    if (!ResolveMutableBlueprint(*AssetOnly, Blueprint, ObjectPath, PackageName, OutError)
+        || !ValidateExpectedSnapshot(Inspector, *Arguments, ObjectPath, OutError)) return false;
+    if (Blueprint->BlueprintType != BPTYPE_Normal)
+    {
+        OutError = {TEXT("unsupported_type"), TEXT("This live Blueprint kind does not support macro editing")};
+        return false;
+    }
+
+    FString MacroId;
+    FString Name;
+    FString NewName;
+    FString Field;
+    FString Policy;
+    UEdGraph* Graph = nullptr;
+    FMacroSignatureSpec Signature;
+    const TSharedPtr<FJsonObject>* SignatureObject = nullptr;
+    const TSharedPtr<FJsonObject>* MetadataObject = nullptr;
+    TSharedRef<FJsonObject> References = MakeShared<FJsonObject>();
+    References->SetBoolField(TEXT("referenced"), false);
+    References->SetNumberField(TEXT("reference_count"), 0);
+    References->SetBoolField(TEXT("unresolved_references"), false);
+    References->SetBoolField(TEXT("references_truncated"), false);
+    References->SetArrayField(TEXT("references"), {});
+
+    if (Operation == TEXT("add"))
+    {
+        if (!HasOnlyFields(*Arguments, {TEXT("operation_id"), TEXT("asset_path"), TEXT("expected_snapshot"), TEXT("target"), TEXT("operation"),
+                TEXT("name"), TEXT("signature"), TEXT("metadata")})
+            || !Arguments->TryGetStringField(TEXT("name"), Name) || !ValidateMemberName(Blueprint, Name, NAME_None, OutError)
+            || !Arguments->TryGetObjectField(TEXT("signature"), SignatureObject) || SignatureObject == nullptr
+            || !DecodeMacroSignature(*SignatureObject, Signature, OutError)) return false;
+        if (Arguments->HasField(TEXT("metadata"))
+            && (!Arguments->TryGetObjectField(TEXT("metadata"), MetadataObject) || MetadataObject == nullptr
+                || !ValidateMacroMetadata(*MetadataObject, OutError))) return false;
+    }
+    else
+    {
+        if (!Arguments->TryGetStringField(TEXT("macro_id"), MacroId)
+            || (Graph = FindLocalMacro(Blueprint, MacroId)) == nullptr)
+        {
+            OutError = {TEXT("stale_precondition"), TEXT("The requested stable local macro identity is unavailable")};
+            return false;
+        }
+        Name = Graph->GetName();
+        References = MacroReferences(Blueprint, Graph);
+        if (Operation == TEXT("rename"))
+        {
+            if (!HasOnlyFields(*Arguments, {TEXT("operation_id"), TEXT("asset_path"), TEXT("expected_snapshot"), TEXT("target"), TEXT("operation"),
+                    TEXT("macro_id"), TEXT("new_name")})
+                || !Arguments->TryGetStringField(TEXT("new_name"), NewName) || NewName == Name
+                || !ValidateMemberName(Blueprint, NewName, Graph->GetFName(), OutError)) return false;
+        }
+        else if (Operation == TEXT("update"))
+        {
+            if (!Arguments->TryGetStringField(TEXT("field"), Field))
+            {
+                OutError = {TEXT("invalid_argument"), TEXT("Macro update requires field signature or metadata")};
+                return false;
+            }
+            if (Field == TEXT("signature"))
+            {
+                if (!HasOnlyFields(*Arguments, {TEXT("operation_id"), TEXT("asset_path"), TEXT("expected_snapshot"), TEXT("target"), TEXT("operation"),
+                        TEXT("macro_id"), TEXT("field"), TEXT("signature"), TEXT("policy")})
+                    || !Arguments->TryGetStringField(TEXT("policy"), Policy) || Policy != TEXT("reject_if_referenced")
+                    || !Arguments->TryGetObjectField(TEXT("signature"), SignatureObject) || SignatureObject == nullptr
+                    || !DecodeMacroSignature(*SignatureObject, Signature, OutError)) return false;
+                if (References->GetBoolField(TEXT("referenced")))
+                {
+                    OutError = {TEXT("referenced_member"), TEXT("The macro is referenced and the reject-only policy forbids a signature change")};
+                    OutError.Details->SetStringField(TEXT("macro_id"), MacroId);
+                    OutError.Details->SetNumberField(TEXT("reference_count"), References->GetNumberField(TEXT("reference_count")));
+                    return false;
+                }
+            }
+            else if (Field == TEXT("metadata"))
+            {
+                if (!HasOnlyFields(*Arguments, {TEXT("operation_id"), TEXT("asset_path"), TEXT("expected_snapshot"), TEXT("target"), TEXT("operation"),
+                        TEXT("macro_id"), TEXT("field"), TEXT("metadata")})
+                    || !Arguments->TryGetObjectField(TEXT("metadata"), MetadataObject) || MetadataObject == nullptr
+                    || !ValidateMacroMetadata(*MetadataObject, OutError)) return false;
+            }
+            else
+            {
+                OutError = {TEXT("invalid_argument"), TEXT("Macro update field must be signature or metadata")};
+                return false;
+            }
+        }
+        else if (!HasOnlyFields(*Arguments, {TEXT("operation_id"), TEXT("asset_path"), TEXT("expected_snapshot"), TEXT("target"), TEXT("operation"),
+                TEXT("macro_id"), TEXT("policy")})
+            || !Arguments->TryGetStringField(TEXT("policy"), Policy) || Policy != TEXT("reject_if_referenced"))
+        {
+            OutError = {TEXT("invalid_argument"), TEXT("Macro removal requires policy reject_if_referenced")};
+            return false;
+        }
+        else if (References->GetBoolField(TEXT("referenced")))
+        {
+            OutError = {TEXT("referenced_member"), TEXT("The macro is referenced and the reject-only policy forbids removal")};
+            OutError.Details->SetStringField(TEXT("macro_id"), MacroId);
+            OutError.Details->SetNumberField(TEXT("reference_count"), References->GetNumberField(TEXT("reference_count")));
+            return false;
+        }
+    }
+
+    bool bApplied = false;
+    {
+        const FScopedTransaction Transaction(FText::FromString(TEXT("Unreal MCP macro edit")));
+        Blueprint->Modify();
+        if (Operation == TEXT("add"))
+        {
+            Graph = FBlueprintEditorUtils::CreateNewGraph(Blueprint, FName(*Name), UEdGraph::StaticClass(), UEdGraphSchema_K2::StaticClass());
+            if (Graph != nullptr)
+            {
+                FBlueprintEditorUtils::AddMacroGraph(Blueprint, Graph, true, nullptr);
+                bApplied = ApplyMacroSignature(Blueprint, Graph, Signature, OutError);
+                UK2Node_Tunnel* Entry = nullptr;
+                UK2Node_Tunnel* Exit = nullptr;
+                bool bPure = false;
+                FKismetEditorUtilities::GetInformationOnMacro(Graph, Entry, Exit, bPure);
+                if (bApplied && MetadataObject != nullptr && Entry != nullptr)
+                {
+                    Entry->Modify();
+                    ApplyCallableMetadata(Entry->MetaData, nullptr, *MetadataObject);
+                }
+                MacroId = GuidString(Graph->GraphGuid);
+                bApplied = bApplied && MacroId.Len() == 32;
+            }
+        }
+        else if (Operation == TEXT("rename"))
+        {
+            Graph->Modify();
+            FBlueprintEditorUtils::RenameGraph(Graph, NewName);
+            bApplied = Graph->GetName() == NewName;
+        }
+        else if (Operation == TEXT("remove"))
+        {
+            FBlueprintEditorUtils::RemoveGraph(Blueprint, Graph);
+            bApplied = FindLocalMacro(Blueprint, MacroId) == nullptr;
+        }
+        else if (Field == TEXT("signature"))
+        {
+            Graph->Modify();
+            bApplied = ApplyMacroSignature(Blueprint, Graph, Signature, OutError);
+        }
+        else
+        {
+            UK2Node_Tunnel* Entry = nullptr;
+            UK2Node_Tunnel* Exit = nullptr;
+            bool bPure = false;
+            FKismetEditorUtilities::GetInformationOnMacro(Graph, Entry, Exit, bPure);
+            if (Entry != nullptr)
+            {
+                Entry->Modify();
+                ApplyCallableMetadata(Entry->MetaData, nullptr, *MetadataObject);
+                FBlueprintEditorUtils::MarkBlueprintAsModified(Blueprint);
+                bApplied = true;
+            }
+        }
+    }
+    if (!bApplied)
+    {
+        RestoreFailedTransaction(OutError);
+        if (OutError.Code.IsEmpty()) OutError = {TEXT("invalid_member"), TEXT("Unreal rejected the macro edit without a committed change")};
+        return false;
+    }
+
+    TSharedPtr<FJsonObject> Macro;
+    if (Operation == TEXT("remove"))
+    {
+        Macro = MakeShared<FJsonObject>();
+        Macro->SetStringField(TEXT("id"), MacroId);
+        Macro->SetStringField(TEXT("name"), Name);
+        Macro->SetBoolField(TEXT("removed"), true);
+    }
+    else if (!ReadInspectedScopedRecord(Inspector, ObjectPath, TEXT("macro_id"), MacroId, TEXT("macros"), Macro, OutError))
+    {
+        RestoreFailedTransaction(OutError);
+        return false;
+    }
+    FString Snapshot;
+    if (!ReadSnapshot(Inspector, ObjectPath, Snapshot, OutError))
+    {
+        RestoreFailedTransaction(OutError);
+        return false;
+    }
+    OutResult = BuildEditResult(Blueprint, ObjectPath, Snapshot, Operation, Macro,
+        Operation == TEXT("add") ? TArray<FString>{MacroId} : TArray<FString>{});
+    OutResult->SetObjectField(TEXT("macro"), Macro);
+    OutResult->SetObjectField(TEXT("reference_summary"), Operation == TEXT("remove") ? References : Macro->GetObjectField(TEXT("reference_summary")));
+    return true;
+}
+
+bool FUnrealMCPBlueprintMutator::CustomEventEdit(
+    const TSharedPtr<FJsonObject>& Arguments,
+    TSharedPtr<FJsonObject>& OutResult,
+    FUnrealMCPError& OutError)
+{
+    FString Target;
+    FString Operation;
+    if (!Arguments->TryGetStringField(TEXT("target"), Target) || Target != TEXT("custom_event")
+        || !Arguments->TryGetStringField(TEXT("operation"), Operation))
+    {
+        OutError = {TEXT("invalid_argument"), TEXT("Custom-event edits require target custom_event and one typed operation")};
+        return false;
+    }
+    TSet<FString> Allowed = {TEXT("operation_id"), TEXT("asset_path"), TEXT("expected_snapshot"), TEXT("target"), TEXT("operation")};
+    if (Operation == TEXT("add")) Allowed.Append({TEXT("graph_id"), TEXT("name"), TEXT("signature"), TEXT("metadata")});
+    else if (Operation == TEXT("rename")) Allowed.Append({TEXT("custom_event_id"), TEXT("new_name")});
+    else if (Operation == TEXT("update")) Allowed.Append({TEXT("custom_event_id"), TEXT("field"), TEXT("signature"), TEXT("metadata"), TEXT("policy")});
+    else if (Operation == TEXT("remove")) Allowed.Append({TEXT("custom_event_id"), TEXT("policy")});
+    else
+    {
+        OutError = {TEXT("invalid_argument"), TEXT("Unknown custom-event edit operation")};
+        return false;
+    }
+    for (const TPair<FString, TSharedPtr<FJsonValue>>& Pair : Arguments->Values)
+    {
+        if (!Allowed.Contains(Pair.Key))
+        {
+            OutError = {TEXT("invalid_argument"), TEXT("The custom-event edit contains a field not accepted by its operation")};
+            return false;
+        }
+    }
+
+    FString RawAsset;
+    if (!Arguments->TryGetStringField(TEXT("asset_path"), RawAsset))
+    {
+        OutError = {TEXT("invalid_argument"), TEXT("asset_path must identify one exact Blueprint asset")};
+        return false;
+    }
+    const TSharedRef<FJsonObject> AssetOnly = MakeShared<FJsonObject>();
+    AssetOnly->SetStringField(TEXT("asset_path"), RawAsset);
+    UBlueprint* Blueprint = nullptr;
+    FString ObjectPath;
+    FString PackageName;
+    if (!ResolveMutableBlueprint(*AssetOnly, Blueprint, ObjectPath, PackageName, OutError)
+        || !ValidateExpectedSnapshot(Inspector, *Arguments, ObjectPath, OutError)) return false;
+    if (Blueprint->BlueprintType != BPTYPE_Normal)
+    {
+        OutError = {TEXT("unsupported_type"), TEXT("This live Blueprint kind does not support custom events")};
+        return false;
+    }
+
+    FString EventId;
+    FString GraphId;
+    FString Name;
+    FString NewName;
+    FString Field;
+    FString Policy;
+    UEdGraph* Graph = nullptr;
+    UK2Node_CustomEvent* Event = nullptr;
+    FCustomEventSignatureSpec Signature;
+    const TSharedPtr<FJsonObject>* SignatureObject = nullptr;
+    const TSharedPtr<FJsonObject>* MetadataObject = nullptr;
+    TSharedRef<FJsonObject> References = MakeShared<FJsonObject>();
+    References->SetBoolField(TEXT("referenced"), false);
+    References->SetNumberField(TEXT("reference_count"), 0);
+    References->SetBoolField(TEXT("unresolved_references"), false);
+    References->SetBoolField(TEXT("references_truncated"), false);
+    References->SetArrayField(TEXT("references"), {});
+
+    if (Operation == TEXT("add"))
+    {
+        if (!HasOnlyFields(*Arguments, {TEXT("operation_id"), TEXT("asset_path"), TEXT("expected_snapshot"), TEXT("target"), TEXT("operation"),
+                TEXT("graph_id"), TEXT("name"), TEXT("signature"), TEXT("metadata")})
+            || !Arguments->TryGetStringField(TEXT("graph_id"), GraphId) || (Graph = FindLocalEventGraph(Blueprint, GraphId)) == nullptr
+            || !Arguments->TryGetStringField(TEXT("name"), Name) || !ValidateMemberName(Blueprint, Name, NAME_None, OutError)
+            || !Arguments->TryGetObjectField(TEXT("signature"), SignatureObject) || SignatureObject == nullptr
+            || !DecodeCustomEventSignature(*SignatureObject, Signature, OutError))
+        {
+            if (OutError.Code.IsEmpty()) OutError = {TEXT("invalid_member"), TEXT("Custom events can be added only to one stable local event graph")};
+            return false;
+        }
+        if (Arguments->HasField(TEXT("metadata"))
+            && (!Arguments->TryGetObjectField(TEXT("metadata"), MetadataObject) || MetadataObject == nullptr
+                || !ValidateFunctionMetadata(*MetadataObject, OutError))) return false;
+    }
+    else
+    {
+        if (!Arguments->TryGetStringField(TEXT("custom_event_id"), EventId)
+            || (Event = FindLocalCustomEvent(Blueprint, EventId)) == nullptr || Event->IsOverride() || !Event->IsEditable()
+            || (Graph = Event->GetGraph()) == nullptr || !FBlueprintEditorUtils::IsEventGraph(Graph))
+        {
+            OutError = {TEXT("stale_precondition"), TEXT("The requested stable editable custom-event identity is unavailable")};
+            return false;
+        }
+        Name = Event->CustomFunctionName.ToString();
+        References = CustomEventReferences(Blueprint, Event);
+        if (Operation == TEXT("rename"))
+        {
+            if (!HasOnlyFields(*Arguments, {TEXT("operation_id"), TEXT("asset_path"), TEXT("expected_snapshot"), TEXT("target"), TEXT("operation"),
+                    TEXT("custom_event_id"), TEXT("new_name")})
+                || !Arguments->TryGetStringField(TEXT("new_name"), NewName) || NewName == Name
+                || !ValidateMemberName(Blueprint, NewName, Event->CustomFunctionName, OutError)) return false;
+        }
+        else if (Operation == TEXT("update"))
+        {
+            if (!Arguments->TryGetStringField(TEXT("field"), Field))
+            {
+                OutError = {TEXT("invalid_argument"), TEXT("Custom-event update requires field signature or metadata")};
+                return false;
+            }
+            if (Field == TEXT("signature"))
+            {
+                if (!HasOnlyFields(*Arguments, {TEXT("operation_id"), TEXT("asset_path"), TEXT("expected_snapshot"), TEXT("target"), TEXT("operation"),
+                        TEXT("custom_event_id"), TEXT("field"), TEXT("signature"), TEXT("policy")})
+                    || !Arguments->TryGetStringField(TEXT("policy"), Policy) || Policy != TEXT("reject_if_referenced")
+                    || !Arguments->TryGetObjectField(TEXT("signature"), SignatureObject) || SignatureObject == nullptr
+                    || !DecodeCustomEventSignature(*SignatureObject, Signature, OutError)) return false;
+                if (References->GetBoolField(TEXT("referenced")))
+                {
+                    OutError = {TEXT("referenced_member"), TEXT("The custom event is referenced and the reject-only policy forbids a signature change")};
+                    OutError.Details->SetStringField(TEXT("custom_event_id"), EventId);
+                    OutError.Details->SetNumberField(TEXT("reference_count"), References->GetNumberField(TEXT("reference_count")));
+                    return false;
+                }
+            }
+            else if (Field == TEXT("metadata"))
+            {
+                if (!HasOnlyFields(*Arguments, {TEXT("operation_id"), TEXT("asset_path"), TEXT("expected_snapshot"), TEXT("target"), TEXT("operation"),
+                        TEXT("custom_event_id"), TEXT("field"), TEXT("metadata")})
+                    || !Arguments->TryGetObjectField(TEXT("metadata"), MetadataObject) || MetadataObject == nullptr
+                    || !ValidateFunctionMetadata(*MetadataObject, OutError)) return false;
+            }
+            else
+            {
+                OutError = {TEXT("invalid_argument"), TEXT("Custom-event update field must be signature or metadata")};
+                return false;
+            }
+        }
+        else if (!HasOnlyFields(*Arguments, {TEXT("operation_id"), TEXT("asset_path"), TEXT("expected_snapshot"), TEXT("target"), TEXT("operation"),
+                TEXT("custom_event_id"), TEXT("policy")})
+            || !Arguments->TryGetStringField(TEXT("policy"), Policy) || Policy != TEXT("reject_if_referenced"))
+        {
+            OutError = {TEXT("invalid_argument"), TEXT("Custom-event removal requires policy reject_if_referenced")};
+            return false;
+        }
+        else if (References->GetBoolField(TEXT("referenced")))
+        {
+            OutError = {TEXT("referenced_member"), TEXT("The custom event is referenced and the reject-only policy forbids removal")};
+            OutError.Details->SetStringField(TEXT("custom_event_id"), EventId);
+            OutError.Details->SetNumberField(TEXT("reference_count"), References->GetNumberField(TEXT("reference_count")));
+            return false;
+        }
+    }
+
+    bool bApplied = false;
+    {
+        const FScopedTransaction Transaction(FText::FromString(TEXT("Unreal MCP custom event edit")));
+        Blueprint->Modify();
+        Graph->Modify();
+        if (Operation == TEXT("add"))
+        {
+            Event = NewObject<UK2Node_CustomEvent>(Graph);
+            if (Event != nullptr)
+            {
+                Event->CreateNewGuid();
+                Event->CustomFunctionName = FName(*Name);
+                Event->bIsEditable = true;
+                Event->SetFlags(RF_Transactional);
+                Event->AllocateDefaultPins();
+                Event->PostPlacedNewNode();
+                Graph->AddNode(Event, true, false);
+                bApplied = ApplyCustomEventSignature(Blueprint, Event, Signature, OutError);
+                if (bApplied && MetadataObject != nullptr)
+                {
+                    bool bCallInEditor = Event->bCallInEditor;
+                    ApplyCallableMetadata(Event->GetUserDefinedMetaData(), &bCallInEditor, *MetadataObject);
+                    Event->bCallInEditor = bCallInEditor;
+                }
+                EventId = GuidString(Event->NodeGuid);
+                bApplied = bApplied && EventId.Len() == 32;
+            }
+        }
+        else if (Operation == TEXT("rename"))
+        {
+            Event->Modify();
+            Event->OnRenameNode(NewName);
+            bApplied = Event->CustomFunctionName == FName(*NewName);
+        }
+        else if (Operation == TEXT("remove"))
+        {
+            Event->Modify();
+            Event->DestroyNode();
+            bApplied = FindLocalCustomEvent(Blueprint, EventId) == nullptr;
+            if (bApplied) FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(Blueprint);
+        }
+        else if (Field == TEXT("signature"))
+        {
+            bApplied = ApplyCustomEventSignature(Blueprint, Event, Signature, OutError);
+        }
+        else
+        {
+            Event->Modify();
+            bool bCallInEditor = Event->bCallInEditor;
+            ApplyCallableMetadata(Event->GetUserDefinedMetaData(), &bCallInEditor, *MetadataObject);
+            Event->bCallInEditor = bCallInEditor;
+            FBlueprintEditorUtils::MarkBlueprintAsModified(Blueprint);
+            bApplied = true;
+        }
+    }
+    if (!bApplied)
+    {
+        RestoreFailedTransaction(OutError);
+        if (OutError.Code.IsEmpty()) OutError = {TEXT("invalid_member"), TEXT("Unreal rejected the custom-event edit without a committed change")};
+        return false;
+    }
+
+    TSharedPtr<FJsonObject> CustomEvent;
+    if (Operation == TEXT("remove"))
+    {
+        CustomEvent = MakeShared<FJsonObject>();
+        CustomEvent->SetStringField(TEXT("id"), EventId);
+        CustomEvent->SetStringField(TEXT("name"), Name);
+        CustomEvent->SetBoolField(TEXT("removed"), true);
+    }
+    else if (!ReadInspectedScopedRecord(Inspector, ObjectPath, TEXT("custom_event_id"), EventId, TEXT("custom_events"), CustomEvent, OutError))
+    {
+        RestoreFailedTransaction(OutError);
+        return false;
+    }
+    FString Snapshot;
+    if (!ReadSnapshot(Inspector, ObjectPath, Snapshot, OutError))
+    {
+        RestoreFailedTransaction(OutError);
+        return false;
+    }
+    OutResult = BuildEditResult(Blueprint, ObjectPath, Snapshot, Operation, CustomEvent,
+        Operation == TEXT("add") ? TArray<FString>{EventId} : TArray<FString>{});
+    OutResult->SetObjectField(TEXT("custom_event"), CustomEvent);
+    OutResult->SetObjectField(TEXT("reference_summary"), Operation == TEXT("remove") ? References : CustomEvent->GetObjectField(TEXT("reference_summary")));
     return true;
 }

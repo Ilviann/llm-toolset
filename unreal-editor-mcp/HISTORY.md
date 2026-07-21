@@ -1,5 +1,12 @@
 # Unreal Editor MCP history
 
+## 0.7.0 — 2026-07-21
+
+- Added bounded macro and custom-event inspection with stable graph/node identities, exact signatures and parameter defaults, metadata, ownership distinctions, graph relationships, required nodes, and reference summaries.
+- Extended `blueprint_member_edit` with transactional macro and custom-event add, identity-preserving rename, supported update, and reject-only safe removal operations while keeping the ten-tool surface unchanged.
+- Added event-graph targeting, macro tunnel preservation, cross-kind and inherited collision checks, custom-event override separation, and reference-safe signature changes.
+- Added public-API probes, exact Python schemas, native Automation/Undo/Redo/compile/save coverage, examples, and cross-process restart proof for persisted macro/custom-event shells.
+
 ## 0.6.0 — 2026-07-21
 
 - Added bounded function, ordered parameter, and function-local-variable inspection with stable graph/local GUIDs, ownership/editability, complete signatures, metadata, required nodes, RepNotify relationships, and reference summaries.

@@ -58,6 +58,14 @@ private:
         const TSharedPtr<FJsonObject>& Arguments,
         TSharedPtr<FJsonObject>& OutResult,
         FUnrealMCPError& OutError);
+    bool MacroEdit(
+        const TSharedPtr<FJsonObject>& Arguments,
+        TSharedPtr<FJsonObject>& OutResult,
+        FUnrealMCPError& OutError);
+    bool CustomEventEdit(
+        const TSharedPtr<FJsonObject>& Arguments,
+        TSharedPtr<FJsonObject>& OutResult,
+        FUnrealMCPError& OutError);
 
     FUnrealMCPBlueprintInspector& Inspector;
     FCompile CompileBlueprint;

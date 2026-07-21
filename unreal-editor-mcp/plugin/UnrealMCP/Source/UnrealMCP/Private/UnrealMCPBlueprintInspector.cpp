@@ -15,9 +15,13 @@
 #include "GameFramework/Actor.h"
 #include "HAL/PlatformTime.h"
 #include "K2Node.h"
+#include "K2Node_CustomEvent.h"
 #include "K2Node_FunctionEntry.h"
 #include "K2Node_FunctionResult.h"
+#include "K2Node_MacroInstance.h"
+#include "K2Node_Tunnel.h"
 #include "Kismet2/BlueprintEditorUtils.h"
+#include "Kismet2/KismetEditorUtilities.h"
 #include "Misc/PackageName.h"
 #include "Misc/SecureHash.h"
 #include "Serialization/JsonSerializer.h"
@@ -33,7 +37,8 @@ namespace
 {
 const TSet<FString> InspectSections = {
     TEXT("summary"), TEXT("parent_class"), TEXT("compile_state"), TEXT("components"),
-    TEXT("class_defaults"), TEXT("variables"), TEXT("functions"), TEXT("parameters"), TEXT("local_variables"),
+    TEXT("class_defaults"), TEXT("variables"), TEXT("functions"), TEXT("macros"), TEXT("custom_events"),
+    TEXT("parameters"), TEXT("local_variables"),
     TEXT("graphs"), TEXT("nodes"), TEXT("pins"), TEXT("connections")};
 
 const TSet<FString> SupportedPinCategories = {
@@ -311,6 +316,46 @@ TSharedRef<FJsonObject> FunctionReferences(UBlueprint* Blueprint, UEdGraph* Func
     return NodeReferenceSummary(MoveTemp(Nodes), bReferenced);
 }
 
+TSharedRef<FJsonObject> MacroReferences(UBlueprint* Blueprint, UEdGraph* MacroGraph)
+{
+    TArray<UK2Node*> Nodes;
+    TArray<UEdGraph*> AllGraphs;
+    Blueprint->GetAllGraphs(AllGraphs);
+    for (UEdGraph* Graph : AllGraphs)
+    {
+        if (Graph == nullptr) continue;
+        for (UEdGraphNode* GraphNode : Graph->Nodes)
+        {
+            UK2Node_MacroInstance* Instance = Cast<UK2Node_MacroInstance>(GraphNode);
+            if (Instance != nullptr && Instance->GetMacroGraph() == MacroGraph) Nodes.Add(Instance);
+        }
+    }
+    const bool bReferenced = !Nodes.IsEmpty();
+    return NodeReferenceSummary(MoveTemp(Nodes), bReferenced);
+}
+
+TSharedRef<FJsonObject> CustomEventReferences(UBlueprint* Blueprint, UK2Node_CustomEvent* Event)
+{
+    TArray<UK2Node*> Nodes;
+    TArray<UEdGraph*> AllGraphs;
+    Blueprint->GetAllGraphs(AllGraphs);
+    for (UEdGraph* Graph : AllGraphs)
+    {
+        if (Graph == nullptr) continue;
+        for (UEdGraphNode* GraphNode : Graph->Nodes)
+        {
+            UK2Node* Node = Cast<UK2Node>(GraphNode);
+            if (Node != nullptr && Node != Event && !Node->IsA<UK2Node_CustomEvent>()
+                && Node->ReferencesFunction(Event->CustomFunctionName, Blueprint->SkeletonGeneratedClass))
+            {
+                Nodes.Add(Node);
+            }
+        }
+    }
+    const bool bReferenced = !Nodes.IsEmpty() || FBlueprintEditorUtils::IsFunctionUsed(Blueprint, Event->CustomFunctionName);
+    return NodeReferenceSummary(MoveTemp(Nodes), bReferenced);
+}
+
 TSharedRef<FJsonObject> LocalReferences(UBlueprint* Blueprint, UEdGraph* FunctionGraph, const FName VariableName)
 {
     TArray<UK2Node*> Nodes;
@@ -357,6 +402,16 @@ TSharedRef<FJsonObject> FunctionMetadata(const UK2Node_FunctionEntry* Entry)
     return Metadata;
 }
 
+TSharedRef<FJsonObject> CallableMetadata(const FKismetUserDeclaredFunctionMetadata& Source, bool bCallInEditor)
+{
+    const TSharedRef<FJsonObject> Metadata = MakeShared<FJsonObject>();
+    Metadata->SetStringField(TEXT("category"), Source.Category.ToString().Left(128));
+    Metadata->SetStringField(TEXT("tooltip"), Source.ToolTip.ToString().Left(512));
+    Metadata->SetStringField(TEXT("keywords"), Source.Keywords.ToString().Left(256));
+    Metadata->SetBoolField(TEXT("call_in_editor"), bCallInEditor);
+    return Metadata;
+}
+
 TSharedRef<FJsonObject> FunctionSignature(const UK2Node_FunctionEntry* Entry, const TArray<UK2Node_FunctionResult*>& Results)
 {
     const int32 Flags = Entry->GetFunctionFlags();
@@ -384,6 +439,54 @@ TSharedRef<FJsonObject> FunctionSignature(const UK2Node_FunctionEntry* Entry, co
     };
     Append(Entry, TEXT("input"));
     if (!Results.IsEmpty()) Append(Results[0], TEXT("output"));
+    Signature->SetArrayField(TEXT("parameters"), Parameters);
+    return Signature;
+}
+
+TSharedRef<FJsonObject> MacroSignature(UK2Node_Tunnel* Entry, UK2Node_Tunnel* Exit, bool bPure)
+{
+    const TSharedRef<FJsonObject> Signature = MakeShared<FJsonObject>();
+    Signature->SetBoolField(TEXT("pure"), bPure);
+    TArray<TSharedPtr<FJsonValue>> Parameters;
+    auto Append = [&Parameters](const UK2Node_Tunnel* Node, const TCHAR* Direction)
+    {
+        if (Node == nullptr) return;
+        for (const TSharedPtr<FUserPinInfo>& Pin : Node->UserDefinedPins)
+        {
+            if (!Pin.IsValid() || Pin->PinType.PinCategory == UEdGraphSchema_K2::PC_Exec) continue;
+            const TSharedRef<FJsonObject> Parameter = MakeShared<FJsonObject>();
+            Parameter->SetStringField(TEXT("name"), Pin->PinName.ToString());
+            Parameter->SetStringField(TEXT("direction"), Direction);
+            Parameter->SetObjectField(TEXT("type"), UnrealMCP::K2TypeCodec::EncodeType(Pin->PinType));
+            if (FCString::Strcmp(Direction, TEXT("input")) == 0 && !Pin->PinType.bIsReference)
+            {
+                Parameter->SetObjectField(TEXT("default"), UnrealMCP::K2TypeCodec::EncodeDefault(Pin->PinType, Pin->PinDefaultValue));
+            }
+            Parameters.Add(MakeShared<FJsonValueObject>(Parameter));
+        }
+    };
+    Append(Entry, TEXT("input"));
+    Append(Exit, TEXT("output"));
+    Signature->SetArrayField(TEXT("parameters"), Parameters);
+    return Signature;
+}
+
+TSharedRef<FJsonObject> CustomEventSignature(const UK2Node_CustomEvent* Event)
+{
+    const TSharedRef<FJsonObject> Signature = MakeShared<FJsonObject>();
+    TArray<TSharedPtr<FJsonValue>> Parameters;
+    for (const TSharedPtr<FUserPinInfo>& Pin : Event->UserDefinedPins)
+    {
+        if (!Pin.IsValid()) continue;
+        const TSharedRef<FJsonObject> Parameter = MakeShared<FJsonObject>();
+        Parameter->SetStringField(TEXT("name"), Pin->PinName.ToString());
+        Parameter->SetObjectField(TEXT("type"), UnrealMCP::K2TypeCodec::EncodeType(Pin->PinType));
+        if (!Pin->PinType.bIsReference)
+        {
+            Parameter->SetObjectField(TEXT("default"), UnrealMCP::K2TypeCodec::EncodeDefault(Pin->PinType, Pin->PinDefaultValue));
+        }
+        Parameters.Add(MakeShared<FJsonValueObject>(Parameter));
+    }
     Signature->SetArrayField(TEXT("parameters"), Parameters);
     return Signature;
 }
@@ -667,7 +770,7 @@ bool BuildInspection(
 {
     OutScanTruncated = false;
     if (!HasOnlyFields(Arguments, {TEXT("mode"), TEXT("asset_path"), TEXT("sections"), TEXT("graph_id"), TEXT("component_id"), TEXT("member_id"),
-        TEXT("function_id"), TEXT("local_id"),
+        TEXT("function_id"), TEXT("local_id"), TEXT("macro_id"), TEXT("custom_event_id"),
         TEXT("property_names"), TEXT("include_inherited"), TEXT("page_size")}))
     {
         OutError = {TEXT("invalid_argument"), TEXT("Inspection arguments contain an unknown field")};
@@ -686,11 +789,11 @@ bool BuildInspection(
         return false;
     }
     TSet<FString> Sections = {TEXT("summary"), TEXT("parent_class"), TEXT("compile_state"), TEXT("components"),
-        TEXT("variables"), TEXT("functions"), TEXT("local_variables"), TEXT("graphs")};
+        TEXT("variables"), TEXT("functions"), TEXT("macros"), TEXT("custom_events"), TEXT("local_variables"), TEXT("graphs")};
     if (Arguments.HasField(TEXT("sections")))
     {
         const TArray<TSharedPtr<FJsonValue>>* Values = nullptr;
-        if (!Arguments.TryGetArrayField(TEXT("sections"), Values) || Values == nullptr || Values->IsEmpty() || Values->Num() > 13)
+        if (!Arguments.TryGetArrayField(TEXT("sections"), Values) || Values == nullptr || Values->IsEmpty() || Values->Num() > 15)
         {
             OutError = {TEXT("invalid_argument"), TEXT("sections must be a non-empty bounded array")};
             return false;
@@ -740,6 +843,20 @@ bool BuildInspection(
         && (!Arguments.TryGetStringField(TEXT("local_id"), LocalFilter) || LocalFilter.Len() != 32))
     {
         OutError = {TEXT("invalid_argument"), TEXT("local_id must be a 32-character stable local-variable identity")};
+        return false;
+    }
+    FString MacroFilter;
+    if (Arguments.HasField(TEXT("macro_id"))
+        && (!Arguments.TryGetStringField(TEXT("macro_id"), MacroFilter) || MacroFilter.Len() != 32))
+    {
+        OutError = {TEXT("invalid_argument"), TEXT("macro_id must be a 32-character stable macro identity")};
+        return false;
+    }
+    FString CustomEventFilter;
+    if (Arguments.HasField(TEXT("custom_event_id"))
+        && (!Arguments.TryGetStringField(TEXT("custom_event_id"), CustomEventFilter) || CustomEventFilter.Len() != 32))
+    {
+        OutError = {TEXT("invalid_argument"), TEXT("custom_event_id must be a 32-character stable custom-event identity")};
         return false;
     }
     TSet<FString> PropertyNames;
@@ -1032,7 +1149,7 @@ bool BuildInspection(
                 {
                     if (!Pin.IsValid()) continue;
                     UEdGraphPin* LivePin = Node->FindPin(Pin->PinName);
-                    if (Sections.Contains(TEXT("parameters")))
+                    if (Sections.Contains(TEXT("parameters")) && MacroFilter.IsEmpty() && CustomEventFilter.IsEmpty())
                     {
                         const TSharedRef<FJsonObject> Value = Record(TEXT("parameter"));
                         Value->SetStringField(TEXT("id"), LivePin != nullptr ? GuidString(LivePin->PinId) : FString());
@@ -1102,6 +1219,193 @@ bool BuildInspection(
     if (!bLocalFound)
     {
         OutError = {TEXT("not_found"), TEXT("The requested local-variable identity was not found")};
+        return false;
+    }
+
+    bool bMacroFound = MacroFilter.IsEmpty();
+    for (const TPair<UBlueprint*, FString>& Owner : Owners)
+    {
+        for (UEdGraph* MacroGraph : Owner.Key->MacroGraphs)
+        {
+            if (MacroGraph == nullptr) continue;
+            const FString MacroId = GuidString(MacroGraph->GraphGuid);
+            if (!MacroFilter.IsEmpty() && MacroId != MacroFilter) continue;
+            bMacroFound = true;
+            UK2Node_Tunnel* Entry = nullptr;
+            UK2Node_Tunnel* Exit = nullptr;
+            bool bPure = false;
+            FKismetEditorUtilities::GetInformationOnMacro(MacroGraph, Entry, Exit, bPure);
+            const bool bLocalOwner = Owner.Key == Blueprint;
+            const bool bEditable = bLocalOwner && MacroId.Len() == 32 && Entry != nullptr && Exit != nullptr;
+            const TSharedRef<FJsonObject> Signature = MacroSignature(Entry, Exit, bPure);
+            const TSharedRef<FJsonObject> References = MacroReferences(Blueprint, MacroGraph);
+            if (Sections.Contains(TEXT("macros")))
+            {
+                const TSharedRef<FJsonObject> Value = Record(TEXT("macro"));
+                Value->SetStringField(TEXT("id"), MacroId);
+                Value->SetBoolField(TEXT("identity_stable"), !MacroId.IsEmpty());
+                Value->SetStringField(TEXT("name"), MacroGraph->GetName());
+                Value->SetStringField(TEXT("owner_blueprint"), Owner.Value);
+                Value->SetBoolField(TEXT("inherited"), !bLocalOwner);
+                Value->SetStringField(TEXT("ownership"), bLocalOwner ? TEXT("local") : TEXT("inherited"));
+                Value->SetBoolField(TEXT("editable"), bEditable);
+                Value->SetObjectField(TEXT("signature"), Signature);
+                Value->SetObjectField(TEXT("metadata"), Entry != nullptr
+                    ? CallableMetadata(Entry->MetaData, false) : CallableMetadata(FKismetUserDeclaredFunctionMetadata(), false));
+                Value->SetObjectField(TEXT("reference_summary"), References);
+                const TSharedRef<FJsonObject> Relationship = MakeShared<FJsonObject>();
+                Relationship->SetStringField(TEXT("graph_id"), MacroId);
+                Relationship->SetStringField(TEXT("graph_kind"), TEXT("macro"));
+                Value->SetObjectField(TEXT("graph_relationship"), Relationship);
+                const TSharedRef<FJsonObject> Required = MakeShared<FJsonObject>();
+                Required->SetStringField(TEXT("entry_node_id"), Entry != nullptr ? GuidString(Entry->NodeGuid) : FString());
+                Required->SetStringField(TEXT("exit_node_id"), Exit != nullptr ? GuidString(Exit->NodeGuid) : FString());
+                Required->SetBoolField(TEXT("entry_present"), Entry != nullptr);
+                Required->SetBoolField(TEXT("exit_present"), Exit != nullptr);
+                Required->SetBoolField(TEXT("valid"), Entry != nullptr && Exit != nullptr);
+                Value->SetObjectField(TEXT("required_nodes"), Required);
+                AddRecord(OutRecords, Value);
+            }
+            int32 ParameterIndex = 0;
+            auto AppendMacroParameters = [&](UK2Node_Tunnel* Node, const TCHAR* Direction)
+            {
+                if (Node == nullptr) return;
+                for (const TSharedPtr<FUserPinInfo>& Pin : Node->UserDefinedPins)
+                {
+                    if (!Pin.IsValid() || Pin->PinType.PinCategory == UEdGraphSchema_K2::PC_Exec) continue;
+                    UEdGraphPin* LivePin = Node->FindPin(Pin->PinName);
+                    if (Sections.Contains(TEXT("parameters")) && FunctionFilter.IsEmpty()
+                        && LocalFilter.IsEmpty() && CustomEventFilter.IsEmpty())
+                    {
+                        const TSharedRef<FJsonObject> Value = Record(TEXT("parameter"));
+                        Value->SetStringField(TEXT("id"), LivePin != nullptr ? GuidString(LivePin->PinId) : FString());
+                        Value->SetBoolField(TEXT("identity_stable"), LivePin != nullptr && LivePin->PinId.IsValid());
+                        Value->SetStringField(TEXT("owner_kind"), TEXT("macro"));
+                        Value->SetStringField(TEXT("owner_id"), MacroId);
+                        Value->SetStringField(TEXT("macro_id"), MacroId);
+                        Value->SetStringField(TEXT("macro_name"), MacroGraph->GetName());
+                        Value->SetNumberField(TEXT("index"), ParameterIndex);
+                        Value->SetStringField(TEXT("name"), Pin->PinName.ToString());
+                        Value->SetStringField(TEXT("direction"), Direction);
+                        Value->SetObjectField(TEXT("type"), UnrealMCP::K2TypeCodec::EncodeType(Pin->PinType));
+                        if (FCString::Strcmp(Direction, TEXT("input")) == 0 && !Pin->PinType.bIsReference)
+                        {
+                            Value->SetObjectField(TEXT("default"), UnrealMCP::K2TypeCodec::EncodeDefault(Pin->PinType, Pin->PinDefaultValue));
+                        }
+                        AddRecord(OutRecords, Value);
+                    }
+                    Fingerprint.Add(TEXT("macro_parameter|") + MacroId + TEXT("|") + LexToString(ParameterIndex) + TEXT("|")
+                        + Direction + TEXT("|") + Pin->PinName.ToString() + TEXT("|") + VariableTypeFingerprint(Pin->PinType)
+                        + TEXT("|") + Pin->PinDefaultValue);
+                    ++ParameterIndex;
+                }
+            };
+            AppendMacroParameters(Entry, TEXT("input"));
+            AppendMacroParameters(Exit, TEXT("output"));
+            const FKismetUserDeclaredFunctionMetadata* Metadata = Entry != nullptr ? &Entry->MetaData : nullptr;
+            Fingerprint.Add(TEXT("macro|") + Owner.Value + TEXT("|") + MacroId + TEXT("|") + MacroGraph->GetName()
+                + TEXT("|") + LexToString(bPure) + TEXT("|") + (Metadata != nullptr ? Metadata->Category.ToString() : FString())
+                + TEXT("|") + (Metadata != nullptr ? Metadata->ToolTip.ToString() : FString())
+                + TEXT("|") + (Metadata != nullptr ? Metadata->Keywords.ToString() : FString())
+                + TEXT("|") + (Entry != nullptr ? GuidString(Entry->NodeGuid) : FString())
+                + TEXT("|") + (Exit != nullptr ? GuidString(Exit->NodeGuid) : FString()));
+        }
+    }
+    if (!bMacroFound)
+    {
+        OutError = {TEXT("not_found"), TEXT("The requested macro identity was not found")};
+        return false;
+    }
+
+    bool bCustomEventFound = CustomEventFilter.IsEmpty();
+    for (const TPair<UBlueprint*, FString>& Owner : Owners)
+    {
+        for (UEdGraph* EventGraph : Owner.Key->UbergraphPages)
+        {
+            if (EventGraph == nullptr || !FBlueprintEditorUtils::IsEventGraph(EventGraph)) continue;
+            TArray<UK2Node_CustomEvent*> Events;
+            EventGraph->GetNodesOfClass(Events);
+            Events.Sort([](const UK2Node_CustomEvent& Left, const UK2Node_CustomEvent& Right)
+            {
+                return GuidString(Left.NodeGuid) < GuidString(Right.NodeGuid);
+            });
+            for (UK2Node_CustomEvent* Event : Events)
+            {
+                if (Event == nullptr) continue;
+                const FString EventId = GuidString(Event->NodeGuid);
+                if (!CustomEventFilter.IsEmpty() && EventId != CustomEventFilter) continue;
+                bCustomEventFound = true;
+                const bool bLocalOwner = Owner.Key == Blueprint;
+                const bool bOverride = Event->IsOverride();
+                const bool bEditable = bLocalOwner && !bOverride && Event->IsEditable() && EventId.Len() == 32;
+                const TSharedRef<FJsonObject> Signature = CustomEventSignature(Event);
+                const TSharedRef<FJsonObject> References = CustomEventReferences(Blueprint, Event);
+                if (Sections.Contains(TEXT("custom_events")))
+                {
+                    const TSharedRef<FJsonObject> Value = Record(TEXT("custom_event"));
+                    Value->SetStringField(TEXT("id"), EventId);
+                    Value->SetBoolField(TEXT("identity_stable"), !EventId.IsEmpty());
+                    Value->SetStringField(TEXT("name"), Event->CustomFunctionName.ToString());
+                    Value->SetStringField(TEXT("owner_blueprint"), Owner.Value);
+                    Value->SetBoolField(TEXT("inherited"), !bLocalOwner);
+                    Value->SetStringField(TEXT("ownership"), !bLocalOwner ? TEXT("inherited")
+                        : bOverride ? TEXT("custom_event_override") : TEXT("local"));
+                    Value->SetBoolField(TEXT("editable"), bEditable);
+                    Value->SetObjectField(TEXT("signature"), Signature);
+                    Value->SetObjectField(TEXT("metadata"), CallableMetadata(Event->GetUserDefinedMetaData(), Event->bCallInEditor));
+                    Value->SetObjectField(TEXT("reference_summary"), References);
+                    const TSharedRef<FJsonObject> Relationship = MakeShared<FJsonObject>();
+                    Relationship->SetStringField(TEXT("graph_id"), GuidString(EventGraph->GraphGuid));
+                    Relationship->SetStringField(TEXT("graph_kind"), TEXT("event"));
+                    Value->SetObjectField(TEXT("graph_relationship"), Relationship);
+                    const TSharedRef<FJsonObject> Required = MakeShared<FJsonObject>();
+                    Required->SetStringField(TEXT("event_node_id"), EventId);
+                    Required->SetBoolField(TEXT("event_node_present"), true);
+                    Required->SetBoolField(TEXT("valid"), FBlueprintEditorUtils::IsEventGraph(EventGraph));
+                    Value->SetObjectField(TEXT("required_nodes"), Required);
+                    AddRecord(OutRecords, Value);
+                }
+                int32 ParameterIndex = 0;
+                for (const TSharedPtr<FUserPinInfo>& Pin : Event->UserDefinedPins)
+                {
+                    if (!Pin.IsValid()) continue;
+                    UEdGraphPin* LivePin = Event->FindPin(Pin->PinName);
+                    if (Sections.Contains(TEXT("parameters")) && FunctionFilter.IsEmpty()
+                        && LocalFilter.IsEmpty() && MacroFilter.IsEmpty())
+                    {
+                        const TSharedRef<FJsonObject> Value = Record(TEXT("parameter"));
+                        Value->SetStringField(TEXT("id"), LivePin != nullptr ? GuidString(LivePin->PinId) : FString());
+                        Value->SetBoolField(TEXT("identity_stable"), LivePin != nullptr && LivePin->PinId.IsValid());
+                        Value->SetStringField(TEXT("owner_kind"), TEXT("custom_event"));
+                        Value->SetStringField(TEXT("owner_id"), EventId);
+                        Value->SetStringField(TEXT("custom_event_id"), EventId);
+                        Value->SetStringField(TEXT("custom_event_name"), Event->CustomFunctionName.ToString());
+                        Value->SetNumberField(TEXT("index"), ParameterIndex);
+                        Value->SetStringField(TEXT("name"), Pin->PinName.ToString());
+                        Value->SetStringField(TEXT("direction"), TEXT("input"));
+                        Value->SetObjectField(TEXT("type"), UnrealMCP::K2TypeCodec::EncodeType(Pin->PinType));
+                        if (!Pin->PinType.bIsReference)
+                        {
+                            Value->SetObjectField(TEXT("default"), UnrealMCP::K2TypeCodec::EncodeDefault(Pin->PinType, Pin->PinDefaultValue));
+                        }
+                        AddRecord(OutRecords, Value);
+                    }
+                    Fingerprint.Add(TEXT("custom_event_parameter|") + EventId + TEXT("|") + LexToString(ParameterIndex)
+                        + TEXT("|") + Pin->PinName.ToString() + TEXT("|") + VariableTypeFingerprint(Pin->PinType)
+                        + TEXT("|") + Pin->PinDefaultValue);
+                    ++ParameterIndex;
+                }
+                const FKismetUserDeclaredFunctionMetadata& Metadata = Event->GetUserDefinedMetaData();
+                Fingerprint.Add(TEXT("custom_event|") + Owner.Value + TEXT("|") + GuidString(EventGraph->GraphGuid) + TEXT("|")
+                    + EventId + TEXT("|") + Event->CustomFunctionName.ToString() + TEXT("|") + LexToString(bOverride)
+                    + TEXT("|") + Metadata.Category.ToString() + TEXT("|") + Metadata.ToolTip.ToString()
+                    + TEXT("|") + Metadata.Keywords.ToString() + TEXT("|") + LexToString(Event->bCallInEditor));
+            }
+        }
+    }
+    if (!bCustomEventFound)
+    {
+        OutError = {TEXT("not_found"), TEXT("The requested custom-event identity was not found")};
         return false;
     }
 

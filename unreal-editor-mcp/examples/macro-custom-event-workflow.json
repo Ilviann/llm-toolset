@@ -1,0 +1,85 @@
+{
+  "inspect_before_edit": {
+    "mode": "inspect",
+    "asset_path": "/Game/Actors/BP_Door.BP_Door",
+    "sections": ["macros", "custom_events", "parameters", "graphs"],
+    "include_inherited": true,
+    "page_size": 100
+  },
+  "add_macro_shell": {
+    "operation_id": "99999999999999999999999999999999",
+    "asset_path": "/Game/Actors/BP_Door.BP_Door",
+    "expected_snapshot": "0123456789abcdef0123456789abcdef01234567",
+    "target": "macro",
+    "operation": "add",
+    "name": "ClampHealth",
+    "signature": {
+      "pure": true,
+      "parameters": [
+        {
+          "name": "Value",
+          "direction": "input",
+          "type": {"category": "int", "container": "none"},
+          "default": {"kind": "literal", "value": 100}
+        },
+        {
+          "name": "Result",
+          "direction": "output",
+          "type": {"category": "int", "container": "none"}
+        }
+      ]
+    },
+    "metadata": {"category": "Stats", "tooltip": "Clamps one health value"}
+  },
+  "inspect_returned_macro": {
+    "mode": "inspect",
+    "asset_path": "/Game/Actors/BP_Door.BP_Door",
+    "sections": ["macros", "parameters"],
+    "macro_id": "11111111111111111111111111111111",
+    "page_size": 25
+  },
+  "add_custom_event_to_returned_event_graph": {
+    "operation_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "asset_path": "/Game/Actors/BP_Door.BP_Door",
+    "expected_snapshot": "89abcdef0123456789abcdef0123456789abcdef",
+    "target": "custom_event",
+    "operation": "add",
+    "graph_id": "22222222222222222222222222222222",
+    "name": "OnHealthChanged",
+    "signature": {
+      "parameters": [
+        {
+          "name": "NewHealth",
+          "type": {"category": "int", "container": "none"},
+          "default": {"kind": "literal", "value": 100}
+        }
+      ]
+    },
+    "metadata": {"category": "Stats", "tooltip": "Health changed", "call_in_editor": true}
+  },
+  "inspect_returned_custom_event": {
+    "mode": "inspect",
+    "asset_path": "/Game/Actors/BP_Door.BP_Door",
+    "sections": ["custom_events", "parameters"],
+    "custom_event_id": "33333333333333333333333333333333",
+    "page_size": 25
+  },
+  "remove_macro_only_if_unreferenced": {
+    "operation_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "asset_path": "/Game/Actors/BP_Door.BP_Door",
+    "expected_snapshot": "fedcba9876543210fedcba9876543210fedcba98",
+    "target": "macro",
+    "operation": "remove",
+    "macro_id": "11111111111111111111111111111111",
+    "policy": "reject_if_referenced"
+  },
+  "remove_custom_event_only_if_unreferenced": {
+    "operation_id": "cccccccccccccccccccccccccccccccc",
+    "asset_path": "/Game/Actors/BP_Door.BP_Door",
+    "expected_snapshot": "abcdef0123456789abcdef0123456789abcdef01",
+    "target": "custom_event",
+    "operation": "remove",
+    "custom_event_id": "33333333333333333333333333333333",
+    "policy": "reject_if_referenced"
+  }
+}

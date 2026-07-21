@@ -12,6 +12,9 @@
 #include "Kismet2/KismetEditorUtilities.h"
 #include "K2Node_FunctionEntry.h"
 #include "K2Node_FunctionResult.h"
+#include "K2Node_CustomEvent.h"
+#include "K2Node_MacroInstance.h"
+#include "K2Node_Tunnel.h"
 #include "ScopedTransaction.h"
 #include "SubobjectDataSubsystem.h"
 
@@ -25,6 +28,9 @@ void RequirePublicTypes()
     static_assert(TIsDerivedFrom<UBlueprintNodeSpawner, UObject>::Value);
     static_assert(TIsDerivedFrom<UK2Node_FunctionEntry, UK2Node>::Value);
     static_assert(TIsDerivedFrom<UK2Node_FunctionResult, UK2Node>::Value);
+    static_assert(TIsDerivedFrom<UK2Node_CustomEvent, UK2Node>::Value);
+    static_assert(TIsDerivedFrom<UK2Node_MacroInstance, UK2Node>::Value);
+    static_assert(TIsDerivedFrom<UK2Node_Tunnel, UK2Node>::Value);
     static_assert(TIsDerivedFrom<USubobjectDataSubsystem, UEngineSubsystem>::Value);
     (void)FHttpServerModule::IsAvailable;
     (void)FAssetRegistryModule::GetRegistry;

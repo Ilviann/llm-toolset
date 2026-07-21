@@ -5,4 +5,4 @@ References in this directory are grouped by the component that owns the contract
 - [`python/`](python/index.md) — Python project, discovery, error, schema, and bridge-client contracts.
 - [`editor-bridge/`](editor-bridge/index.md) — native request, error, capability, state, discovery, and limit contracts.
 - [`blueprint-inspector/`](blueprint-inspector/index.md) — Actor Blueprint queries, pages, snapshots, identities, and bounded value encodings.
-- [`blueprint-mutator/`](blueprint-mutator/index.md) — Actor Blueprint creation, compile/save, components/defaults, member variables, function signatures, locals, diagnostics, mutation scope, and cleanup contracts.
+- [`blueprint-mutator/`](blueprint-mutator/index.md) — Actor Blueprint creation, compile/save, components/defaults, member variables, functions, locals, macros, custom events, diagnostics, mutation scope, and cleanup contracts.

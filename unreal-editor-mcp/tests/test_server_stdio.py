@@ -15,7 +15,7 @@ class FakeBridge:
     def call(self, command, arguments=None):
         self.calls.append((command, arguments))
         if command == "capabilities":
-            return {"bridge_version": "0.6.0", "commands": [
+            return {"bridge_version": "0.7.0", "commands": [
                 "capabilities", "editor_state", "operation_status", "blueprint_inspect",
                 "blueprint_create", "blueprint_compile", "blueprint_save",
                 "blueprint_component_edit", "blueprint_default_edit",
@@ -36,7 +36,7 @@ class ServerStdioTests(unittest.TestCase):
         bridge = FakeBridge()
         server = MCPServer(bridge)
         initialized = server.handle({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2025-06-18"}})
-        self.assertEqual(initialized["result"]["serverInfo"]["version"], "0.6.0")
+        self.assertEqual(initialized["result"]["serverInfo"]["version"], "0.7.0")
         listed = server.handle({"jsonrpc": "2.0", "id": 2, "method": "tools/list"})
         self.assertEqual([tool["name"] for tool in listed["result"]["tools"]], [
             "capabilities", "editor_state", "operation_status", "blueprint_inspect",
@@ -67,6 +67,8 @@ class ServerStdioTests(unittest.TestCase):
             {"mode": "inspect", "asset_path": "/Game/Actors/BP_Light.BP_Light", "sections": ["variables"], "member_id": "e" * 32},
             {"mode": "inspect", "asset_path": "/Game/Actors/BP_Light.BP_Light", "sections": ["functions", "parameters"], "function_id": "f" * 32},
             {"mode": "inspect", "asset_path": "/Game/Actors/BP_Light.BP_Light", "sections": ["local_variables"], "local_id": "d" * 32},
+            {"mode": "inspect", "asset_path": "/Game/Actors/BP_Light.BP_Light", "sections": ["macros", "parameters"], "macro_id": "c" * 32},
+            {"mode": "inspect", "asset_path": "/Game/Actors/BP_Light.BP_Light", "sections": ["custom_events", "parameters"], "custom_event_id": "9" * 32},
             {"mode": "inspect", "asset_path": "/ProjectPlugin/BP_Light.BP_Light"},
             {"cursor": "a" * 32, "page_size": 25},
         )
@@ -138,6 +140,25 @@ class ServerStdioTests(unittest.TestCase):
                 "target": "local_variable", "operation": "remove", "function_id": "f" * 32, "local_id": "d" * 32,
                 "policy": "reject_if_referenced"}),
             ("blueprint_member_edit", {"operation_id": operation_id, "asset_path": "/Game/Actors/BP_Light", "expected_snapshot": snapshot,
+                "target": "macro", "operation": "add", "name": "ComputeFlow",
+                "signature": {"pure": False, "parameters": [
+                    {"name": "Count", "direction": "input", "type": {"category": "int", "container": "none"},
+                     "default": {"kind": "literal", "value": 1}},
+                    {"name": "Result", "direction": "output", "type": {"category": "boolean", "container": "none"}},
+                ]}, "metadata": {"category": "Logic", "tooltip": "Compute a flow"}}),
+            ("blueprint_member_edit", {"operation_id": operation_id, "asset_path": "/Game/Actors/BP_Light", "expected_snapshot": snapshot,
+                "target": "macro", "operation": "update", "macro_id": "c" * 32, "field": "signature",
+                "signature": {"pure": True, "parameters": []}, "policy": "reject_if_referenced"}),
+            ("blueprint_member_edit", {"operation_id": operation_id, "asset_path": "/Game/Actors/BP_Light", "expected_snapshot": snapshot,
+                "target": "custom_event", "operation": "add", "graph_id": "8" * 32, "name": "OnReady",
+                "signature": {"parameters": [
+                    {"name": "Value", "type": {"category": "string", "container": "none"},
+                     "default": {"kind": "literal", "value": "ready"}},
+                ]}, "metadata": {"category": "Events", "call_in_editor": True}}),
+            ("blueprint_member_edit", {"operation_id": operation_id, "asset_path": "/Game/Actors/BP_Light", "expected_snapshot": snapshot,
+                "target": "custom_event", "operation": "remove", "custom_event_id": "9" * 32,
+                "policy": "reject_if_referenced"}),
+            ("blueprint_member_edit", {"operation_id": operation_id, "asset_path": "/Game/Actors/BP_Light", "expected_snapshot": snapshot,
                 "operation": "update", "member_id": "e" * 32, "field": "metadata",
                 "metadata": {"replication": "rep_notify", "rep_notify_function": "OnRep_Health", "replication_condition": "COND_OwnerOnly"}}),
             ("operation_status", {"operation_id": operation_id, "bridge_instance_id": "d" * 32}),
@@ -168,6 +189,12 @@ class ServerStdioTests(unittest.TestCase):
             ("blueprint_member_edit", {"operation_id": operation_id, "asset_path": "/Game/BP_A", "expected_snapshot": snapshot,
                 "target": "local_variable", "operation": "remove", "function_id": "f" * 32, "local_id": "d" * 32,
                 "policy": "cascade"}),
+            ("blueprint_member_edit", {"operation_id": operation_id, "asset_path": "/Game/BP_A", "expected_snapshot": snapshot,
+                "target": "macro", "operation": "add", "name": "Bad",
+                "signature": {"pure": False, "parameters": []}, "metadata": {"call_in_editor": True}}),
+            ("blueprint_member_edit", {"operation_id": operation_id, "asset_path": "/Game/BP_A", "expected_snapshot": snapshot,
+                "target": "custom_event", "operation": "add", "graph_id": "8" * 32, "name": "Bad",
+                "signature": {"parameters": [{"name": "Bad", "direction": "input", "type": {"category": "int", "container": "none"}}]}}),
         )
         for name, arguments in invalid:
             with self.subTest(name=name, arguments=arguments):

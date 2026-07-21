@@ -60,6 +60,22 @@
     "local_id": "22222222222222222222222222222222",
     "page_size": 10
   },
+  "inspect_one_macro_signature": {
+    "mode": "inspect",
+    "asset_path": "/Game/Actors/BP_Door.BP_Door",
+    "sections": ["macros", "parameters"],
+    "macro_id": "33333333333333333333333333333333",
+    "include_inherited": true,
+    "page_size": 25
+  },
+  "inspect_one_custom_event_signature": {
+    "mode": "inspect",
+    "asset_path": "/Game/Actors/BP_Door.BP_Door",
+    "sections": ["custom_events", "parameters"],
+    "custom_event_id": "44444444444444444444444444444444",
+    "include_inherited": true,
+    "page_size": 25
+  },
   "continue_page": {
     "cursor": "0123456789abcdef0123456789abcdef",
     "page_size": 50

@@ -35,6 +35,8 @@ _COMPONENT_ID = {
 _MEMBER_ID = _COMPONENT_ID
 _FUNCTION_ID = _COMPONENT_ID
 _LOCAL_ID = _COMPONENT_ID
+_MACRO_ID = _COMPONENT_ID
+_CUSTOM_EVENT_ID = _COMPONENT_ID
 _PROPERTY_VALUE = {
     "oneOf": [
         {"type": "boolean"},
@@ -189,6 +191,44 @@ _FUNCTION_METADATA = {
     "minProperties": 1,
     "additionalProperties": False,
 }
+_MACRO_METADATA = {
+    "type": "object",
+    "properties": {
+        "category": {"type": "string", "maxLength": 128},
+        "tooltip": {"type": "string", "maxLength": 512},
+        "keywords": {"type": "string", "maxLength": 256},
+    },
+    "minProperties": 1,
+    "additionalProperties": False,
+}
+
+_MACRO_SIGNATURE = {
+    "type": "object",
+    "properties": {
+        "pure": {"type": "boolean"},
+        "parameters": {"type": "array", "maxItems": 32, "items": _FUNCTION_PARAMETER},
+    },
+    "required": ["pure", "parameters"],
+    "additionalProperties": False,
+}
+_CUSTOM_EVENT_PARAMETER = {
+    "type": "object",
+    "properties": {
+        "name": {"type": "string", "minLength": 1, "maxLength": 128},
+        "type": _K2_TYPE,
+        "default": _K2_DEFAULT,
+    },
+    "required": ["name", "type"],
+    "additionalProperties": False,
+}
+_CUSTOM_EVENT_SIGNATURE = {
+    "type": "object",
+    "properties": {
+        "parameters": {"type": "array", "maxItems": 32, "items": _CUSTOM_EVENT_PARAMETER},
+    },
+    "required": ["parameters"],
+    "additionalProperties": False,
+}
 
 
 def _mutation_properties(**extra: object) -> dict[str, object]:
@@ -283,12 +323,13 @@ TOOLS: Final = (
                         "sections": {
                             "type": "array",
                             "minItems": 1,
-                            "maxItems": 13,
+                            "maxItems": 15,
                             "items": {
                                 "type": "string",
                                 "enum": [
                                     "summary", "parent_class", "compile_state", "components",
-                                    "class_defaults", "variables", "functions", "parameters", "local_variables",
+                                    "class_defaults", "variables", "functions", "macros", "custom_events",
+                                    "parameters", "local_variables",
                                     "graphs", "nodes", "pins", "connections",
                                 ],
                             },
@@ -298,6 +339,8 @@ TOOLS: Final = (
                         "member_id": _MEMBER_ID,
                         "function_id": _FUNCTION_ID,
                         "local_id": _LOCAL_ID,
+                        "macro_id": _MACRO_ID,
+                        "custom_event_id": _CUSTOM_EVENT_ID,
                         "property_names": {
                             "type": "array",
                             "minItems": 1,
@@ -406,7 +449,7 @@ TOOLS: Final = (
     },
     {
         "name": "blueprint_member_edit",
-        "description": "Safely edit one Actor Blueprint member variable, user function shell/signature, or function-local variable.",
+        "description": "Safely edit one Actor Blueprint variable, function, local, macro, or custom-event shell.",
         "inputSchema": {
             "oneOf": [
                 _member_shape(
@@ -506,6 +549,65 @@ TOOLS: Final = (
                     "local_variable", "remove", ["function_id", "local_id", "policy"],
                     function_id=_FUNCTION_ID,
                     local_id=_LOCAL_ID,
+                    policy={"const": "reject_if_referenced"},
+                ),
+                _scoped_member_shape(
+                    "macro", "add", ["name", "signature"],
+                    name={"type": "string", "minLength": 1, "maxLength": 128},
+                    signature=_MACRO_SIGNATURE,
+                    metadata=_MACRO_METADATA,
+                ),
+                _scoped_member_shape(
+                    "macro", "rename", ["macro_id", "new_name"],
+                    macro_id=_MACRO_ID,
+                    new_name={"type": "string", "minLength": 1, "maxLength": 128},
+                ),
+                _scoped_member_shape(
+                    "macro", "update", ["macro_id", "field", "signature", "policy"],
+                    macro_id=_MACRO_ID,
+                    field={"const": "signature"},
+                    signature=_MACRO_SIGNATURE,
+                    policy={"const": "reject_if_referenced"},
+                ),
+                _scoped_member_shape(
+                    "macro", "update", ["macro_id", "field", "metadata"],
+                    macro_id=_MACRO_ID,
+                    field={"const": "metadata"},
+                    metadata=_MACRO_METADATA,
+                ),
+                _scoped_member_shape(
+                    "macro", "remove", ["macro_id", "policy"],
+                    macro_id=_MACRO_ID,
+                    policy={"const": "reject_if_referenced"},
+                ),
+                _scoped_member_shape(
+                    "custom_event", "add", ["graph_id", "name", "signature"],
+                    graph_id=_COMPONENT_ID,
+                    name={"type": "string", "minLength": 1, "maxLength": 128},
+                    signature=_CUSTOM_EVENT_SIGNATURE,
+                    metadata=_FUNCTION_METADATA,
+                ),
+                _scoped_member_shape(
+                    "custom_event", "rename", ["custom_event_id", "new_name"],
+                    custom_event_id=_CUSTOM_EVENT_ID,
+                    new_name={"type": "string", "minLength": 1, "maxLength": 128},
+                ),
+                _scoped_member_shape(
+                    "custom_event", "update", ["custom_event_id", "field", "signature", "policy"],
+                    custom_event_id=_CUSTOM_EVENT_ID,
+                    field={"const": "signature"},
+                    signature=_CUSTOM_EVENT_SIGNATURE,
+                    policy={"const": "reject_if_referenced"},
+                ),
+                _scoped_member_shape(
+                    "custom_event", "update", ["custom_event_id", "field", "metadata"],
+                    custom_event_id=_CUSTOM_EVENT_ID,
+                    field={"const": "metadata"},
+                    metadata=_FUNCTION_METADATA,
+                ),
+                _scoped_member_shape(
+                    "custom_event", "remove", ["custom_event_id", "policy"],
+                    custom_event_id=_CUSTOM_EVENT_ID,
                     policy={"const": "reject_if_referenced"},
                 ),
             ]

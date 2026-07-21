@@ -3,7 +3,7 @@
 - [x] [Phase 4 — Reliable mutations, Actor components, and defaults](docs/todo/phase-04.md) — Add reliable mutation delivery, Actor component editing, and Blueprint/component defaults.
 - [x] [Phase 5 — Blueprint member variables](docs/todo/phase-05.md) — Add typed Blueprint member-variable inspection and editing.
 - [x] [Phase 6 — Function signatures and local variables](docs/todo/phase-06.md) — Add function signatures, function shells, and local variables.
-- [ ] [Phase 7 — Macros and custom events](docs/todo/phase-07.md) — Add macro and custom-event shells with matching inspection.
+- [x] [Phase 7 — Macros and custom events](docs/todo/phase-07.md) — Add macro and custom-event shells with matching inspection.
 - [ ] [Phase 8 — Action-catalog infrastructure and core actions](docs/todo/phase-08.md) — Add the bounded action-catalog infrastructure and core actions.
 - [ ] [Phase 9 — Expanded action-catalog families](docs/todo/phase-09.md) — Expand the action catalog to the remaining supported action families.
 - [ ] [Phase 10 — Graph-node lifecycle](docs/todo/phase-10.md) — Add transactional graph-node creation, movement, and removal.

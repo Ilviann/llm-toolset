@@ -42,7 +42,7 @@ def wait_until_ready(layout: ProjectLayout, process: subprocess.Popen[bytes], de
         try:
             record = read_discovery(layout)
             result = UnrealBridge(layout, timeout=2.0).call("capabilities")
-            if result.get("bridge_ready") is True and record.bridge_version == "0.6.0":
+            if result.get("bridge_ready") is True and record.bridge_version == "0.7.0":
                 return
         except Exception as error:
             last_error = str(error)
@@ -97,7 +97,7 @@ def send_without_reading(layout: ProjectLayout, command: str, arguments: dict[st
         headers={
             "Authorization": "Bearer " + read_token(layout),
             "Content-Type": "application/json",
-            "X-Unreal-MCP-Version": "0.6.0",
+            "X-Unreal-MCP-Version": "0.7.0",
         },
     )
     connection.close()
@@ -149,6 +149,7 @@ def run_automation(executable: Path, project: Path, environment: dict[str, str],
         "K2TypeCodec",
         "MemberVariables",
         "FunctionsAndLocals",
+        "MacrosAndCustomEvents",
     )
     if test_filter == "UnrealMCP":
         expected = all_expected
@@ -160,6 +161,8 @@ def run_automation(executable: Path, project: Path, environment: dict[str, str],
         expected = tuple(name for name in all_expected if name in {"K2TypeCodec", "MemberVariables"})
     elif test_filter == "UnrealMCP.Phase6":
         expected = tuple(name for name in all_expected if name == "FunctionsAndLocals")
+    elif test_filter == "UnrealMCP.Phase7":
+        expected = tuple(name for name in all_expected if name == "MacrosAndCustomEvents")
     else:
         leaf = test_filter.rsplit(".", 1)[-1]
         expected = (leaf,) if leaf in all_expected else ()
@@ -248,13 +251,16 @@ def main() -> int:
                 "blueprint_component_edit", "blueprint_default_edit", "blueprint_member_edit",
             ]:
                 raise AssertionError("released command catalog mismatch")
-            if capabilities.get("bridge_version") != "0.6.0" or state.get("bridge_ready") is not True:
+            if capabilities.get("bridge_version") != "0.7.0" or state.get("bridge_ready") is not True:
                 raise AssertionError("capability/state contract mismatch")
             if capabilities.get("features", {}).get("blueprint_mutation") is not True:
                 raise AssertionError("Phase 6 mutation capability is unavailable")
             for feature in ("blueprint_functions", "blueprint_local_variables", "blueprint_rep_notify"):
                 if capabilities.get("features", {}).get(feature) is not True:
                     raise AssertionError(f"Phase 6 capability is unavailable: {feature}")
+            for feature in ("blueprint_macros", "blueprint_custom_events"):
+                if capabilities.get("features", {}).get(feature) is not True:
+                    raise AssertionError(f"Phase 7 capability is unavailable: {feature}")
             if capabilities.get("asset_access") != {
                 "read_scope": "all_mounted_content",
                 "mutation_scope": "project_content_and_local_project_plugins",
@@ -421,10 +427,61 @@ def main() -> int:
             })
             if notified_member.get("member", {}).get("replication", {}).get("rep_notify_function_id") != notify_id:
                 raise AssertionError(f"RepNotify relationship did not bind the function identity: {notified_member!r}")
-            compiled = bridge.call("blueprint_compile", {
+            graph_inspection = bridge.call("blueprint_inspect", {
+                "mode": "inspect",
+                "asset_path": asset_path,
+                "sections": ["graphs"],
+                "page_size": 100,
+            })
+            event_graphs = [
+                record for record in graph_inspection.get("records", [])
+                if record.get("section") == "graph" and record.get("kind") == "event" and record.get("inherited") is False
+            ]
+            if not event_graphs or not isinstance(event_graphs[0].get("id"), str):
+                raise AssertionError(f"local event graph identity is unavailable: {event_graphs!r}")
+            macro = bridge.call("blueprint_member_edit", {
                 "operation_id": uuid.uuid4().hex,
                 "asset_path": asset_path,
                 "expected_snapshot": notified_member["snapshot_id"],
+                "target": "macro",
+                "operation": "add",
+                "name": "ClampHealth",
+                "signature": {
+                    "pure": True,
+                    "parameters": [
+                        {"name": "Value", "direction": "input", "type": {"category": "int", "container": "none"},
+                         "default": {"kind": "literal", "value": 100}},
+                        {"name": "Result", "direction": "output", "type": {"category": "int", "container": "none"}},
+                    ],
+                },
+                "metadata": {"category": "Stats", "tooltip": "Clamp one health value"},
+            })
+            macro_id = macro.get("macro", {}).get("id")
+            if not isinstance(macro_id, str) or len(macro_id) != 32:
+                raise AssertionError(f"macro mutation omitted its stable identity: {macro!r}")
+            custom_event = bridge.call("blueprint_member_edit", {
+                "operation_id": uuid.uuid4().hex,
+                "asset_path": asset_path,
+                "expected_snapshot": macro["snapshot_id"],
+                "target": "custom_event",
+                "operation": "add",
+                "graph_id": event_graphs[0]["id"],
+                "name": "OnHealthChanged",
+                "signature": {
+                    "parameters": [
+                        {"name": "NewHealth", "type": {"category": "int", "container": "none"},
+                         "default": {"kind": "literal", "value": 100}},
+                    ],
+                },
+                "metadata": {"category": "Stats", "tooltip": "Health changed", "call_in_editor": True},
+            })
+            custom_event_id = custom_event.get("custom_event", {}).get("id")
+            if not isinstance(custom_event_id, str) or len(custom_event_id) != 32:
+                raise AssertionError(f"custom-event mutation omitted its stable identity: {custom_event!r}")
+            compiled = bridge.call("blueprint_compile", {
+                "operation_id": uuid.uuid4().hex,
+                "asset_path": asset_path,
+                "expected_snapshot": custom_event["snapshot_id"],
             })
             if compiled.get("compile_succeeded") is not True or compiled.get("saved") is not False:
                 raise AssertionError(f"explicit Blueprint compile contract mismatch: {compiled!r}")
@@ -455,7 +512,7 @@ def main() -> int:
                 "mode": "inspect",
                 "asset_path": "/Game/UnrealMCPPhase4/BP_ComponentFixture.BP_ComponentFixture",
                 "sections": ["summary", "parent_class", "compile_state", "components", "class_defaults", "variables",
-                             "functions", "parameters", "local_variables", "graphs", "nodes", "pins", "connections"],
+                             "functions", "macros", "custom_events", "parameters", "local_variables", "graphs", "nodes", "pins", "connections"],
                 "property_names": ["InitialLifeSpan"],
                 "page_size": 100,
             })
@@ -518,6 +575,22 @@ def main() -> int:
             ]
             if len(locals_) != 1 or locals_[0].get("scope", {}).get("function_id") != function_id:
                 raise AssertionError(f"local-variable scope changed after restart: {locals_!r}")
+            macros = [
+                record for record in reloaded.get("records", [])
+                if record.get("section") == "macro" and record.get("id") == macro_id
+            ]
+            if len(macros) != 1 or macros[0].get("name") != "ClampHealth" or macros[0].get("required_nodes", {}).get("valid") is not True:
+                raise AssertionError(f"macro shell changed after restart: {macros!r}")
+            if macros[0].get("signature", {}).get("pure") is not True:
+                raise AssertionError(f"macro signature changed after restart: {macros!r}")
+            custom_events = [
+                record for record in reloaded.get("records", [])
+                if record.get("section") == "custom_event" and record.get("id") == custom_event_id
+            ]
+            if len(custom_events) != 1 or custom_events[0].get("name") != "OnHealthChanged":
+                raise AssertionError(f"custom-event shell changed after restart: {custom_events!r}")
+            if custom_events[0].get("graph_relationship", {}).get("graph_kind") != "event":
+                raise AssertionError(f"custom-event graph relationship changed after restart: {custom_events!r}")
         except Exception:
             log.seek(0)
             sys.stderr.buffer.write(log.read()[-32_000:])
@@ -534,7 +607,7 @@ def main() -> int:
             pass
         else:
             raise AssertionError("a live discovery heartbeat remained after editor termination")
-    print("Phase 6 integration passed: functions/signatures/locals, RepNotify, typed members, components/defaults, reconciliation, restart inspection, loopback binding, and clean unload")
+    print("Phase 7 integration passed: macros/custom events, functions/signatures/locals, RepNotify, typed members, components/defaults, reconciliation, restart inspection, loopback binding, and clean unload")
     return 0
 
 
