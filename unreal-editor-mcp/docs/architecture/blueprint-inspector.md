@@ -12,7 +12,7 @@ The HTTP bridge owns one inspector and supplies already-authenticated JSON argum
 
 - Omitting `package_path` discovers across every content mount visible to the project. Supplying it restricts discovery recursively below that normalized mount/package path. Exact optional asset-name matching, a 2,048-candidate ceiling, and no asset loading apply in either form.
 - Deep inspection resolves one exact object or package path in any visible mount, rejects missing, non-Blueprint, and non-Actor assets, and loads only that target.
-- Read scope includes `/Game`, `/Engine`, enabled project plugins, enabled engine/marketplace plugins, and other mounted content. This does not grant future mutation authority: mutation scope is `/Game` plus content plugins physically located under the current project's local `Plugins/` directory.
+- Read scope includes `/Game`, `/Engine`, enabled project plugins, enabled engine/marketplace plugins, and other mounted content. This does not grant mutation authority: Phase 3 mutation scope is `/Game` plus symlink-free content mounts owned by plugins physically located under the current project's local `Plugins/` directory.
 - Default inspection is shallow: summary, parent, compile state, components, variables, and graphs. Nodes, pins, and connections require explicit sections.
 - Every result is a page from one structural snapshot. A continuation cursor is opaque, single-use, retained for 30 seconds, and bound to its normalized query and snapshot. Changed structure returns `stale_precondition`.
 - At most 4,096 structural records, 100 records per page, 32 cursors, and 16 changed component defaults per component are retained or encoded. The shared 256 KiB response bound still applies.

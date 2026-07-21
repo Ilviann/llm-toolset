@@ -20,6 +20,10 @@ Unreal's `HTTPServer` module starts and stops listener sockets for the process, 
 
 Unreal MCP configures a per-port loopback listener override, verifies that the listener became active, owns and unbinds only `/unreal-mcp/v1/command`, and leaves process-wide listener shutdown to Unreal. The cross-process test separately proves that the configured port is unreachable through a non-loopback local interface.
 
+## Deferred asset validation requires live dynamic mounts
+
+Unreal 5.8 schedules validate-on-save work after `UPackage::SavePackage` returns. A native test that created a Blueprint in a dynamically registered local-plugin mount and immediately unregistered the mount triggered the localization validator because the saved asset no longer had a resolvable mount. Dynamic mutation tests keep a successful local-plugin mount registered through process shutdown; production project-plugin mounts already have editor/plugin lifetime.
+
 ## Abnormal termination can leave a discovery record
 
 A forced or abnormal editor exit can bypass normal module shutdown and leave `Saved/UnrealMCP/discovery.json` behind. The record must never be treated as proof that the editor is still available.
@@ -31,4 +35,3 @@ The plugin removes any previous discovery record before its startup gate. The Py
 UnrealBuildTool described Xcode 26.1.1 as a non-standard Xcode because it was selected from a project-specific location rather than assumed from the global developer directory. Supplying `DEVELOPER_DIR="$UNREAL_MCP_DEVELOPER_DIR"` consistently selected the intended compiler and SDK, and native compilation and linking succeeded.
 
 No Xcode compiler, linker, code-signing, or SDK defect was encountered. The initial native compile corrections—matching Unreal's public forward declarations and using the correct ticker delegate-handle type—were plugin integration mistakes exposed by compilation, not Xcode behavior.
-

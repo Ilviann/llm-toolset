@@ -13,6 +13,7 @@
 #include "Misc/ScopeLock.h"
 #include "UnrealMCPDiscovery.h"
 #include "UnrealMCPBlueprintInspector.h"
+#include "UnrealMCPBlueprintMutator.h"
 #include "UnrealMCPProtocol.h"
 #include "UnrealMCPVersion.h"
 #include "UObject/GarbageCollection.h"
@@ -130,6 +131,7 @@ void FUnrealMCPBridge::Stop()
     }
     Route.Reset();
     Router.Reset();
+    BlueprintMutator.Reset();
     BlueprintInspector.Reset();
     Token.Reset();
 }
@@ -166,7 +168,8 @@ bool FUnrealMCPBridge::HandleRequest(const FHttpServerRequest& Request, const FH
         Complete(UnrealMCP::Protocol::Error(EHttpServerResponseCodes::BadRequest, ParseError));
         return true;
     }
-    if (Command != TEXT("capabilities") && Command != TEXT("editor_state") && Command != TEXT("blueprint_inspect"))
+    if (Command != TEXT("capabilities") && Command != TEXT("editor_state") && Command != TEXT("blueprint_inspect")
+        && Command != TEXT("blueprint_create") && Command != TEXT("blueprint_compile") && Command != TEXT("blueprint_save"))
     {
         Complete(UnrealMCP::Protocol::Error(EHttpServerResponseCodes::BadRequest, TEXT("invalid_argument"), TEXT("Unknown or unavailable command")));
         return true;
@@ -225,7 +228,15 @@ bool FUnrealMCPBridge::Execute(const FString& Command, const TSharedPtr<FJsonObj
     {
         BlueprintInspector = MakeUnique<FUnrealMCPBlueprintInspector>();
     }
-    return BlueprintInspector->Execute(Arguments, OutResult, OutError);
+    if (Command == TEXT("blueprint_inspect"))
+    {
+        return BlueprintInspector->Execute(Arguments, OutResult, OutError);
+    }
+    if (!BlueprintMutator)
+    {
+        BlueprintMutator = MakeUnique<FUnrealMCPBlueprintMutator>(*BlueprintInspector);
+    }
+    return BlueprintMutator->Execute(Command, Arguments, OutResult, OutError);
 }
 
 TSharedPtr<FJsonObject> FUnrealMCPBridge::Capabilities() const
@@ -235,13 +246,17 @@ TSharedPtr<FJsonObject> FUnrealMCPBridge::Capabilities() const
     Result->SetStringField(TEXT("bridge_version"), UnrealMCP::Version);
     Result->SetStringField(TEXT("unreal_version"), FEngineVersion::Current().ToString(EVersionComponent::Changelist));
     Result->SetStringField(TEXT("platform"), FPlatformProperties::PlatformName());
-    Result->SetStringField(TEXT("mode"), TEXT("read_only"));
+    Result->SetStringField(TEXT("mode"), TEXT("actor_authoring"));
     Result->SetBoolField(TEXT("bridge_ready"), bReady);
-    Result->SetArrayField(TEXT("commands"), Strings({TEXT("capabilities"), TEXT("editor_state"), TEXT("blueprint_inspect")}));
+    Result->SetArrayField(TEXT("commands"), Strings({TEXT("capabilities"), TEXT("editor_state"), TEXT("blueprint_inspect"),
+        TEXT("blueprint_create"), TEXT("blueprint_compile"), TEXT("blueprint_save")}));
 
     const TSharedRef<FJsonObject> Features = MakeShared<FJsonObject>();
     Features->SetBoolField(TEXT("blueprint_inspection"), true);
-    Features->SetBoolField(TEXT("blueprint_mutation"), false);
+    Features->SetBoolField(TEXT("blueprint_mutation"), true);
+    Features->SetBoolField(TEXT("blueprint_creation"), true);
+    Features->SetBoolField(TEXT("blueprint_compile"), true);
+    Features->SetBoolField(TEXT("blueprint_save"), true);
     Features->SetBoolField(TEXT("editor_lifecycle"), false);
     Features->SetBoolField(TEXT("project_build"), false);
     Result->SetObjectField(TEXT("features"), Features);
@@ -263,6 +278,8 @@ TSharedPtr<FJsonObject> FUnrealMCPBridge::Capabilities() const
     Limits->SetNumberField(TEXT("inspect_records"), UnrealMCP::MaxInspectRecords);
     Limits->SetNumberField(TEXT("retained_cursors"), UnrealMCP::MaxRetainedCursors);
     Limits->SetNumberField(TEXT("cursor_lifetime_ms"), static_cast<int32>(UnrealMCP::CursorLifetimeSeconds * 1000.0));
+    Limits->SetNumberField(TEXT("compiler_diagnostics"), UnrealMCP::MaxCompilerDiagnostics);
+    Limits->SetNumberField(TEXT("diagnostic_chars"), UnrealMCP::MaxDiagnosticChars);
     Result->SetObjectField(TEXT("limits"), Limits);
 
     const TSharedRef<FJsonObject> Listener = MakeShared<FJsonObject>();

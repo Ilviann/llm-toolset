@@ -2,7 +2,7 @@
 
 ## Ownership
 
-`unreal_editor_mcp/` owns the Python 3.10+ process. `stdio.py` bounds newline-delimited JSON-RPC and keeps stdout protocol-only. `server.py` negotiates MCP, publishes the three static read-only tools, validates arguments, and converts domain failures to MCP tool errors. `project.py`, `platforms.py`, and `discovery.py` resolve one project and validate generated state. `bridge.py` is the only HTTP client. `cli.py` composes these responsibilities.
+`unreal_editor_mcp/` owns the Python 3.10+ process. `stdio.py` bounds newline-delimited JSON-RPC and keeps stdout protocol-only. `server.py` negotiates MCP, publishes the six Phase 3 tools, validates arguments, and converts domain failures to MCP tool errors. `project.py`, `platforms.py`, and `discovery.py` resolve one project and validate generated state. `bridge.py` is the only HTTP client. `cli.py` composes these responsibilities.
 
 ## Dependency direction
 
@@ -10,9 +10,10 @@ The CLI constructs a `ProjectLayout`, `UnrealBridge`, and `MCPServer`; the trans
 
 ## Invariants
 
-- Only `capabilities`, `editor_state`, and `blueprint_inspect` appear in the tool catalog.
+- Only `capabilities`, `editor_state`, `blueprint_inspect`, `blueprint_create`, `blueprint_compile`, and `blueprint_save` appear in the tool catalog.
 - Tool arguments are exact objects with no additional fields.
 - `blueprint_inspect` has three mutually exclusive shapes: discovery, exact inspection, or cursor continuation; Python bounds paths, sections, cursor size, and page size before HTTP.
+- Creation requires exactly one parent class path and one package path; compile/save require exactly one asset path.
 - HTTP always targets the literal IPv4 loopback address and authenticates with the generated token.
 - Generated records and HTTP messages are read with explicit byte limits and strict record shapes.
 - A stale heartbeat, dead process, unsafe token format, project identity change, timeout, or version mismatch produces a stable bounded error.

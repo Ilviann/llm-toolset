@@ -11,6 +11,7 @@ struct FUnrealMCPError;
 class FJsonObject;
 class FUnrealMCPDiscovery;
 class FUnrealMCPBlueprintInspector;
+class FUnrealMCPBlueprintMutator;
 class IHttpRouter;
 
 class FUnrealMCPBridge : public TSharedFromThis<FUnrealMCPBridge>
@@ -40,6 +41,7 @@ private:
     FHttpRouteHandle Route;
     TUniquePtr<FUnrealMCPDiscovery> Discovery;
     TUniquePtr<FUnrealMCPBlueprintInspector> BlueprintInspector;
+    TUniquePtr<FUnrealMCPBlueprintMutator> BlueprintMutator;
     FTSTicker::FDelegateHandle HeartbeatHandle;
     TAtomic<int32> Pending{0};
     TAtomic<bool> bStopping{false};

@@ -41,7 +41,14 @@ class UnrealBridge:
         self._closed = False
 
     def call(self, command: str, arguments: dict[str, Any] | None = None) -> Any:
-        if command not in {"capabilities", "editor_state", "blueprint_inspect"}:
+        if command not in {
+            "capabilities",
+            "editor_state",
+            "blueprint_inspect",
+            "blueprint_create",
+            "blueprint_compile",
+            "blueprint_save",
+        }:
             raise BridgeError("Unsupported bridge command", code=ErrorCode.INVALID_ARGUMENT)
         record = read_discovery(self.layout)
         if self.port is not None and self.port != record.port:

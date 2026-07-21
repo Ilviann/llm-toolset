@@ -41,7 +41,7 @@ def wait_until_ready(layout: ProjectLayout, process: subprocess.Popen[bytes], de
         try:
             record = read_discovery(layout)
             result = UnrealBridge(layout, timeout=2.0).call("capabilities")
-            if result.get("bridge_ready") is True and record.bridge_version == "0.2.1":
+            if result.get("bridge_ready") is True and record.bridge_version == "0.3.0":
                 return
         except Exception as error:
             last_error = str(error)
@@ -109,10 +109,13 @@ def run_automation(executable: Path, project: Path, environment: dict[str, str])
         "CursorGuards",
         "InspectionContracts",
         "LiveFixture",
+        "CreationContracts",
+        "FailureCleanup",
+        "CreationLiveFixture",
     )
     command = [
         str(executable), str(project), "-unattended", "-nop4", "-nosplash", "-nullrhi",
-        "-stdout", "-FullStdOutLogOutput",
+        "-stdout", "-FullStdOutLogOutput", "-NoAssetRegistryCache",
         "-ExecCmds=Automation RunTests UnrealMCP;Quit",
         "-TestExit=Automation Test Queue Empty",
     ]
@@ -167,6 +170,8 @@ def main() -> int:
     if not executable.is_file():
         raise SystemExit(f"Unreal Editor executable not found: {executable}")
     layout = ProjectLayout.resolve(project)
+    phase_three_fixture = layout.root / "Content" / "UnrealMCPPhase3" / "BP_CreationFixture.uasset"
+    phase_three_fixture.unlink(missing_ok=True)
     environment = dict(os.environ)
     environment["DEVELOPER_DIR"] = str(developer)
     if sys.argv[1:] == ["--automation-only"]:
@@ -185,10 +190,15 @@ def main() -> int:
             bridge = UnrealBridge(layout, timeout=3.0)
             capabilities = bridge.call("capabilities")
             state = bridge.call("editor_state")
-            if capabilities.get("commands") != ["capabilities", "editor_state", "blueprint_inspect"]:
-                raise AssertionError("mutation or unknown command was registered")
-            if capabilities.get("bridge_version") != "0.2.1" or state.get("bridge_ready") is not True:
+            if capabilities.get("commands") != [
+                "capabilities", "editor_state", "blueprint_inspect",
+                "blueprint_create", "blueprint_compile", "blueprint_save",
+            ]:
+                raise AssertionError("released command catalog mismatch")
+            if capabilities.get("bridge_version") != "0.3.0" or state.get("bridge_ready") is not True:
                 raise AssertionError("capability/state contract mismatch")
+            if capabilities.get("features", {}).get("blueprint_mutation") is not True:
+                raise AssertionError("Phase 3 mutation capability is unavailable")
             if capabilities.get("asset_access") != {
                 "read_scope": "all_mounted_content",
                 "mutation_scope": "project_content_and_local_project_plugins",
@@ -212,10 +222,54 @@ def main() -> int:
             found = {record.get("section") for record in inspection.get("records", [])}
             if not {"summary", "component", "variable", "graph", "node", "pin"}.issubset(found):
                 raise AssertionError(f"live inspection omitted required structure: {sorted(found)!r}")
+            created = bridge.call("blueprint_create", {
+                "parent_class": "/Script/Engine.Actor",
+                "package_path": "/Game/UnrealMCPPhase3/BP_CreationFixture",
+            })
+            if created.get("compile_succeeded") is not True or created.get("saved") is not True:
+                raise AssertionError(f"Actor Blueprint creation did not compile and save: {created!r}")
+            if created.get("parent_class") != "/Script/Engine.Actor" or created.get("package_dirty") is not False:
+                raise AssertionError(f"Actor Blueprint creation contract mismatch: {created!r}")
+            compiled = bridge.call("blueprint_compile", {
+                "asset_path": "/Game/UnrealMCPPhase3/BP_CreationFixture.BP_CreationFixture",
+            })
+            if compiled.get("compile_succeeded") is not True or compiled.get("saved") is not False:
+                raise AssertionError(f"explicit Blueprint compile contract mismatch: {compiled!r}")
+            saved = bridge.call("blueprint_save", {
+                "asset_path": "/Game/UnrealMCPPhase3/BP_CreationFixture.BP_CreationFixture",
+            })
+            if saved.get("saved") is not True or saved.get("package_dirty") is not False:
+                raise AssertionError(f"explicit Blueprint save contract mismatch: {saved!r}")
+            created_snapshot = saved.get("snapshot_id")
+            if not isinstance(created_snapshot, str) or len(created_snapshot) != 40:
+                raise AssertionError("created Blueprint did not return a structural snapshot")
             if os.name == "posix" and layout.token_file.stat().st_mode & 0o077:
                 raise AssertionError("bridge token permissions are broader than the owning user")
             reject_bad_token(layout)
             verify_loopback_only(read_discovery(layout).port)
+        except Exception:
+            log.seek(0)
+            sys.stderr.buffer.write(log.read()[-32_000:])
+            raise
+        finally:
+            stop_editor(process)
+        process = subprocess.Popen(command, cwd=ROOT, env=environment, stdout=log, stderr=subprocess.STDOUT)
+        try:
+            wait_until_ready(layout, process, time.monotonic() + 120.0)
+            reloaded = UnrealBridge(layout, timeout=3.0).call("blueprint_inspect", {
+                "mode": "inspect",
+                "asset_path": "/Game/UnrealMCPPhase3/BP_CreationFixture.BP_CreationFixture",
+                "sections": ["summary", "parent_class", "compile_state", "graphs", "nodes", "pins", "connections"],
+                "page_size": 100,
+            })
+            if reloaded.get("snapshot_id") != created_snapshot:
+                raise AssertionError("created Blueprint snapshot changed after editor restart")
+            parent_records = [record for record in reloaded.get("records", []) if record.get("section") == "parent_class"]
+            if len(parent_records) != 1 or parent_records[0].get("class_path") != "/Script/Engine.Actor":
+                raise AssertionError("created Blueprint parent changed after editor restart")
+            compile_records = [record for record in reloaded.get("records", []) if record.get("section") == "compile_state"]
+            if len(compile_records) != 1 or compile_records[0].get("state") not in {"up_to_date", "up_to_date_with_warnings"}:
+                raise AssertionError("created Blueprint did not reload in a compiled state")
         except Exception:
             log.seek(0)
             sys.stderr.buffer.write(log.read()[-32_000:])
@@ -232,7 +286,7 @@ def main() -> int:
             pass
         else:
             raise AssertionError("a live discovery heartbeat remained after editor termination")
-    print("Phase 2 integration passed: authenticated discovery/inspection, save-reload snapshot, loopback binding, and clean unload")
+    print("Phase 3 integration passed: authenticated create/compile/save, restart inspection, loopback binding, and clean unload")
     return 0
 
 

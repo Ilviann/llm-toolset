@@ -6,7 +6,7 @@ This roadmap turns the requirements in `docs/draft.md` into sequential, releasab
 
 - [x] Phase 1 — Establish the versioned Python/C++ foundation and authenticated bridge.
 - [x] Phase 2 — Add bounded, read-only Actor Blueprint discovery and inspection.
-- [ ] Phase 3 — Create, compile, save, and verify new Actor Blueprints safely.
+- [x] Phase 3 — Create, compile, save, and verify new Actor Blueprints safely.
 - [ ] Phase 4 — Edit Actor Blueprint component hierarchies and component defaults.
 - [ ] Phase 5 — Edit Blueprint variables, functions, macros, and custom-event shells.
 - [ ] Phase 6 — Discover valid Blueprint actions and create graph nodes atomically.

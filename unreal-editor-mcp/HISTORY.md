@@ -1,5 +1,12 @@
 # Unreal Editor MCP history
 
+## 0.3.0 — 2026-07-21
+
+- Added `blueprint_create` with native and Blueprint-generated Actor parent validation, strict no-overwrite semantics, `/Game` and local project-plugin confinement, symlink/path guards, mandatory initial compile/save, and deterministic unpublished-asset cleanup.
+- Added explicit `blueprint_compile` with 64 bounded structured diagnostics and `blueprint_save` with non-interactive package saving and distinct write-conflict/save failures.
+- Added read-back snapshots to every mutation result and cross-process proof that a Blueprint created through the authenticated Python bridge retains its parent, compiled state, and exact snapshot after editor restart.
+- Added native coverage for invalid/skeleton parents, duplicate/case-only destinations, engine/external/local-plugin mounts, read-only paths, injected compile/save failures, cleanup-and-retry, and preservation of existing assets.
+
 ## 0.2.1 — 2026-07-21
 
 - Expanded read-only Actor Blueprint discovery and exact inspection from `/Game` to every mounted content namespace available to the project, including `/Engine` and enabled plugin content.

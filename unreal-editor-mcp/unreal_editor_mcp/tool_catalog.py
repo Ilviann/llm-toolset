@@ -1,4 +1,4 @@
-"""Small static tool catalog for the released read-only surface."""
+"""Small static tool catalog for the released Actor Blueprint surface."""
 
 from __future__ import annotations
 
@@ -86,6 +86,63 @@ TOOLS: Final = (
                     "additionalProperties": False,
                 },
             ]
+        },
+    },
+    {
+        "name": "blueprint_create",
+        "description": "Create, compile, save, and verify one new Actor Blueprint without overwriting content.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "parent_class": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 512,
+                    "pattern": "^(?!.*\\.\\.)/[^\\\\]+$",
+                },
+                "package_path": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 512,
+                    "pattern": "^(?!.*\\.)(?!.*\\.\\.)/[^\\\\]+$",
+                },
+            },
+            "required": ["parent_class", "package_path"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "blueprint_compile",
+        "description": "Compile one mutable Actor Blueprint and return bounded structured diagnostics.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "asset_path": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 512,
+                    "pattern": "^(?!.*\\.\\.)/[^\\\\]+$",
+                },
+            },
+            "required": ["asset_path"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "blueprint_save",
+        "description": "Save one mutable Actor Blueprint package non-interactively and verify its snapshot.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "asset_path": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 512,
+                    "pattern": "^(?!.*\\.\\.)/[^\\\\]+$",
+                },
+            },
+            "required": ["asset_path"],
+            "additionalProperties": False,
         },
     },
 )

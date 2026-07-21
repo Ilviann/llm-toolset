@@ -4,7 +4,7 @@
 
 namespace UnrealMCP
 {
-inline constexpr TCHAR Version[] = TEXT("0.2.1");
+inline constexpr TCHAR Version[] = TEXT("0.3.0");
 inline constexpr uint32 DefaultPort = 15485;
 inline constexpr int32 MaxRequestBytes = 64 * 1024;
 inline constexpr int32 MaxResponseBytes = 256 * 1024;
@@ -20,4 +20,6 @@ inline constexpr int32 MaxInspectRecords = 4096;
 inline constexpr int32 MaxRetainedCursors = 32;
 inline constexpr int32 MaxComponentDefaults = 16;
 inline constexpr double CursorLifetimeSeconds = 30.0;
+inline constexpr int32 MaxCompilerDiagnostics = 64;
+inline constexpr int32 MaxDiagnosticChars = 512;
 }

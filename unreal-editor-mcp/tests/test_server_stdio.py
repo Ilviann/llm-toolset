@@ -15,9 +15,14 @@ class FakeBridge:
     def call(self, command, arguments=None):
         self.calls.append((command, arguments))
         if command == "capabilities":
-            return {"bridge_version": "0.2.1", "commands": ["capabilities", "editor_state", "blueprint_inspect"]}
+            return {"bridge_version": "0.3.0", "commands": [
+                "capabilities", "editor_state", "blueprint_inspect",
+                "blueprint_create", "blueprint_compile", "blueprint_save",
+            ]}
         if command == "blueprint_inspect":
             return {"mode": "discover", "snapshot_id": "a" * 40, "records": []}
+        if command.startswith("blueprint_"):
+            return {"asset_path": "/Game/Actors/BP_Light.BP_Light", "snapshot_id": "a" * 40}
         return {"bridge_ready": True}
 
     def close(self):
@@ -29,19 +34,22 @@ class ServerStdioTests(unittest.TestCase):
         bridge = FakeBridge()
         server = MCPServer(bridge)
         initialized = server.handle({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2025-06-18"}})
-        self.assertEqual(initialized["result"]["serverInfo"]["version"], "0.2.1")
+        self.assertEqual(initialized["result"]["serverInfo"]["version"], "0.3.0")
         listed = server.handle({"jsonrpc": "2.0", "id": 2, "method": "tools/list"})
-        self.assertEqual([tool["name"] for tool in listed["result"]["tools"]], ["capabilities", "editor_state", "blueprint_inspect"])
+        self.assertEqual([tool["name"] for tool in listed["result"]["tools"]], [
+            "capabilities", "editor_state", "blueprint_inspect",
+            "blueprint_create", "blueprint_compile", "blueprint_save",
+        ])
         called = server.handle({"jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": {"name": "capabilities", "arguments": {}}})
         payload = json.loads(called["result"]["content"][0]["text"])
         self.assertTrue(payload["version_match"])
         self.assertEqual(payload["mcp_protocol_version"], "2025-06-18")
 
-    def test_rejects_schema_and_unknown_mutation_tool(self):
+    def test_rejects_schema_and_unknown_tool(self):
         server = MCPServer(FakeBridge())
         for params in (
             {"name": "capabilities", "arguments": {"unexpected": True}},
-            {"name": "blueprint_create", "arguments": {}},
+            {"name": "blueprint_component_edit", "arguments": {}},
         ):
             response = server.handle({"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": params})
             self.assertEqual(response["error"]["code"], -32602)
@@ -71,6 +79,30 @@ class ServerStdioTests(unittest.TestCase):
         for arguments in invalid:
             with self.subTest(arguments=arguments):
                 response = server.handle({"jsonrpc": "2.0", "id": 5, "method": "tools/call", "params": {"name": "blueprint_inspect", "arguments": arguments}})
+                self.assertEqual(response["error"]["code"], -32602)
+
+    def test_phase_three_mutation_schemas_are_exact(self):
+        server = MCPServer(FakeBridge())
+        valid = (
+            ("blueprint_create", {"parent_class": "/Script/Engine.Actor", "package_path": "/Game/Actors/BP_Light"}),
+            ("blueprint_create", {"parent_class": "/Game/Actors/BP_Parent.BP_Parent_C", "package_path": "/LocalPlugin/BP_Child"}),
+            ("blueprint_compile", {"asset_path": "/Game/Actors/BP_Light.BP_Light"}),
+            ("blueprint_save", {"asset_path": "/Game/Actors/BP_Light"}),
+        )
+        for name, arguments in valid:
+            with self.subTest(name=name, arguments=arguments):
+                response = server.handle({"jsonrpc": "2.0", "id": 6, "method": "tools/call", "params": {"name": name, "arguments": arguments}})
+                self.assertNotIn("error", response)
+        invalid = (
+            ("blueprint_create", {}),
+            ("blueprint_create", {"parent_class": "Actor", "package_path": "/Game/BP_A"}),
+            ("blueprint_create", {"parent_class": "/Script/Engine.Actor", "package_path": "/Game/BP_A.BP_A"}),
+            ("blueprint_compile", {"asset_path": "/Game/../Engine/BP_A.BP_A"}),
+            ("blueprint_save", {"asset_path": "/Game/BP_A.BP_A", "unexpected": True}),
+        )
+        for name, arguments in invalid:
+            with self.subTest(name=name, arguments=arguments):
+                response = server.handle({"jsonrpc": "2.0", "id": 7, "method": "tools/call", "params": {"name": name, "arguments": arguments}})
                 self.assertEqual(response["error"]["code"], -32602)
 
     def test_domain_error_is_tool_error(self):

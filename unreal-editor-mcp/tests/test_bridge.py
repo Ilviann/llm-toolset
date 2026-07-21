@@ -11,7 +11,7 @@ from unreal_editor_mcp.errors import BridgeError, ErrorCode
 from unreal_editor_mcp.project import ProjectLayout
 
 
-RECORD = DiscoveryRecord("a" * 40, 123, 15485, "0.2.1", "5.8.0", 1)
+RECORD = DiscoveryRecord("a" * 40, 123, 15485, "0.3.0", "5.8.0", 1)
 
 
 class FakeResponse:
@@ -73,6 +73,20 @@ class BridgeTests(unittest.TestCase):
         self._bridge().call("blueprint_inspect", arguments)
         body = json.loads(FakeConnection.instances[-1].request_data[2])
         self.assertEqual(body, {"command": "blueprint_inspect", "arguments": arguments})
+
+    @patch("unreal_editor_mcp.bridge.read_token", return_value="b" * 64)
+    @patch("unreal_editor_mcp.bridge.read_discovery", return_value=RECORD)
+    def test_sends_phase_three_mutation_arguments(self, _discovery, _token):
+        calls = (
+            ("blueprint_create", {"parent_class": "/Script/Engine.Actor", "package_path": "/Game/BP_New"}),
+            ("blueprint_compile", {"asset_path": "/Game/BP_New.BP_New"}),
+            ("blueprint_save", {"asset_path": "/Game/BP_New.BP_New"}),
+        )
+        bridge = self._bridge()
+        for command, arguments in calls:
+            bridge.call(command, arguments)
+            body = json.loads(FakeConnection.instances[-1].request_data[2])
+            self.assertEqual(body, {"command": command, "arguments": arguments})
 
     @patch("unreal_editor_mcp.bridge.read_token", return_value="b" * 64)
     @patch("unreal_editor_mcp.bridge.read_discovery", return_value=DiscoveryRecord("a" * 40, 1, 15485, "9.0.0", "5.8", 1))
