@@ -9,7 +9,7 @@ Use this workflow for every Unreal Editor MCP feature, fix, or refactor.
 3. Read only the affected component folders in [`types/`](types/index.md). Follow their local `index.md` files before opening individual references.
 4. Inspect the named source, metadata, examples, tests, history, and roadmap entries. Expand the working set only when source evidence reveals another dependency.
 
-During pre-implementation work, use [`draft.md`](draft.md), [`notice.md`](notice.md), and [`../ROADMAP.md`](../ROADMAP.md) to establish intended scope. Do not infer implemented behavior from those planning documents or other prose. Schemas, executable constants, package/plugin metadata, handler registrations, runtime capabilities, and behavioral tests are the authoritative implementation contracts.
+During pre-implementation work, use [`draft.md`](draft.md), [`notice.md`](notice.md), the concise [`../ROADMAP.md`](../ROADMAP.md) checklist, and the relevant detailed phase file under [`todo/`](todo/index.md) to establish intended scope. Do not infer implemented behavior from those planning documents or other prose. Schemas, executable constants, package/plugin metadata, handler registrations, runtime capabilities, and behavioral tests are the authoritative implementation contracts.
 
 ## 2. Design the change
 
