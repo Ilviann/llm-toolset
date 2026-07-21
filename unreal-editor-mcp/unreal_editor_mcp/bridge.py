@@ -17,6 +17,10 @@ from .project import ProjectLayout
 BRIDGE_PATH = "/unreal-mcp/v1/command"
 MAX_REQUEST_BYTES = 64 * 1024
 MAX_RESPONSE_BYTES = 256 * 1024
+MUTATING_COMMANDS = {
+    "blueprint_create", "blueprint_compile", "blueprint_save",
+    "blueprint_component_edit", "blueprint_default_edit",
+}
 
 
 class UnrealBridge:
@@ -39,15 +43,19 @@ class UnrealBridge:
         self._lock = threading.Lock()
         self._active: set[http.client.HTTPConnection] = set()
         self._closed = False
+        self._bridge_instance_id = ""
 
     def call(self, command: str, arguments: dict[str, Any] | None = None) -> Any:
         if command not in {
             "capabilities",
             "editor_state",
+            "operation_status",
             "blueprint_inspect",
             "blueprint_create",
             "blueprint_compile",
             "blueprint_save",
+            "blueprint_component_edit",
+            "blueprint_default_edit",
         }:
             raise BridgeError("Unsupported bridge command", code=ErrorCode.INVALID_ARGUMENT)
         record = read_discovery(self.layout)
@@ -90,6 +98,16 @@ class UnrealBridge:
             response = connection.getresponse()
             body = response.read(MAX_RESPONSE_BYTES + 1)
         except TimeoutError:
+            if command in MUTATING_COMMANDS:
+                raise BridgeError(
+                    "Mutation response was lost; resolve operation_status before retrying",
+                    code=ErrorCode.OUTCOME_UNKNOWN,
+                    details={
+                        "operation_id": (arguments or {}).get("operation_id", ""),
+                        "bridge_instance_id": self._bridge_instance_id,
+                    },
+                    retryable=False,
+                ) from None
             raise BridgeError("Unreal bridge request timed out", code=ErrorCode.TIMEOUT, retryable=True) from None
         except (OSError, http.client.HTTPException):
             with self._lock:
@@ -105,7 +123,12 @@ class UnrealBridge:
                 self._active.discard(connection)
         if len(body) > MAX_RESPONSE_BYTES:
             raise BridgeError("Unreal bridge response is too large", code=ErrorCode.RESPONSE_TOO_LARGE)
-        return self._decode(response.status, body, record)
+        result = self._decode(response.status, body, record)
+        if isinstance(result, dict):
+            instance_id = result.get("bridge_instance_id")
+            if isinstance(instance_id, str) and len(instance_id) == 32:
+                self._bridge_instance_id = instance_id
+        return result
 
     @staticmethod
     def _decode(status: int, body: bytes, record: DiscoveryRecord) -> Any:

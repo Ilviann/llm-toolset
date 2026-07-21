@@ -1,17 +1,23 @@
 {
   "create_from_native_actor": {
+    "operation_id": "11111111111111111111111111111111",
     "parent_class": "/Script/Engine.Actor",
     "package_path": "/Game/Actors/BP_Door"
   },
   "create_from_blueprint_parent": {
+    "operation_id": "22222222222222222222222222222222",
     "parent_class": "/Game/Actors/BP_InteractiveBase.BP_InteractiveBase_C",
     "package_path": "/Game/Actors/BP_Door"
   },
   "compile": {
-    "asset_path": "/Game/Actors/BP_Door.BP_Door"
+    "operation_id": "33333333333333333333333333333333",
+    "asset_path": "/Game/Actors/BP_Door.BP_Door",
+    "expected_snapshot": "0123456789abcdef0123456789abcdef01234567"
   },
   "save": {
-    "asset_path": "/Game/Actors/BP_Door.BP_Door"
+    "operation_id": "44444444444444444444444444444444",
+    "asset_path": "/Game/Actors/BP_Door.BP_Door",
+    "expected_snapshot": "89abcdef0123456789abcdef0123456789abcdef"
   },
   "inspect_read_back": {
     "mode": "inspect",

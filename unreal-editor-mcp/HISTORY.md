@@ -1,5 +1,12 @@
 # Unreal Editor MCP history
 
+## 0.4.0 — 2026-07-21
+
+- Added caller-generated operation IDs, process/bridge identity, canonical request digests, retained terminal replay, conflict detection, queued cancellation, expiry/bounds, `operation_status`, and explicit unknown-outcome recovery for every mutation.
+- Added transactional `blueprint_component_edit` operations for local component add/remove/rename/reparent/root/property changes with stable identity, ownership, class, hierarchy, and snapshot validation.
+- Added `blueprint_default_edit` plus targeted component/class-default inspection through one shared bounded reflected-property codec and reference policy.
+- Added native ledger, component/default, stale-precondition, Undo/Redo, compile/save, and restart tests, including deliberate lost-response reconciliation and same-ID replay through the production bridge.
+
 ## 0.3.0 — 2026-07-21
 
 - Added `blueprint_create` with native and Blueprint-generated Actor parent validation, strict no-overwrite semantics, `/Game` and local project-plugin confinement, symlink/path guards, mandatory initial compile/save, and deterministic unpublished-asset cleanup.

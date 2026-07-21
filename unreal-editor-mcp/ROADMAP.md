@@ -1,10 +1,10 @@
-# Remaining Unreal Editor MCP Roadmap
+# Unreal Editor MCP Roadmap
 
 This roadmap contains only the remaining implementation work. The target is Unreal Engine 5.8 and newer. macOS remains the primary development host. Native Windows validation begins with the Actor beta and becomes a release gate for every later feature phase. Linux remains source-portable with unit-tested platform branches until a native host is available.
 
 ## Top-level checklist
 
-- [ ] Phase 4 — Add reliable mutation delivery, Actor component editing, and Blueprint/component defaults.
+- [x] Phase 4 — Add reliable mutation delivery, Actor component editing, and Blueprint/component defaults.
 - [ ] Phase 5 — Add Blueprint members, signatures, logic-container shells, and matching inspection.
 - [ ] Phase 6 — Add bounded, read-only discovery of context-valid Blueprint actions.
 - [ ] Phase 7 — Add complete atomic graph editing, including node creation and wiring.

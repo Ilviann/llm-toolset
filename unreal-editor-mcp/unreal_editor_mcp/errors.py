@@ -32,6 +32,10 @@ class ErrorCode(str, Enum):
     WRITE_CONFLICT = "write_conflict"
     CURSOR_EXPIRED = "cursor_expired"
     STALE_PRECONDITION = "stale_precondition"
+    OPERATION_CONFLICT = "operation_conflict"
+    OUTCOME_UNKNOWN = "outcome_unknown"
+    UNSUPPORTED_PROPERTY = "unsupported_property"
+    INVALID_COMPONENT = "invalid_component"
     INTERNAL_ERROR = "internal_error"
 
 

@@ -28,6 +28,15 @@
     "include_inherited": false,
     "page_size": 50
   },
+  "inspect_component_and_class_defaults": {
+    "mode": "inspect",
+    "asset_path": "/Game/Actors/BP_Door.BP_Door",
+    "sections": ["components", "class_defaults"],
+    "component_id": "0123456789abcdef0123456789abcdef",
+    "property_names": ["bVisible", "InitialLifeSpan"],
+    "include_inherited": true,
+    "page_size": 25
+  },
   "continue_page": {
     "cursor": "0123456789abcdef0123456789abcdef",
     "page_size": 50

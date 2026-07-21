@@ -1,15 +1,18 @@
 # Unreal Editor MCP
 
-Unreal Editor MCP 0.3.0 is an offline-first MCP bridge for Unreal Engine 5.8+. It pairs a dependency-free Python 3.10+ stdio server with an editor-only C++ plugin. This release exposes exactly six tools:
+Unreal Editor MCP 0.4.0 is an offline-first MCP bridge for Unreal Engine 5.8+. It pairs a dependency-free Python 3.10+ stdio server with an editor-only C++ plugin. This release exposes exactly nine tools:
 
 - `capabilities` reports the exact Python/plugin/Unreal versions, commands, features, listener state, and effective limits.
 - `editor_state` reports project identity, bridge readiness, play/simulate/save/GC state, and concise queued-operation state.
+- `operation_status` reconciles or safely cancels one retained mutation by operation and bridge identity.
 - `blueprint_inspect` discovers Actor Blueprints across mounted content and returns bounded pages of one selected Blueprint's structure.
 - `blueprint_create` creates, compiles, saves, and verifies one new Actor Blueprint without overwriting content.
 - `blueprint_compile` explicitly compiles one mutable Actor Blueprint and returns bounded diagnostics.
 - `blueprint_save` explicitly saves one mutable Actor Blueprint package without interactive dialogs.
+- `blueprint_component_edit` adds, removes, renames, reparents, roots, or edits one local Actor component.
+- `blueprint_default_edit` edits one supported Blueprint-generated class-default property.
 
-Phase 3 mutation is limited to Actor Blueprint creation, compilation, and saving. There are no component/member/graph mutation, editor lifecycle, build, filesystem, console, general reflection, or code-execution commands in 0.3.0.
+Phase 4 supports reliable Actor Blueprint creation, component hierarchy/default editing, class-default editing, compilation, and saving. Member/graph mutation, editor lifecycle, build, filesystem, console, unrestricted reflection, and code execution remain unavailable.
 
 ## Security model
 
@@ -23,7 +26,7 @@ Treat the project `Saved/` directory as generated state and keep it out of sourc
 
 1. Copy [`plugin/UnrealMCP`](plugin/UnrealMCP) to `<YourProject>/Plugins/UnrealMCP` or add this repository's `plugin/` folder as an `AdditionalPluginDirectories` entry in a disposable development `.uproject`.
 2. Enable the `UnrealMCP` plugin and compile the project's Editor target with Unreal 5.8 or a newer version that passes the included public-API probes.
-3. Open the project. Look for `Unreal MCP 0.3.0 ready on 127.0.0.1:15485` in the editor log.
+3. Open the project. Look for `Unreal MCP 0.4.0 ready on 127.0.0.1:15485` in the editor log.
 4. Install the Python package offline from this folder:
 
    ```sh
@@ -85,7 +88,7 @@ Inspect one exact asset after discovery. The shallow default returns summary, pa
 }
 ```
 
-Set `include_inherited` to include content owned by Blueprint-generated ancestors. Set `graph_id` to restrict graph, node, pin, and connection records to one exact graph identity. The committed [`examples/inspection-queries.json`](examples/inspection-queries.json) contains discovery, shallow, targeted graph, and continuation argument examples.
+Set `include_inherited` to include Blueprint-ancestor and native components. Set `graph_id` to restrict graph records, or `component_id` to select one stable component. Add one-to-32 `property_names` and the `class_defaults` section for targeted reflected-default read-back. The committed [`examples/inspection-queries.json`](examples/inspection-queries.json) contains discovery, shallow, targeted graph/default, and continuation examples.
 
 Results are flat records with a `section` discriminator and a structural `snapshot_id`. A partial result supplies a single-use `next_cursor`; continue it within 30 seconds using only:
 
@@ -95,14 +98,30 @@ Results are flat records with a `section` discriminator and a structural `snapsh
 
 The cursor is bound to the original normalized query and snapshot. If graph structure, identities, defaults, or links change before continuation, the call returns `stale_precondition`. Re-inspect after compile, undo/redo, reload, or node reconstruction even when Unreal retained the same GUIDs.
 
-Component, variable, graph, node, and pin records use Unreal GUIDs where available and report `identity_stable: false` rather than inventing an ID otherwise. Common K2 types and changed component defaults have compact bounded encodings. Unsupported categories and reflected properties remain explicit with `supported: false`; arbitrary UObject graphs are never serialized.
+Component, variable, graph, node, and pin records use Unreal GUIDs where available and report `identity_stable: false` rather than inventing an ID otherwise. Components report local/inherited/native ownership and editability. Supported properties use compact bounded Boolean, finite-number, string/name/text, enum/flags, common struct, and compatible visible asset/class reference encodings. Unsupported fields remain explicit with `supported: false`; arbitrary UObject graphs are never serialized.
 
-## Actor Blueprint creation, compile, and save
+## Reliable Actor Blueprint mutation
+
+Call `capabilities` before mutation and retain its `bridge_instance_id`. Generate a fresh 32-character lowercase hexadecimal `operation_id` for every intended mutation. Reusing the same ID and exact request returns its retained result without executing again; reusing it with different arguments returns `operation_conflict`.
+
+If a mutation times out or its response is lost, do not retry it with a new ID. Reconcile first:
+
+```json
+{
+  "operation_id": "0123456789abcdef0123456789abcdef",
+  "bridge_instance_id": "fedcba9876543210fedcba9876543210"
+}
+```
+
+`queued` may be cancelled by adding `"cancel": true`; `executing` is not interrupted unsafely. `committed` contains the retained result, while `rejected` contains the retained error. `outcome_unknown` means the bridge restarted or forgot the record: inspect the asset before deciding on another mutation.
+
+## Creation, components, defaults, compile, and save
 
 Create a Blueprint with one exact parent class and one destination long package name. Native parents use `/Script/Module.Class`; Blueprint parents use their generated class path ending in `_C`:
 
 ```json
 {
+  "operation_id": "11111111111111111111111111111111",
   "parent_class": "/Script/Engine.Actor",
   "package_path": "/Game/Actors/BP_Door"
 }
@@ -112,19 +131,44 @@ The parent must be Actor-derived and usable as a Blueprint base. Missing, non-Ac
 
 Creation compiles and saves before publishing the asset. A mandatory compile failure returns `compile_failed`; a save operation failure returns `save_failed`; a read-only file or unwritable destination returns `write_conflict`. Before publication, any failure removes only the new asset/file and releases its requested package namespace so the same destination can be retried. Existing assets are never deleted during failure cleanup.
 
-Compile and save an existing mutable Actor Blueprint explicitly:
+Every existing-asset mutation requires the current `snapshot_id` from inspection or the preceding mutation result. For example, add a scene component and make it the root in two atomic calls:
 
 ```json
-{"asset_path": "/Game/Actors/BP_Door.BP_Door"}
+{
+  "operation_id": "22222222222222222222222222222222",
+  "asset_path": "/Game/Actors/BP_Door.BP_Door",
+  "expected_snapshot": "0123456789abcdef0123456789abcdef01234567",
+  "operation": "add",
+  "component_class": "/Script/Engine.SceneComponent",
+  "name": "SceneRoot"
+}
 ```
 
-`blueprint_compile` returns `compile_succeeded: false` rather than a tool error when the compiler completed and found Blueprint errors, preserving its bounded structured diagnostics. `blueprint_save` does not compile implicitly. Every successful tool result contains the exact asset/parent paths, compile state, dirty state, saved/compiled flags, snapshot ID, and diagnostic counts. Use a separate `blueprint_inspect` call for detailed read-back. See [`examples/creation-workflow.json`](examples/creation-workflow.json) for the complete create → compile → save → inspect argument sequence.
+The component result returns its stable ID and a new snapshot. Subsequent operations may `remove`, `rename`, `reparent`, `set_root`, or `set_property` by that exact ID. Only locally owned editable components are mutable. Adds accept suitable Blueprint-spawnable `UActorComponent` classes; names must be unique, scene attachments must be acyclic, non-scene components cannot be attached or rooted, and native/inherited components reject mutation.
+
+Edit one generated-class default with `blueprint_default_edit`:
+
+```json
+{
+  "operation_id": "33333333333333333333333333333333",
+  "asset_path": "/Game/Actors/BP_Door.BP_Door",
+  "expected_snapshot": "89abcdef0123456789abcdef0123456789abcdef",
+  "property_name": "InitialLifeSpan",
+  "value": 12.5
+}
+```
+
+Property writes share inspection's codec and accept only safely editable reflected fields. Object/class references must be compatible visible packageable paths; delegates, interfaces, containers, transient/editor-only fields, arbitrary pointers, and non-finite numbers reject. Each edit is one editor transaction, so normal Unreal Undo/Redo applies. An unexpected failed postcondition is undone before an error is returned.
+
+Compilation and saving remain explicit. Both require `operation_id`, `asset_path`, and the latest `expected_snapshot`. `blueprint_compile` returns `compile_succeeded: false` rather than a tool error when the compiler completed and found Blueprint errors. `blueprint_save` does not compile implicitly. Re-inspect after compile because Unreal may reconstruct identities; save only the current returned snapshot.
+
+See [`examples/creation-workflow.json`](examples/creation-workflow.json) and [`examples/component-default-workflow.json`](examples/component-default-workflow.json) for complete inspect-before-edit sequences.
 
 If saving fails, confirm that the package directory is writable and that source-control policy has not made the existing `.uasset` read-only. If compilation fails, inspect the returned diagnostics, correct the Blueprint in the editor or through later editing phases, compile again, and save only after `compile_succeeded` becomes true.
 
 ## Limits
 
-The plugin publishes these authoritative defaults through `capabilities`: 64 KiB requests, 256 KiB responses, eight queued requests, JSON depth 16, strings up to 4096 characters, and a five-second Game-thread dispatch deadline. Inspection uses 25 records by default and allows 100 per page, scans at most 2,048 registry candidates, accepts at most 4,096 structural records, retains 32 cursors for 30 seconds, and returns at most 16 changed defaults per component. Compilation returns at most 64 diagnostic messages of 512 characters each. Discovery heartbeats are valid for ten seconds. Python HTTP calls default to three seconds and can be configured from `0.05` to `30` seconds.
+The plugin publishes these authoritative defaults through `capabilities`: 64 KiB requests, 256 KiB responses, eight queued requests, JSON depth 16, strings up to 4096 characters, and a five-second Game-thread dispatch deadline. Inspection uses 25 records by default and allows 100 per page, scans at most 2,048 registry candidates, accepts at most 4,096 structural records, retains 32 cursors for 30 seconds, allows 32 targeted properties, and returns at most 16 changed defaults per component. The operation ledger retains 128 operations for 15 minutes. Compilation returns at most 64 diagnostic messages of 512 characters each. Discovery heartbeats are valid for ten seconds. Python HTTP calls default to three seconds and can be configured from `0.05` to `30` seconds.
 
 ## Offline development and tests
 
@@ -157,4 +201,4 @@ Run the cross-process bridge acceptance test:
 python3 scripts/run_headless_integration.py
 ```
 
-The 0.3.0 native baseline is Unreal 5.8.0 on Apple Silicon macOS 26.5.2 with Xcode 26.1.1. Windows and Linux path/process branches are unit-tested through injected adapters; native Windows qualification remains a later roadmap gate.
+The 0.4.0 native baseline is Unreal 5.8.0 on Apple Silicon macOS 26.5.2 with Xcode 26.1.1. Windows and Linux path/process branches are unit-tested through injected adapters; native Windows qualification remains a later roadmap gate.

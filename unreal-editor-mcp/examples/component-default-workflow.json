@@ -1,0 +1,34 @@
+{
+  "inspect_before_edit": {
+    "mode": "inspect",
+    "asset_path": "/Game/Actors/BP_Door.BP_Door",
+    "sections": ["components", "class_defaults"],
+    "property_names": ["InitialLifeSpan"]
+  },
+  "add_scene_root": {
+    "operation_id": "11111111111111111111111111111111",
+    "asset_path": "/Game/Actors/BP_Door.BP_Door",
+    "expected_snapshot": "0123456789abcdef0123456789abcdef01234567",
+    "operation": "add",
+    "component_class": "/Script/Engine.SceneComponent",
+    "name": "SceneRoot"
+  },
+  "set_root_using_returned_component_id_and_snapshot": {
+    "operation_id": "22222222222222222222222222222222",
+    "asset_path": "/Game/Actors/BP_Door.BP_Door",
+    "expected_snapshot": "89abcdef0123456789abcdef0123456789abcdef",
+    "operation": "set_root",
+    "component_id": "0123456789abcdef0123456789abcdef"
+  },
+  "edit_class_default_using_latest_snapshot": {
+    "operation_id": "33333333333333333333333333333333",
+    "asset_path": "/Game/Actors/BP_Door.BP_Door",
+    "expected_snapshot": "fedcba9876543210fedcba9876543210fedcba98",
+    "property_name": "InitialLifeSpan",
+    "value": 12.5
+  },
+  "reconcile_lost_response": {
+    "operation_id": "33333333333333333333333333333333",
+    "bridge_instance_id": "abcdef0123456789abcdef0123456789"
+  }
+}

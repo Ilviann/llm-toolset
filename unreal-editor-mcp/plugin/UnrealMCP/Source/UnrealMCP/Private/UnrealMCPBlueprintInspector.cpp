@@ -4,6 +4,7 @@
 #include "AssetRegistry/IAssetRegistry.h"
 #include "Blueprint/BlueprintSupport.h"
 #include "Components/ActorComponent.h"
+#include "Components/SceneComponent.h"
 #include "EdGraph/EdGraph.h"
 #include "EdGraph/EdGraphNode.h"
 #include "EdGraph/EdGraphPin.h"
@@ -17,6 +18,7 @@
 #include "Serialization/JsonSerializer.h"
 #include "Serialization/JsonWriter.h"
 #include "UnrealMCPVersion.h"
+#include "UnrealMCPPropertyCodec.h"
 #include "UObject/Package.h"
 #include "UObject/SoftObjectPath.h"
 #include "UObject/UnrealType.h"
@@ -25,7 +27,7 @@ namespace
 {
 const TSet<FString> InspectSections = {
     TEXT("summary"), TEXT("parent_class"), TEXT("compile_state"), TEXT("components"),
-    TEXT("variables"), TEXT("graphs"), TEXT("nodes"), TEXT("pins"), TEXT("connections")};
+    TEXT("class_defaults"), TEXT("variables"), TEXT("graphs"), TEXT("nodes"), TEXT("pins"), TEXT("connections")};
 
 const TSet<FString> SupportedPinCategories = {
     TEXT("exec"), TEXT("boolean"), TEXT("byte"), TEXT("int"), TEXT("int64"), TEXT("real"),
@@ -219,29 +221,30 @@ void AddBlueprintGraphs(UBlueprint* Blueprint, const FString& OwnerPath, TArray<
     Append(Blueprint->DelegateSignatureGraphs);
 }
 
-bool IsSafeComponentProperty(const FProperty* Property, FString& OutKind)
+bool ReadPropertyNames(const FJsonObject& Arguments, TSet<FString>& OutNames, FUnrealMCPError& OutError)
 {
-    if (Property->IsA<FBoolProperty>()) OutKind = TEXT("bool");
-    else if (Property->IsA<FNumericProperty>()) OutKind = TEXT("number");
-    else if (Property->IsA<FNameProperty>()) OutKind = TEXT("name");
-    else if (Property->IsA<FStrProperty>()) OutKind = TEXT("string");
-    else if (Property->IsA<FTextProperty>()) OutKind = TEXT("text");
-    else if (Property->IsA<FEnumProperty>() || Property->IsA<FByteProperty>()) OutKind = TEXT("enum");
-    else if (const FStructProperty* Struct = CastField<FStructProperty>(Property))
+    if (!Arguments.HasField(TEXT("property_names"))) return true;
+    const TArray<TSharedPtr<FJsonValue>>* Values = nullptr;
+    if (!Arguments.TryGetArrayField(TEXT("property_names"), Values) || Values == nullptr || Values->IsEmpty()
+        || Values->Num() > UnrealMCP::MaxPropertyNames)
     {
-        static const TSet<FName> SafeStructs = {
-            TEXT("Vector"), TEXT("Vector2D"), TEXT("Rotator"), TEXT("Quat"), TEXT("Transform"),
-            TEXT("Color"), TEXT("LinearColor"), TEXT("IntPoint"), TEXT("IntVector")};
-        if (!SafeStructs.Contains(Struct->Struct->GetFName())) return false;
-        OutKind = TEXT("struct");
+        OutError = {TEXT("invalid_argument"), TEXT("property_names must be a non-empty bounded array")};
+        return false;
     }
-    else if (Property->IsA<FClassProperty>() || Property->IsA<FSoftClassProperty>()) OutKind = TEXT("class_reference");
-    else if (Property->IsA<FObjectPropertyBase>() || Property->IsA<FSoftObjectProperty>()) OutKind = TEXT("object_reference");
-    else return false;
-    return Property->ArrayDim == 1;
+    for (const TSharedPtr<FJsonValue>& Item : *Values)
+    {
+        FString Name;
+        if (!Item.IsValid() || !Item->TryGetString(Name) || Name.IsEmpty() || Name.Len() > 128 || Name.Contains(TEXT(".")) || OutNames.Contains(Name))
+        {
+            OutError = {TEXT("invalid_argument"), TEXT("property_names contains an invalid or duplicate exact property name")};
+            return false;
+        }
+        OutNames.Add(Name);
+    }
+    return true;
 }
 
-FString AddComponentDefaults(UActorComponent* Template, const TSharedRef<FJsonObject>& Component)
+FString AddComponentDefaults(UActorComponent* Template, const TSet<FString>& RequestedProperties, const TSharedRef<FJsonObject>& Component)
 {
     TArray<FProperty*> Changed;
     UObject* Archetype = Template->GetArchetype();
@@ -258,28 +261,51 @@ FString AddComponentDefaults(UActorComponent* Template, const TSharedRef<FJsonOb
     TArray<TSharedPtr<FJsonValue>> Defaults;
     TArray<FString> Fingerprint;
     const int32 Count = FMath::Min(Changed.Num(), UnrealMCP::MaxComponentDefaults);
-    for (int32 Index = 0; Index < Count; ++Index)
+    for (int32 Index = 0; Index < Changed.Num(); ++Index)
     {
         FProperty* Property = Changed[Index];
-        const TSharedRef<FJsonObject> Value = MakeShared<FJsonObject>();
-        Value->SetStringField(TEXT("name"), Property->GetName());
         FString Kind;
-        const bool bSupported = IsSafeComponentProperty(Property, Kind);
-        Value->SetBoolField(TEXT("supported"), bSupported);
-        Value->SetStringField(TEXT("type"), bSupported ? Kind : TEXT("unsupported"));
+        const bool bSupported = UnrealMCP::PropertyCodec::IsSupportedEditable(Property, Kind);
         FString Encoded;
-        if (bSupported)
-        {
-            Property->ExportText_InContainer(0, Encoded, Template, Archetype, Template, PPF_None);
-            Value->SetStringField(TEXT("value"), Encoded.Left(512));
-        }
+        Property->ExportText_InContainer(0, Encoded, Template, Archetype, Template, PPF_None);
         Fingerprint.Add(Property->GetName() + TEXT("|") + (bSupported ? Kind : TEXT("unsupported")) + TEXT("|") + Encoded);
-        Defaults.Add(MakeShared<FJsonValueObject>(Value));
+        if (Index < Count) Defaults.Add(MakeShared<FJsonValueObject>(UnrealMCP::PropertyCodec::Encode(Template, Property)));
     }
     Component->SetArrayField(TEXT("changed_defaults"), Defaults);
     Component->SetNumberField(TEXT("changed_default_count"), Changed.Num());
     Component->SetBoolField(TEXT("defaults_truncated"), Changed.Num() > Count);
+    if (!RequestedProperties.IsEmpty())
+    {
+        TArray<FString> Sorted = RequestedProperties.Array();
+        Sorted.Sort();
+        TArray<TSharedPtr<FJsonValue>> Editable;
+        for (const FString& Name : Sorted)
+        {
+            Editable.Add(MakeShared<FJsonValueObject>(UnrealMCP::PropertyCodec::Encode(
+                Template, Template->GetClass()->FindPropertyByName(FName(*Name)))));
+        }
+        Component->SetArrayField(TEXT("editable_properties"), Editable);
+    }
     return FString::Join(Fingerprint, TEXT(";"));
+}
+
+void AddClassDefaultFingerprint(UBlueprint* Blueprint, TArray<FString>& Fingerprint)
+{
+    UObject* Defaults = Blueprint != nullptr && Blueprint->GeneratedClass != nullptr ? Blueprint->GeneratedClass->GetDefaultObject(false) : nullptr;
+    if (Defaults == nullptr) return;
+    UObject* Archetype = Defaults->GetArchetype();
+    for (TFieldIterator<FProperty> It(Defaults->GetClass(), EFieldIterationFlags::IncludeSuper); It; ++It)
+    {
+        FProperty* Property = *It;
+        FString Kind;
+        if (UnrealMCP::PropertyCodec::IsSupportedEditable(Property, Kind)
+            && (Archetype == nullptr || !Property->Identical_InContainer(Defaults, Archetype)))
+        {
+            FString Encoded;
+            Property->ExportText_InContainer(0, Encoded, Defaults, Archetype, Defaults, PPF_None);
+            Fingerprint.Add(TEXT("class_default|") + Property->GetName() + TEXT("|") + Kind + TEXT("|") + Encoded);
+        }
+    }
 }
 
 bool AssetIsActorBlueprint(const FAssetData& Asset)
@@ -384,7 +410,8 @@ bool BuildInspection(
     FUnrealMCPError& OutError)
 {
     OutScanTruncated = false;
-    if (!HasOnlyFields(Arguments, {TEXT("mode"), TEXT("asset_path"), TEXT("sections"), TEXT("graph_id"), TEXT("include_inherited"), TEXT("page_size")}))
+    if (!HasOnlyFields(Arguments, {TEXT("mode"), TEXT("asset_path"), TEXT("sections"), TEXT("graph_id"), TEXT("component_id"),
+        TEXT("property_names"), TEXT("include_inherited"), TEXT("page_size")}))
     {
         OutError = {TEXT("invalid_argument"), TEXT("Inspection arguments contain an unknown field")};
         return false;
@@ -405,7 +432,7 @@ bool BuildInspection(
     if (Arguments.HasField(TEXT("sections")))
     {
         const TArray<TSharedPtr<FJsonValue>>* Values = nullptr;
-        if (!Arguments.TryGetArrayField(TEXT("sections"), Values) || Values == nullptr || Values->IsEmpty() || Values->Num() > 9)
+        if (!Arguments.TryGetArrayField(TEXT("sections"), Values) || Values == nullptr || Values->IsEmpty() || Values->Num() > 10)
         {
             OutError = {TEXT("invalid_argument"), TEXT("sections must be a non-empty bounded array")};
             return false;
@@ -427,6 +454,20 @@ bool BuildInspection(
         && (!Arguments.TryGetStringField(TEXT("graph_id"), GraphFilter) || GraphFilter.Len() != 32))
     {
         OutError = {TEXT("invalid_argument"), TEXT("graph_id must be a 32-character graph identity")};
+        return false;
+    }
+    FString ComponentFilter;
+    if (Arguments.HasField(TEXT("component_id"))
+        && (!Arguments.TryGetStringField(TEXT("component_id"), ComponentFilter) || ComponentFilter.Len() != 32))
+    {
+        OutError = {TEXT("invalid_argument"), TEXT("component_id must be a 32-character stable component identity")};
+        return false;
+    }
+    TSet<FString> PropertyNames;
+    if (!ReadPropertyNames(Arguments, PropertyNames, OutError)) return false;
+    if (Sections.Contains(TEXT("class_defaults")) && PropertyNames.IsEmpty())
+    {
+        OutError = {TEXT("invalid_argument"), TEXT("class_defaults inspection requires one or more targeted property_names")};
         return false;
     }
 
@@ -453,6 +494,7 @@ bool BuildInspection(
     const bool bDirtyBefore = Package->IsDirty();
     const EBlueprintStatus StatusBefore = Blueprint->Status;
     TArray<FString> Fingerprint;
+    AddClassDefaultFingerprint(Blueprint, Fingerprint);
 
     if (Sections.Contains(TEXT("summary")))
     {
@@ -493,6 +535,7 @@ bool BuildInspection(
         }
     }
 
+    bool bComponentFound = ComponentFilter.IsEmpty();
     for (const TPair<UBlueprint*, FString>& Owner : Owners)
     {
         if (Owner.Key->SimpleConstructionScript == nullptr) continue;
@@ -507,10 +550,11 @@ bool BuildInspection(
             if (Node == nullptr) continue;
             const TSharedRef<FJsonObject> Value = Record(TEXT("component"));
             const FString Id = GuidString(Node->VariableGuid);
+            if (Id == ComponentFilter) bComponentFound = true;
             const USCS_Node* const* Parent = Parents.Find(Node);
             FString DefaultsFingerprint;
-            if (Node->ComponentTemplate != nullptr) DefaultsFingerprint = AddComponentDefaults(Node->ComponentTemplate, Value);
-            if (Sections.Contains(TEXT("components")))
+            if (Node->ComponentTemplate != nullptr) DefaultsFingerprint = AddComponentDefaults(Node->ComponentTemplate, PropertyNames, Value);
+            if (Sections.Contains(TEXT("components")) && (ComponentFilter.IsEmpty() || ComponentFilter == Id))
             {
                 Value->SetStringField(TEXT("id"), Id);
                 Value->SetBoolField(TEXT("identity_stable"), !Id.IsEmpty());
@@ -518,11 +562,80 @@ bool BuildInspection(
                 Value->SetStringField(TEXT("class_path"), Node->ComponentClass != nullptr ? Node->ComponentClass->GetPathName() : FString());
                 Value->SetStringField(TEXT("owner_blueprint"), Owner.Value);
                 Value->SetBoolField(TEXT("inherited"), Owner.Key != Blueprint);
+                Value->SetStringField(TEXT("ownership"), Owner.Key == Blueprint ? TEXT("local") : TEXT("inherited"));
+                Value->SetBoolField(TEXT("native"), false);
+                Value->SetBoolField(TEXT("instanced"), false);
+                Value->SetBoolField(TEXT("editable"), Owner.Key == Blueprint && !Id.IsEmpty());
+                Value->SetBoolField(TEXT("scene_component"), Node->ComponentClass != nullptr && Node->ComponentClass->IsChildOf(USceneComponent::StaticClass()));
+                Value->SetBoolField(TEXT("root"), Owner.Key->SimpleConstructionScript->GetRootNodes().Contains(Node));
                 Value->SetStringField(TEXT("parent_id"), Parent != nullptr && *Parent != nullptr ? GuidString((*Parent)->VariableGuid) : FString());
                 AddRecord(OutRecords, Value);
             }
             Fingerprint.Add(TEXT("component|") + Owner.Value + TEXT("|") + Id + TEXT("|") + Node->GetVariableName().ToString()
                 + TEXT("|") + (Parent != nullptr && *Parent != nullptr ? GuidString((*Parent)->VariableGuid) : FString()) + TEXT("|") + DefaultsFingerprint);
+        }
+    }
+    if (!bComponentFound)
+    {
+        OutError = {TEXT("not_found"), TEXT("The requested component identity was not found")};
+        return false;
+    }
+
+    if (bIncludeInherited && Blueprint->GeneratedClass != nullptr)
+    {
+        if (AActor* DefaultsActor = Cast<AActor>(Blueprint->GeneratedClass->GetDefaultObject(false)))
+        {
+            TInlineComponentArray<UActorComponent*> NativeComponents;
+            DefaultsActor->GetComponents(NativeComponents);
+            NativeComponents.Sort([](const UActorComponent& Left, const UActorComponent& Right)
+            {
+                return Left.GetName() < Right.GetName();
+            });
+            for (UActorComponent* Component : NativeComponents)
+            {
+                if (Component == nullptr || Component->CreationMethod != EComponentCreationMethod::Native) continue;
+                const TSharedRef<FJsonObject> Value = Record(TEXT("component"));
+                const FString DefaultsFingerprint = AddComponentDefaults(Component, PropertyNames, Value);
+                if (Sections.Contains(TEXT("components")) && ComponentFilter.IsEmpty())
+                {
+                    Value->SetStringField(TEXT("id"), FString());
+                    Value->SetBoolField(TEXT("identity_stable"), false);
+                    Value->SetStringField(TEXT("name"), Component->GetName());
+                    Value->SetStringField(TEXT("class_path"), Component->GetClass()->GetPathName());
+                    Value->SetStringField(TEXT("owner_blueprint"), Blueprint->ParentClass != nullptr ? Blueprint->ParentClass->GetPathName() : FString());
+                    Value->SetBoolField(TEXT("inherited"), true);
+                    Value->SetStringField(TEXT("ownership"), TEXT("native"));
+                    Value->SetBoolField(TEXT("native"), true);
+                    Value->SetBoolField(TEXT("instanced"), false);
+                    Value->SetBoolField(TEXT("editable"), false);
+                    Value->SetBoolField(TEXT("scene_component"), Component->IsA<USceneComponent>());
+                    Value->SetBoolField(TEXT("root"), DefaultsActor->GetRootComponent() == Component);
+                    Value->SetStringField(TEXT("parent_id"), FString());
+                    AddRecord(OutRecords, Value);
+                }
+                Fingerprint.Add(TEXT("native_component|") + Component->GetName() + TEXT("|")
+                    + Component->GetClass()->GetPathName() + TEXT("|") + DefaultsFingerprint);
+            }
+        }
+    }
+
+    if (Sections.Contains(TEXT("class_defaults")))
+    {
+        UObject* Defaults = Blueprint->GeneratedClass != nullptr ? Blueprint->GeneratedClass->GetDefaultObject(false) : nullptr;
+        if (Defaults == nullptr)
+        {
+            OutError = {TEXT("busy"), TEXT("The Blueprint generated-class defaults are unavailable"), MakeShared<FJsonObject>(), true};
+            return false;
+        }
+        TArray<FString> SortedNames = PropertyNames.Array();
+        SortedNames.Sort();
+        for (const FString& Name : SortedNames)
+        {
+            const TSharedRef<FJsonObject> Value = Record(TEXT("class_default"));
+            const TSharedRef<FJsonObject> Encoded = UnrealMCP::PropertyCodec::Encode(
+                Defaults, Defaults->GetClass()->FindPropertyByName(FName(*Name)));
+            for (const TPair<FString, TSharedPtr<FJsonValue>>& Pair : Encoded->Values) Value->SetField(Pair.Key, Pair.Value);
+            AddRecord(OutRecords, Value);
         }
     }
 

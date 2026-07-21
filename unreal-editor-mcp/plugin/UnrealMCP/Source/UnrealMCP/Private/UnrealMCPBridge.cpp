@@ -11,10 +11,12 @@
 #include "Misc/App.h"
 #include "Misc/EngineVersion.h"
 #include "Misc/ScopeLock.h"
+#include "Misc/SecureHash.h"
 #include "UnrealMCPDiscovery.h"
 #include "UnrealMCPBlueprintInspector.h"
 #include "UnrealMCPBlueprintMutator.h"
 #include "UnrealMCPProtocol.h"
+#include "UnrealMCPOperationLedger.h"
 #include "UnrealMCPVersion.h"
 #include "UObject/GarbageCollection.h"
 #include "UObject/UObjectGlobals.h"
@@ -39,11 +41,28 @@ FString Header(const FHttpServerRequest& Request, const TCHAR* LowercaseName)
     const TArray<FString>* Values = Request.Headers.Find(LowercaseName);
     return Values != nullptr && Values->Num() == 1 ? (*Values)[0] : FString();
 }
+
+bool IsMutationCommand(const FString& Command)
+{
+    return Command == TEXT("blueprint_create") || Command == TEXT("blueprint_compile") || Command == TEXT("blueprint_save")
+        || Command == TEXT("blueprint_component_edit") || Command == TEXT("blueprint_default_edit");
+}
+
+FString AuthenticationBinding(const FString& ProjectHash, const FString& BridgeInstanceId, const FString& Token)
+{
+    const FString Material = ProjectHash + TEXT("|") + BridgeInstanceId + TEXT("|") + Token;
+    FTCHARToUTF8 Encoded(*Material);
+    uint8 Digest[FSHA1::DigestSize];
+    FSHA1::HashBuffer(Encoded.Get(), Encoded.Length(), Digest);
+    return BytesToHex(Digest, FSHA1::DigestSize).ToLower();
+}
 }
 
 FUnrealMCPBridge::FUnrealMCPBridge(FString InToken, FString InStateDirectory, FString InProjectHash, uint32 InPort)
     : Token(MoveTemp(InToken)), StateDirectory(MoveTemp(InStateDirectory)), ProjectHash(MoveTemp(InProjectHash)), Port(InPort)
 {
+    BridgeInstanceId = FGuid::NewGuid().ToString(EGuidFormats::Digits).ToLower();
+    OperationLedger = MakeUnique<FUnrealMCPOperationLedger>(BridgeInstanceId, AuthenticationBinding(ProjectHash, BridgeInstanceId, Token));
 }
 
 FUnrealMCPBridge::~FUnrealMCPBridge()
@@ -115,6 +134,10 @@ void FUnrealMCPBridge::Stop()
         return;
     }
     bReady = false;
+    if (OperationLedger)
+    {
+        OperationLedger->CancelQueued();
+    }
     if (HeartbeatHandle.IsValid())
     {
         FTSTicker::GetCoreTicker().RemoveTicker(HeartbeatHandle);
@@ -155,11 +178,6 @@ bool FUnrealMCPBridge::HandleRequest(const FHttpServerRequest& Request, const FH
         Complete(UnrealMCP::Protocol::Error(EHttpServerResponseCodes::RequestTooLarge, TEXT("request_too_large"), TEXT("Request body exceeds the configured limit")));
         return true;
     }
-    if (Pending.Load() >= UnrealMCP::MaxQueuedRequests)
-    {
-        Complete(UnrealMCP::Protocol::Error(EHttpServerResponseCodes::TooManyRequests, TEXT("busy"), TEXT("Bridge request queue is full"), true));
-        return true;
-    }
     FString Command;
     TSharedPtr<FJsonObject> Arguments;
     FUnrealMCPError ParseError;
@@ -168,20 +186,66 @@ bool FUnrealMCPBridge::HandleRequest(const FHttpServerRequest& Request, const FH
         Complete(UnrealMCP::Protocol::Error(EHttpServerResponseCodes::BadRequest, ParseError));
         return true;
     }
-    if (Command != TEXT("capabilities") && Command != TEXT("editor_state") && Command != TEXT("blueprint_inspect")
-        && Command != TEXT("blueprint_create") && Command != TEXT("blueprint_compile") && Command != TEXT("blueprint_save"))
+    if (Command != TEXT("capabilities") && Command != TEXT("editor_state") && Command != TEXT("operation_status")
+        && Command != TEXT("blueprint_inspect") && Command != TEXT("blueprint_create") && Command != TEXT("blueprint_compile")
+        && Command != TEXT("blueprint_save") && Command != TEXT("blueprint_component_edit") && Command != TEXT("blueprint_default_edit"))
     {
         Complete(UnrealMCP::Protocol::Error(EHttpServerResponseCodes::BadRequest, TEXT("invalid_argument"), TEXT("Unknown or unavailable command")));
         return true;
     }
+    if (Command == TEXT("operation_status"))
+    {
+        TSharedPtr<FJsonObject> Status;
+        FUnrealMCPError Error;
+        if (!OperationLedger || !OperationLedger->Status(Arguments, Status, Error))
+        {
+            Complete(UnrealMCP::Protocol::Error(EHttpServerResponseCodes::BadRequest, Error));
+        }
+        else
+        {
+            Complete(UnrealMCP::Protocol::Success(Status));
+        }
+        return true;
+    }
+    if (Pending.Load() >= UnrealMCP::MaxQueuedRequests)
+    {
+        Complete(UnrealMCP::Protocol::Error(EHttpServerResponseCodes::TooManyRequests, TEXT("busy"), TEXT("Bridge request queue is full"), true));
+        return true;
+    }
+    FString OperationId;
+    FString RequestDigest;
+    if (IsMutationCommand(Command))
+    {
+        const FUnrealMCPOperationAdmission Admission = OperationLedger->Admit(Command, Arguments);
+        OperationId = Admission.OperationId;
+        RequestDigest = Admission.RequestDigest;
+        if (Admission.Kind == EUnrealMCPOperationAdmission::ReplaySuccess)
+        {
+            Complete(UnrealMCP::Protocol::Success(Admission.Result));
+            return true;
+        }
+        if (Admission.Kind != EUnrealMCPOperationAdmission::Accepted)
+        {
+            Complete(UnrealMCP::Protocol::Error(EHttpServerResponseCodes::BadRequest,
+                Admission.Error != nullptr ? *Admission.Error : FUnrealMCPError{TEXT("internal_error"), TEXT("Operation admission failed")}));
+            return true;
+        }
+    }
     ++Pending;
-    DispatchOnGameThread(MoveTemp(Command), MoveTemp(Arguments), Complete, FPlatformTime::Seconds());
+    DispatchOnGameThread(MoveTemp(Command), MoveTemp(Arguments), MoveTemp(OperationId), MoveTemp(RequestDigest), Complete, FPlatformTime::Seconds());
     return true;
 }
 
-void FUnrealMCPBridge::DispatchOnGameThread(FString Command, TSharedPtr<FJsonObject> Arguments, const FHttpResultCallback& Complete, double AcceptedAt)
+void FUnrealMCPBridge::DispatchOnGameThread(
+    FString Command,
+    TSharedPtr<FJsonObject> Arguments,
+    FString OperationId,
+    FString RequestDigest,
+    const FHttpResultCallback& Complete,
+    double AcceptedAt)
 {
-    AsyncTask(ENamedThreads::GameThread, [Weak = TWeakPtr<FUnrealMCPBridge>(AsShared()), Command = MoveTemp(Command), Arguments = MoveTemp(Arguments), Complete, AcceptedAt]() mutable
+    AsyncTask(ENamedThreads::GameThread, [Weak = TWeakPtr<FUnrealMCPBridge>(AsShared()), Command = MoveTemp(Command),
+        Arguments = MoveTemp(Arguments), OperationId = MoveTemp(OperationId), RequestDigest = MoveTemp(RequestDigest), Complete, AcceptedAt]() mutable
     {
         const TSharedPtr<FUnrealMCPBridge> Pinned = Weak.Pin();
         if (!Pinned.IsValid())
@@ -197,15 +261,35 @@ void FUnrealMCPBridge::DispatchOnGameThread(FString Command, TSharedPtr<FJsonObj
         }
         if (FPlatformTime::Seconds() - AcceptedAt > UnrealMCP::CommandDeadlineSeconds)
         {
-            Complete(UnrealMCP::Protocol::Error(EHttpServerResponseCodes::GatewayTimeout, TEXT("timeout"), TEXT("Command expired before Game-thread dispatch"), true));
+            FUnrealMCPError Timeout{TEXT("timeout"), TEXT("Command expired before Game-thread dispatch"), MakeShared<FJsonObject>(), true};
+            if (!OperationId.IsEmpty() && Pinned->OperationLedger) Pinned->OperationLedger->Reject(OperationId, Timeout);
+            Complete(UnrealMCP::Protocol::Error(EHttpServerResponseCodes::GatewayTimeout, Timeout));
             return;
+        }
+        if (!OperationId.IsEmpty() && Pinned->OperationLedger)
+        {
+            FUnrealMCPError AdmissionError;
+            if (!Pinned->OperationLedger->MarkExecuting(OperationId, AdmissionError))
+            {
+                Complete(UnrealMCP::Protocol::Error(EHttpServerResponseCodes::BadRequest, AdmissionError));
+                return;
+            }
         }
         TSharedPtr<FJsonObject> Result;
         FUnrealMCPError Error;
         if (!Pinned->Execute(Command, Arguments, Result, Error))
         {
+            if (!OperationId.IsEmpty() && Pinned->OperationLedger) Pinned->OperationLedger->Reject(OperationId, Error);
             Complete(UnrealMCP::Protocol::Error(EHttpServerResponseCodes::BadRequest, Error));
             return;
+        }
+        if (!OperationId.IsEmpty())
+        {
+            Result->SetStringField(TEXT("operation_id"), OperationId);
+            Result->SetStringField(TEXT("operation_state"), TEXT("committed"));
+            Result->SetStringField(TEXT("bridge_instance_id"), Pinned->BridgeInstanceId);
+            Result->SetStringField(TEXT("request_digest"), RequestDigest);
+            Pinned->OperationLedger->Commit(OperationId, Result);
         }
         Complete(UnrealMCP::Protocol::Success(Result));
     });
@@ -244,12 +328,14 @@ TSharedPtr<FJsonObject> FUnrealMCPBridge::Capabilities() const
     const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
     Result->SetStringField(TEXT("project_hash"), ProjectHash);
     Result->SetStringField(TEXT("bridge_version"), UnrealMCP::Version);
+    Result->SetStringField(TEXT("bridge_instance_id"), BridgeInstanceId);
     Result->SetStringField(TEXT("unreal_version"), FEngineVersion::Current().ToString(EVersionComponent::Changelist));
     Result->SetStringField(TEXT("platform"), FPlatformProperties::PlatformName());
     Result->SetStringField(TEXT("mode"), TEXT("actor_authoring"));
     Result->SetBoolField(TEXT("bridge_ready"), bReady);
-    Result->SetArrayField(TEXT("commands"), Strings({TEXT("capabilities"), TEXT("editor_state"), TEXT("blueprint_inspect"),
-        TEXT("blueprint_create"), TEXT("blueprint_compile"), TEXT("blueprint_save")}));
+    Result->SetArrayField(TEXT("commands"), Strings({TEXT("capabilities"), TEXT("editor_state"), TEXT("operation_status"),
+        TEXT("blueprint_inspect"), TEXT("blueprint_create"), TEXT("blueprint_compile"), TEXT("blueprint_save"),
+        TEXT("blueprint_component_edit"), TEXT("blueprint_default_edit")}));
 
     const TSharedRef<FJsonObject> Features = MakeShared<FJsonObject>();
     Features->SetBoolField(TEXT("blueprint_inspection"), true);
@@ -257,6 +343,9 @@ TSharedPtr<FJsonObject> FUnrealMCPBridge::Capabilities() const
     Features->SetBoolField(TEXT("blueprint_creation"), true);
     Features->SetBoolField(TEXT("blueprint_compile"), true);
     Features->SetBoolField(TEXT("blueprint_save"), true);
+    Features->SetBoolField(TEXT("reliable_mutations"), true);
+    Features->SetBoolField(TEXT("blueprint_components"), true);
+    Features->SetBoolField(TEXT("blueprint_defaults"), true);
     Features->SetBoolField(TEXT("editor_lifecycle"), false);
     Features->SetBoolField(TEXT("project_build"), false);
     Result->SetObjectField(TEXT("features"), Features);
@@ -280,6 +369,9 @@ TSharedPtr<FJsonObject> FUnrealMCPBridge::Capabilities() const
     Limits->SetNumberField(TEXT("cursor_lifetime_ms"), static_cast<int32>(UnrealMCP::CursorLifetimeSeconds * 1000.0));
     Limits->SetNumberField(TEXT("compiler_diagnostics"), UnrealMCP::MaxCompilerDiagnostics);
     Limits->SetNumberField(TEXT("diagnostic_chars"), UnrealMCP::MaxDiagnosticChars);
+    Limits->SetNumberField(TEXT("retained_operations"), UnrealMCP::MaxRetainedOperations);
+    Limits->SetNumberField(TEXT("operation_lifetime_ms"), static_cast<int32>(UnrealMCP::OperationLifetimeSeconds * 1000.0));
+    Limits->SetNumberField(TEXT("property_names"), UnrealMCP::MaxPropertyNames);
     Result->SetObjectField(TEXT("limits"), Limits);
 
     const TSharedRef<FJsonObject> Listener = MakeShared<FJsonObject>();
@@ -302,9 +394,8 @@ TSharedPtr<FJsonObject> FUnrealMCPBridge::EditorState() const
     Result->SetBoolField(TEXT("is_saving"), UE::IsSavingPackage());
     Result->SetBoolField(TEXT("is_garbage_collecting"), IsGarbageCollecting());
     Result->SetNumberField(TEXT("queued_requests"), Pending.Load());
-    const TSharedRef<FJsonObject> Operation = MakeShared<FJsonObject>();
-    Operation->SetStringField(TEXT("state"), Pending.Load() > 0 ? TEXT("queued") : TEXT("idle"));
-    Result->SetObjectField(TEXT("operation"), Operation);
+    Result->SetStringField(TEXT("bridge_instance_id"), BridgeInstanceId);
+    Result->SetObjectField(TEXT("operation"), OperationLedger ? OperationLedger->CurrentState() : MakeShared<FJsonObject>());
     return Result;
 }
 

@@ -12,6 +12,7 @@ class FJsonObject;
 class FUnrealMCPDiscovery;
 class FUnrealMCPBlueprintInspector;
 class FUnrealMCPBlueprintMutator;
+class FUnrealMCPOperationLedger;
 class IHttpRouter;
 
 class FUnrealMCPBridge : public TSharedFromThis<FUnrealMCPBridge>
@@ -27,7 +28,8 @@ public:
 
 private:
     bool HandleRequest(const FHttpServerRequest& Request, const FHttpResultCallback& Complete);
-    void DispatchOnGameThread(FString Command, TSharedPtr<FJsonObject> Arguments, const FHttpResultCallback& Complete, double AcceptedAt);
+    void DispatchOnGameThread(FString Command, TSharedPtr<FJsonObject> Arguments, FString OperationId, FString RequestDigest,
+        const FHttpResultCallback& Complete, double AcceptedAt);
     bool Execute(const FString& Command, const TSharedPtr<FJsonObject>& Arguments, TSharedPtr<FJsonObject>& OutResult, FUnrealMCPError& OutError);
     TSharedPtr<FJsonObject> Capabilities() const;
     TSharedPtr<FJsonObject> EditorState() const;
@@ -42,6 +44,8 @@ private:
     TUniquePtr<FUnrealMCPDiscovery> Discovery;
     TUniquePtr<FUnrealMCPBlueprintInspector> BlueprintInspector;
     TUniquePtr<FUnrealMCPBlueprintMutator> BlueprintMutator;
+    TUniquePtr<FUnrealMCPOperationLedger> OperationLedger;
+    FString BridgeInstanceId;
     FTSTicker::FDelegateHandle HeartbeatHandle;
     TAtomic<int32> Pending{0};
     TAtomic<bool> bStopping{false};

@@ -15,9 +15,10 @@ class FakeBridge:
     def call(self, command, arguments=None):
         self.calls.append((command, arguments))
         if command == "capabilities":
-            return {"bridge_version": "0.3.0", "commands": [
-                "capabilities", "editor_state", "blueprint_inspect",
+            return {"bridge_version": "0.4.0", "commands": [
+                "capabilities", "editor_state", "operation_status", "blueprint_inspect",
                 "blueprint_create", "blueprint_compile", "blueprint_save",
+                "blueprint_component_edit", "blueprint_default_edit",
             ]}
         if command == "blueprint_inspect":
             return {"mode": "discover", "snapshot_id": "a" * 40, "records": []}
@@ -34,11 +35,12 @@ class ServerStdioTests(unittest.TestCase):
         bridge = FakeBridge()
         server = MCPServer(bridge)
         initialized = server.handle({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2025-06-18"}})
-        self.assertEqual(initialized["result"]["serverInfo"]["version"], "0.3.0")
+        self.assertEqual(initialized["result"]["serverInfo"]["version"], "0.4.0")
         listed = server.handle({"jsonrpc": "2.0", "id": 2, "method": "tools/list"})
         self.assertEqual([tool["name"] for tool in listed["result"]["tools"]], [
-            "capabilities", "editor_state", "blueprint_inspect",
+            "capabilities", "editor_state", "operation_status", "blueprint_inspect",
             "blueprint_create", "blueprint_compile", "blueprint_save",
+            "blueprint_component_edit", "blueprint_default_edit",
         ])
         called = server.handle({"jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": {"name": "capabilities", "arguments": {}}})
         payload = json.loads(called["result"]["content"][0]["text"])
@@ -81,13 +83,22 @@ class ServerStdioTests(unittest.TestCase):
                 response = server.handle({"jsonrpc": "2.0", "id": 5, "method": "tools/call", "params": {"name": "blueprint_inspect", "arguments": arguments}})
                 self.assertEqual(response["error"]["code"], -32602)
 
-    def test_phase_three_mutation_schemas_are_exact(self):
+    def test_phase_four_mutation_schemas_are_exact(self):
         server = MCPServer(FakeBridge())
+        operation_id = "a" * 32
+        snapshot = "b" * 40
         valid = (
-            ("blueprint_create", {"parent_class": "/Script/Engine.Actor", "package_path": "/Game/Actors/BP_Light"}),
-            ("blueprint_create", {"parent_class": "/Game/Actors/BP_Parent.BP_Parent_C", "package_path": "/LocalPlugin/BP_Child"}),
-            ("blueprint_compile", {"asset_path": "/Game/Actors/BP_Light.BP_Light"}),
-            ("blueprint_save", {"asset_path": "/Game/Actors/BP_Light"}),
+            ("blueprint_create", {"operation_id": operation_id, "parent_class": "/Script/Engine.Actor", "package_path": "/Game/Actors/BP_Light"}),
+            ("blueprint_create", {"operation_id": operation_id, "parent_class": "/Game/Actors/BP_Parent.BP_Parent_C", "package_path": "/LocalPlugin/BP_Child"}),
+            ("blueprint_compile", {"operation_id": operation_id, "asset_path": "/Game/Actors/BP_Light.BP_Light", "expected_snapshot": snapshot}),
+            ("blueprint_save", {"operation_id": operation_id, "asset_path": "/Game/Actors/BP_Light", "expected_snapshot": snapshot}),
+            ("blueprint_component_edit", {"operation_id": operation_id, "asset_path": "/Game/Actors/BP_Light", "expected_snapshot": snapshot,
+                "operation": "add", "component_class": "/Script/Engine.SceneComponent", "name": "Root"}),
+            ("blueprint_component_edit", {"operation_id": operation_id, "asset_path": "/Game/Actors/BP_Light", "expected_snapshot": snapshot,
+                "operation": "set_property", "component_id": "c" * 32, "property_name": "bVisible", "value": False}),
+            ("blueprint_default_edit", {"operation_id": operation_id, "asset_path": "/Game/Actors/BP_Light", "expected_snapshot": snapshot,
+                "property_name": "InitialLifeSpan", "value": 12.5}),
+            ("operation_status", {"operation_id": operation_id, "bridge_instance_id": "d" * 32}),
         )
         for name, arguments in valid:
             with self.subTest(name=name, arguments=arguments):
@@ -95,10 +106,14 @@ class ServerStdioTests(unittest.TestCase):
                 self.assertNotIn("error", response)
         invalid = (
             ("blueprint_create", {}),
-            ("blueprint_create", {"parent_class": "Actor", "package_path": "/Game/BP_A"}),
-            ("blueprint_create", {"parent_class": "/Script/Engine.Actor", "package_path": "/Game/BP_A.BP_A"}),
-            ("blueprint_compile", {"asset_path": "/Game/../Engine/BP_A.BP_A"}),
-            ("blueprint_save", {"asset_path": "/Game/BP_A.BP_A", "unexpected": True}),
+            ("blueprint_create", {"operation_id": operation_id, "parent_class": "Actor", "package_path": "/Game/BP_A"}),
+            ("blueprint_create", {"operation_id": operation_id, "parent_class": "/Script/Engine.Actor", "package_path": "/Game/BP_A.BP_A"}),
+            ("blueprint_compile", {"operation_id": operation_id, "asset_path": "/Game/../Engine/BP_A.BP_A", "expected_snapshot": snapshot}),
+            ("blueprint_save", {"operation_id": operation_id, "asset_path": "/Game/BP_A.BP_A", "expected_snapshot": snapshot, "unexpected": True}),
+            ("blueprint_component_edit", {"operation_id": operation_id, "asset_path": "/Game/BP_A", "expected_snapshot": snapshot,
+                "operation": "remove", "component_id": "short"}),
+            ("blueprint_default_edit", {"operation_id": operation_id, "asset_path": "/Game/BP_A", "expected_snapshot": snapshot,
+                "property_name": "Unsafe", "value": {"nested": True}}),
         )
         for name, arguments in invalid:
             with self.subTest(name=name, arguments=arguments):

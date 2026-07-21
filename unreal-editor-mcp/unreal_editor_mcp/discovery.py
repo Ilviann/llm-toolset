@@ -31,6 +31,7 @@ class DiscoveryRecord:
     updated_at_ms: int
 
 
+
 def _read_regular_file(path: Path, maximum: int) -> bytes:
     flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0)
     try:

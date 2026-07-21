@@ -38,6 +38,14 @@ private:
         const TSharedPtr<FJsonObject>& Arguments,
         TSharedPtr<FJsonObject>& OutResult,
         FUnrealMCPError& OutError);
+    bool ComponentEdit(
+        const TSharedPtr<FJsonObject>& Arguments,
+        TSharedPtr<FJsonObject>& OutResult,
+        FUnrealMCPError& OutError);
+    bool DefaultEdit(
+        const TSharedPtr<FJsonObject>& Arguments,
+        TSharedPtr<FJsonObject>& OutResult,
+        FUnrealMCPError& OutError);
 
     FUnrealMCPBlueprintInspector& Inspector;
     FCompile CompileBlueprint;
