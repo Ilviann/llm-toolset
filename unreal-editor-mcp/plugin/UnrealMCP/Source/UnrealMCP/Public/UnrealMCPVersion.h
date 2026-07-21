@@ -4,7 +4,7 @@
 
 namespace UnrealMCP
 {
-inline constexpr TCHAR Version[] = TEXT("0.9.0");
+inline constexpr TCHAR Version[] = TEXT("0.10.0");
 inline constexpr uint32 DefaultPort = 15485;
 inline constexpr int32 MaxRequestBytes = 64 * 1024;
 inline constexpr int32 MaxResponseBytes = 256 * 1024;
@@ -34,4 +34,7 @@ inline constexpr int32 MaxRetainedCatalogs = 32;
 inline constexpr double ActionLifetimeSeconds = 60.0;
 inline constexpr double ActionScanSeconds = 1.0;
 inline constexpr int32 MaxConcurrentCatalogs = 1;
+inline constexpr int32 MaxGraphNodes = 2048;
+inline constexpr int32 MaxGraphPinsPerNode = 256;
+inline constexpr int32 MaxGraphCoordinate = 1000000;
 }

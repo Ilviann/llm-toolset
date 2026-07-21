@@ -12,6 +12,7 @@ class FJsonObject;
 class FUnrealMCPDiscovery;
 class FUnrealMCPBlueprintInspector;
 class FUnrealMCPBlueprintActionCatalog;
+class FUnrealMCPBlueprintGraphEditor;
 class FUnrealMCPBlueprintMutator;
 class FUnrealMCPOperationLedger;
 class IHttpRouter;
@@ -45,6 +46,7 @@ private:
     TUniquePtr<FUnrealMCPDiscovery> Discovery;
     TUniquePtr<FUnrealMCPBlueprintInspector> BlueprintInspector;
     TUniquePtr<FUnrealMCPBlueprintActionCatalog> BlueprintActionCatalog;
+    TUniquePtr<FUnrealMCPBlueprintGraphEditor> BlueprintGraphEditor;
     TUniquePtr<FUnrealMCPBlueprintMutator> BlueprintMutator;
     TUniquePtr<FUnrealMCPOperationLedger> OperationLedger;
     FString BridgeInstanceId;

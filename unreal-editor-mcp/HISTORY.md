@@ -1,5 +1,12 @@
 # Unreal Editor MCP history
 
+## 0.10.0 — 2026-07-22
+
+- Added reconciled `blueprint_graph_edit` operations for action-ID-backed node creation, exact movement, and safe removal in local event, user-function, and macro graphs.
+- Re-resolve and re-filter retained action signatures against the live graph immediately before invocation; created nodes and pins receive persistent GUID identities, while unique spawners that return an existing node are reported explicitly.
+- Added graph/node/snapshot preconditions, protected-graph and protected-node rejection, mutation-scope enforcement, transactional restoration, authoritative read-back, and published graph-node, pin, and coordinate bounds.
+- Added exact Python schemas and stable graph errors, native Phase 11 coverage for lifecycle families/failures/Undo/Redo/compile/save, and cross-process lost-response reconciliation plus restart verification for every lifecycle operation.
+
 ## 0.9.0 — 2026-07-22
 
 - Expanded `blueprint_action_catalog` with context-valid event, flow-control, cast, literal, and common operator families while preserving the Phase 8 opaque-ID, cache, expiry, snapshot, scan, and mutation-free contracts.

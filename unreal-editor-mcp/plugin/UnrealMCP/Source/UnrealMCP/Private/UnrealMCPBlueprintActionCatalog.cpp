@@ -14,6 +14,138 @@ FUnrealMCPBlueprintActionCatalog::FUnrealMCPBlueprintActionCatalog(
 {
 }
 
+bool FUnrealMCPBlueprintActionCatalog::ResolveForInvocation(
+    const FString& ActionId,
+    UBlueprint* Blueprint,
+    UEdGraph* Graph,
+    const FString& AssetPath,
+    const FString& GraphId,
+    const FString& SnapshotId,
+    FResolvedAction& OutAction,
+    FUnrealMCPError& OutError)
+{
+    using namespace UnrealMCP::BlueprintActionCatalogPrivate;
+    check(IsInGameThread());
+    OutAction = FResolvedAction();
+    RemoveExpired(Now());
+    const FRetainedAction* Retained = RetainedActions.Find(ActionId);
+    if (!IsGuidString(ActionId, 32) || Retained == nullptr)
+    {
+        OutError = {TEXT("invalid_action"), TEXT("The retained action identity is unknown or expired")};
+        return false;
+    }
+    const UEdGraphSchema* Schema = Graph != nullptr ? Graph->GetSchema() : nullptr;
+    if (Blueprint == nullptr || Graph == nullptr || Schema == nullptr
+        || Retained->AssetPath != AssetPath || Retained->GraphId != GraphId || Retained->SnapshotId != SnapshotId
+        || Blueprint->GeneratedClass == nullptr || Blueprint->GeneratedClass->GetPathName() != Retained->TargetClass
+        || Schema->GetClass()->GetPathName() != Retained->GraphSchema)
+    {
+        OutError = {TEXT("invalid_action"), TEXT("The retained action does not belong to this live graph snapshot")};
+        return false;
+    }
+
+    UEdGraphPin* ContextPin = nullptr;
+    if (!Retained->PinId.IsEmpty())
+    {
+        for (UEdGraphNode* Node : Graph->Nodes)
+        {
+            if (Node == nullptr || GuidString(Node->NodeGuid) != Retained->PinNodeId) continue;
+            for (UEdGraphPin* Pin : Node->Pins)
+            {
+                if (Pin != nullptr && GuidString(Pin->PinId) == Retained->PinId)
+                {
+                    ContextPin = Pin;
+                    break;
+                }
+            }
+            break;
+        }
+        if (ContextPin == nullptr)
+        {
+            OutError = {TEXT("invalid_action"), TEXT("The retained action pin context is no longer available")};
+            return false;
+        }
+    }
+
+    FBlueprintActionFilter Filter;
+    Filter.Context.Blueprints.Add(Blueprint);
+    Filter.Context.Graphs.Add(Graph);
+    if (ContextPin != nullptr) Filter.Context.Pins.Add(ContextPin);
+    FBlueprintActionDatabase& Database = FBlueprintActionDatabase::Get();
+    const FBlueprintActionDatabase::FActionRegistry& RegistryActions = Database.GetAllActions();
+    const double StartedAt = ScanNow();
+    int32 ScannedCount = 0;
+    bool bStopped = false;
+    auto TryActions = [&](UObject* ActionOwner, const FBlueprintActionDatabase::FActionList& Actions)
+    {
+        if (ActionOwner == nullptr || bStopped) return;
+        for (const UBlueprintNodeSpawner* Spawner : Actions)
+        {
+            if (++ScannedCount > UnrealMCP::MaxActionScan || ScanNow() - StartedAt > UnrealMCP::ActionScanSeconds)
+            {
+                bStopped = true;
+                break;
+            }
+            if (Spawner == nullptr) continue;
+            FBlueprintActionInfo ActionInfo(ActionOwner, Spawner);
+            FString Family;
+            bool bWildcard = false;
+            if (!ClassifyAction(Spawner, ActionInfo, Family, bWildcard) || Filter.IsFiltered(ActionInfo)) continue;
+            const UFunction* Function = ActionInfo.GetAssociatedFunction();
+            const FProperty* Property = ActionInfo.GetAssociatedProperty();
+            FFieldVariant MemberField = ActionInfo.GetAssociatedMemberField();
+            const UClass* NodeClass = Spawner->NodeClass.Get();
+            const FBlueprintActionUiSpec Ui = Spawner->GetUiSpec(Filter.Context, ActionInfo.GetBindings());
+            const FString Title = Ui.MenuName.ToString().Left(256);
+            const FString MemberName = Function != nullptr ? Function->GetName()
+                : Property != nullptr ? Property->GetName()
+                : MemberField ? MemberField.GetName()
+                : Family == TEXT("flow_control") && NodeClass != nullptr && NodeClass->IsChildOf(UK2Node_MacroInstance::StaticClass())
+                    ? Title
+                    : NodeClass != nullptr ? NodeClass->GetName() : Title;
+            const FString OwnerPath = Function != nullptr ? CanonicalOwnerPath(Function->GetOwnerClass(), Blueprint)
+                : Property != nullptr ? CanonicalOwnerPath(Property->GetOwnerClass(), Blueprint)
+                : CanonicalActionOwnerPath(ActionInfo, Blueprint);
+            if (ActionSignature(Family, OwnerPath, MemberName, ActionOwner, Spawner) != Retained->RebuildSignature) continue;
+            OutAction.Spawner = Spawner;
+            OutAction.Bindings = ActionInfo.GetBindings();
+            bStopped = true;
+            break;
+        }
+    };
+
+    TSet<FObjectKey> ProcessedOwners;
+    TArray<UObject*> PriorityOwners = {Blueprint, Blueprint->SkeletonGeneratedClass, Blueprint->GeneratedClass};
+    for (UClass* Class = Blueprint->GeneratedClass; Class != nullptr; Class = Class->GetSuperClass()) PriorityOwners.AddUnique(Class);
+    for (UClass* Class = Blueprint->SkeletonGeneratedClass; Class != nullptr; Class = Class->GetSuperClass()) PriorityOwners.AddUnique(Class);
+    for (UObject* Owner : PriorityOwners)
+    {
+        if (Owner == nullptr) continue;
+        const FObjectKey Key(Owner);
+        if (const FBlueprintActionDatabase::FActionList* Actions = RegistryActions.Find(Key))
+        {
+            ProcessedOwners.Add(Key);
+            TryActions(Owner, *Actions);
+        }
+        if (OutAction.Spawner != nullptr || bStopped) break;
+    }
+    if (OutAction.Spawner == nullptr && !bStopped)
+    {
+        for (auto It = RegistryActions.CreateConstIterator(); It; ++It)
+        {
+            if (ProcessedOwners.Contains(It.Key())) continue;
+            TryActions(It.Key().ResolveObjectPtr(), It.Value());
+            if (OutAction.Spawner != nullptr || bStopped) break;
+        }
+    }
+    if (OutAction.Spawner == nullptr)
+    {
+        OutError = {TEXT("invalid_action"), TEXT("The retained action could not be re-resolved as context-valid")};
+        return false;
+    }
+    return true;
+}
+
 void FUnrealMCPBlueprintActionCatalog::RemoveExpired(double CurrentTime)
 {
     using namespace UnrealMCP::BlueprintActionCatalogPrivate;
@@ -238,7 +370,7 @@ bool FUnrealMCPBlueprintActionCatalog::Execute(
         RetainedActions.Add(ActionId, FRetainedAction{Record, QueryKey, RebuildSignature,
             Blueprint->GeneratedClass != nullptr ? Blueprint->GeneratedClass->GetPathName() : FString(),
             GraphSchema->GetClass()->GetPathName(),
-            AssetPath, GraphId, SnapshotId, Cache.ExpiresAt});
+            AssetPath, GraphId, SnapshotId, PinNodeId, PinId, Cache.ExpiresAt});
         PublicActions.Add(MakeShared<FJsonValueObject>(Record));
     }
     Catalogs.Add(QueryKey, Cache);

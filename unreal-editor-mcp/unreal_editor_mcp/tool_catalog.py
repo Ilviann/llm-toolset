@@ -39,6 +39,16 @@ _MACRO_ID = _COMPONENT_ID
 _CUSTOM_EVENT_ID = _COMPONENT_ID
 _NODE_ID = _COMPONENT_ID
 _PIN_ID = _COMPONENT_ID
+_ACTION_ID = _COMPONENT_ID
+_GRAPH_POSITION = {
+    "type": "object",
+    "properties": {
+        "x": {"type": "integer", "minimum": -1000000, "maximum": 1000000},
+        "y": {"type": "integer", "minimum": -1000000, "maximum": 1000000},
+    },
+    "required": ["x", "y"],
+    "additionalProperties": False,
+}
 _PROPERTY_VALUE = {
     "oneOf": [
         {"type": "boolean"},
@@ -271,6 +281,19 @@ def _scoped_member_shape(target: str, operation: str, required: list[str], **ext
     }
 
 
+def _graph_shape(operation: str, required: list[str], **extra: object) -> dict[str, object]:
+    return {
+        "type": "object",
+        "properties": _mutation_properties(
+            operation={"const": operation}, graph_id=_COMPONENT_ID, **extra
+        ),
+        "required": [
+            "operation_id", "asset_path", "expected_snapshot", "operation", "graph_id", *required,
+        ],
+        "additionalProperties": False,
+    }
+
+
 TOOLS: Final = (
     {
         "name": "capabilities",
@@ -397,6 +420,28 @@ TOOLS: Final = (
             },
             "required": ["asset_path", "graph_id", "expected_snapshot"],
             "additionalProperties": False,
+        },
+    },
+    {
+        "name": "blueprint_graph_edit",
+        "description": "Create, move, or safely remove one graph node through a reconciled Blueprint mutation.",
+        "inputSchema": {
+            "oneOf": [
+                _graph_shape(
+                    "add_node", ["action_id", "position"],
+                    action_id=_ACTION_ID,
+                    position=_GRAPH_POSITION,
+                ),
+                _graph_shape(
+                    "move_node", ["node_id", "position"],
+                    node_id=_NODE_ID,
+                    position=_GRAPH_POSITION,
+                ),
+                _graph_shape(
+                    "remove_node", ["node_id"],
+                    node_id=_NODE_ID,
+                ),
+            ]
         },
     },
     {

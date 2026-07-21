@@ -39,6 +39,10 @@ class ErrorCode(str, Enum):
     INVALID_MEMBER = "invalid_member"
     UNSUPPORTED_TYPE = "unsupported_type"
     REFERENCED_MEMBER = "referenced_member"
+    INVALID_ACTION = "invalid_action"
+    INVALID_NODE = "invalid_node"
+    PROTECTED_NODE = "protected_node"
+    GRAPH_LIMIT_EXCEEDED = "graph_limit_exceeded"
     INTERNAL_ERROR = "internal_error"
 
 

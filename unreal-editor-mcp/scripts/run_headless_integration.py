@@ -42,7 +42,7 @@ def wait_until_ready(layout: ProjectLayout, process: subprocess.Popen[bytes], de
         try:
             record = read_discovery(layout)
             result = UnrealBridge(layout, timeout=2.0).call("capabilities")
-            if result.get("bridge_ready") is True and record.bridge_version == "0.9.0":
+            if result.get("bridge_ready") is True and record.bridge_version == "0.10.0":
                 return
         except Exception as error:
             last_error = str(error)
@@ -97,7 +97,7 @@ def send_without_reading(layout: ProjectLayout, command: str, arguments: dict[st
         headers={
             "Authorization": "Bearer " + read_token(layout),
             "Content-Type": "application/json",
-            "X-Unreal-MCP-Version": "0.9.0",
+            "X-Unreal-MCP-Version": "0.10.0",
         },
     )
     connection.close()
@@ -152,6 +152,7 @@ def run_automation(executable: Path, project: Path, environment: dict[str, str],
         "MacrosAndCustomEvents",
         "ActionCatalog",
         "ExpandedActionCatalog",
+        "GraphNodeLifecycle",
     )
     if test_filter == "UnrealMCP":
         expected = all_expected
@@ -169,6 +170,8 @@ def run_automation(executable: Path, project: Path, environment: dict[str, str],
         expected = tuple(name for name in all_expected if name == "ActionCatalog")
     elif test_filter == "UnrealMCP.Phase10":
         expected = tuple(name for name in all_expected if name == "ExpandedActionCatalog")
+    elif test_filter == "UnrealMCP.Phase11":
+        expected = tuple(name for name in all_expected if name == "GraphNodeLifecycle")
     else:
         leaf = test_filter.rsplit(".", 1)[-1]
         expected = (leaf,) if leaf in all_expected else ()
@@ -252,12 +255,12 @@ def main() -> int:
             capabilities = bridge.call("capabilities")
             state = bridge.call("editor_state")
             if capabilities.get("commands") != [
-                "capabilities", "editor_state", "operation_status", "blueprint_inspect", "blueprint_action_catalog",
+                "capabilities", "editor_state", "operation_status", "blueprint_inspect", "blueprint_action_catalog", "blueprint_graph_edit",
                 "blueprint_create", "blueprint_compile", "blueprint_save",
                 "blueprint_component_edit", "blueprint_default_edit", "blueprint_member_edit",
             ]:
                 raise AssertionError("released command catalog mismatch")
-            if capabilities.get("bridge_version") != "0.9.0" or state.get("bridge_ready") is not True:
+            if capabilities.get("bridge_version") != "0.10.0" or state.get("bridge_ready") is not True:
                 raise AssertionError("capability/state contract mismatch")
             if capabilities.get("features", {}).get("blueprint_mutation") is not True:
                 raise AssertionError("Phase 6 mutation capability is unavailable")
@@ -269,6 +272,12 @@ def main() -> int:
                     raise AssertionError(f"Phase 7 capability is unavailable: {feature}")
             if capabilities.get("features", {}).get("blueprint_action_catalog") is not True:
                 raise AssertionError("Phase 10 action catalog capability is unavailable")
+            for feature in ("blueprint_graph_mutation", "blueprint_graph_node_lifecycle"):
+                if capabilities.get("features", {}).get(feature) is not True:
+                    raise AssertionError(f"Phase 11 graph capability is unavailable: {feature}")
+            expected_graph_limits = {"graph_nodes": 2048, "graph_pins_per_node": 256, "graph_coordinate": 1000000}
+            if any(capabilities.get("limits", {}).get(name) != value for name, value in expected_graph_limits.items()):
+                raise AssertionError(f"Phase 11 graph limits mismatch: {capabilities.get('limits')!r}")
             if capabilities.get("asset_access") != {
                 "read_scope": "all_mounted_content",
                 "mutation_scope": "project_content_and_local_project_plugins",
@@ -486,10 +495,99 @@ def main() -> int:
             custom_event_id = custom_event.get("custom_event", {}).get("id")
             if not isinstance(custom_event_id, str) or len(custom_event_id) != 32:
                 raise AssertionError(f"custom-event mutation omitted its stable identity: {custom_event!r}")
+            event_graph_id = event_graphs[0]["id"]
+            graph_catalog = bridge.call("blueprint_action_catalog", {
+                "asset_path": asset_path,
+                "graph_id": event_graph_id,
+                "expected_snapshot": custom_event["snapshot_id"],
+                "member": "Health",
+                "node_family": "variable_get",
+                "limit": 5,
+            })
+            if not graph_catalog.get("actions"):
+                raise AssertionError(f"Phase 11 retained node action is unavailable: {graph_catalog!r}")
+            graph_add_operation = uuid.uuid4().hex
+            graph_add_arguments = {
+                "operation_id": graph_add_operation,
+                "asset_path": asset_path,
+                "expected_snapshot": custom_event["snapshot_id"],
+                "operation": "add_node",
+                "graph_id": event_graph_id,
+                "action_id": graph_catalog["actions"][0]["action_id"],
+                "position": {"x": 160, "y": 240},
+            }
+            send_without_reading(layout, "blueprint_graph_edit", graph_add_arguments)
+            graph_add_status = reconcile_operation(bridge, graph_add_operation, capabilities["bridge_instance_id"])
+            if graph_add_status.get("state") != "committed" or not isinstance(graph_add_status.get("result"), dict):
+                raise AssertionError(f"lost node-add response did not reconcile: {graph_add_status!r}")
+            graph_add = graph_add_status["result"]
+            graph_node = graph_add.get("changed", {}).get("node", {})
+            graph_node_id = graph_node.get("id")
+            graph_pin_ids = [pin.get("id") for pin in graph_node.get("pins", [])]
+            if (not isinstance(graph_node_id, str) or len(graph_node_id) != 32
+                    or not graph_pin_ids or any(not isinstance(pin_id, str) or len(pin_id) != 32 for pin_id in graph_pin_ids)):
+                raise AssertionError(f"node add omitted persistent node or pin identities: {graph_add!r}")
+
+            graph_move_operation = uuid.uuid4().hex
+            graph_move_arguments = {
+                "operation_id": graph_move_operation,
+                "asset_path": asset_path,
+                "expected_snapshot": graph_add["snapshot_id"],
+                "operation": "move_node",
+                "graph_id": event_graph_id,
+                "node_id": graph_node_id,
+                "position": {"x": 480, "y": -160},
+            }
+            send_without_reading(layout, "blueprint_graph_edit", graph_move_arguments)
+            graph_move_status = reconcile_operation(bridge, graph_move_operation, capabilities["bridge_instance_id"])
+            graph_move = graph_move_status.get("result") if graph_move_status.get("state") == "committed" else None
+            if not isinstance(graph_move, dict) or graph_move.get("changed", {}).get("node", {}).get("x") != 480:
+                raise AssertionError(f"lost node-move response did not reconcile: {graph_move_status!r}")
+
+            removal_catalog = bridge.call("blueprint_action_catalog", {
+                "asset_path": asset_path,
+                "graph_id": event_graph_id,
+                "expected_snapshot": graph_move["snapshot_id"],
+                "member": "Health",
+                "node_family": "variable_get",
+                "limit": 5,
+            })
+            if not removal_catalog.get("actions"):
+                raise AssertionError(f"Phase 11 removal fixture action is unavailable: {removal_catalog!r}")
+            temporary_add_operation = uuid.uuid4().hex
+            temporary_add_arguments = {
+                "operation_id": temporary_add_operation,
+                "asset_path": asset_path,
+                "expected_snapshot": graph_move["snapshot_id"],
+                "operation": "add_node",
+                "graph_id": event_graph_id,
+                "action_id": removal_catalog["actions"][0]["action_id"],
+                "position": {"x": 640, "y": 320},
+            }
+            send_without_reading(layout, "blueprint_graph_edit", temporary_add_arguments)
+            temporary_add_status = reconcile_operation(bridge, temporary_add_operation, capabilities["bridge_instance_id"])
+            temporary_add = temporary_add_status.get("result") if temporary_add_status.get("state") == "committed" else None
+            temporary_node_id = temporary_add.get("changed", {}).get("node", {}).get("id") if isinstance(temporary_add, dict) else None
+            if not isinstance(temporary_node_id, str):
+                raise AssertionError(f"temporary node add did not reconcile: {temporary_add_status!r}")
+            graph_remove_operation = uuid.uuid4().hex
+            graph_remove_arguments = {
+                "operation_id": graph_remove_operation,
+                "asset_path": asset_path,
+                "expected_snapshot": temporary_add["snapshot_id"],
+                "operation": "remove_node",
+                "graph_id": event_graph_id,
+                "node_id": temporary_node_id,
+            }
+            send_without_reading(layout, "blueprint_graph_edit", graph_remove_arguments)
+            graph_remove_status = reconcile_operation(bridge, graph_remove_operation, capabilities["bridge_instance_id"])
+            graph_remove = graph_remove_status.get("result") if graph_remove_status.get("state") == "committed" else None
+            if not isinstance(graph_remove, dict) or graph_remove.get("changed", {}).get("node", {}).get("id") != temporary_node_id:
+                raise AssertionError(f"lost node-remove response did not reconcile: {graph_remove_status!r}")
             compiled = bridge.call("blueprint_compile", {
                 "operation_id": uuid.uuid4().hex,
                 "asset_path": asset_path,
-                "expected_snapshot": custom_event["snapshot_id"],
+                "expected_snapshot": graph_remove["snapshot_id"],
             })
             if compiled.get("compile_succeeded") is not True or compiled.get("saved") is not False:
                 raise AssertionError(f"explicit Blueprint compile contract mismatch: {compiled!r}")
@@ -599,6 +697,22 @@ def main() -> int:
                 raise AssertionError(f"custom-event shell changed after restart: {custom_events!r}")
             if custom_events[0].get("graph_relationship", {}).get("graph_kind") != "event":
                 raise AssertionError(f"custom-event graph relationship changed after restart: {custom_events!r}")
+            nodes = {
+                record.get("id"): record
+                for record in reloaded.get("records", [])
+                if record.get("section") == "node"
+            }
+            if graph_node_id not in nodes or nodes[graph_node_id].get("x") != 480 or nodes[graph_node_id].get("y") != -160:
+                raise AssertionError(f"created/moved graph node changed after restart: {nodes.get(graph_node_id)!r}")
+            if temporary_node_id in nodes:
+                raise AssertionError("removed graph node returned after restart")
+            reloaded_pin_ids = {
+                record.get("id")
+                for record in reloaded.get("records", [])
+                if record.get("section") == "pin" and record.get("node_id") == graph_node_id
+            }
+            if set(graph_pin_ids) != reloaded_pin_ids:
+                raise AssertionError(f"created pin identities changed after restart: {sorted(reloaded_pin_ids)!r}")
             event_graphs = [
                 record for record in reloaded.get("records", [])
                 if record.get("section") == "graph" and record.get("kind") == "event" and record.get("inherited") is False
@@ -657,7 +771,7 @@ def main() -> int:
             pass
         else:
             raise AssertionError("a live discovery heartbeat remained after editor termination")
-    print("Phase 10 integration passed: expanded bounded action catalog, macros/custom events, functions/signatures/locals, RepNotify, typed members, components/defaults, reconciliation, restart inspection, loopback binding, and clean unload")
+    print("Phase 11 integration passed: reconciled graph-node creation/movement/removal, restart-stable node and pin identities, expanded action catalogs, complete Actor authoring, loopback binding, and clean unload")
     return 0
 
 

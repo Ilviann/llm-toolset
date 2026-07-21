@@ -15,6 +15,7 @@
 #include "UnrealMCPDiscovery.h"
 #include "UnrealMCPBlueprintInspector.h"
 #include "UnrealMCPBlueprintActionCatalog.h"
+#include "UnrealMCPBlueprintGraphEditor.h"
 #include "UnrealMCPBlueprintMutator.h"
 #include "UnrealMCPProtocol.h"
 #include "UnrealMCPOperationLedger.h"
@@ -47,7 +48,7 @@ bool IsMutationCommand(const FString& Command)
 {
     return Command == TEXT("blueprint_create") || Command == TEXT("blueprint_compile") || Command == TEXT("blueprint_save")
         || Command == TEXT("blueprint_component_edit") || Command == TEXT("blueprint_default_edit")
-        || Command == TEXT("blueprint_member_edit");
+        || Command == TEXT("blueprint_member_edit") || Command == TEXT("blueprint_graph_edit");
 }
 
 FString AuthenticationBinding(const FString& ProjectHash, const FString& BridgeInstanceId, const FString& Token)
@@ -156,6 +157,7 @@ void FUnrealMCPBridge::Stop()
     }
     Route.Reset();
     Router.Reset();
+    BlueprintGraphEditor.Reset();
     BlueprintMutator.Reset();
     BlueprintActionCatalog.Reset();
     BlueprintInspector.Reset();
@@ -192,7 +194,8 @@ bool FUnrealMCPBridge::HandleRequest(const FHttpServerRequest& Request, const FH
     if (Command != TEXT("capabilities") && Command != TEXT("editor_state") && Command != TEXT("operation_status")
         && Command != TEXT("blueprint_inspect") && Command != TEXT("blueprint_create") && Command != TEXT("blueprint_compile")
         && Command != TEXT("blueprint_save") && Command != TEXT("blueprint_component_edit") && Command != TEXT("blueprint_default_edit")
-        && Command != TEXT("blueprint_member_edit") && Command != TEXT("blueprint_action_catalog"))
+        && Command != TEXT("blueprint_member_edit") && Command != TEXT("blueprint_action_catalog")
+        && Command != TEXT("blueprint_graph_edit"))
     {
         Complete(UnrealMCP::Protocol::Error(EHttpServerResponseCodes::BadRequest, TEXT("invalid_argument"), TEXT("Unknown or unavailable command")));
         return true;
@@ -328,6 +331,18 @@ bool FUnrealMCPBridge::Execute(const FString& Command, const TSharedPtr<FJsonObj
         }
         return BlueprintActionCatalog->Execute(Arguments, OutResult, OutError);
     }
+    if (Command == TEXT("blueprint_graph_edit"))
+    {
+        if (!BlueprintActionCatalog)
+        {
+            BlueprintActionCatalog = MakeUnique<FUnrealMCPBlueprintActionCatalog>(*BlueprintInspector, BridgeInstanceId);
+        }
+        if (!BlueprintGraphEditor)
+        {
+            BlueprintGraphEditor = MakeUnique<FUnrealMCPBlueprintGraphEditor>(*BlueprintInspector, *BlueprintActionCatalog);
+        }
+        return BlueprintGraphEditor->Execute(Arguments, OutResult, OutError);
+    }
     if (!BlueprintMutator)
     {
         BlueprintMutator = MakeUnique<FUnrealMCPBlueprintMutator>(*BlueprintInspector);
@@ -346,7 +361,7 @@ TSharedPtr<FJsonObject> FUnrealMCPBridge::Capabilities() const
     Result->SetStringField(TEXT("mode"), TEXT("actor_authoring"));
     Result->SetBoolField(TEXT("bridge_ready"), bReady);
     Result->SetArrayField(TEXT("commands"), Strings({TEXT("capabilities"), TEXT("editor_state"), TEXT("operation_status"),
-        TEXT("blueprint_inspect"), TEXT("blueprint_action_catalog"), TEXT("blueprint_create"), TEXT("blueprint_compile"),
+        TEXT("blueprint_inspect"), TEXT("blueprint_action_catalog"), TEXT("blueprint_graph_edit"), TEXT("blueprint_create"), TEXT("blueprint_compile"),
         TEXT("blueprint_save"), TEXT("blueprint_component_edit"), TEXT("blueprint_default_edit"), TEXT("blueprint_member_edit")}));
 
     const TSharedRef<FJsonObject> Features = MakeShared<FJsonObject>();
@@ -365,7 +380,8 @@ TSharedPtr<FJsonObject> FUnrealMCPBridge::Capabilities() const
     Features->SetBoolField(TEXT("blueprint_macros"), true);
     Features->SetBoolField(TEXT("blueprint_custom_events"), true);
     Features->SetBoolField(TEXT("blueprint_action_catalog"), true);
-    Features->SetBoolField(TEXT("blueprint_graph_mutation"), false);
+    Features->SetBoolField(TEXT("blueprint_graph_mutation"), true);
+    Features->SetBoolField(TEXT("blueprint_graph_node_lifecycle"), true);
     Features->SetBoolField(TEXT("editor_lifecycle"), false);
     Features->SetBoolField(TEXT("project_build"), false);
     Result->SetObjectField(TEXT("features"), Features);
@@ -400,6 +416,9 @@ TSharedPtr<FJsonObject> FUnrealMCPBridge::Capabilities() const
     Limits->SetNumberField(TEXT("action_lifetime_ms"), static_cast<int32>(UnrealMCP::ActionLifetimeSeconds * 1000.0));
     Limits->SetNumberField(TEXT("action_scan_ms"), static_cast<int32>(UnrealMCP::ActionScanSeconds * 1000.0));
     Limits->SetNumberField(TEXT("concurrent_catalogs"), UnrealMCP::MaxConcurrentCatalogs);
+    Limits->SetNumberField(TEXT("graph_nodes"), UnrealMCP::MaxGraphNodes);
+    Limits->SetNumberField(TEXT("graph_pins_per_node"), UnrealMCP::MaxGraphPinsPerNode);
+    Limits->SetNumberField(TEXT("graph_coordinate"), UnrealMCP::MaxGraphCoordinate);
     Result->SetObjectField(TEXT("limits"), Limits);
 
     const TSharedRef<FJsonObject> Listener = MakeShared<FJsonObject>();

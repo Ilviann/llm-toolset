@@ -48,6 +48,7 @@
 #include "Serialization/JsonSerializer.h"
 #include "UnrealMCPBlueprintInspector.h"
 #include "UnrealMCPBlueprintActionCatalog.h"
+#include "UnrealMCPBlueprintGraphEditor.h"
 #include "UnrealMCPBlueprintMutator.h"
 #include "UnrealMCPCompatibility.h"
 #include "UnrealMCPProtocol.h"

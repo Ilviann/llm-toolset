@@ -20,6 +20,7 @@ MAX_RESPONSE_BYTES = 256 * 1024
 MUTATING_COMMANDS = {
     "blueprint_create", "blueprint_compile", "blueprint_save",
     "blueprint_component_edit", "blueprint_default_edit", "blueprint_member_edit",
+    "blueprint_graph_edit",
 }
 
 
@@ -52,6 +53,7 @@ class UnrealBridge:
             "operation_status",
             "blueprint_inspect",
             "blueprint_action_catalog",
+            "blueprint_graph_edit",
             "blueprint_create",
             "blueprint_compile",
             "blueprint_save",

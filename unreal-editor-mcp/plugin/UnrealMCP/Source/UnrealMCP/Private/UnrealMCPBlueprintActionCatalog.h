@@ -1,10 +1,13 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "BlueprintNodeSpawner.h"
 #include "Dom/JsonObject.h"
 #include "UnrealMCPProtocol.h"
 
 class FUnrealMCPBlueprintInspector;
+class UBlueprint;
+class UEdGraph;
 
 class FUnrealMCPBlueprintActionCatalog
 {
@@ -20,6 +23,22 @@ public:
         TSharedPtr<FJsonObject>& OutResult,
         FUnrealMCPError& OutError);
 
+    struct FResolvedAction
+    {
+        const UBlueprintNodeSpawner* Spawner = nullptr;
+        IBlueprintNodeBinder::FBindingSet Bindings;
+    };
+
+    bool ResolveForInvocation(
+        const FString& ActionId,
+        UBlueprint* Blueprint,
+        UEdGraph* Graph,
+        const FString& AssetPath,
+        const FString& GraphId,
+        const FString& SnapshotId,
+        FResolvedAction& OutAction,
+        FUnrealMCPError& OutError);
+
 private:
     struct FRetainedAction
     {
@@ -31,6 +50,8 @@ private:
         FString AssetPath;
         FString GraphId;
         FString SnapshotId;
+        FString PinNodeId;
+        FString PinId;
         double ExpiresAt = 0.0;
     };
 

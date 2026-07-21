@@ -1,0 +1,36 @@
+{
+  "catalog_variable_get": {
+    "asset_path": "/Game/Actors/BP_Door.BP_Door",
+    "graph_id": "0123456789abcdef0123456789abcdef",
+    "expected_snapshot": "0123456789abcdef0123456789abcdef01234567",
+    "member": "Health",
+    "node_family": "variable_get",
+    "limit": 5
+  },
+  "add_node": {
+    "operation_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "asset_path": "/Game/Actors/BP_Door.BP_Door",
+    "expected_snapshot": "0123456789abcdef0123456789abcdef01234567",
+    "operation": "add_node",
+    "graph_id": "0123456789abcdef0123456789abcdef",
+    "action_id": "fedcba9876543210fedcba9876543210",
+    "position": {"x": 160, "y": 240}
+  },
+  "move_node": {
+    "operation_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "asset_path": "/Game/Actors/BP_Door.BP_Door",
+    "expected_snapshot": "89abcdef0123456789abcdef0123456789abcdef",
+    "operation": "move_node",
+    "graph_id": "0123456789abcdef0123456789abcdef",
+    "node_id": "11111111111111111111111111111111",
+    "position": {"x": 480, "y": -160}
+  },
+  "remove_node": {
+    "operation_id": "cccccccccccccccccccccccccccccccc",
+    "asset_path": "/Game/Actors/BP_Door.BP_Door",
+    "expected_snapshot": "fedcba9876543210fedcba9876543210fedcba98",
+    "operation": "remove_node",
+    "graph_id": "0123456789abcdef0123456789abcdef",
+    "node_id": "11111111111111111111111111111111"
+  }
+}
