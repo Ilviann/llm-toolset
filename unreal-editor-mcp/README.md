@@ -1,12 +1,12 @@
 # Unreal Editor MCP
 
-Unreal Editor MCP 0.8.1 is an offline-first MCP bridge for Unreal Engine 5.8+. It pairs a dependency-free Python 3.10+ stdio server with an editor-only C++ plugin. This release exposes exactly eleven tools:
+Unreal Editor MCP 0.9.0 is an offline-first MCP bridge for Unreal Engine 5.8+. It pairs a dependency-free Python 3.10+ stdio server with an editor-only C++ plugin. This release exposes exactly eleven tools:
 
 - `capabilities` reports the exact Python/plugin/Unreal versions, commands, features, listener state, and effective limits.
 - `editor_state` reports project identity, bridge readiness, play/simulate/save/GC state, and concise queued-operation state.
 - `operation_status` reconciles or safely cancels one retained mutation by operation and bridge identity.
 - `blueprint_inspect` discovers Actor Blueprints across mounted content and returns bounded pages of one selected Blueprint's structure.
-- `blueprint_action_catalog` discovers a bounded set of context-valid function-call and variable actions for one exact Blueprint graph snapshot.
+- `blueprint_action_catalog` discovers bounded context-valid function, variable, event, flow-control, cast, literal, and operator actions for one exact Blueprint graph snapshot.
 - `blueprint_create` creates, compiles, saves, and verifies one new Actor Blueprint without overwriting content.
 - `blueprint_compile` explicitly compiles one mutable Actor Blueprint and returns bounded diagnostics.
 - `blueprint_save` explicitly saves one mutable Actor Blueprint package without interactive dialogs.
@@ -14,7 +14,7 @@ Unreal Editor MCP 0.8.1 is an offline-first MCP bridge for Unreal Engine 5.8+. I
 - `blueprint_default_edit` edits one supported Blueprint-generated class-default property.
 - `blueprint_member_edit` adds, renames, updates, or safely removes one typed Blueprint variable, function, local variable, macro, or custom-event shell.
 
-Phase 8 supports reliable Actor Blueprint creation, component hierarchy/default editing, typed variables, user-function shells, locals, macros, custom-event shells, RepNotify coupling, compilation, saving, and read-only graph-action discovery. General graph-node mutation, editor lifecycle, build, filesystem, console, unrestricted reflection, and code execution remain unavailable.
+Phase 10 supports reliable Actor Blueprint creation, component hierarchy/default editing, typed variables, user-function shells, locals, macros, custom-event shells, RepNotify coupling, compilation, saving, and read-only discovery across all released graph-action families. General graph-node mutation, editor lifecycle, build, filesystem, console, unrestricted reflection, and code execution remain unavailable.
 
 ## Security model
 
@@ -28,7 +28,7 @@ Treat the project `Saved/` directory as generated state and keep it out of sourc
 
 1. Copy [`plugin/UnrealMCP`](plugin/UnrealMCP) to `<YourProject>/Plugins/UnrealMCP` or add this repository's `plugin/` folder as an `AdditionalPluginDirectories` entry in a disposable development `.uproject`.
 2. Enable the `UnrealMCP` plugin and compile the project's Editor target with Unreal 5.8 or a newer version that passes the included public-API probes.
-3. Open the project. Look for `Unreal MCP 0.8.1 ready on 127.0.0.1:15485` in the editor log.
+3. Open the project. Look for `Unreal MCP 0.9.0 ready on 127.0.0.1:15485` in the editor log.
 4. Install the Python package offline from this folder:
 
    ```sh
@@ -117,9 +117,18 @@ Use inspect first to obtain the current `snapshot_id`, one stable local `graph_i
 }
 ```
 
-Optional filters are exact case-insensitive `text`, exact `owner_class`, `function`, `member`, one `node_family` (`function_call`, `variable_get`, or `variable_set`), and an exact `pin_context` containing `node_id` and `pin_id`. Every result has already passed Unreal's live Blueprint, graph, and optional pin action filters. Pure/impure and static/instance function metadata is returned explicitly. The catalog never accepts a node class or forged function/property signature.
+Optional filters are exact case-insensitive `text`, exact `owner_class`, `function`, `member`, one `node_family`, and an exact `pin_context` containing `node_id` and `pin_id`. The released families are:
 
-Each result has an opaque `action_id`. Repeating an identical live query reuses IDs, but they expire after 60 seconds and are invalidated by retention eviction, structural snapshot changes, or editor/bridge restart. Phase 8 provides no action invocation or graph mutation operation; retain an ID only for the later graph-edit workflow and re-catalog whenever its lifetime or snapshot is uncertain.
+- `function_call`, `variable_get`, and `variable_set` for callable and property actions, including local and inherited members;
+- `event` for available inherited event overrides in event graphs, excluding unique events already implemented by the Blueprint;
+- `flow_control` for branches, sequences, multi-gates, do-once nodes, switches, enum iteration, and context-valid standard flow-control macros;
+- `cast` for object and class dynamic casts, with `owner_class` selecting the target class;
+- `literal` for `MakeLiteral*`, enum, bitmask, and self-reference actions; and
+- `operator` for common promotable or associative operators.
+
+`function` applies to function-backed `function_call`, `event`, `literal`, and `operator` actions; `member` applies only to variable get/set actions. Every result has already passed Unreal's live Blueprint, graph, uniqueness, and optional pin filters. Function-backed records report pure, static, const, and latent flags; every record reports whether it is a wildcard candidate, and casts report whether they cast class references. Latent calls are excluded from incompatible function graphs, events are excluded from function and macro graphs, and pin context removes incompatible candidates. The catalog never accepts a node class or forged field/spawner signature.
+
+Each result has an opaque `action_id`. Repeating an identical live query reuses IDs, but they expire after 60 seconds and are invalidated by retention eviction, structural snapshot changes, or editor/bridge restart. Phase 10 provides no action invocation or graph mutation operation; retain an ID only for the later graph-edit workflow and re-catalog whenever its lifetime or snapshot is uncertain.
 
 Broad scans are intentionally bounded and report `truncated` and `timed_out`. Prefer an exact function/member and family, then add owner class or pin context when ambiguity remains. See [`examples/action-catalog-workflow.json`](examples/action-catalog-workflow.json) for inspect-first queries.
 
@@ -344,4 +353,4 @@ Run the cross-process bridge acceptance test:
 python3 scripts/run_headless_integration.py
 ```
 
-The 0.8.1 native baseline is Unreal 5.8.0 on Apple Silicon macOS 26.5.2 with Xcode 26.1.1. Windows and Linux path/process branches are unit-tested through injected adapters; native Windows qualification remains a later roadmap gate.
+The 0.9.0 native baseline is Unreal 5.8.0 on Apple Silicon macOS 26.5.2 with Xcode 26.1.1. Windows and Linux path/process branches are unit-tested through injected adapters; native Windows qualification remains a later roadmap gate.

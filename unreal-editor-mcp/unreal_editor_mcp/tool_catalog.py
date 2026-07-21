@@ -369,7 +369,7 @@ TOOLS: Final = (
     },
     {
         "name": "blueprint_action_catalog",
-        "description": "Discover a bounded set of context-valid function-call and variable actions for one Blueprint graph snapshot.",
+        "description": "Discover bounded context-valid function, variable, event, flow-control, cast, literal, and operator actions for one Blueprint graph snapshot.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -382,7 +382,10 @@ TOOLS: Final = (
                 "member": {"type": "string", "minLength": 1, "maxLength": 128},
                 "node_family": {
                     "type": "string",
-                    "enum": ["function_call", "variable_get", "variable_set"],
+                    "enum": [
+                        "function_call", "variable_get", "variable_set", "event",
+                        "flow_control", "cast", "literal", "operator",
+                    ],
                 },
                 "pin_context": {
                     "type": "object",

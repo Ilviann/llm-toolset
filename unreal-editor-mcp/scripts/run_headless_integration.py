@@ -42,7 +42,7 @@ def wait_until_ready(layout: ProjectLayout, process: subprocess.Popen[bytes], de
         try:
             record = read_discovery(layout)
             result = UnrealBridge(layout, timeout=2.0).call("capabilities")
-            if result.get("bridge_ready") is True and record.bridge_version == "0.8.1":
+            if result.get("bridge_ready") is True and record.bridge_version == "0.9.0":
                 return
         except Exception as error:
             last_error = str(error)
@@ -97,7 +97,7 @@ def send_without_reading(layout: ProjectLayout, command: str, arguments: dict[st
         headers={
             "Authorization": "Bearer " + read_token(layout),
             "Content-Type": "application/json",
-            "X-Unreal-MCP-Version": "0.8.1",
+            "X-Unreal-MCP-Version": "0.9.0",
         },
     )
     connection.close()
@@ -151,6 +151,7 @@ def run_automation(executable: Path, project: Path, environment: dict[str, str],
         "FunctionsAndLocals",
         "MacrosAndCustomEvents",
         "ActionCatalog",
+        "ExpandedActionCatalog",
     )
     if test_filter == "UnrealMCP":
         expected = all_expected
@@ -166,6 +167,8 @@ def run_automation(executable: Path, project: Path, environment: dict[str, str],
         expected = tuple(name for name in all_expected if name == "MacrosAndCustomEvents")
     elif test_filter == "UnrealMCP.Phase8":
         expected = tuple(name for name in all_expected if name == "ActionCatalog")
+    elif test_filter == "UnrealMCP.Phase10":
+        expected = tuple(name for name in all_expected if name == "ExpandedActionCatalog")
     else:
         leaf = test_filter.rsplit(".", 1)[-1]
         expected = (leaf,) if leaf in all_expected else ()
@@ -254,7 +257,7 @@ def main() -> int:
                 "blueprint_component_edit", "blueprint_default_edit", "blueprint_member_edit",
             ]:
                 raise AssertionError("released command catalog mismatch")
-            if capabilities.get("bridge_version") != "0.8.1" or state.get("bridge_ready") is not True:
+            if capabilities.get("bridge_version") != "0.9.0" or state.get("bridge_ready") is not True:
                 raise AssertionError("capability/state contract mismatch")
             if capabilities.get("features", {}).get("blueprint_mutation") is not True:
                 raise AssertionError("Phase 6 mutation capability is unavailable")
@@ -265,7 +268,7 @@ def main() -> int:
                 if capabilities.get("features", {}).get(feature) is not True:
                     raise AssertionError(f"Phase 7 capability is unavailable: {feature}")
             if capabilities.get("features", {}).get("blueprint_action_catalog") is not True:
-                raise AssertionError("Phase 8 action catalog capability is unavailable")
+                raise AssertionError("Phase 10 action catalog capability is unavailable")
             if capabilities.get("asset_access") != {
                 "read_scope": "all_mounted_content",
                 "mutation_scope": "project_content_and_local_project_plugins",
@@ -611,12 +614,33 @@ def main() -> int:
                 **catalog_base, "member": "Health", "node_family": "variable_get", "limit": 5,
             })
             if not any(action.get("member_name") == "Health" for action in variable_actions.get("actions", [])):
-                raise AssertionError(f"Phase 8 variable action missing after restart: {variable_actions!r}")
+                raise AssertionError(f"Phase 10 variable action missing after restart: {variable_actions!r}")
             function_actions = UnrealBridge(layout, timeout=3.0).call("blueprint_action_catalog", {
                 **catalog_base, "function": "ComputeHealth", "node_family": "function_call", "limit": 5,
             })
             if not any(action.get("member_name") == "ComputeHealth" for action in function_actions.get("actions", [])):
-                raise AssertionError(f"Phase 8 function action missing after restart: {function_actions!r}")
+                raise AssertionError(f"Phase 10 function action missing after restart: {function_actions!r}")
+            expanded_queries = {
+                "event": {"node_family": "event"},
+                "flow_control": {"node_family": "flow_control"},
+                "cast": {"node_family": "cast", "owner_class": "/Script/Engine.Actor"},
+                "literal": {"node_family": "literal", "function": "MakeLiteralInt"},
+                "operator": {"node_family": "operator"},
+            }
+            for family, filters in expanded_queries.items():
+                catalog = UnrealBridge(layout, timeout=3.0).call("blueprint_action_catalog", {
+                    **catalog_base, **filters, "limit": 10,
+                })
+                actions = catalog.get("actions", [])
+                if not actions or any(action.get("node_family") != family for action in actions):
+                    raise AssertionError(f"Phase 10 {family} action missing after restart: {catalog!r}")
+                if len(json.dumps(catalog, separators=(",", ":"))) > 32_768:
+                    raise AssertionError(f"Phase 10 {family} catalog exceeded representative context budget")
+            operator_catalog = UnrealBridge(layout, timeout=3.0).call("blueprint_action_catalog", {
+                **catalog_base, "node_family": "operator", "limit": 50,
+            })
+            if not any(action.get("wildcard") is True for action in operator_catalog.get("actions", [])):
+                raise AssertionError(f"Phase 10 wildcard operator action missing: {operator_catalog!r}")
         except Exception:
             log.seek(0)
             sys.stderr.buffer.write(log.read()[-32_000:])
@@ -633,7 +657,7 @@ def main() -> int:
             pass
         else:
             raise AssertionError("a live discovery heartbeat remained after editor termination")
-    print("Phase 8 integration passed: bounded action catalog, macros/custom events, functions/signatures/locals, RepNotify, typed members, components/defaults, reconciliation, restart inspection, loopback binding, and clean unload")
+    print("Phase 10 integration passed: expanded bounded action catalog, macros/custom events, functions/signatures/locals, RepNotify, typed members, components/defaults, reconciliation, restart inspection, loopback binding, and clean unload")
     return 0
 
 

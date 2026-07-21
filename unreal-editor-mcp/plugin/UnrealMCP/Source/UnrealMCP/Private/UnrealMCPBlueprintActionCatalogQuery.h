@@ -47,11 +47,17 @@ static bool DecodeActionCatalogQuery(
         OutError = {TEXT("invalid_argument"), TEXT("owner_class must be an exact class path")};
         return false;
     }
+    const bool bFunctionFamily = Out.Family.IsEmpty() || Out.Family == TEXT("function_call")
+        || Out.Family == TEXT("event") || Out.Family == TEXT("literal") || Out.Family == TEXT("operator");
+    const bool bMemberFamily = Out.Family.IsEmpty() || Out.Family == TEXT("variable_get") || Out.Family == TEXT("variable_set");
     if ((!Out.Function.IsEmpty() && !Out.Member.IsEmpty())
-        || (!Out.Function.IsEmpty() && !Out.Family.IsEmpty() && Out.Family != TEXT("function_call"))
-        || (!Out.Member.IsEmpty() && Out.Family == TEXT("function_call"))
+        || (!Out.Function.IsEmpty() && !bFunctionFamily)
+        || (!Out.Member.IsEmpty() && !bMemberFamily)
         || (!Out.Family.IsEmpty() && Out.Family != TEXT("function_call")
-            && Out.Family != TEXT("variable_get") && Out.Family != TEXT("variable_set")))
+            && Out.Family != TEXT("variable_get") && Out.Family != TEXT("variable_set")
+            && Out.Family != TEXT("event") && Out.Family != TEXT("flow_control")
+            && Out.Family != TEXT("cast") && Out.Family != TEXT("literal")
+            && Out.Family != TEXT("operator")))
     {
         OutError = {TEXT("invalid_argument"), TEXT("Function, member, and node-family filters conflict")};
         return false;

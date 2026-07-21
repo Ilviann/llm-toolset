@@ -33,5 +33,47 @@
       "pin_id": "22222222222222222222222222222222"
     },
     "limit": 10
+  },
+  "catalog_available_events": {
+    "asset_path": "/Game/Actors/BP_Door.BP_Door",
+    "graph_id": "0123456789abcdef0123456789abcdef",
+    "expected_snapshot": "0123456789abcdef0123456789abcdef01234567",
+    "node_family": "event",
+    "limit": 10
+  },
+  "catalog_flow_control": {
+    "asset_path": "/Game/Actors/BP_Door.BP_Door",
+    "graph_id": "0123456789abcdef0123456789abcdef",
+    "expected_snapshot": "0123456789abcdef0123456789abcdef01234567",
+    "text": "Branch",
+    "node_family": "flow_control",
+    "limit": 5
+  },
+  "catalog_actor_cast": {
+    "asset_path": "/Game/Actors/BP_Door.BP_Door",
+    "graph_id": "0123456789abcdef0123456789abcdef",
+    "expected_snapshot": "0123456789abcdef0123456789abcdef01234567",
+    "owner_class": "/Script/Engine.Actor",
+    "node_family": "cast",
+    "limit": 5
+  },
+  "catalog_integer_literal": {
+    "asset_path": "/Game/Actors/BP_Door.BP_Door",
+    "graph_id": "0123456789abcdef0123456789abcdef",
+    "expected_snapshot": "0123456789abcdef0123456789abcdef01234567",
+    "function": "MakeLiteralInt",
+    "node_family": "literal",
+    "limit": 5
+  },
+  "catalog_operator_for_pin": {
+    "asset_path": "/Game/Actors/BP_Door.BP_Door",
+    "graph_id": "0123456789abcdef0123456789abcdef",
+    "expected_snapshot": "0123456789abcdef0123456789abcdef01234567",
+    "node_family": "operator",
+    "pin_context": {
+      "node_id": "11111111111111111111111111111111",
+      "pin_id": "22222222222222222222222222222222"
+    },
+    "limit": 10
   }
 }

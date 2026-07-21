@@ -6,6 +6,8 @@
 #include "AssetRegistry/IAssetRegistry.h"
 #include "BlueprintActionDatabase.h"
 #include "BlueprintActionFilter.h"
+#include "BlueprintEventNodeSpawner.h"
+#include "BlueprintFieldNodeSpawner.h"
 #include "BlueprintFunctionNodeSpawner.h"
 #include "BlueprintVariableNodeSpawner.h"
 #include "Dom/JsonValue.h"
@@ -18,9 +20,25 @@
 #include "GameFramework/Actor.h"
 #include "HAL/PlatformTime.h"
 #include "K2Node_CallFunction.h"
+#include "K2Node_BitmaskLiteral.h"
+#include "K2Node_ClassDynamicCast.h"
+#include "K2Node_CommutativeAssociativeBinaryOperator.h"
+#include "K2Node_DoOnceMultiInput.h"
+#include "K2Node_DynamicCast.h"
+#include "K2Node_EnumLiteral.h"
+#include "K2Node_Event.h"
+#include "K2Node_ExecutionSequence.h"
+#include "K2Node_ForEachElementInEnum.h"
+#include "K2Node_IfThenElse.h"
+#include "K2Node_MacroInstance.h"
+#include "K2Node_MultiGate.h"
+#include "K2Node_PromotableOperator.h"
+#include "K2Node_Self.h"
+#include "K2Node_Switch.h"
 #include "K2Node_VariableGet.h"
 #include "K2Node_VariableSet.h"
 #include "EdGraphSchema_K2.h"
+#include "Kismet/KismetSystemLibrary.h"
 #include "Kismet2/BlueprintEditorUtils.h"
 #include "Misc/PackageName.h"
 #include "Misc/SecureHash.h"
@@ -95,6 +113,21 @@ static FString CanonicalOwnerPath(const UClass* OwnerClass, const UBlueprint* Bl
     return OwnerClass->GetPathName();
 }
 
+static FString CanonicalActionOwnerPath(FBlueprintActionInfo& ActionInfo, const UBlueprint* Blueprint)
+{
+    if (const UClass* OwnerClass = ActionInfo.GetOwnerClass())
+    {
+        return CanonicalOwnerPath(OwnerClass, Blueprint);
+    }
+    if (const UBlueprint* OwnerBlueprint = Cast<UBlueprint>(ActionInfo.GetActionOwner()))
+    {
+        return OwnerBlueprint->GeneratedClass != nullptr
+            ? OwnerBlueprint->GeneratedClass->GetPathName()
+            : OwnerBlueprint->GetPathName();
+    }
+    return ActionInfo.GetActionOwner() != nullptr ? ActionInfo.GetActionOwner()->GetPathName() : FString();
+}
+
 static FString QueryDigest(const FString& Material)
 {
     FTCHARToUTF8 Encoded(*Material);
@@ -103,8 +136,70 @@ static FString QueryDigest(const FString& Material)
     return BytesToHex(Digest, FSHA1::DigestSize).ToLower();
 }
 
-static bool IsCoreFamily(const UBlueprintNodeSpawner* Spawner, FString& OutFamily)
+static bool IsFunctionLiteral(const UFunction* Function)
 {
+    return Function != nullptr && Function->GetOwnerClass() == UKismetSystemLibrary::StaticClass()
+        && Function->GetName().StartsWith(TEXT("MakeLiteral"), ESearchCase::CaseSensitive);
+}
+
+static bool IsFlowControlNode(const UClass* NodeClass, FBlueprintActionInfo& ActionInfo)
+{
+    if (NodeClass == nullptr) return false;
+    if (NodeClass->IsChildOf(UK2Node_MacroInstance::StaticClass()))
+    {
+        const UBlueprint* MacroLibrary = Cast<UBlueprint>(ActionInfo.GetActionOwner());
+        return MacroLibrary != nullptr && MacroLibrary->GetName() == TEXT("StandardMacros");
+    }
+    return NodeClass->IsChildOf(UK2Node_IfThenElse::StaticClass())
+            || NodeClass->IsChildOf(UK2Node_ExecutionSequence::StaticClass())
+            || NodeClass->IsChildOf(UK2Node_MultiGate::StaticClass())
+            || NodeClass->IsChildOf(UK2Node_DoOnceMultiInput::StaticClass())
+            || NodeClass->IsChildOf(UK2Node_Switch::StaticClass())
+            || NodeClass->IsChildOf(UK2Node_ForEachElementInEnum::StaticClass());
+}
+
+static bool ClassifyAction(
+    const UBlueprintNodeSpawner* Spawner,
+    FBlueprintActionInfo& ActionInfo,
+    FString& OutFamily,
+    bool& bOutWildcard)
+{
+    bOutWildcard = false;
+    if (const UBlueprintEventNodeSpawner* EventSpawner = Cast<UBlueprintEventNodeSpawner>(Spawner))
+    {
+        if (EventSpawner->IsForCustomEvent() || EventSpawner->GetEventFunction() == nullptr) return false;
+        OutFamily = TEXT("event");
+        return true;
+    }
+    const UClass* NodeClass = Spawner != nullptr ? Spawner->NodeClass.Get() : nullptr;
+    if (NodeClass == nullptr) return false;
+    if (NodeClass->IsChildOf(UK2Node_DynamicCast::StaticClass())
+        || NodeClass->IsChildOf(UK2Node_ClassDynamicCast::StaticClass()))
+    {
+        OutFamily = TEXT("cast");
+        return true;
+    }
+    if (IsFlowControlNode(NodeClass, ActionInfo))
+    {
+        OutFamily = TEXT("flow_control");
+        return true;
+    }
+    const UFunction* Function = ActionInfo.GetAssociatedFunction();
+    if (NodeClass->IsChildOf(UK2Node_PromotableOperator::StaticClass())
+        || NodeClass->IsChildOf(UK2Node_CommutativeAssociativeBinaryOperator::StaticClass()))
+    {
+        OutFamily = TEXT("operator");
+        bOutWildcard = NodeClass->IsChildOf(UK2Node_PromotableOperator::StaticClass());
+        return Function != nullptr;
+    }
+    if (IsFunctionLiteral(Function)
+        || NodeClass->IsChildOf(UK2Node_EnumLiteral::StaticClass())
+        || NodeClass->IsChildOf(UK2Node_BitmaskLiteral::StaticClass())
+        || NodeClass->IsChildOf(UK2Node_Self::StaticClass()))
+    {
+        OutFamily = TEXT("literal");
+        return true;
+    }
     if (Cast<UBlueprintFunctionNodeSpawner>(Spawner) != nullptr)
     {
         OutFamily = TEXT("function_call");
@@ -112,13 +207,13 @@ static bool IsCoreFamily(const UBlueprintNodeSpawner* Spawner, FString& OutFamil
     }
     if (const UBlueprintVariableNodeSpawner* Variable = Cast<UBlueprintVariableNodeSpawner>(Spawner))
     {
-        const UClass* NodeClass = Variable->NodeClass.Get();
-        if (NodeClass != nullptr && NodeClass->IsChildOf(UK2Node_VariableGet::StaticClass()))
+        const UClass* VariableNodeClass = Variable->NodeClass.Get();
+        if (VariableNodeClass != nullptr && VariableNodeClass->IsChildOf(UK2Node_VariableGet::StaticClass()))
         {
             OutFamily = TEXT("variable_get");
             return true;
         }
-        if (NodeClass != nullptr && NodeClass->IsChildOf(UK2Node_VariableSet::StaticClass()))
+        if (VariableNodeClass != nullptr && VariableNodeClass->IsChildOf(UK2Node_VariableSet::StaticClass()))
         {
             OutFamily = TEXT("variable_set");
             return true;
@@ -131,10 +226,13 @@ static FString ActionSignature(
     const FString& Family,
     const FString& OwnerClass,
     const FString& MemberName,
+    const UObject* ActionOwner,
     const UBlueprintNodeSpawner* Spawner)
 {
-    return Family + TEXT("|") + OwnerClass + TEXT("|") + MemberName + TEXT("|")
-        + (Spawner != nullptr && Spawner->NodeClass != nullptr ? Spawner->NodeClass->GetPathName() : FString());
+    const FString Material = Family + TEXT("|") + OwnerClass + TEXT("|") + MemberName + TEXT("|")
+        + (ActionOwner != nullptr ? ActionOwner->GetPathName() : FString()) + TEXT("|")
+        + (Spawner != nullptr ? Spawner->GetSpawnerSignature().ToString() : FString());
+    return QueryDigest(Material);
 }
 
 static TSharedRef<FJsonObject> MakeResult(
@@ -162,4 +260,3 @@ static TSharedRef<FJsonObject> MakeResult(
     return Result;
 }
 }
-

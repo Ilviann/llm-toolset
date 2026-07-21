@@ -15,7 +15,7 @@ class FakeBridge:
     def call(self, command, arguments=None):
         self.calls.append((command, arguments))
         if command == "capabilities":
-            return {"bridge_version": "0.8.1", "commands": [
+            return {"bridge_version": "0.9.0", "commands": [
                 "capabilities", "editor_state", "operation_status", "blueprint_inspect", "blueprint_action_catalog",
                 "blueprint_create", "blueprint_compile", "blueprint_save",
                 "blueprint_component_edit", "blueprint_default_edit",
@@ -36,7 +36,7 @@ class ServerStdioTests(unittest.TestCase):
         bridge = FakeBridge()
         server = MCPServer(bridge)
         initialized = server.handle({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2025-06-18"}})
-        self.assertEqual(initialized["result"]["serverInfo"]["version"], "0.8.1")
+        self.assertEqual(initialized["result"]["serverInfo"]["version"], "0.9.0")
         listed = server.handle({"jsonrpc": "2.0", "id": 2, "method": "tools/list"})
         self.assertEqual([tool["name"] for tool in listed["result"]["tools"]], [
             "capabilities", "editor_state", "operation_status", "blueprint_inspect", "blueprint_action_catalog",
@@ -214,6 +214,11 @@ class ServerStdioTests(unittest.TestCase):
              "function": "Compute", "node_family": "function_call", "limit": 1},
             {**base, "member": "Health", "node_family": "variable_get",
              "pin_context": {"node_id": "c" * 32, "pin_id": "d" * 32}, "limit": 50},
+            {**base, "function": "ReceiveBeginPlay", "node_family": "event"},
+            {**base, "node_family": "flow_control"},
+            {**base, "owner_class": "/Script/Engine.Actor", "node_family": "cast"},
+            {**base, "function": "MakeLiteralInt", "node_family": "literal"},
+            {**base, "function": "Add_DoubleDouble", "node_family": "operator"},
         )
         for arguments in valid:
             with self.subTest(arguments=arguments):

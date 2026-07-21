@@ -1,5 +1,12 @@
 # Unreal Editor MCP history
 
+## 0.9.0 — 2026-07-22
+
+- Expanded `blueprint_action_catalog` with context-valid event, flow-control, cast, literal, and common operator families while preserving the Phase 8 opaque-ID, cache, expiry, snapshot, scan, and mutation-free contracts.
+- Added explicit wildcard, latent, and class-cast metadata; exact function filtering for function-backed event/literal/operator actions; target-class filtering for casts; and live suppression of pre-existing unique events.
+- Applied Unreal's live Blueprint, graph, and optional pin filters across event, function, and macro graphs, including latent restrictions and wildcard operator specialization candidates.
+- Added exact Python schemas, focused examples, public-API probes, native Phase 10 Automation coverage, representative context-size checks, and cross-process restart verification for every released action family.
+
 ## 0.8.1 — 2026-07-21
 
 - Split the native Blueprint mutator into lifecycle, component/default, member, function, local-variable, macro, and custom-event translation units while preserving its bridge-facing facade and injected compile/save seams.
