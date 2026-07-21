@@ -1,25 +1,23 @@
-# Phase 10 — Graph-node lifecycle
+# Phase 10 — Expanded action-catalog families
 
-**Outcome:** Agents can create, move, and remove supported graph nodes through individually prevalidated and reconcilable mutations.
+**Outcome:** Agents can discover the remaining supported event, flow-control, cast, literal, and operator actions through the same bounded catalog contract.
 
 ### Implementation
 
-- Add `blueprint_graph_edit` operations for `add_node`, `move_node`, and `remove_node`. Add rename or comment operations only where public semantics and preservation behavior are proven.
-- Require a valid retained action ID for `add_node`. Re-resolve and re-filter its rebuildable signature against the live graph before invoking the spawner; do not trust cached UObject pointers.
-- Require operation ID, Blueprint snapshot, graph identity, and node identity preconditions as applicable. Reject read-only, inherited, interface, intermediate, construction, signature, or other protected targets unless the specific operation is proven safe.
-- Assign persistent identities to created nodes and pins, detect spawners that return an existing unique node, and return a concise complete change record after reconstruction.
-- Prevalidate node creation, position, ownership, deletion safety, and structure limits before opening one transaction. Verify postconditions and restore explicitly on unexpected failure.
-- Bound graph size, position, result size, transaction work, diagnostics, retained operation state, and Game-thread duration.
+- Extend `blueprint_action_catalog` with event, flow-control, cast, literal, and common operator families that pass the live graph, Blueprint family, and optional pin-context filters.
+- Preserve the Phase 8 action-ID, rebuildable-signature, cache, expiry, snapshot, and scan-limit contracts without adding family-specific bypasses.
+- Apply live schema filtering for unique events, latent calls, static and instance contexts, inherited members, local members, and incompatible graph types.
+- Keep the catalog mutation-free and keep node construction unavailable until Phase 11.
 
 ### Verification
 
-- Test event, function, macro, pure and impure, variable, and unique-event nodes; invalid action IDs; spawner failure; returned-existing-node behavior; protected-node deletion; move bounds; and stale identities.
-- Test undo/redo, compilation, saving, restart, reload, and lost-response reconciliation for every node-lifecycle operation.
-- Capture the graph before every rejection and injected failure and prove equality of structure, dirty state, compile state, and transaction history afterward.
+- Test unique events, latent calls, flow-control nodes, casts, literals, common operators, family restrictions, pin contexts, wildcard candidates, narrow filters, and bounded truncation.
+- Repeat forgery, cross-project, cross-graph, expired-ID, stale-snapshot, cache-eviction, timeout, and mutation-free proofs for every added family.
+- Prove representative queries remain small enough for the default model context.
 
 ### Documentation and completion gate
 
-- Document node creation, identity reconstruction, movement, safe removal, operation reconciliation, and re-inspection requirements.
-- Complete the phase when supported nodes can be created, positioned, removed, compiled, saved, restarted, and inspected entirely through MCP calls.
+- Document every supported action family, its filters and restrictions, and focused catalog recipes.
+- Complete the phase when representative Actor event, function, and macro graphs return small context-valid catalogs across all supported action families.
 
 [Back to roadmap](../../ROADMAP.md) · [Shared roadmap contracts](index.md)

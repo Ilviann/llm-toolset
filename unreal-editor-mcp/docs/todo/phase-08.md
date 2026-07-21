@@ -9,7 +9,7 @@
 - Initially cover pure and impure function calls and variable get/set actions that pass the live graph, family, member, and optional pin-context filters.
 - Return opaque action IDs bound to the bridge instance, target Blueprint class, graph schema and identity, structural snapshot, normalized query, and rebuildable action signature.
 - Bound action-database scans, elapsed time, result count, encoded bytes, retained action records, cache lifetime, and concurrent catalog work. Publish the effective limits.
-- Keep this phase mutation-free. Node creation moves to Phase 10.
+- Keep this phase mutation-free. Node creation moves to Phase 11.
 
 ### Verification
 

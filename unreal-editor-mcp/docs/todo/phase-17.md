@@ -1,27 +1,23 @@
-# Phase 17 — Complete function replacement
+# Phase 17 — GameInstance family
 
-**Outcome:** Agents can replace one complete user-owned function as a single prevalidated operation while preserving unrelated Blueprint content.
+**Outcome:** The established workflow supports UObject-based GameInstance Blueprints without weakening Actor-family restrictions or assuming component support.
 
 ### Implementation
 
-- Add `blueprint_block_replace` using the existing member, action-catalog, type/value, graph-edit, operation-ledger, and diagnostic primitives rather than a second mutation engine.
-- Limit the first contract to one complete user-owned function. Treat the function entry, result, parameters, and locals as the complete declared boundary; keep arbitrary graph regions, events, custom events, and macros unsupported.
-- Define required entry and result identities, owned nodes, local variables, replacement operations, action signatures, limits, expected fingerprints, explicit node positions, and current-snapshot preconditions.
-- Preflight without supplied code or free-form Blueprint text. Use an isolated non-transient scratch Blueprint/package or a semantic preflight proven behaviorally equivalent to live spawning; do not assume transient-graph node spawning matches a live graph.
-- Compile the isolated candidate, compare planned postconditions, and remove all scratch objects and registrations before touching the live Blueprint.
-- Apply the validated live replacement as one reconciled editor transaction. Preserve unrelated graphs, nodes, variables, metadata, links, positions, bookmarks, comments, and prior dirty state; explicitly restore on any unexpected result.
-- Require explicit positions for changed nodes. Automatic layout remains unsupported until Phase 19.
+- Add the `UGameInstance` family through the Phase 16 family-policy and capability-matrix contracts.
+- Evaluate live GameInstance capabilities for defaults, components, event graphs, local variables, overrides, graph types, and supported actions. Reject component operations and every other unsupported operation before mutation.
+- Reuse inspection, class defaults, members, action catalog, graph editing, compile, save, diagnostics, operation reconciliation, and security contracts without introducing a separate mutation path.
+- Add GameInstance-specific default properties, callbacks, override functions, and graph-action coverage. Keep every output family-aware.
 
 ### Verification
 
-- Replace representative pure and impure user-owned functions with parameters, results, locals, internal branches, cycles, latent restrictions, and supported conversions.
-- Test invalid boundaries, stale snapshots, expired actions, compile failure, timeout, lost response, rollback, undo/redo, save/reload, and unchanged-content fingerprints.
-- Prove scratch preflight/live parity for every supported node family. Prove failed preflight creates no live transaction and unexpected live failure restores exact inspected structure and prior dirty state.
-- Run the complete function-replacement and preservation suites natively on macOS and Windows.
+- Create, inspect, edit defaults and logic, compile, save, restart, and read back representative GameInstance Blueprints.
+- Test callbacks, inherited functions, class defaults, explicit component-operation rejection, local-variable and graph capabilities, parent changes outside scope, and manual project-settings assignment.
+- Run the complete shared and GameInstance-specific suites natively on macOS and Windows and require identical normal model-facing contracts.
 
 ### Documentation and completion gate
 
-- Document function ownership, declared boundaries, scratch preflight, explicit positions, preservation guarantees, limits, operation recovery, and when atomic actions remain preferable.
-- Complete the phase only when unrelated-content fingerprints remain stable across successful, rejected, timed-out, and replayed function replacements on both native platforms.
+- Document GameInstance capabilities, component differences, default-property use cases, callbacks, and focused examples. Do not add project-settings mutation.
+- Complete the phase only when GameInstance passes the shared contract and its family-specific restrictions on both native platforms.
 
 [Back to roadmap](../../ROADMAP.md) · [Shared roadmap contracts](index.md)

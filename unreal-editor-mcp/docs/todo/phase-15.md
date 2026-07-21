@@ -1,24 +1,25 @@
-# Phase 15 — GameMode and GameState families
+# Phase 15 — Native Windows Actor beta
 
-**Outcome:** The established Actor-derived workflow formally supports GameMode and GameState Blueprint families through an explicit published family policy.
+**Outcome:** The hardened Actor Blueprint workflow passes its first native Windows qualification and is ready for a supervised cross-platform beta.
+
+Native Windows build preparation and environment setup may proceed in parallel with late Phase 14 work after the model-facing contracts from Phase 13 are frozen. Qualification and release remain ordered after Phase 14.
 
 ### Implementation
 
-- Replace Actor-only eligibility checks in discovery, inspection, creation, compile, save, and mutation resolution with an explicit published family policy.
-- Formally classify and qualify `AGameModeBase`/`AGameMode` and `AGameStateBase`/`AGameState` within the existing Actor-derived path rather than treating them as a new inheritance category.
-- Evaluate live Blueprint capabilities for defaults, components, event graphs, local variables, overrides, and graph types. Publish a family/operation capability matrix and reject unsupported operations before mutation.
-- Reuse inspection, class defaults, components, members, action catalog, graph editing, compile, save, diagnostics, operation reconciliation, and security contracts.
-- Add family-specific default properties, callbacks, override functions, and graph-action coverage. Keep every output family-aware.
+- Build the plugin and run the complete Actor acceptance workflow on native Windows.
+- Fix only source-evidenced platform differences behind narrow compatibility or platform adapters with tests.
+- Keep published schemas, errors, limits, operation semantics, Blueprint results, and exact Python/plugin matching identical across macOS and Windows.
+- Add Windows setup and troubleshooting material without weakening the offline-first or security contracts.
 
 ### Verification
 
-- Create, inspect, edit defaults and logic, compile, save, restart, and read back representative GameModeBase, GameMode, GameStateBase, and GameState Blueprints.
-- Test framework callbacks, inherited functions, class defaults, component operations, local-variable and graph capabilities, parent changes outside scope, and manual project-settings assignment of saved classes.
-- Run the complete shared and family-specific suites natively on macOS and Windows and require identical normal model-facing contracts.
+- On native Windows, verify credentials and permissions, loopback binding, discovery, paths and casing, plugin loading, Game-thread dispatch, component/member/graph transactions, compilation, saving, restart read-back, and exact model-facing contracts.
+- Run the complete Python, Unreal Automation, cross-process, clean-project, and existing-Blueprint beta suites.
+- Record peak request/response bytes, retained state, startup time, schema size, and typical operation latency on the Windows qualification host and compare them with the macOS baseline.
 
 ### Documentation and completion gate
 
-- Document the family capability matrix, default-property use cases, callbacks, component behavior, and focused examples. Do not add project-settings mutation.
-- Complete the phase only when all four GameMode and GameState families pass the shared contract and family-specific restrictions on both native platforms.
+- Complete Windows installation, configuration, troubleshooting, limits, recovery, and end-to-end workflow documentation.
+- Publish the Actor Blueprint beta only when the native macOS acceptance workflows remain green and the defined native Windows beta suite passes.
 
 [Back to roadmap](../../ROADMAP.md) · [Shared roadmap contracts](index.md)

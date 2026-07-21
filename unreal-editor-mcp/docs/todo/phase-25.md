@@ -1,23 +1,26 @@
-# Phase 25 — Optional editor-target builds
+# Phase 25 — Optional editor-offline project-file generation
 
-**Outcome:** Agents can opt in to narrowly configured editor-target builds only while the configured project editor is stopped.
+**Outcome:** Agents can opt in to narrowly configured project-file generation only while the configured project editor is stopped.
 
 ### Implementation
 
-- Extend `project_build` with a typed `build_editor_target` operation while keeping the tool in opt-in large mode.
-- Let the model select only targets and configurations from a bounded published allowlist. Never accept executable paths, project paths, shell fragments, environment variables, compiler/linker flags, working directories, or arbitrary arguments.
-- Reuse the Phase 24 fixed platform adapters, stopped-editor precondition, durable lifecycle reconciliation, process bounds, retention, cancellation escalation, and child-process cleanup.
-- Normalize compiler diagnostics and keep raw subprocess output off MCP stdout except inside valid bounded tool results.
+- Keep C++ source editing outside this application. Pair with `rooted-files-mcp` for separately configured confined text edits.
+- Add the single `project_build` tool in opt-in large mode with a typed `generate_project_files` operation.
+- Resolve Unreal Build Tool or platform scripts from validated startup configuration and the installed engine layout. Use fixed templates owned by narrow platform adapters.
+- Accept no executable path, project path, shell fragment, environment variable, compiler flag, linker flag, working directory, or arbitrary argument from a tool call.
+- Refuse generation while the authenticated configured editor is running or its lifecycle state is uncertain. Reconcile with durable lifecycle operations before starting.
+- Bound process count, queueing, duration, output capture, diagnostic count and size, retained operation results, cancellation escalation, and child-process cleanup.
+- Keep subprocess output off MCP stdout except inside valid bounded tool results.
 
 ### Verification
 
-- Test target and configuration allowlists, fixed command construction, missing tools, invalid selections, editor-running and uncertain-state rejection, timeout, cancellation, nonzero exit, oversized logs, normalized diagnostics, replay, and process-tree cleanup.
-- Run native offline editor-target builds from packaged configuration on macOS and Windows without network access or runtime downloads. Unit test Linux construction separately.
-- Prove that tool arguments cannot alter the executable, project, environment, working directory, command template, or unrestricted flags.
+- Test fixed command construction, paths with spaces, missing tools, editor-running and uncertain-state rejection, timeout, cancellation, nonzero exit, oversized logs, retained-result replay, and process-tree cleanup.
+- Run native offline project generation from packaged configuration on macOS and Windows without network access or runtime downloads. Unit test Linux construction separately.
+- Prove that tool arguments cannot alter the executable, project, environment, working directory, command template, or fixed arguments.
 
 ### Documentation and completion gate
 
-- Document configured allowlists, offline tool preparation, lifecycle interaction, bounded diagnostics, cancellation, platform behavior, and default-mode exclusion.
-- Complete the phase only when fixed native editor-target builds are reproducible from clean documented configuration on macOS and Windows.
+- Document offline engine/tool preparation, lifecycle interaction, bounded output, cancellation, platform behavior, default-mode exclusion, and use with the confined file MCP.
+- Complete the phase only when fixed native project generation is reproducible from clean documented configuration on macOS and Windows.
 
 [Back to roadmap](../../ROADMAP.md) · [Shared roadmap contracts](index.md)

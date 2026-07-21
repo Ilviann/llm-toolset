@@ -1,24 +1,25 @@
-# Phase 12 — Wildcards, conversions, and complete atomic graph editing
+# Phase 12 — Pin defaults and direct connections
 
-**Outcome:** Agents can complete Actor Blueprint logic through wildcard-aware graph editing and explicitly requested bounded conversion insertion.
+**Outcome:** Agents can set supported pin defaults and create or remove schema-valid direct connections without automatic conversion.
 
 ### Implementation
 
-- Extend `blueprint_graph_edit` connection preflight and verification with live-schema wildcard specialization and node or pin reconstruction.
-- Add explicit opt-in automatic conversion while keeping it disabled by default.
-- Bound inserted conversion nodes, include all insertions in preflight and the transaction, and return every inserted or reconstructed node and pin identity.
-- Preserve the operation, snapshot, identity, protected-target, transaction, rollback, and limits contracts established in Phases 10 and 11.
-- Audit the complete graph-edit tool schema and change records for consistent operation discriminators, concise results, and bounded context use.
+- Add `blueprint_graph_edit` operations for `set_pin_default`, `connect_pins`, and `disconnect_pins`.
+- Use the live K2 graph schema for exact pin compatibility, connection responses, default parsing, link replacement, and link breaking. Never write link arrays or unvalidated default strings directly.
+- Keep automatic conversion disabled and reject connections that require an inserted conversion node.
+- Require operation ID, current Blueprint snapshot, graph identity, node identity, and pin identity preconditions as applicable.
+- Prevalidate the complete pin operation before opening one transaction. Verify links, defaults, ownership, reconstruction, dirty state, and structure limits afterward; restore explicitly on unexpected failure.
+- Bound links per pin, default size, result size, transaction work, diagnostics, retained operation state, and Game-thread duration.
 
 ### Verification
 
-- Test wildcard specialization, conversion disabled and enabled, conversion limits, incompatible conversions, inserted-node identities, reconstruction, cycles, stale identities, rollback, and read-back.
-- Repeat undo/redo, compile, save, restart, reload, lost-response reconciliation, and exact rejection-preservation tests across every graph-edit operation family.
-- Implement, compile, save, restart, and inspect a small BeginPlay-driven Actor behavior using components, variables, direct links, wildcards, and an explicit conversion.
+- Test execution and data pins, compatible and incompatible types, duplicate and replacement links, disconnect behavior, defaults, and object/class/asset references.
+- Test protected pins, stale and reconstructed identities, conversion-required rejection, undo/redo, compile, save, restart, reload, and lost-response reconciliation.
+- Capture the graph before every rejection and injected failure and prove equality of structure, dirty state, compile state, and transaction history afterward.
 
 ### Documentation and completion gate
 
-- Add complete atomic graph-editing recipes, wildcard and conversion policy, operation reconciliation, and re-inspection guidance.
-- Complete the phase only when the full BeginPlay acceptance workflow succeeds through MCP calls alone.
+- Document pin identities, supported defaults, direct-connection policy, link replacement, operation reconciliation, and re-inspection after reconstruction.
+- Complete the phase when MCP calls alone can build and persist a small behavior using only directly compatible node and pin types.
 
 [Back to roadmap](../../ROADMAP.md) · [Shared roadmap contracts](index.md)

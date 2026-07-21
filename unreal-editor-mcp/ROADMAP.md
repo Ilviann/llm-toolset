@@ -5,20 +5,21 @@
 - [x] [Phase 6 — Function signatures and local variables](docs/todo/phase-06.md) — Add function signatures, function shells, and local variables.
 - [x] [Phase 7 — Macros and custom events](docs/todo/phase-07.md) — Add macro and custom-event shells with matching inspection.
 - [x] [Phase 8 — Action-catalog infrastructure and core actions](docs/todo/phase-08.md) — Add the bounded action-catalog infrastructure and core actions.
-- [ ] [Phase 9 — Expanded action-catalog families](docs/todo/phase-09.md) — Expand the action catalog to the remaining supported action families.
-- [ ] [Phase 10 — Graph-node lifecycle](docs/todo/phase-10.md) — Add transactional graph-node creation, movement, and removal.
-- [ ] [Phase 11 — Pin defaults and direct connections](docs/todo/phase-11.md) — Add pin defaults and direct graph connections without automatic conversion.
-- [ ] [Phase 12 — Wildcards, conversions, and complete atomic graph editing](docs/todo/phase-12.md) — Add wildcard specialization, explicit conversion insertion, and complete atomic graph editing.
-- [ ] [Phase 13 — Actor workflow hardening on macOS](docs/todo/phase-13.md) — Harden the complete Actor workflow natively on macOS.
-- [ ] [Phase 14 — Native Windows Actor beta](docs/todo/phase-14.md) — Qualify and publish the Actor Blueprint beta on native Windows.
-- [ ] [Phase 15 — GameMode and GameState families](docs/todo/phase-15.md) — Formalize GameMode and GameState family support.
-- [ ] [Phase 16 — GameInstance family](docs/todo/phase-16.md) — Add GameInstance family support.
-- [ ] [Phase 17 — Complete function replacement](docs/todo/phase-17.md) — Add transactional replacement of one complete user-owned function.
-- [ ] [Phase 18 — Event, custom-event, and macro replacement](docs/todo/phase-18.md) — Extend bounded replacement to events, custom events, and macros.
-- [ ] [Phase 19 — Deterministic changed-node layout](docs/todo/phase-19.md) — Add deterministic layout for changed nodes.
-- [ ] [Phase 20 — Cross-platform qualification and stable release](docs/todo/phase-20.md) — Complete cross-platform qualification and publish the first stable-tagged release.
-- [ ] [Phase 21 — Optional configured editor launch](docs/todo/phase-21.md) — Add optional configured editor launch.
-- [ ] [Phase 22 — Optional graceful editor shutdown](docs/todo/phase-22.md) — Add optional graceful editor shutdown.
-- [ ] [Phase 23 — Optional durable editor restart](docs/todo/phase-23.md) — Add optional durable editor restart.
-- [ ] [Phase 24 — Optional editor-offline project-file generation](docs/todo/phase-24.md) — Add optional editor-offline project-file generation.
-- [ ] [Phase 25 — Optional editor-target builds](docs/todo/phase-25.md) — Add optional editor-target builds.
+- [ ] [Phase 9 — C++ architecture and test decomposition](docs/todo/phase-09.md) — Split oversized native components and Automation Tests along cohesive internal boundaries without changing behavior.
+- [ ] [Phase 10 — Expanded action-catalog families](docs/todo/phase-10.md) — Expand the action catalog to the remaining supported action families.
+- [ ] [Phase 11 — Graph-node lifecycle](docs/todo/phase-11.md) — Add transactional graph-node creation, movement, and removal.
+- [ ] [Phase 12 — Pin defaults and direct connections](docs/todo/phase-12.md) — Add pin defaults and direct graph connections without automatic conversion.
+- [ ] [Phase 13 — Wildcards, conversions, and complete atomic graph editing](docs/todo/phase-13.md) — Add wildcard specialization, explicit conversion insertion, and complete atomic graph editing.
+- [ ] [Phase 14 — Actor workflow hardening on macOS](docs/todo/phase-14.md) — Harden the complete Actor workflow natively on macOS.
+- [ ] [Phase 15 — Native Windows Actor beta](docs/todo/phase-15.md) — Qualify and publish the Actor Blueprint beta on native Windows.
+- [ ] [Phase 16 — GameMode and GameState families](docs/todo/phase-16.md) — Formalize GameMode and GameState family support.
+- [ ] [Phase 17 — GameInstance family](docs/todo/phase-17.md) — Add GameInstance family support.
+- [ ] [Phase 18 — Complete function replacement](docs/todo/phase-18.md) — Add transactional replacement of one complete user-owned function.
+- [ ] [Phase 19 — Event, custom-event, and macro replacement](docs/todo/phase-19.md) — Extend bounded replacement to events, custom events, and macros.
+- [ ] [Phase 20 — Deterministic changed-node layout](docs/todo/phase-20.md) — Add deterministic layout for changed nodes.
+- [ ] [Phase 21 — Cross-platform qualification and stable release](docs/todo/phase-21.md) — Complete cross-platform qualification and publish the first stable-tagged release.
+- [ ] [Phase 22 — Optional configured editor launch](docs/todo/phase-22.md) — Add optional configured editor launch.
+- [ ] [Phase 23 — Optional graceful editor shutdown](docs/todo/phase-23.md) — Add optional graceful editor shutdown.
+- [ ] [Phase 24 — Optional durable editor restart](docs/todo/phase-24.md) — Add optional durable editor restart.
+- [ ] [Phase 25 — Optional editor-offline project-file generation](docs/todo/phase-25.md) — Add optional editor-offline project-file generation.
+- [ ] [Phase 26 — Optional editor-target builds](docs/todo/phase-26.md) — Add optional editor-target builds.

@@ -31,7 +31,7 @@ bool UnrealMCP::Compatibility::SecureTokenFile(const FString& Path)
     return chmod(NativePath.Get(), S_IRUSR | S_IWUSR) == 0;
 #elif PLATFORM_WINDOWS
     // Windows project state inherits the owning user's ACL. Native Windows
-    // qualification in Phase 13 verifies that no broader ACL is introduced.
+    // qualification in Phase 14 verifies that no broader ACL is introduced.
     return true;
 #else
     return false;

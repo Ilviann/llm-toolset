@@ -1,25 +1,24 @@
-# Phase 14 — Native Windows Actor beta
+# Phase 14 — Actor workflow hardening on macOS
 
-**Outcome:** The hardened Actor Blueprint workflow passes its first native Windows qualification and is ready for a supervised cross-platform beta.
-
-Native Windows build preparation and environment setup may proceed in parallel with late Phase 13 work after the model-facing contracts from Phase 12 are frozen. Qualification and release remain ordered after Phase 13.
+**Outcome:** The complete create/open → inspect → component/default/member/graph edit → compile → save → inspect workflow is dependable for supervised Actor Blueprint development on macOS.
 
 ### Implementation
 
-- Build the plugin and run the complete Actor acceptance workflow on native Windows.
-- Fix only source-evidenced platform differences behind narrow compatibility or platform adapters with tests.
-- Keep published schemas, errors, limits, operation semantics, Blueprint results, and exact Python/plugin matching identical across macOS and Windows.
-- Add Windows setup and troubleshooting material without weakening the offline-first or security contracts.
+- Normalize compiler warnings, errors, notes, node and graph references, and source locations into bounded structured diagnostics with bounded continuation where needed.
+- Audit every mutation for exact prevalidation, operation reconciliation, transaction scope, postconditions, package dirty state, rollback behavior, and deterministic handling while the editor is compiling, saving, loading, undoing, garbage collecting, playing, or shutting down.
+- Measure tool-schema and representative-result token costs. Tighten descriptions, defaults, filters, result pages, and modes for small local models without hiding required identity, safety, or operation fields.
+- Add deterministic seeded schema/value fuzz cases without third-party runtime dependencies.
+- Maintain the canonical end-to-end fixture builder and behavioral integration suite in the disposable test project. Expected results must come from runtime contracts and created assets, not prose files or committed generated assets.
 
 ### Verification
 
-- On native Windows, verify credentials and permissions, loopback binding, discovery, paths and casing, plugin loading, Game-thread dispatch, component/member/graph transactions, compilation, saving, restart read-back, and exact model-facing contracts.
-- Run the complete Python, Unreal Automation, cross-process, clean-project, and existing-Blueprint beta suites.
-- Record peak request/response bytes, retained state, startup time, schema size, and typical operation latency on the Windows qualification host and compare them with the macOS baseline.
+- Run repeated macOS sessions against clean and already-edited Actor Blueprints, including malformed requests, stale snapshots, lost responses, cancellation, timeout, compiler failure, save conflict, editor restart, bridge restart, and undo/redo.
+- Run bounded native JSON/property decoder tests, operation-ledger stress tests, complete Python tests, Unreal Automation Tests, and cross-process workflows.
+- Record peak request/response bytes, retained state, startup time, schema size, and typical operation latency on the 16 GB macOS development machine.
 
 ### Documentation and completion gate
 
-- Complete Windows installation, configuration, troubleshooting, limits, recovery, and end-to-end workflow documentation.
-- Publish the Actor Blueprint beta only when the native macOS acceptance workflows remain green and the defined native Windows beta suite passes.
+- Complete the Actor-focused README, troubleshooting, security model, limits, mode guidance, LM Studio setup, operation recovery, macOS setup, and end-to-end tutorial.
+- Complete the phase only when the documented clean-project and existing-Blueprint workflows pass repeatedly on native macOS.
 
 [Back to roadmap](../../ROADMAP.md) · [Shared roadmap contracts](index.md)
