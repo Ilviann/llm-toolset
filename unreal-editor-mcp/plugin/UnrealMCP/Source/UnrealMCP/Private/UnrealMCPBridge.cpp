@@ -382,6 +382,9 @@ TSharedPtr<FJsonObject> FUnrealMCPBridge::Capabilities() const
     Features->SetBoolField(TEXT("blueprint_action_catalog"), true);
     Features->SetBoolField(TEXT("blueprint_graph_mutation"), true);
     Features->SetBoolField(TEXT("blueprint_graph_node_lifecycle"), true);
+    Features->SetBoolField(TEXT("blueprint_graph_pin_defaults"), true);
+    Features->SetBoolField(TEXT("blueprint_graph_direct_connections"), true);
+    Features->SetBoolField(TEXT("blueprint_graph_automatic_conversion"), false);
     Features->SetBoolField(TEXT("editor_lifecycle"), false);
     Features->SetBoolField(TEXT("project_build"), false);
     Result->SetObjectField(TEXT("features"), Features);
@@ -419,6 +422,8 @@ TSharedPtr<FJsonObject> FUnrealMCPBridge::Capabilities() const
     Limits->SetNumberField(TEXT("graph_nodes"), UnrealMCP::MaxGraphNodes);
     Limits->SetNumberField(TEXT("graph_pins_per_node"), UnrealMCP::MaxGraphPinsPerNode);
     Limits->SetNumberField(TEXT("graph_coordinate"), UnrealMCP::MaxGraphCoordinate);
+    Limits->SetNumberField(TEXT("graph_links_per_pin"), UnrealMCP::MaxGraphLinksPerPin);
+    Limits->SetNumberField(TEXT("pin_default_chars"), UnrealMCP::MaxPinDefaultChars);
     Result->SetObjectField(TEXT("limits"), Limits);
 
     const TSharedRef<FJsonObject> Listener = MakeShared<FJsonObject>();

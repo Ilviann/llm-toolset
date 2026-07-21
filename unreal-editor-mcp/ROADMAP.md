@@ -8,7 +8,7 @@
 - [x] [Phase 9 — C++ architecture and test decomposition](docs/todo/phase-09.md) — Split oversized native components and Automation Tests along cohesive internal boundaries without changing behavior.
 - [x] [Phase 10 — Expanded action-catalog families](docs/todo/phase-10.md) — Expand the action catalog to the remaining supported action families.
 - [x] [Phase 11 — Graph-node lifecycle](docs/todo/phase-11.md) — Add transactional graph-node creation, movement, and removal.
-- [ ] [Phase 12 — Pin defaults and direct connections](docs/todo/phase-12.md) — Add pin defaults and direct graph connections without automatic conversion.
+- [x] [Phase 12 — Pin defaults and direct connections](docs/todo/phase-12.md) — Add pin defaults and direct graph connections without automatic conversion.
 - [ ] [Phase 13 — Wildcards, conversions, and complete atomic graph editing](docs/todo/phase-13.md) — Add wildcard specialization, explicit conversion insertion, and complete atomic graph editing.
 - [ ] [Phase 14 — Actor workflow hardening on macOS](docs/todo/phase-14.md) — Harden the complete Actor workflow natively on macOS.
 - [ ] [Phase 15 — Native Windows Actor beta](docs/todo/phase-15.md) — Qualify and publish the Actor Blueprint beta on native Windows.

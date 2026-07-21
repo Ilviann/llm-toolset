@@ -1,5 +1,12 @@
 # Unreal Editor MCP history
 
+## 0.11.0 — 2026-07-22
+
+- Added reconciled `blueprint_graph_edit` operations for typed pin defaults and schema-valid direct pin connection/disconnection by stable graph, node, and pin identities.
+- Parse defaults through the shared bounded K2 codec and live graph schema, including Boolean, numeric, textual, object, class, asset, and engine-default forms; protected, linked, hidden, unsupported, stale, and oversized defaults reject before a transaction.
+- Honor the live schema's exact make and link-replacement responses while rejecting incompatible, wildcard-specializing, promotion, and conversion-node connections; automatic conversion remains disabled.
+- Added 64-link-per-pin and 512-character canonical-default limits, typed pin-default inspection, object/text-inclusive snapshots, capability flags, native Undo/Redo/compile/save coverage, and cross-process lost-response/restart verification for all three operations.
+
 ## 0.10.0 — 2026-07-22
 
 - Added reconciled `blueprint_graph_edit` operations for action-ID-backed node creation, exact movement, and safe removal in local event, user-function, and macro graphs.

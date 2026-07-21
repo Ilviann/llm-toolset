@@ -42,7 +42,7 @@ def wait_until_ready(layout: ProjectLayout, process: subprocess.Popen[bytes], de
         try:
             record = read_discovery(layout)
             result = UnrealBridge(layout, timeout=2.0).call("capabilities")
-            if result.get("bridge_ready") is True and record.bridge_version == "0.10.0":
+            if result.get("bridge_ready") is True and record.bridge_version == "0.11.0":
                 return
         except Exception as error:
             last_error = str(error)
@@ -97,7 +97,7 @@ def send_without_reading(layout: ProjectLayout, command: str, arguments: dict[st
         headers={
             "Authorization": "Bearer " + read_token(layout),
             "Content-Type": "application/json",
-            "X-Unreal-MCP-Version": "0.10.0",
+            "X-Unreal-MCP-Version": "0.11.0",
         },
     )
     connection.close()
@@ -153,6 +153,7 @@ def run_automation(executable: Path, project: Path, environment: dict[str, str],
         "ActionCatalog",
         "ExpandedActionCatalog",
         "GraphNodeLifecycle",
+        "PinDefaultsAndDirectConnections",
     )
     if test_filter == "UnrealMCP":
         expected = all_expected
@@ -172,6 +173,8 @@ def run_automation(executable: Path, project: Path, environment: dict[str, str],
         expected = tuple(name for name in all_expected if name == "ExpandedActionCatalog")
     elif test_filter == "UnrealMCP.Phase11":
         expected = tuple(name for name in all_expected if name == "GraphNodeLifecycle")
+    elif test_filter == "UnrealMCP.Phase12":
+        expected = tuple(name for name in all_expected if name == "PinDefaultsAndDirectConnections")
     else:
         leaf = test_filter.rsplit(".", 1)[-1]
         expected = (leaf,) if leaf in all_expected else ()
@@ -260,7 +263,7 @@ def main() -> int:
                 "blueprint_component_edit", "blueprint_default_edit", "blueprint_member_edit",
             ]:
                 raise AssertionError("released command catalog mismatch")
-            if capabilities.get("bridge_version") != "0.10.0" or state.get("bridge_ready") is not True:
+            if capabilities.get("bridge_version") != "0.11.0" or state.get("bridge_ready") is not True:
                 raise AssertionError("capability/state contract mismatch")
             if capabilities.get("features", {}).get("blueprint_mutation") is not True:
                 raise AssertionError("Phase 6 mutation capability is unavailable")
@@ -275,9 +278,17 @@ def main() -> int:
             for feature in ("blueprint_graph_mutation", "blueprint_graph_node_lifecycle"):
                 if capabilities.get("features", {}).get(feature) is not True:
                     raise AssertionError(f"Phase 11 graph capability is unavailable: {feature}")
-            expected_graph_limits = {"graph_nodes": 2048, "graph_pins_per_node": 256, "graph_coordinate": 1000000}
+            for feature in ("blueprint_graph_pin_defaults", "blueprint_graph_direct_connections"):
+                if capabilities.get("features", {}).get(feature) is not True:
+                    raise AssertionError(f"Phase 12 graph capability is unavailable: {feature}")
+            if capabilities.get("features", {}).get("blueprint_graph_automatic_conversion") is not False:
+                raise AssertionError("Phase 12 automatic conversion must remain disabled")
+            expected_graph_limits = {
+                "graph_nodes": 2048, "graph_pins_per_node": 256, "graph_coordinate": 1000000,
+                "graph_links_per_pin": 64, "pin_default_chars": 512,
+            }
             if any(capabilities.get("limits", {}).get(name) != value for name, value in expected_graph_limits.items()):
-                raise AssertionError(f"Phase 11 graph limits mismatch: {capabilities.get('limits')!r}")
+                raise AssertionError(f"Phase 12 graph limits mismatch: {capabilities.get('limits')!r}")
             if capabilities.get("asset_access") != {
                 "read_scope": "all_mounted_content",
                 "mutation_scope": "project_content_and_local_project_plugins",
@@ -584,10 +595,112 @@ def main() -> int:
             graph_remove = graph_remove_status.get("result") if graph_remove_status.get("state") == "committed" else None
             if not isinstance(graph_remove, dict) or graph_remove.get("changed", {}).get("node", {}).get("id") != temporary_node_id:
                 raise AssertionError(f"lost node-remove response did not reconcile: {graph_remove_status!r}")
+
+            setter_catalog = bridge.call("blueprint_action_catalog", {
+                "asset_path": asset_path,
+                "graph_id": event_graph_id,
+                "expected_snapshot": graph_remove["snapshot_id"],
+                "member": "Health",
+                "node_family": "variable_set",
+                "limit": 5,
+            })
+            if not setter_catalog.get("actions"):
+                raise AssertionError(f"Phase 12 setter action is unavailable: {setter_catalog!r}")
+            setter_add_operation = uuid.uuid4().hex
+            setter_add_arguments = {
+                "operation_id": setter_add_operation,
+                "asset_path": asset_path,
+                "expected_snapshot": graph_remove["snapshot_id"],
+                "operation": "add_node",
+                "graph_id": event_graph_id,
+                "action_id": setter_catalog["actions"][0]["action_id"],
+                "position": {"x": 800, "y": 240},
+            }
+            send_without_reading(layout, "blueprint_graph_edit", setter_add_arguments)
+            setter_add_status = reconcile_operation(bridge, setter_add_operation, capabilities["bridge_instance_id"])
+            setter_add = setter_add_status.get("result") if setter_add_status.get("state") == "committed" else None
+            setter_node_id = setter_add.get("changed", {}).get("node", {}).get("id") if isinstance(setter_add, dict) else None
+            if not isinstance(setter_node_id, str):
+                raise AssertionError(f"Phase 12 setter node did not reconcile: {setter_add_status!r}")
+            pin_inspection = bridge.call("blueprint_inspect", {
+                "mode": "inspect",
+                "asset_path": asset_path,
+                "sections": ["pins"],
+                "graph_id": event_graph_id,
+                "page_size": 100,
+            })
+            pins = [record for record in pin_inspection.get("records", []) if record.get("section") == "pin"]
+            def exact_pin(node_id: str, direction: str, category: str, name: str | None = None) -> str:
+                matches = [record for record in pins
+                           if record.get("node_id") == node_id and record.get("direction") == direction
+                           and record.get("type", {}).get("category") == category
+                           and (name is None or record.get("name") == name)]
+                if len(matches) != 1 or not isinstance(matches[0].get("id"), str):
+                    raise AssertionError(f"expected one stable {node_id}/{direction}/{category}/{name} pin: {matches!r}")
+                return matches[0]["id"]
+            setter_exec_pin_id = exact_pin(setter_node_id, "input", "exec")
+            setter_value_pin_id = exact_pin(setter_node_id, "input", "int", "Health")
+            custom_event_exec_pin_id = exact_pin(custom_event_id, "output", "exec")
+
+            pin_default_operation = uuid.uuid4().hex
+            pin_default_arguments = {
+                "operation_id": pin_default_operation,
+                "asset_path": asset_path,
+                "expected_snapshot": setter_add["snapshot_id"],
+                "operation": "set_pin_default",
+                "graph_id": event_graph_id,
+                "node_id": setter_node_id,
+                "pin_id": setter_value_pin_id,
+                "default": {"kind": "literal", "value": 77},
+            }
+            send_without_reading(layout, "blueprint_graph_edit", pin_default_arguments)
+            pin_default_status = reconcile_operation(bridge, pin_default_operation, capabilities["bridge_instance_id"])
+            pin_default = pin_default_status.get("result") if pin_default_status.get("state") == "committed" else None
+            if not isinstance(pin_default, dict) or pin_default.get("changed", {}).get("default") != {"kind": "literal", "value": 77}:
+                raise AssertionError(f"lost pin-default response did not reconcile: {pin_default_status!r}")
+
+            connection_arguments = {
+                "asset_path": asset_path,
+                "operation": "connect_pins",
+                "graph_id": event_graph_id,
+                "from_node_id": custom_event_id,
+                "from_pin_id": custom_event_exec_pin_id,
+                "to_node_id": setter_node_id,
+                "to_pin_id": setter_exec_pin_id,
+            }
+            connect_operation = uuid.uuid4().hex
+            send_without_reading(layout, "blueprint_graph_edit", {
+                **connection_arguments, "operation_id": connect_operation,
+                "expected_snapshot": pin_default["snapshot_id"],
+            })
+            connect_status = reconcile_operation(bridge, connect_operation, capabilities["bridge_instance_id"])
+            connected = connect_status.get("result") if connect_status.get("state") == "committed" else None
+            if not isinstance(connected, dict) or connected.get("changed", {}).get("connection", {}).get("connected") is not True:
+                raise AssertionError(f"lost direct-connect response did not reconcile: {connect_status!r}")
+
+            disconnect_operation = uuid.uuid4().hex
+            send_without_reading(layout, "blueprint_graph_edit", {
+                **connection_arguments, "operation": "disconnect_pins", "operation_id": disconnect_operation,
+                "expected_snapshot": connected["snapshot_id"],
+            })
+            disconnect_status = reconcile_operation(bridge, disconnect_operation, capabilities["bridge_instance_id"])
+            disconnected = disconnect_status.get("result") if disconnect_status.get("state") == "committed" else None
+            if not isinstance(disconnected, dict) or disconnected.get("changed", {}).get("connection", {}).get("connected") is not False:
+                raise AssertionError(f"lost direct-disconnect response did not reconcile: {disconnect_status!r}")
+
+            reconnect_operation = uuid.uuid4().hex
+            send_without_reading(layout, "blueprint_graph_edit", {
+                **connection_arguments, "operation_id": reconnect_operation,
+                "expected_snapshot": disconnected["snapshot_id"],
+            })
+            reconnect_status = reconcile_operation(bridge, reconnect_operation, capabilities["bridge_instance_id"])
+            reconnected = reconnect_status.get("result") if reconnect_status.get("state") == "committed" else None
+            if not isinstance(reconnected, dict) or reconnected.get("changed", {}).get("connection", {}).get("direct") is not True:
+                raise AssertionError(f"lost direct-reconnect response did not reconcile: {reconnect_status!r}")
             compiled = bridge.call("blueprint_compile", {
                 "operation_id": uuid.uuid4().hex,
                 "asset_path": asset_path,
-                "expected_snapshot": graph_remove["snapshot_id"],
+                "expected_snapshot": reconnected["snapshot_id"],
             })
             if compiled.get("compile_succeeded") is not True or compiled.get("saved") is not False:
                 raise AssertionError(f"explicit Blueprint compile contract mismatch: {compiled!r}")
@@ -713,6 +826,22 @@ def main() -> int:
             }
             if set(graph_pin_ids) != reloaded_pin_ids:
                 raise AssertionError(f"created pin identities changed after restart: {sorted(reloaded_pin_ids)!r}")
+            setter_pins = {
+                record.get("id"): record
+                for record in reloaded.get("records", [])
+                if record.get("section") == "pin" and record.get("node_id") == setter_node_id
+            }
+            if setter_value_pin_id not in setter_pins or setter_pins[setter_value_pin_id].get("default") != {"kind": "literal", "value": 77}:
+                raise AssertionError(f"Phase 12 pin default changed after restart: {setter_pins.get(setter_value_pin_id)!r}")
+            connections = [record for record in reloaded.get("records", []) if record.get("section") == "connection"]
+            expected_connection = {
+                "from_node_id": custom_event_id,
+                "from_pin_id": custom_event_exec_pin_id,
+                "to_node_id": setter_node_id,
+                "to_pin_id": setter_exec_pin_id,
+            }
+            if not any(all(record.get(key) == value for key, value in expected_connection.items()) for record in connections):
+                raise AssertionError(f"Phase 12 direct connection changed after restart: {connections!r}")
             event_graphs = [
                 record for record in reloaded.get("records", [])
                 if record.get("section") == "graph" and record.get("kind") == "event" and record.get("inherited") is False
@@ -771,7 +900,7 @@ def main() -> int:
             pass
         else:
             raise AssertionError("a live discovery heartbeat remained after editor termination")
-    print("Phase 11 integration passed: reconciled graph-node creation/movement/removal, restart-stable node and pin identities, expanded action catalogs, complete Actor authoring, loopback binding, and clean unload")
+    print("Phase 12 integration passed: reconciled pin defaults and direct connections, restart-stable graph behavior, complete Actor authoring, loopback binding, and clean unload")
     return 0
 
 

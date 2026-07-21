@@ -1,6 +1,7 @@
 #include "UnrealMCPBlueprintGraphEditor.h"
 
 #include "UnrealMCPBlueprintInspectionSupport.h"
+#include "UnrealMCPK2TypeCodec.h"
 #include "UnrealMCPBlueprintMutationCommon.h"
 
 #include "AssetRegistry/AssetRegistryModule.h"
@@ -33,6 +34,12 @@ struct FGraphEditRequest
     FString GraphId;
     FString ActionId;
     FString NodeId;
+    FString PinId;
+    FString FromNodeId;
+    FString FromPinId;
+    FString ToNodeId;
+    FString ToPinId;
+    TSharedPtr<FJsonObject> Default;
     int32 X = 0;
     int32 Y = 0;
 };
@@ -69,18 +76,28 @@ static bool DecodeRequest(const TSharedPtr<FJsonObject>& Arguments, FGraphEditRe
 {
     if (!Arguments.IsValid()
         || !Arguments->TryGetStringField(TEXT("operation"), Out.Operation)
-        || (Out.Operation != TEXT("add_node") && Out.Operation != TEXT("move_node") && Out.Operation != TEXT("remove_node")))
+        || (Out.Operation != TEXT("add_node") && Out.Operation != TEXT("move_node") && Out.Operation != TEXT("remove_node")
+            && Out.Operation != TEXT("set_pin_default") && Out.Operation != TEXT("connect_pins")
+            && Out.Operation != TEXT("disconnect_pins")))
     {
         OutError = {TEXT("invalid_argument"), TEXT("Graph edit operation is invalid")};
         return false;
     }
     const bool bAdd = Out.Operation == TEXT("add_node");
     const bool bMove = Out.Operation == TEXT("move_node");
-    if (!HasOnlyFields(*Arguments, bAdd
-            ? std::initializer_list<const TCHAR*>{TEXT("operation_id"), TEXT("asset_path"), TEXT("expected_snapshot"), TEXT("operation"), TEXT("graph_id"), TEXT("action_id"), TEXT("position")}
-            : bMove
-                ? std::initializer_list<const TCHAR*>{TEXT("operation_id"), TEXT("asset_path"), TEXT("expected_snapshot"), TEXT("operation"), TEXT("graph_id"), TEXT("node_id"), TEXT("position")}
-                : std::initializer_list<const TCHAR*>{TEXT("operation_id"), TEXT("asset_path"), TEXT("expected_snapshot"), TEXT("operation"), TEXT("graph_id"), TEXT("node_id")}))
+    const bool bSetDefault = Out.Operation == TEXT("set_pin_default");
+    const bool bConnection = Out.Operation == TEXT("connect_pins") || Out.Operation == TEXT("disconnect_pins");
+    const bool bShapeValid = bAdd
+        ? HasOnlyFields(*Arguments, {TEXT("operation_id"), TEXT("asset_path"), TEXT("expected_snapshot"), TEXT("operation"), TEXT("graph_id"), TEXT("action_id"), TEXT("position")})
+        : bMove
+            ? HasOnlyFields(*Arguments, {TEXT("operation_id"), TEXT("asset_path"), TEXT("expected_snapshot"), TEXT("operation"), TEXT("graph_id"), TEXT("node_id"), TEXT("position")})
+            : bSetDefault
+                ? HasOnlyFields(*Arguments, {TEXT("operation_id"), TEXT("asset_path"), TEXT("expected_snapshot"), TEXT("operation"), TEXT("graph_id"), TEXT("node_id"), TEXT("pin_id"), TEXT("default")})
+                : bConnection
+                    ? HasOnlyFields(*Arguments, {TEXT("operation_id"), TEXT("asset_path"), TEXT("expected_snapshot"), TEXT("operation"), TEXT("graph_id"),
+                        TEXT("from_node_id"), TEXT("from_pin_id"), TEXT("to_node_id"), TEXT("to_pin_id")})
+                    : HasOnlyFields(*Arguments, {TEXT("operation_id"), TEXT("asset_path"), TEXT("expected_snapshot"), TEXT("operation"), TEXT("graph_id"), TEXT("node_id")});
+    if (!bShapeValid)
     {
         OutError = {TEXT("invalid_argument"), TEXT("Graph edit arguments have an invalid shape")};
         return false;
@@ -105,7 +122,7 @@ static bool DecodeRequest(const TSharedPtr<FJsonObject>& Arguments, FGraphEditRe
             return false;
         }
     }
-    else
+    else if (bMove || Out.Operation == TEXT("remove_node") || bSetDefault)
     {
         if (!Arguments->TryGetStringField(TEXT("node_id"), Out.NodeId) || !IsGuidString(Out.NodeId, 32))
         {
@@ -113,6 +130,28 @@ static bool DecodeRequest(const TSharedPtr<FJsonObject>& Arguments, FGraphEditRe
             return false;
         }
         if (bMove && !ReadPosition(*Arguments, Out.X, Out.Y, OutError)) return false;
+        if (bSetDefault)
+        {
+            const TSharedPtr<FJsonObject>* Default = nullptr;
+            if (!Arguments->TryGetStringField(TEXT("pin_id"), Out.PinId) || !IsGuidString(Out.PinId, 32)
+                || !Arguments->TryGetObjectField(TEXT("default"), Default) || Default == nullptr || !Default->IsValid())
+            {
+                OutError = {TEXT("invalid_pin"), TEXT("pin_id and default must identify one stable pin and typed value")};
+                return false;
+            }
+            Out.Default = *Default;
+        }
+    }
+    else
+    {
+        if (!Arguments->TryGetStringField(TEXT("from_node_id"), Out.FromNodeId) || !IsGuidString(Out.FromNodeId, 32)
+            || !Arguments->TryGetStringField(TEXT("from_pin_id"), Out.FromPinId) || !IsGuidString(Out.FromPinId, 32)
+            || !Arguments->TryGetStringField(TEXT("to_node_id"), Out.ToNodeId) || !IsGuidString(Out.ToNodeId, 32)
+            || !Arguments->TryGetStringField(TEXT("to_pin_id"), Out.ToPinId) || !IsGuidString(Out.ToPinId, 32))
+        {
+            OutError = {TEXT("invalid_pin"), TEXT("Direct connections require stable from/to node and pin identities")};
+            return false;
+        }
     }
     return true;
 }
@@ -156,6 +195,41 @@ static UEdGraphNode* FindNode(UEdGraph* Graph, const FString& NodeId)
     return nullptr;
 }
 
+static UEdGraphPin* FindPin(UEdGraphNode* Node, const FString& PinId)
+{
+    if (Node == nullptr) return nullptr;
+    for (UEdGraphPin* Pin : Node->Pins)
+        if (Pin != nullptr && Pin->GetOwningNodeUnchecked() == Node && GuidString(Pin->PinId) == PinId) return Pin;
+    return nullptr;
+}
+
+static bool IsStablePinNode(UEdGraph* Graph, UEdGraphNode* Node)
+{
+    return Graph != nullptr && Node != nullptr && Node->GetGraph() == Graph && Node->GetOuter() == Graph
+        && Node->NodeGuid.IsValid() && !Node->IsIntermediateNode();
+}
+
+static bool IsProtectedConnectionPin(UEdGraphPin* Pin)
+{
+    return Pin == nullptr || !Pin->PinId.IsValid() || Pin->bWasTrashed || Pin->bOrphanedPin || Pin->bNotConnectable;
+}
+
+static bool SameLinks(const UEdGraphPin* Pin, const TSet<UEdGraphPin*>& Expected)
+{
+    if (Pin == nullptr || Pin->LinkedTo.Num() != Expected.Num()) return false;
+    for (UEdGraphPin* Linked : Pin->LinkedTo)
+        if (Linked == nullptr || !Expected.Contains(Linked) || !Linked->LinkedTo.Contains(const_cast<UEdGraphPin*>(Pin))) return false;
+    return true;
+}
+
+static FString PinDefaultText(const UEdGraphPin* Pin)
+{
+    if (Pin == nullptr) return FString();
+    if (Pin->DefaultObject != nullptr) return Pin->DefaultObject->GetPathName();
+    if (Pin->PinType.PinCategory == UEdGraphSchema_K2::PC_Text) return Pin->DefaultTextValue.ToString();
+    return Pin->DefaultValue;
+}
+
 static bool IsProtectedNode(UEdGraphNode* Node)
 {
     return Node == nullptr || Node->IsIntermediateNode() || !Node->CanUserDeleteNode()
@@ -188,6 +262,8 @@ static TSharedRef<FJsonObject> EncodeNode(UEdGraph* Graph, UEdGraphNode* Node)
             PinRecord->SetObjectField(TEXT("type"), UnrealMCP::BlueprintInspectionPrivate::PinType(Pin->PinType));
             PinRecord->SetStringField(TEXT("default_value"), Pin->DefaultValue.Left(512));
             if (Pin->DefaultObject != nullptr) PinRecord->SetStringField(TEXT("default_object"), Pin->DefaultObject->GetPathName().Left(512));
+            if (!Pin->DefaultTextValue.IsEmpty()) PinRecord->SetStringField(TEXT("default_text"), Pin->DefaultTextValue.ToString().Left(512));
+            PinRecord->SetObjectField(TEXT("default"), UnrealMCP::K2TypeCodec::EncodeDefault(Pin->PinType, PinDefaultText(Pin)));
             Pins.Add(MakeShared<FJsonValueObject>(PinRecord));
         }
     }
@@ -229,6 +305,267 @@ static TSharedRef<FJsonObject> BuildResult(
     for (const FString& Id : CreatedIdentities) Identities.Add(MakeShared<FJsonValueString>(Id));
     Result->SetArrayField(TEXT("created_identities"), Identities);
     return Result;
+}
+
+
+static bool ExecutePinEdit(
+    UBlueprint* Blueprint,
+    UEdGraph* Graph,
+    const FGraphEditRequest& Request,
+    FUnrealMCPBlueprintInspector& Inspector,
+    const FString& Snapshot,
+    TSharedPtr<FJsonObject>& OutResult,
+    FUnrealMCPError& OutError)
+{
+    const UEdGraphSchema_K2* Schema = Cast<UEdGraphSchema_K2>(Graph != nullptr ? Graph->GetSchema() : nullptr);
+    if (Blueprint == nullptr || Graph == nullptr || Schema == nullptr)
+    {
+        OutError = {TEXT("protected_pin"), TEXT("Pin edits require one live local K2 graph schema")};
+        return false;
+    }
+
+    UEdGraphNode* FromNode = nullptr;
+    UEdGraphNode* ToNode = nullptr;
+    UEdGraphPin* FromPin = nullptr;
+    UEdGraphPin* ToPin = nullptr;
+    FString NewDefaultText;
+    FString ParsedDefaultValue;
+    TObjectPtr<UObject> ParsedDefaultObject = nullptr;
+    FText ParsedDefaultText;
+    bool bEngineDefault = false;
+    ECanCreateConnectionResponse ConnectionResponse = CONNECT_RESPONSE_DISALLOW;
+    TSet<UEdGraphPin*> FromLinksBefore;
+    TSet<UEdGraphPin*> ToLinksBefore;
+    TSet<UEdGraphPin*> ExpectedFromLinks;
+    TSet<UEdGraphPin*> ExpectedToLinks;
+    int32 ReplacedLinkCount = 0;
+
+    if (Request.Operation == TEXT("set_pin_default"))
+    {
+        FromNode = FindNode(Graph, Request.NodeId);
+        FromPin = FindPin(FromNode, Request.PinId);
+        if (!IsStablePinNode(Graph, FromNode) || FromPin == nullptr)
+        {
+            OutError = {TEXT("invalid_pin"), TEXT("The requested stable node and pin identities were not found in the graph")};
+            return false;
+        }
+        const TSharedRef<FJsonObject> EncodedType = UnrealMCP::K2TypeCodec::EncodeType(FromPin->PinType);
+        if (IsProtectedConnectionPin(FromPin) || FromPin->Direction != EGPD_Input || FromPin->HasAnyConnections()
+            || FromPin->bDefaultValueIsIgnored || FromPin->bDefaultValueIsReadOnly
+            || Schema->ShouldHidePinDefaultValue(FromPin) || !EncodedType->GetBoolField(TEXT("supported")))
+        {
+            OutError = {TEXT("protected_pin"), TEXT("The requested pin is not one editable, unlinked, supported K2 input default")};
+            return false;
+        }
+        FString Kind;
+        if (!Request.Default.IsValid() || !Request.Default->TryGetStringField(TEXT("kind"), Kind)
+            || !UnrealMCP::K2TypeCodec::DecodeDefault(FromPin->PinType, Request.Default, NewDefaultText, OutError))
+        {
+            return false;
+        }
+        bEngineDefault = Kind == TEXT("engine_default");
+        if (bEngineDefault) NewDefaultText = FromPin->AutogeneratedDefaultValue;
+        if (NewDefaultText.Len() > UnrealMCP::MaxPinDefaultChars)
+        {
+            OutError = {TEXT("pin_default_too_large"), TEXT("The canonical pin default exceeds the published character limit")};
+            return false;
+        }
+        Schema->GetPinDefaultValuesFromString(FromPin->PinType, FromNode, NewDefaultText,
+            ParsedDefaultValue, ParsedDefaultObject, ParsedDefaultText, false);
+        const FString Validation = Schema->IsPinDefaultValid(FromPin, ParsedDefaultValue, ParsedDefaultObject, ParsedDefaultText);
+        if (!Validation.IsEmpty())
+        {
+            OutError = {TEXT("invalid_pin_default"), TEXT("The live K2 schema rejected the typed pin default")};
+            OutError.Details->SetStringField(TEXT("schema_message"), Validation.Left(UnrealMCP::MaxDiagnosticChars));
+            return false;
+        }
+        const bool bAlreadySet = bEngineDefault ? Schema->DoesDefaultValueMatchAutogenerated(*FromPin)
+            : FromPin->DefaultValue == ParsedDefaultValue && FromPin->DefaultObject == ParsedDefaultObject
+                && FromPin->DefaultTextValue.EqualTo(ParsedDefaultText);
+        if (bAlreadySet)
+        {
+            OutError = {TEXT("no_change"), TEXT("The pin already has the requested default")};
+            return false;
+        }
+    }
+    else
+    {
+        FromNode = FindNode(Graph, Request.FromNodeId);
+        ToNode = FindNode(Graph, Request.ToNodeId);
+        FromPin = FindPin(FromNode, Request.FromPinId);
+        ToPin = FindPin(ToNode, Request.ToPinId);
+        if (!IsStablePinNode(Graph, FromNode) || !IsStablePinNode(Graph, ToNode)
+            || IsProtectedConnectionPin(FromPin) || IsProtectedConnectionPin(ToPin))
+        {
+            OutError = {TEXT("invalid_pin"), TEXT("The requested stable node and pin identities were not found or are protected")};
+            return false;
+        }
+        if (FromPin->Direction != EGPD_Output || ToPin->Direction != EGPD_Input)
+        {
+            OutError = {TEXT("invalid_connection"), TEXT("Direct connections require an output from_pin and input to_pin")};
+            return false;
+        }
+        if (FromPin->LinkedTo.Num() > UnrealMCP::MaxGraphLinksPerPin || ToPin->LinkedTo.Num() > UnrealMCP::MaxGraphLinksPerPin)
+        {
+            OutError = {TEXT("graph_limit_exceeded"), TEXT("One requested pin exceeds the supported direct-link limit")};
+            return false;
+        }
+        for (UEdGraphPin* Pin : FromPin->LinkedTo) if (Pin != nullptr) FromLinksBefore.Add(Pin);
+        for (UEdGraphPin* Pin : ToPin->LinkedTo) if (Pin != nullptr) ToLinksBefore.Add(Pin);
+        ExpectedFromLinks = FromLinksBefore;
+        ExpectedToLinks = ToLinksBefore;
+        if (Request.Operation == TEXT("disconnect_pins"))
+        {
+            if (!FromLinksBefore.Contains(ToPin) || !ToLinksBefore.Contains(FromPin))
+            {
+                OutError = {TEXT("invalid_connection"), TEXT("The requested direct pin connection does not exist")};
+                return false;
+            }
+            ExpectedFromLinks.Remove(ToPin);
+            ExpectedToLinks.Remove(FromPin);
+        }
+        else
+        {
+            if (FromLinksBefore.Contains(ToPin) || ToLinksBefore.Contains(FromPin))
+            {
+                OutError = {TEXT("invalid_connection"), TEXT("The requested pins are already directly connected")};
+                return false;
+            }
+            if (FromPin->PinType.PinCategory == UEdGraphSchema_K2::PC_Wildcard
+                || ToPin->PinType.PinCategory == UEdGraphSchema_K2::PC_Wildcard)
+            {
+                OutError = {TEXT("wildcard_specialization_required"), TEXT("Wildcard specialization is not available in this phase")};
+                return false;
+            }
+            const FPinConnectionResponse Response = Schema->CanCreateConnection(FromPin, ToPin);
+            ConnectionResponse = Response.Response;
+            if (ConnectionResponse == CONNECT_RESPONSE_MAKE_WITH_CONVERSION_NODE
+                || ConnectionResponse == CONNECT_RESPONSE_MAKE_WITH_PROMOTION)
+            {
+                OutError = {TEXT("conversion_required"), TEXT("The live K2 schema requires conversion or promotion; automatic insertion is disabled")};
+                OutError.Details->SetStringField(TEXT("schema_message"), Response.Message.ToString().Left(UnrealMCP::MaxDiagnosticChars));
+                return false;
+            }
+            if (ConnectionResponse != CONNECT_RESPONSE_MAKE && ConnectionResponse != CONNECT_RESPONSE_BREAK_OTHERS_A
+                && ConnectionResponse != CONNECT_RESPONSE_BREAK_OTHERS_B && ConnectionResponse != CONNECT_RESPONSE_BREAK_OTHERS_AB)
+            {
+                OutError = {TEXT("incompatible_pins"), TEXT("The live K2 schema rejected the direct pin connection")};
+                OutError.Details->SetStringField(TEXT("schema_message"), Response.Message.ToString().Left(UnrealMCP::MaxDiagnosticChars));
+                return false;
+            }
+            if (ConnectionResponse == CONNECT_RESPONSE_BREAK_OTHERS_A || ConnectionResponse == CONNECT_RESPONSE_BREAK_OTHERS_AB)
+            {
+                ReplacedLinkCount += ExpectedFromLinks.Num();
+                ExpectedFromLinks.Reset();
+            }
+            if (ConnectionResponse == CONNECT_RESPONSE_BREAK_OTHERS_B || ConnectionResponse == CONNECT_RESPONSE_BREAK_OTHERS_AB)
+            {
+                ReplacedLinkCount += ExpectedToLinks.Num();
+                ExpectedToLinks.Reset();
+            }
+            if (ReplacedLinkCount + 1 > UnrealMCP::MaxGraphLinksPerPin)
+            {
+                OutError = {TEXT("graph_limit_exceeded"), TEXT("The direct connection replacement exceeds the transaction-work limit")};
+                return false;
+            }
+            ExpectedFromLinks.Add(ToPin);
+            ExpectedToLinks.Add(FromPin);
+            if (ExpectedFromLinks.Num() > UnrealMCP::MaxGraphLinksPerPin
+                || ExpectedToLinks.Num() > UnrealMCP::MaxGraphLinksPerPin)
+            {
+                OutError = {TEXT("graph_limit_exceeded"), TEXT("The resulting direct connection would exceed the per-pin link limit")};
+                return false;
+            }
+        }
+    }
+
+    const int32 NodesBefore = Graph->Nodes.Num();
+    bool bApplied = false;
+    {
+        FScopedTransaction Transaction(FText::FromString(TEXT("Unreal MCP graph pin edit")));
+        Blueprint->Modify();
+        Graph->Modify();
+        FromNode->Modify();
+        FromPin->Modify();
+        if (ToNode != nullptr && ToNode != FromNode) ToNode->Modify();
+        if (ToPin != nullptr) ToPin->Modify();
+        if (Request.Operation == TEXT("set_pin_default"))
+        {
+            if (bEngineDefault) Schema->ResetPinToAutogeneratedDefaultValue(FromPin, true);
+            else Schema->TrySetDefaultValue(*FromPin, NewDefaultText, true);
+            bApplied = true;
+        }
+        else if (Request.Operation == TEXT("connect_pins"))
+        {
+            bApplied = Schema->TryCreateConnection(FromPin, ToPin);
+        }
+        else
+        {
+            Schema->BreakSinglePinLink(FromPin, ToPin);
+            FBlueprintEditorUtils::MarkBlueprintAsModified(Blueprint);
+            bApplied = true;
+        }
+    }
+
+    UEdGraphNode* LiveFromNode = FindNode(Graph, Request.Operation == TEXT("set_pin_default") ? Request.NodeId : Request.FromNodeId);
+    UEdGraphNode* LiveToNode = Request.Operation == TEXT("set_pin_default") ? nullptr : FindNode(Graph, Request.ToNodeId);
+    UEdGraphPin* LiveFromPin = FindPin(LiveFromNode, Request.Operation == TEXT("set_pin_default") ? Request.PinId : Request.FromPinId);
+    UEdGraphPin* LiveToPin = Request.Operation == TEXT("set_pin_default") ? nullptr : FindPin(LiveToNode, Request.ToPinId);
+    bool bVerified = bApplied && Graph->Nodes.Num() == NodesBefore && LiveFromNode == FromNode && LiveFromPin == FromPin;
+    if (Request.Operation == TEXT("set_pin_default"))
+    {
+        bVerified = bVerified && (bEngineDefault ? Schema->DoesDefaultValueMatchAutogenerated(*LiveFromPin)
+            : LiveFromPin->DefaultValue == ParsedDefaultValue && LiveFromPin->DefaultObject == ParsedDefaultObject
+                && LiveFromPin->DefaultTextValue.EqualTo(ParsedDefaultText));
+    }
+    else
+    {
+        bVerified = bVerified && LiveToNode == ToNode && LiveToPin == ToPin
+            && SameLinks(LiveFromPin, ExpectedFromLinks) && SameLinks(LiveToPin, ExpectedToLinks);
+    }
+    if (!bVerified)
+    {
+        OutError = {TEXT("internal_error"), TEXT("Graph pin mutation failed identity or authoritative schema read-back verification")};
+        RestoreFailedTransaction(OutError);
+        return false;
+    }
+
+    FString NewSnapshot;
+    if (!ReadSnapshot(Inspector, Request.AssetPath, NewSnapshot, OutError) || NewSnapshot == Snapshot)
+    {
+        if (OutError.Code.IsEmpty()) OutError = {TEXT("internal_error"), TEXT("Graph pin mutation did not produce a new structural snapshot")};
+        RestoreFailedTransaction(OutError);
+        return false;
+    }
+    const TSharedRef<FJsonObject> Changed = MakeShared<FJsonObject>();
+    if (Request.Operation == TEXT("set_pin_default"))
+    {
+        Changed->SetObjectField(TEXT("node"), EncodeNode(Graph, LiveFromNode));
+        Changed->SetStringField(TEXT("pin_id"), Request.PinId);
+        Changed->SetObjectField(TEXT("default"), UnrealMCP::K2TypeCodec::EncodeDefault(LiveFromPin->PinType, PinDefaultText(LiveFromPin)));
+    }
+    else
+    {
+        const TSharedRef<FJsonObject> Connection = MakeShared<FJsonObject>();
+        Connection->SetStringField(TEXT("from_node_id"), Request.FromNodeId);
+        Connection->SetStringField(TEXT("from_pin_id"), Request.FromPinId);
+        Connection->SetStringField(TEXT("to_node_id"), Request.ToNodeId);
+        Connection->SetStringField(TEXT("to_pin_id"), Request.ToPinId);
+        Connection->SetBoolField(TEXT("connected"), Request.Operation == TEXT("connect_pins"));
+        Connection->SetBoolField(TEXT("direct"), true);
+        Connection->SetNumberField(TEXT("replaced_link_count"), ReplacedLinkCount);
+        Changed->SetObjectField(TEXT("connection"), Connection);
+    }
+    const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+    Result->SetStringField(TEXT("asset_path"), Request.AssetPath);
+    Result->SetStringField(TEXT("edit"), Request.Operation);
+    Result->SetStringField(TEXT("graph_id"), Request.GraphId);
+    Result->SetStringField(TEXT("snapshot_id"), NewSnapshot);
+    Result->SetBoolField(TEXT("package_dirty"), Blueprint->GetOutermost()->IsDirty());
+    Result->SetObjectField(TEXT("changed"), Changed);
+    Result->SetArrayField(TEXT("created_identities"), {});
+    OutResult = Result;
+    return true;
 }
 }
 
@@ -303,6 +640,11 @@ bool FUnrealMCPBlueprintGraphEditor::Execute(
     {
         OutError = {TEXT("graph_limit_exceeded"), TEXT("The graph exceeds the supported node limit")};
         return false;
+    }
+    if (Request.Operation == TEXT("set_pin_default") || Request.Operation == TEXT("connect_pins")
+        || Request.Operation == TEXT("disconnect_pins"))
+    {
+        return ExecutePinEdit(Blueprint, Graph, Request, Inspector, Snapshot, OutResult, OutError);
     }
 
     UEdGraphNode* TargetNode = nullptr;

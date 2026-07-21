@@ -15,7 +15,7 @@ class FakeBridge:
     def call(self, command, arguments=None):
         self.calls.append((command, arguments))
         if command == "capabilities":
-            return {"bridge_version": "0.10.0", "commands": [
+            return {"bridge_version": "0.11.0", "commands": [
                 "capabilities", "editor_state", "operation_status", "blueprint_inspect", "blueprint_action_catalog", "blueprint_graph_edit",
                 "blueprint_create", "blueprint_compile", "blueprint_save",
                 "blueprint_component_edit", "blueprint_default_edit",
@@ -36,7 +36,7 @@ class ServerStdioTests(unittest.TestCase):
         bridge = FakeBridge()
         server = MCPServer(bridge)
         initialized = server.handle({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2025-06-18"}})
-        self.assertEqual(initialized["result"]["serverInfo"]["version"], "0.10.0")
+        self.assertEqual(initialized["result"]["serverInfo"]["version"], "0.11.0")
         listed = server.handle({"jsonrpc": "2.0", "id": 2, "method": "tools/list"})
         self.assertEqual([tool["name"] for tool in listed["result"]["tools"]], [
             "capabilities", "editor_state", "operation_status", "blueprint_inspect", "blueprint_action_catalog", "blueprint_graph_edit",
@@ -254,6 +254,14 @@ class ServerStdioTests(unittest.TestCase):
             {**base, "operation": "move_node", "node_id": "e" * 32,
              "position": {"x": 160, "y": -320}},
             {**base, "operation": "remove_node", "node_id": "e" * 32},
+            {**base, "operation": "set_pin_default", "node_id": "e" * 32,
+             "pin_id": "f" * 32, "default": {"kind": "literal", "value": 42}},
+            {**base, "operation": "set_pin_default", "node_id": "e" * 32,
+             "pin_id": "f" * 32, "default": {"kind": "reference", "path": "/Game/Data/DA_Config.DA_Config"}},
+            {**base, "operation": "connect_pins", "from_node_id": "d" * 32,
+             "from_pin_id": "e" * 32, "to_node_id": "f" * 32, "to_pin_id": "1" * 32},
+            {**base, "operation": "disconnect_pins", "from_node_id": "d" * 32,
+             "from_pin_id": "e" * 32, "to_node_id": "f" * 32, "to_pin_id": "1" * 32},
         )
         for arguments in valid:
             with self.subTest(arguments=arguments):
@@ -266,6 +274,15 @@ class ServerStdioTests(unittest.TestCase):
             {**base, "operation": "move_node", "node_id": "e" * 32, "position": {"x": 1000001, "y": 0}},
             {**base, "operation": "move_node", "node_id": "e" * 32, "position": {"x": 1.5, "y": 0}},
             {**base, "operation": "remove_node", "node_id": "e" * 32, "position": {"x": 0, "y": 0}},
+            {**base, "operation": "set_pin_default", "node_id": "e" * 32,
+             "pin_id": "short", "default": {"kind": "literal", "value": 1}},
+            {**base, "operation": "set_pin_default", "node_id": "e" * 32,
+             "pin_id": "f" * 32, "default": {"kind": "raw", "value": "unsafe"}},
+            {**base, "operation": "connect_pins", "from_node_id": "d" * 32,
+             "from_pin_id": "e" * 32, "to_node_id": "f" * 32},
+            {**base, "operation": "disconnect_pins", "from_node_id": "d" * 32,
+             "from_pin_id": "e" * 32, "to_node_id": "f" * 32, "to_pin_id": "1" * 32,
+             "automatic_conversion": True},
             {**base, "operation": "rename_node", "node_id": "e" * 32},
         )
         for arguments in invalid:

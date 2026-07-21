@@ -424,7 +424,7 @@ TOOLS: Final = (
     },
     {
         "name": "blueprint_graph_edit",
-        "description": "Create, move, or safely remove one graph node through a reconciled Blueprint mutation.",
+        "description": "Create, move, remove, configure, or directly connect graph nodes and pins through a reconciled Blueprint mutation.",
         "inputSchema": {
             "oneOf": [
                 _graph_shape(
@@ -440,6 +440,26 @@ TOOLS: Final = (
                 _graph_shape(
                     "remove_node", ["node_id"],
                     node_id=_NODE_ID,
+                ),
+                _graph_shape(
+                    "set_pin_default", ["node_id", "pin_id", "default"],
+                    node_id=_NODE_ID,
+                    pin_id=_PIN_ID,
+                    default=_K2_DEFAULT,
+                ),
+                _graph_shape(
+                    "connect_pins", ["from_node_id", "from_pin_id", "to_node_id", "to_pin_id"],
+                    from_node_id=_NODE_ID,
+                    from_pin_id=_PIN_ID,
+                    to_node_id=_NODE_ID,
+                    to_pin_id=_PIN_ID,
+                ),
+                _graph_shape(
+                    "disconnect_pins", ["from_node_id", "from_pin_id", "to_node_id", "to_pin_id"],
+                    from_node_id=_NODE_ID,
+                    from_pin_id=_PIN_ID,
+                    to_node_id=_NODE_ID,
+                    to_pin_id=_PIN_ID,
                 ),
             ]
         },

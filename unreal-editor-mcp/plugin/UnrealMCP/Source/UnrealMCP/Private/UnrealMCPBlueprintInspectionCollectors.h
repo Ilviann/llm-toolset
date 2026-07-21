@@ -181,10 +181,16 @@ for (const TPair<UEdGraph*, FString>& Entry : Graphs)
                 Value->SetObjectField(TEXT("type"), PinType(Pin->PinType));
                 Value->SetStringField(TEXT("default_value"), Pin->DefaultValue.Left(512));
                 if (Pin->DefaultObject != nullptr) Value->SetStringField(TEXT("default_object"), Pin->DefaultObject->GetPathName());
+                if (!Pin->DefaultTextValue.IsEmpty()) Value->SetStringField(TEXT("default_text"), Pin->DefaultTextValue.ToString().Left(512));
+                const FString TypedDefault = Pin->DefaultObject != nullptr ? Pin->DefaultObject->GetPathName()
+                    : Pin->PinType.PinCategory == UEdGraphSchema_K2::PC_Text ? Pin->DefaultTextValue.ToString() : Pin->DefaultValue;
+                Value->SetObjectField(TEXT("default"), UnrealMCP::K2TypeCodec::EncodeDefault(Pin->PinType, TypedDefault));
                 AddRecord(Sink.Records, Value);
             }
+            const FString DefaultObjectPath = Pin->DefaultObject != nullptr ? Pin->DefaultObject->GetPathName() : FString();
             Sink.Fingerprint.Add(TEXT("pin|") + GraphId + TEXT("|") + NodeId + TEXT("|") + PinId + TEXT("|")
-                + Pin->PinName.ToString() + TEXT("|") + Pin->PinType.PinCategory.ToString() + TEXT("|") + Pin->DefaultValue);
+                + Pin->PinName.ToString() + TEXT("|") + Pin->PinType.PinCategory.ToString() + TEXT("|") + Pin->DefaultValue
+                + TEXT("|") + DefaultObjectPath + TEXT("|") + Pin->DefaultTextValue.ToString());
             if (Pin->Direction == EGPD_Output)
             {
                 for (UEdGraphPin* Linked : Pin->LinkedTo)

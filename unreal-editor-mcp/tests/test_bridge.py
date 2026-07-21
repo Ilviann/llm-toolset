@@ -11,7 +11,7 @@ from unreal_editor_mcp.errors import BridgeError, ErrorCode
 from unreal_editor_mcp.project import ProjectLayout
 
 
-RECORD = DiscoveryRecord("a" * 40, 123, 15485, "0.10.0", "5.8.0", 1)
+RECORD = DiscoveryRecord("a" * 40, 123, 15485, "0.11.0", "5.8.0", 1)
 
 
 class FakeResponse:
@@ -91,8 +91,9 @@ class BridgeTests(unittest.TestCase):
                 "operation": "add", "name": "Health", "type": {"category": "int", "container": "none"},
                 "default": {"kind": "literal", "value": 100}}),
             ("blueprint_graph_edit", {"operation_id": operation_id, "asset_path": "/Game/BP_New.BP_New", "expected_snapshot": snapshot,
-                "operation": "add_node", "graph_id": "e" * 32, "action_id": "f" * 32,
-                "position": {"x": 120, "y": -40}}),
+                "operation": "connect_pins", "graph_id": "e" * 32,
+                "from_node_id": "f" * 32, "from_pin_id": "1" * 32,
+                "to_node_id": "2" * 32, "to_pin_id": "3" * 32}),
         )
         bridge = self._bridge()
         for command, arguments in calls:

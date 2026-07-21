@@ -1,13 +1,13 @@
 # Unreal Editor MCP
 
-Unreal Editor MCP 0.10.0 is an offline-first MCP bridge for Unreal Engine 5.8+. It pairs a dependency-free Python 3.10+ stdio server with an editor-only C++ plugin. This release exposes exactly twelve tools:
+Unreal Editor MCP 0.11.0 is an offline-first MCP bridge for Unreal Engine 5.8+. It pairs a dependency-free Python 3.10+ stdio server with an editor-only C++ plugin. This release exposes exactly twelve tools:
 
 - `capabilities` reports the exact Python/plugin/Unreal versions, commands, features, listener state, and effective limits.
 - `editor_state` reports project identity, bridge readiness, play/simulate/save/GC state, and concise queued-operation state.
 - `operation_status` reconciles or safely cancels one retained mutation by operation and bridge identity.
 - `blueprint_inspect` discovers Actor Blueprints across mounted content and returns bounded pages of one selected Blueprint's structure.
 - `blueprint_action_catalog` discovers bounded context-valid function, variable, event, flow-control, cast, literal, and operator actions for one exact Blueprint graph snapshot.
-- `blueprint_graph_edit` creates, moves, or safely removes one node in a local Blueprint graph through a reconciled mutation.
+- `blueprint_graph_edit` creates, moves, removes, configures, or directly connects graph nodes and pins through a reconciled mutation.
 - `blueprint_create` creates, compiles, saves, and verifies one new Actor Blueprint without overwriting content.
 - `blueprint_compile` explicitly compiles one mutable Actor Blueprint and returns bounded diagnostics.
 - `blueprint_save` explicitly saves one mutable Actor Blueprint package without interactive dialogs.
@@ -15,7 +15,7 @@ Unreal Editor MCP 0.10.0 is an offline-first MCP bridge for Unreal Engine 5.8+. 
 - `blueprint_default_edit` edits one supported Blueprint-generated class-default property.
 - `blueprint_member_edit` adds, renames, updates, or safely removes one typed Blueprint variable, function, local variable, macro, or custom-event shell.
 
-Phase 11 supports reliable Actor Blueprint creation, component hierarchy/default editing, typed variables, user-function shells, locals, macros, custom-event shells, RepNotify coupling, compilation, saving, action discovery, and transactional node creation/movement/removal. Pin defaults, graph connections, wildcard specialization, automatic conversions, editor lifecycle, builds, filesystem access, console access, unrestricted reflection, and code execution remain unavailable.
+Phase 12 supports reliable Actor Blueprint creation, component hierarchy/default editing, typed variables, user-function shells, locals, macros, custom-event shells, RepNotify coupling, compilation, saving, action discovery, transactional node lifecycle, typed pin defaults, and direct schema-valid graph connections. Wildcard specialization, automatic conversions, editor lifecycle, builds, filesystem access, console access, unrestricted reflection, and code execution remain unavailable.
 
 ## Security model
 
@@ -29,7 +29,7 @@ Treat the project `Saved/` directory as generated state and keep it out of sourc
 
 1. Copy [`plugin/UnrealMCP`](plugin/UnrealMCP) to `<YourProject>/Plugins/UnrealMCP` or add this repository's `plugin/` folder as an `AdditionalPluginDirectories` entry in a disposable development `.uproject`.
 2. Enable the `UnrealMCP` plugin and compile the project's Editor target with Unreal 5.8 or a newer version that passes the included public-API probes.
-3. Open the project. Look for `Unreal MCP 0.10.0 ready on 127.0.0.1:15485` in the editor log.
+3. Open the project. Look for `Unreal MCP 0.11.0 ready on 127.0.0.1:15485` in the editor log.
 4. Install the Python package offline from this folder:
 
    ```sh
@@ -165,9 +165,46 @@ Use the returned node ID and latest snapshot to move or remove it:
 }
 ```
 
-`remove_node` uses the same shape without `position`. Only local event graphs, editable user-function graphs, and local macro graphs are mutable. Inherited, interface, construction, delegate/signature, intermediate, non-K2, and read-only graphs reject. Required entry/result/tunnel nodes, intermediate nodes, nodes without stable identity, and nodes Unreal does not consider user-deletable cannot be moved or removed. Removal breaks that node's links; connection repair is intentionally deferred.
+`remove_node` uses the same shape without `position`. Only local event graphs, editable user-function graphs, and local macro graphs are mutable. Inherited, interface, construction, delegate/signature, intermediate, non-K2, and read-only graphs reject. Required entry/result/tunnel nodes, intermediate nodes, nodes without stable identity, and nodes Unreal does not consider user-deletable cannot be moved or removed. Removal breaks that node's links; reconnect surviving nodes explicitly with `connect_pins` when needed.
 
 Every accepted edit is one Unreal transaction and remains dirty until `blueprint_save`. Re-inspect after each edit, compile, Undo/Redo, save/reload, or bridge restart; never reuse a prior action ID or snapshot. See [`examples/graph-node-lifecycle-workflow.json`](examples/graph-node-lifecycle-workflow.json) for the complete three-operation flow.
+
+## Pin defaults and direct connections
+
+Inspect `pins` after creating nodes and target every pin by its stable node and pin identities. Set one unlinked supported input default with the same tagged K2 values used by members and parameters:
+
+```json
+{
+  "operation_id": "cccccccccccccccccccccccccccccccc",
+  "asset_path": "/Game/Actors/BP_Door.BP_Door",
+  "expected_snapshot": "0123456789abcdef0123456789abcdef01234567",
+  "operation": "set_pin_default",
+  "graph_id": "11111111111111111111111111111111",
+  "node_id": "22222222222222222222222222222222",
+  "pin_id": "33333333333333333333333333333333",
+  "default": {"kind": "literal", "value": 77}
+}
+```
+
+`engine_default` restores the pin's autogenerated default. Explicit Boolean, numeric, name/string/text/enum, and compatible hard/soft object/class/asset references are parsed by the live K2 schema. Defaults are limited to 512 canonical characters. The pin must be an editable, unlinked supported input; execution, wildcard, linked, orphaned, hidden/read-only/ignored, unstable, and stale pins reject without a transaction. Pin inspection reports the tagged `default` plus bounded raw string/object/text storage for precise read-back.
+
+Create one direct output-to-input connection by supplying both node/pin identity pairs:
+
+```json
+{
+  "operation_id": "dddddddddddddddddddddddddddddddd",
+  "asset_path": "/Game/Actors/BP_Door.BP_Door",
+  "expected_snapshot": "89abcdef0123456789abcdef0123456789abcdef",
+  "operation": "connect_pins",
+  "graph_id": "11111111111111111111111111111111",
+  "from_node_id": "44444444444444444444444444444444",
+  "from_pin_id": "55555555555555555555555555555555",
+  "to_node_id": "22222222222222222222222222222222",
+  "to_pin_id": "66666666666666666666666666666666"
+}
+```
+
+The live schema decides exact compatibility and whether an exclusive input or execution output replaces existing links; the result reports `replaced_link_count`. Each pin is limited to 64 links. Connections requiring a conversion node, numeric promotion, or wildcard specialization reject before mutation—Phase 12 never inserts an implicit node. `disconnect_pins` uses the same four identities and requires that exact direct link to exist. Re-inspect after every operation and after compile/Undo/Redo/reload because reconstruction may replace otherwise similar pins. See [`examples/pin-default-connection-workflow.json`](examples/pin-default-connection-workflow.json).
 
 ## Reliable Actor Blueprint mutation
 
@@ -351,13 +388,13 @@ Rename preserves the macro graph or custom-event node identity. Signature change
 
 Compilation and saving remain explicit. Both require `operation_id`, `asset_path`, and the latest `expected_snapshot`. `blueprint_compile` returns `compile_succeeded: false` rather than a tool error when the compiler completed and found Blueprint errors. `blueprint_save` does not compile implicitly. Re-inspect after compile because Unreal may reconstruct identities; save only the current returned snapshot.
 
-See [`examples/creation-workflow.json`](examples/creation-workflow.json), [`examples/component-default-workflow.json`](examples/component-default-workflow.json), [`examples/member-variable-workflow.json`](examples/member-variable-workflow.json), [`examples/function-local-workflow.json`](examples/function-local-workflow.json), [`examples/macro-custom-event-workflow.json`](examples/macro-custom-event-workflow.json), [`examples/action-catalog-workflow.json`](examples/action-catalog-workflow.json), and [`examples/graph-node-lifecycle-workflow.json`](examples/graph-node-lifecycle-workflow.json) for complete inspect-before-edit/discover sequences.
+See [`examples/creation-workflow.json`](examples/creation-workflow.json), [`examples/component-default-workflow.json`](examples/component-default-workflow.json), [`examples/member-variable-workflow.json`](examples/member-variable-workflow.json), [`examples/function-local-workflow.json`](examples/function-local-workflow.json), [`examples/macro-custom-event-workflow.json`](examples/macro-custom-event-workflow.json), [`examples/action-catalog-workflow.json`](examples/action-catalog-workflow.json), [`examples/graph-node-lifecycle-workflow.json`](examples/graph-node-lifecycle-workflow.json), and [`examples/pin-default-connection-workflow.json`](examples/pin-default-connection-workflow.json) for complete inspect-before-edit/discover sequences.
 
 If saving fails, confirm that the package directory is writable and that source-control policy has not made the existing `.uasset` read-only. If compilation fails, inspect the returned diagnostics, correct the Blueprint in the editor or through later editing phases, compile again, and save only after `compile_succeeded` becomes true.
 
 ## Limits
 
-The plugin publishes these authoritative defaults through `capabilities`: 64 KiB requests, 256 KiB responses, eight queued requests, JSON depth 16, strings up to 4096 characters, and a five-second Game-thread dispatch deadline. Inspection uses 25 records by default and allows 100 per page, scans at most 2,048 registry candidates, accepts at most 4,096 structural records, retains 32 cursors for 30 seconds, allows 32 targeted properties, returns at most 16 changed defaults per component, and lists at most 64 member or callable references. Action cataloging returns at most 50 results, scans at most 20,000 spawners for one second, retains 32 catalogs and 256 actions for 60 seconds, and permits one Game-thread catalog at a time. Graph lifecycle permits 2,048 nodes per graph, 256 pins per changed-node result, and integer coordinates within ±1,000,000. Function, macro, and custom-event signatures accept at most 32 parameters. K2 container defaults hold at most 64 items or map entries. The operation ledger retains 128 operations for 15 minutes. Compilation returns at most 64 diagnostic messages of 512 characters each. Discovery heartbeats are valid for ten seconds. Python HTTP calls default to three seconds and can be configured from `0.05` to `30` seconds.
+The plugin publishes these authoritative defaults through `capabilities`: 64 KiB requests, 256 KiB responses, eight queued requests, JSON depth 16, strings up to 4096 characters, and a five-second Game-thread dispatch deadline. Inspection uses 25 records by default and allows 100 per page, scans at most 2,048 registry candidates, accepts at most 4,096 structural records, retains 32 cursors for 30 seconds, allows 32 targeted properties, returns at most 16 changed defaults per component, and lists at most 64 member or callable references. Action cataloging returns at most 50 results, scans at most 20,000 spawners for one second, retains 32 catalogs and 256 actions for 60 seconds, and permits one Game-thread catalog at a time. Graph editing permits 2,048 nodes per graph, 256 pins per changed-node result, integer coordinates within ±1,000,000, 64 links per pin, and 512 canonical pin-default characters. Function, macro, and custom-event signatures accept at most 32 parameters. K2 container defaults hold at most 64 items or map entries. The operation ledger retains 128 operations for 15 minutes. Compilation returns at most 64 diagnostic messages of 512 characters each. Discovery heartbeats are valid for ten seconds. Python HTTP calls default to three seconds and can be configured from `0.05` to `30` seconds.
 
 ## Offline development and tests
 
@@ -390,4 +427,4 @@ Run the cross-process bridge acceptance test:
 python3 scripts/run_headless_integration.py
 ```
 
-The 0.10.0 native baseline is Unreal 5.8.0 on Apple Silicon macOS 26.5.2 with Xcode 26.1.1. Windows and Linux path/process branches are unit-tested through injected adapters; native Windows qualification remains a later roadmap gate.
+The 0.11.0 native baseline is Unreal 5.8.0 on Apple Silicon macOS 26.5.2 with Xcode 26.1.1. Windows and Linux path/process branches are unit-tested through injected adapters; native Windows qualification remains a later roadmap gate.

@@ -51,6 +51,10 @@ void RequirePublicTypes()
     (void)FHttpServerModule::IsAvailable;
     (void)FAssetRegistryModule::GetRegistry;
     (void)FBlueprintActionDatabase::Get;
+    (void)&UEdGraphSchema_K2::CanCreateConnection;
+    (void)&UEdGraphSchema_K2::TryCreateConnection;
+    (void)&UEdGraphSchema_K2::TrySetDefaultValue;
+    (void)&UEdGraphSchema_K2::BreakSinglePinLink;
     (void)FEditorFileUtils::SaveDirtyPackages;
 }
 }

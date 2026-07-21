@@ -43,6 +43,15 @@ class ErrorCode(str, Enum):
     INVALID_NODE = "invalid_node"
     PROTECTED_NODE = "protected_node"
     GRAPH_LIMIT_EXCEEDED = "graph_limit_exceeded"
+    INVALID_PIN = "invalid_pin"
+    PROTECTED_PIN = "protected_pin"
+    INVALID_PIN_DEFAULT = "invalid_pin_default"
+    PIN_DEFAULT_TOO_LARGE = "pin_default_too_large"
+    INVALID_CONNECTION = "invalid_connection"
+    INCOMPATIBLE_PINS = "incompatible_pins"
+    CONVERSION_REQUIRED = "conversion_required"
+    WILDCARD_SPECIALIZATION_REQUIRED = "wildcard_specialization_required"
+    NO_CHANGE = "no_change"
     INTERNAL_ERROR = "internal_error"
 
 

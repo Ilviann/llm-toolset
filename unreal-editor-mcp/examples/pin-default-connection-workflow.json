@@ -1,0 +1,34 @@
+{
+  "set_pin_default": {
+    "operation_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "asset_path": "/Game/Actors/BP_Door.BP_Door",
+    "expected_snapshot": "0123456789abcdef0123456789abcdef01234567",
+    "operation": "set_pin_default",
+    "graph_id": "11111111111111111111111111111111",
+    "node_id": "22222222222222222222222222222222",
+    "pin_id": "33333333333333333333333333333333",
+    "default": {"kind": "literal", "value": 77}
+  },
+  "connect_pins": {
+    "operation_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "asset_path": "/Game/Actors/BP_Door.BP_Door",
+    "expected_snapshot": "89abcdef0123456789abcdef0123456789abcdef",
+    "operation": "connect_pins",
+    "graph_id": "11111111111111111111111111111111",
+    "from_node_id": "44444444444444444444444444444444",
+    "from_pin_id": "55555555555555555555555555555555",
+    "to_node_id": "22222222222222222222222222222222",
+    "to_pin_id": "66666666666666666666666666666666"
+  },
+  "disconnect_pins": {
+    "operation_id": "cccccccccccccccccccccccccccccccc",
+    "asset_path": "/Game/Actors/BP_Door.BP_Door",
+    "expected_snapshot": "fedcba9876543210fedcba9876543210fedcba98",
+    "operation": "disconnect_pins",
+    "graph_id": "11111111111111111111111111111111",
+    "from_node_id": "44444444444444444444444444444444",
+    "from_pin_id": "55555555555555555555555555555555",
+    "to_node_id": "22222222222222222222222222222222",
+    "to_pin_id": "66666666666666666666666666666666"
+  }
+}
