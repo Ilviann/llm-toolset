@@ -1,5 +1,12 @@
 # Unreal Editor MCP history
 
+## 0.8.0 — 2026-07-21
+
+- Added read-only `blueprint_action_catalog` for context-valid pure/impure, static/instance function calls and variable get/set actions in one exact Actor Blueprint graph snapshot.
+- Added exact text, owner-class, function, member, family, graph, and pin-context filters backed by Unreal's public action database, spawners, and live action filter.
+- Added bridge/class/schema/snapshot/query-bound opaque action IDs with deterministic cache reuse, 60-second expiry, bounded retention, eviction, restart invalidation, and no Phase 8 invocation path.
+- Added target-first bounded scanning, observable truncation/timeouts, published limits, exact Python schema coverage, native non-mutation Automation coverage, examples, and cross-process restart verification.
+
 ## 0.7.0 — 2026-07-21
 
 - Added bounded macro and custom-event inspection with stable graph/node identities, exact signatures and parameter defaults, metadata, ownership distinctions, graph relationships, required nodes, and reference summaries.

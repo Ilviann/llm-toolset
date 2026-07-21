@@ -1,0 +1,37 @@
+{
+  "inspect_graph_and_pins": {
+    "mode": "inspect",
+    "asset_path": "/Game/Actors/BP_Door.BP_Door",
+    "sections": ["summary", "graphs", "nodes", "pins"],
+    "graph_id": "0123456789abcdef0123456789abcdef",
+    "page_size": 50
+  },
+  "catalog_member_getter": {
+    "asset_path": "/Game/Actors/BP_Door.BP_Door",
+    "graph_id": "0123456789abcdef0123456789abcdef",
+    "expected_snapshot": "0123456789abcdef0123456789abcdef01234567",
+    "member": "Health",
+    "node_family": "variable_get",
+    "limit": 5
+  },
+  "catalog_exact_function": {
+    "asset_path": "/Game/Actors/BP_Door.BP_Door",
+    "graph_id": "0123456789abcdef0123456789abcdef",
+    "expected_snapshot": "0123456789abcdef0123456789abcdef01234567",
+    "owner_class": "/Script/Engine.Actor",
+    "function": "K2_GetActorLocation",
+    "node_family": "function_call",
+    "limit": 5
+  },
+  "catalog_for_pin": {
+    "asset_path": "/Game/Actors/BP_Door.BP_Door",
+    "graph_id": "0123456789abcdef0123456789abcdef",
+    "expected_snapshot": "0123456789abcdef0123456789abcdef01234567",
+    "node_family": "function_call",
+    "pin_context": {
+      "node_id": "11111111111111111111111111111111",
+      "pin_id": "22222222222222222222222222222222"
+    },
+    "limit": 10
+  }
+}

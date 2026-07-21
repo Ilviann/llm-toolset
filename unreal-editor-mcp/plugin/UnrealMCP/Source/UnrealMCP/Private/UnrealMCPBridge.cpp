@@ -14,6 +14,7 @@
 #include "Misc/SecureHash.h"
 #include "UnrealMCPDiscovery.h"
 #include "UnrealMCPBlueprintInspector.h"
+#include "UnrealMCPBlueprintActionCatalog.h"
 #include "UnrealMCPBlueprintMutator.h"
 #include "UnrealMCPProtocol.h"
 #include "UnrealMCPOperationLedger.h"
@@ -156,6 +157,7 @@ void FUnrealMCPBridge::Stop()
     Route.Reset();
     Router.Reset();
     BlueprintMutator.Reset();
+    BlueprintActionCatalog.Reset();
     BlueprintInspector.Reset();
     Token.Reset();
 }
@@ -190,7 +192,7 @@ bool FUnrealMCPBridge::HandleRequest(const FHttpServerRequest& Request, const FH
     if (Command != TEXT("capabilities") && Command != TEXT("editor_state") && Command != TEXT("operation_status")
         && Command != TEXT("blueprint_inspect") && Command != TEXT("blueprint_create") && Command != TEXT("blueprint_compile")
         && Command != TEXT("blueprint_save") && Command != TEXT("blueprint_component_edit") && Command != TEXT("blueprint_default_edit")
-        && Command != TEXT("blueprint_member_edit"))
+        && Command != TEXT("blueprint_member_edit") && Command != TEXT("blueprint_action_catalog"))
     {
         Complete(UnrealMCP::Protocol::Error(EHttpServerResponseCodes::BadRequest, TEXT("invalid_argument"), TEXT("Unknown or unavailable command")));
         return true;
@@ -318,6 +320,14 @@ bool FUnrealMCPBridge::Execute(const FString& Command, const TSharedPtr<FJsonObj
     {
         return BlueprintInspector->Execute(Arguments, OutResult, OutError);
     }
+    if (Command == TEXT("blueprint_action_catalog"))
+    {
+        if (!BlueprintActionCatalog)
+        {
+            BlueprintActionCatalog = MakeUnique<FUnrealMCPBlueprintActionCatalog>(*BlueprintInspector, BridgeInstanceId);
+        }
+        return BlueprintActionCatalog->Execute(Arguments, OutResult, OutError);
+    }
     if (!BlueprintMutator)
     {
         BlueprintMutator = MakeUnique<FUnrealMCPBlueprintMutator>(*BlueprintInspector);
@@ -336,8 +346,8 @@ TSharedPtr<FJsonObject> FUnrealMCPBridge::Capabilities() const
     Result->SetStringField(TEXT("mode"), TEXT("actor_authoring"));
     Result->SetBoolField(TEXT("bridge_ready"), bReady);
     Result->SetArrayField(TEXT("commands"), Strings({TEXT("capabilities"), TEXT("editor_state"), TEXT("operation_status"),
-        TEXT("blueprint_inspect"), TEXT("blueprint_create"), TEXT("blueprint_compile"), TEXT("blueprint_save"),
-        TEXT("blueprint_component_edit"), TEXT("blueprint_default_edit"), TEXT("blueprint_member_edit")}));
+        TEXT("blueprint_inspect"), TEXT("blueprint_action_catalog"), TEXT("blueprint_create"), TEXT("blueprint_compile"),
+        TEXT("blueprint_save"), TEXT("blueprint_component_edit"), TEXT("blueprint_default_edit"), TEXT("blueprint_member_edit")}));
 
     const TSharedRef<FJsonObject> Features = MakeShared<FJsonObject>();
     Features->SetBoolField(TEXT("blueprint_inspection"), true);
@@ -354,6 +364,8 @@ TSharedPtr<FJsonObject> FUnrealMCPBridge::Capabilities() const
     Features->SetBoolField(TEXT("blueprint_rep_notify"), true);
     Features->SetBoolField(TEXT("blueprint_macros"), true);
     Features->SetBoolField(TEXT("blueprint_custom_events"), true);
+    Features->SetBoolField(TEXT("blueprint_action_catalog"), true);
+    Features->SetBoolField(TEXT("blueprint_graph_mutation"), false);
     Features->SetBoolField(TEXT("editor_lifecycle"), false);
     Features->SetBoolField(TEXT("project_build"), false);
     Result->SetObjectField(TEXT("features"), Features);
@@ -381,6 +393,13 @@ TSharedPtr<FJsonObject> FUnrealMCPBridge::Capabilities() const
     Limits->SetNumberField(TEXT("operation_lifetime_ms"), static_cast<int32>(UnrealMCP::OperationLifetimeSeconds * 1000.0));
     Limits->SetNumberField(TEXT("property_names"), UnrealMCP::MaxPropertyNames);
     Limits->SetNumberField(TEXT("variable_references"), UnrealMCP::MaxVariableReferences);
+    Limits->SetNumberField(TEXT("action_results"), UnrealMCP::MaxActionResults);
+    Limits->SetNumberField(TEXT("action_scan"), UnrealMCP::MaxActionScan);
+    Limits->SetNumberField(TEXT("retained_actions"), UnrealMCP::MaxRetainedActions);
+    Limits->SetNumberField(TEXT("retained_catalogs"), UnrealMCP::MaxRetainedCatalogs);
+    Limits->SetNumberField(TEXT("action_lifetime_ms"), static_cast<int32>(UnrealMCP::ActionLifetimeSeconds * 1000.0));
+    Limits->SetNumberField(TEXT("action_scan_ms"), static_cast<int32>(UnrealMCP::ActionScanSeconds * 1000.0));
+    Limits->SetNumberField(TEXT("concurrent_catalogs"), UnrealMCP::MaxConcurrentCatalogs);
     Result->SetObjectField(TEXT("limits"), Limits);
 
     const TSharedRef<FJsonObject> Listener = MakeShared<FJsonObject>();

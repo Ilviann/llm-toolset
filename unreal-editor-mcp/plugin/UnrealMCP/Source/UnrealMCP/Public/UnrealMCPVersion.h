@@ -4,7 +4,7 @@
 
 namespace UnrealMCP
 {
-inline constexpr TCHAR Version[] = TEXT("0.7.0");
+inline constexpr TCHAR Version[] = TEXT("0.8.0");
 inline constexpr uint32 DefaultPort = 15485;
 inline constexpr int32 MaxRequestBytes = 64 * 1024;
 inline constexpr int32 MaxResponseBytes = 256 * 1024;
@@ -26,4 +26,12 @@ inline constexpr int32 MaxRetainedOperations = 128;
 inline constexpr double OperationLifetimeSeconds = 15.0 * 60.0;
 inline constexpr int32 MaxPropertyNames = 32;
 inline constexpr int32 MaxVariableReferences = 64;
+inline constexpr int32 DefaultActionResults = 20;
+inline constexpr int32 MaxActionResults = 50;
+inline constexpr int32 MaxActionScan = 20000;
+inline constexpr int32 MaxRetainedActions = 256;
+inline constexpr int32 MaxRetainedCatalogs = 32;
+inline constexpr double ActionLifetimeSeconds = 60.0;
+inline constexpr double ActionScanSeconds = 1.0;
+inline constexpr int32 MaxConcurrentCatalogs = 1;
 }

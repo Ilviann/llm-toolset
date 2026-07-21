@@ -42,7 +42,7 @@ def wait_until_ready(layout: ProjectLayout, process: subprocess.Popen[bytes], de
         try:
             record = read_discovery(layout)
             result = UnrealBridge(layout, timeout=2.0).call("capabilities")
-            if result.get("bridge_ready") is True and record.bridge_version == "0.7.0":
+            if result.get("bridge_ready") is True and record.bridge_version == "0.8.0":
                 return
         except Exception as error:
             last_error = str(error)
@@ -97,7 +97,7 @@ def send_without_reading(layout: ProjectLayout, command: str, arguments: dict[st
         headers={
             "Authorization": "Bearer " + read_token(layout),
             "Content-Type": "application/json",
-            "X-Unreal-MCP-Version": "0.7.0",
+            "X-Unreal-MCP-Version": "0.8.0",
         },
     )
     connection.close()
@@ -150,6 +150,7 @@ def run_automation(executable: Path, project: Path, environment: dict[str, str],
         "MemberVariables",
         "FunctionsAndLocals",
         "MacrosAndCustomEvents",
+        "ActionCatalog",
     )
     if test_filter == "UnrealMCP":
         expected = all_expected
@@ -163,6 +164,8 @@ def run_automation(executable: Path, project: Path, environment: dict[str, str],
         expected = tuple(name for name in all_expected if name == "FunctionsAndLocals")
     elif test_filter == "UnrealMCP.Phase7":
         expected = tuple(name for name in all_expected if name == "MacrosAndCustomEvents")
+    elif test_filter == "UnrealMCP.Phase8":
+        expected = tuple(name for name in all_expected if name == "ActionCatalog")
     else:
         leaf = test_filter.rsplit(".", 1)[-1]
         expected = (leaf,) if leaf in all_expected else ()
@@ -246,12 +249,12 @@ def main() -> int:
             capabilities = bridge.call("capabilities")
             state = bridge.call("editor_state")
             if capabilities.get("commands") != [
-                "capabilities", "editor_state", "operation_status", "blueprint_inspect",
+                "capabilities", "editor_state", "operation_status", "blueprint_inspect", "blueprint_action_catalog",
                 "blueprint_create", "blueprint_compile", "blueprint_save",
                 "blueprint_component_edit", "blueprint_default_edit", "blueprint_member_edit",
             ]:
                 raise AssertionError("released command catalog mismatch")
-            if capabilities.get("bridge_version") != "0.7.0" or state.get("bridge_ready") is not True:
+            if capabilities.get("bridge_version") != "0.8.0" or state.get("bridge_ready") is not True:
                 raise AssertionError("capability/state contract mismatch")
             if capabilities.get("features", {}).get("blueprint_mutation") is not True:
                 raise AssertionError("Phase 6 mutation capability is unavailable")
@@ -261,6 +264,8 @@ def main() -> int:
             for feature in ("blueprint_macros", "blueprint_custom_events"):
                 if capabilities.get("features", {}).get(feature) is not True:
                     raise AssertionError(f"Phase 7 capability is unavailable: {feature}")
+            if capabilities.get("features", {}).get("blueprint_action_catalog") is not True:
+                raise AssertionError("Phase 8 action catalog capability is unavailable")
             if capabilities.get("asset_access") != {
                 "read_scope": "all_mounted_content",
                 "mutation_scope": "project_content_and_local_project_plugins",
@@ -591,6 +596,27 @@ def main() -> int:
                 raise AssertionError(f"custom-event shell changed after restart: {custom_events!r}")
             if custom_events[0].get("graph_relationship", {}).get("graph_kind") != "event":
                 raise AssertionError(f"custom-event graph relationship changed after restart: {custom_events!r}")
+            event_graphs = [
+                record for record in reloaded.get("records", [])
+                if record.get("section") == "graph" and record.get("kind") == "event" and record.get("inherited") is False
+            ]
+            if not event_graphs:
+                raise AssertionError("reloaded Blueprint has no local event graph for action catalog")
+            catalog_base = {
+                "asset_path": "/Game/UnrealMCPPhase4/BP_ComponentFixture.BP_ComponentFixture",
+                "graph_id": event_graphs[0]["id"],
+                "expected_snapshot": reloaded["snapshot_id"],
+            }
+            variable_actions = UnrealBridge(layout, timeout=3.0).call("blueprint_action_catalog", {
+                **catalog_base, "member": "Health", "node_family": "variable_get", "limit": 5,
+            })
+            if not any(action.get("member_name") == "Health" for action in variable_actions.get("actions", [])):
+                raise AssertionError(f"Phase 8 variable action missing after restart: {variable_actions!r}")
+            function_actions = UnrealBridge(layout, timeout=3.0).call("blueprint_action_catalog", {
+                **catalog_base, "function": "ComputeHealth", "node_family": "function_call", "limit": 5,
+            })
+            if not any(action.get("member_name") == "ComputeHealth" for action in function_actions.get("actions", [])):
+                raise AssertionError(f"Phase 8 function action missing after restart: {function_actions!r}")
         except Exception:
             log.seek(0)
             sys.stderr.buffer.write(log.read()[-32_000:])
@@ -607,7 +633,7 @@ def main() -> int:
             pass
         else:
             raise AssertionError("a live discovery heartbeat remained after editor termination")
-    print("Phase 7 integration passed: macros/custom events, functions/signatures/locals, RepNotify, typed members, components/defaults, reconciliation, restart inspection, loopback binding, and clean unload")
+    print("Phase 8 integration passed: bounded action catalog, macros/custom events, functions/signatures/locals, RepNotify, typed members, components/defaults, reconciliation, restart inspection, loopback binding, and clean unload")
     return 0
 
 

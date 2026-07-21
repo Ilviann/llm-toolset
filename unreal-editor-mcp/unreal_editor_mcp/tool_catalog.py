@@ -37,6 +37,8 @@ _FUNCTION_ID = _COMPONENT_ID
 _LOCAL_ID = _COMPONENT_ID
 _MACRO_ID = _COMPONENT_ID
 _CUSTOM_EVENT_ID = _COMPONENT_ID
+_NODE_ID = _COMPONENT_ID
+_PIN_ID = _COMPONENT_ID
 _PROPERTY_VALUE = {
     "oneOf": [
         {"type": "boolean"},
@@ -363,6 +365,35 @@ TOOLS: Final = (
                     "additionalProperties": False,
                 },
             ]
+        },
+    },
+    {
+        "name": "blueprint_action_catalog",
+        "description": "Discover a bounded set of context-valid function-call and variable actions for one Blueprint graph snapshot.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "asset_path": _PATH,
+                "graph_id": _COMPONENT_ID,
+                "expected_snapshot": _SNAPSHOT_ID,
+                "text": {"type": "string", "minLength": 1, "maxLength": 128},
+                "owner_class": _PATH,
+                "function": {"type": "string", "minLength": 1, "maxLength": 128},
+                "member": {"type": "string", "minLength": 1, "maxLength": 128},
+                "node_family": {
+                    "type": "string",
+                    "enum": ["function_call", "variable_get", "variable_set"],
+                },
+                "pin_context": {
+                    "type": "object",
+                    "properties": {"node_id": _NODE_ID, "pin_id": _PIN_ID},
+                    "required": ["node_id", "pin_id"],
+                    "additionalProperties": False,
+                },
+                "limit": {"type": "integer", "minimum": 1, "maximum": 50},
+            },
+            "required": ["asset_path", "graph_id", "expected_snapshot"],
+            "additionalProperties": False,
         },
     },
     {

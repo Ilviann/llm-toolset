@@ -51,6 +51,7 @@ class UnrealBridge:
             "editor_state",
             "operation_status",
             "blueprint_inspect",
+            "blueprint_action_catalog",
             "blueprint_create",
             "blueprint_compile",
             "blueprint_save",

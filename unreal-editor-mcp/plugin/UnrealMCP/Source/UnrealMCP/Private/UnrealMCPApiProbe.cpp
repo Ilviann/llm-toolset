@@ -3,6 +3,10 @@
 // normal module build makes every supported engine compile the probe.
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "BlueprintNodeSpawner.h"
+#include "BlueprintActionDatabase.h"
+#include "BlueprintActionFilter.h"
+#include "BlueprintFunctionNodeSpawner.h"
+#include "BlueprintVariableNodeSpawner.h"
 #include "EdGraphSchema_K2.h"
 #include "FileHelpers.h"
 #include "HttpServerModule.h"
@@ -26,6 +30,8 @@ void RequirePublicTypes()
     static_assert(sizeof(FCompilerResultsLog) > 0);
     static_assert(TIsDerivedFrom<UEdGraphSchema_K2, UEdGraphSchema>::Value);
     static_assert(TIsDerivedFrom<UBlueprintNodeSpawner, UObject>::Value);
+    static_assert(TIsDerivedFrom<UBlueprintFunctionNodeSpawner, UBlueprintNodeSpawner>::Value);
+    static_assert(TIsDerivedFrom<UBlueprintVariableNodeSpawner, UBlueprintNodeSpawner>::Value);
     static_assert(TIsDerivedFrom<UK2Node_FunctionEntry, UK2Node>::Value);
     static_assert(TIsDerivedFrom<UK2Node_FunctionResult, UK2Node>::Value);
     static_assert(TIsDerivedFrom<UK2Node_CustomEvent, UK2Node>::Value);
@@ -34,6 +40,7 @@ void RequirePublicTypes()
     static_assert(TIsDerivedFrom<USubobjectDataSubsystem, UEngineSubsystem>::Value);
     (void)FHttpServerModule::IsAvailable;
     (void)FAssetRegistryModule::GetRegistry;
+    (void)FBlueprintActionDatabase::Get;
     (void)FEditorFileUtils::SaveDirtyPackages;
 }
 }

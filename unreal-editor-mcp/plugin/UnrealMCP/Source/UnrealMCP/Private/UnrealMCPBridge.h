@@ -11,6 +11,7 @@ struct FUnrealMCPError;
 class FJsonObject;
 class FUnrealMCPDiscovery;
 class FUnrealMCPBlueprintInspector;
+class FUnrealMCPBlueprintActionCatalog;
 class FUnrealMCPBlueprintMutator;
 class FUnrealMCPOperationLedger;
 class IHttpRouter;
@@ -43,6 +44,7 @@ private:
     FHttpRouteHandle Route;
     TUniquePtr<FUnrealMCPDiscovery> Discovery;
     TUniquePtr<FUnrealMCPBlueprintInspector> BlueprintInspector;
+    TUniquePtr<FUnrealMCPBlueprintActionCatalog> BlueprintActionCatalog;
     TUniquePtr<FUnrealMCPBlueprintMutator> BlueprintMutator;
     TUniquePtr<FUnrealMCPOperationLedger> OperationLedger;
     FString BridgeInstanceId;
