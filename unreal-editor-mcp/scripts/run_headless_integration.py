@@ -42,7 +42,7 @@ def wait_until_ready(layout: ProjectLayout, process: subprocess.Popen[bytes], de
         try:
             record = read_discovery(layout)
             result = UnrealBridge(layout, timeout=2.0).call("capabilities")
-            if result.get("bridge_ready") is True and record.bridge_version == "0.4.0":
+            if result.get("bridge_ready") is True and record.bridge_version == "0.5.0":
                 return
         except Exception as error:
             last_error = str(error)
@@ -97,7 +97,7 @@ def send_without_reading(layout: ProjectLayout, command: str, arguments: dict[st
         headers={
             "Authorization": "Bearer " + read_token(layout),
             "Content-Type": "application/json",
-            "X-Unreal-MCP-Version": "0.4.0",
+            "X-Unreal-MCP-Version": "0.5.0",
         },
     )
     connection.close()
@@ -146,6 +146,8 @@ def run_automation(executable: Path, project: Path, environment: dict[str, str],
         "ComponentAndDefaultEdits",
         "OperationLedger",
         "PropertyCodec",
+        "K2TypeCodec",
+        "MemberVariables",
     )
     if test_filter == "UnrealMCP":
         expected = all_expected
@@ -153,6 +155,8 @@ def run_automation(executable: Path, project: Path, environment: dict[str, str],
         expected = tuple(name for name in all_expected if name in {
             "ComponentAndDefaultEdits", "OperationLedger", "PropertyCodec",
         })
+    elif test_filter == "UnrealMCP.Phase5":
+        expected = tuple(name for name in all_expected if name in {"K2TypeCodec", "MemberVariables"})
     else:
         leaf = test_filter.rsplit(".", 1)[-1]
         expected = (leaf,) if leaf in all_expected else ()
@@ -238,13 +242,13 @@ def main() -> int:
             if capabilities.get("commands") != [
                 "capabilities", "editor_state", "operation_status", "blueprint_inspect",
                 "blueprint_create", "blueprint_compile", "blueprint_save",
-                "blueprint_component_edit", "blueprint_default_edit",
+                "blueprint_component_edit", "blueprint_default_edit", "blueprint_member_edit",
             ]:
                 raise AssertionError("released command catalog mismatch")
-            if capabilities.get("bridge_version") != "0.4.0" or state.get("bridge_ready") is not True:
+            if capabilities.get("bridge_version") != "0.5.0" or state.get("bridge_ready") is not True:
                 raise AssertionError("capability/state contract mismatch")
             if capabilities.get("features", {}).get("blueprint_mutation") is not True:
-                raise AssertionError("Phase 4 mutation capability is unavailable")
+                raise AssertionError("Phase 5 mutation capability is unavailable")
             if capabilities.get("asset_access") != {
                 "read_scope": "all_mounted_content",
                 "mutation_scope": "project_content_and_local_project_plugins",
@@ -330,10 +334,30 @@ def main() -> int:
                 "property_name": "InitialLifeSpan",
                 "value": 12.5,
             })
-            compiled = bridge.call("blueprint_compile", {
+            member = bridge.call("blueprint_member_edit", {
                 "operation_id": uuid.uuid4().hex,
                 "asset_path": asset_path,
                 "expected_snapshot": defaulted["snapshot_id"],
+                "operation": "add",
+                "name": "Health",
+                "type": {"category": "int", "container": "none"},
+                "default": {"kind": "literal", "value": 100},
+                "metadata": {
+                    "category": "Stats",
+                    "tooltip": "Current health",
+                    "instance_editable": True,
+                    "blueprint_visible": True,
+                    "save_game": True,
+                    "replication": "replicated",
+                },
+            })
+            member_id = member.get("member", {}).get("id")
+            if not isinstance(member_id, str) or len(member_id) != 32:
+                raise AssertionError(f"member mutation omitted its stable identity: {member!r}")
+            compiled = bridge.call("blueprint_compile", {
+                "operation_id": uuid.uuid4().hex,
+                "asset_path": asset_path,
+                "expected_snapshot": member["snapshot_id"],
             })
             if compiled.get("compile_succeeded") is not True or compiled.get("saved") is not False:
                 raise AssertionError(f"explicit Blueprint compile contract mismatch: {compiled!r}")
@@ -363,7 +387,7 @@ def main() -> int:
             reloaded = UnrealBridge(layout, timeout=3.0).call("blueprint_inspect", {
                 "mode": "inspect",
                 "asset_path": "/Game/UnrealMCPPhase4/BP_ComponentFixture.BP_ComponentFixture",
-                "sections": ["summary", "parent_class", "compile_state", "components", "class_defaults", "graphs", "nodes", "pins", "connections"],
+                "sections": ["summary", "parent_class", "compile_state", "components", "class_defaults", "variables", "graphs", "nodes", "pins", "connections"],
                 "property_names": ["InitialLifeSpan"],
                 "page_size": 100,
             })
@@ -392,6 +416,19 @@ def main() -> int:
             ]
             if len(defaults) != 1 or defaults[0].get("value") != 12.5:
                 raise AssertionError(f"edited Actor class default changed after restart: {defaults!r}")
+            members = [
+                record for record in reloaded.get("records", [])
+                if record.get("section") == "variable" and record.get("name") == "Health"
+            ]
+            if len(members) != 1 or members[0].get("id") != member_id:
+                raise AssertionError(f"member identity changed after restart: {members!r}")
+            health = members[0]
+            if health.get("type", {}).get("category") != "int" or health.get("default") != {"kind": "literal", "value": 100}:
+                raise AssertionError(f"member type/default changed after restart: {health!r}")
+            if health.get("metadata", {}).get("category") != "Stats" or health.get("metadata", {}).get("save_game") is not True:
+                raise AssertionError(f"member metadata changed after restart: {health!r}")
+            if health.get("replication", {}).get("mode") != "replicated":
+                raise AssertionError(f"member replication changed after restart: {health!r}")
         except Exception:
             log.seek(0)
             sys.stderr.buffer.write(log.read()[-32_000:])
@@ -408,7 +445,7 @@ def main() -> int:
             pass
         else:
             raise AssertionError("a live discovery heartbeat remained after editor termination")
-    print("Phase 4 integration passed: multi-component Actor defaults, lost-response reconciliation, restart inspection, loopback binding, and clean unload")
+    print("Phase 5 integration passed: typed members, components/defaults, lost-response reconciliation, restart inspection, loopback binding, and clean unload")
     return 0
 
 

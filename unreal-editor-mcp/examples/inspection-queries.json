@@ -37,6 +37,14 @@
     "include_inherited": true,
     "page_size": 25
   },
+  "inspect_one_member": {
+    "mode": "inspect",
+    "asset_path": "/Game/Actors/BP_Door.BP_Door",
+    "sections": ["variables"],
+    "member_id": "fedcba9876543210fedcba9876543210",
+    "include_inherited": true,
+    "page_size": 10
+  },
   "continue_page": {
     "cursor": "0123456789abcdef0123456789abcdef",
     "page_size": 50

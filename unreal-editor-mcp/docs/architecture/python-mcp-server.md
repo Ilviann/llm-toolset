@@ -2,7 +2,7 @@
 
 ## Ownership
 
-`unreal_editor_mcp/` owns the Python 3.10+ process. `stdio.py` bounds newline-delimited JSON-RPC and keeps stdout protocol-only. `server.py` negotiates MCP, publishes the nine Phase 4 tools, validates arguments, and converts domain failures to MCP tool errors. `project.py`, `platforms.py`, and `discovery.py` resolve one project and validate generated state. `bridge.py` is the only HTTP client. `cli.py` composes these responsibilities.
+`unreal_editor_mcp/` owns the Python 3.10+ process. `stdio.py` bounds newline-delimited JSON-RPC and keeps stdout protocol-only. `server.py` negotiates MCP, publishes the ten Phase 5 tools, validates arguments, and converts domain failures to MCP tool errors. `project.py`, `platforms.py`, and `discovery.py` resolve one project and validate generated state. `bridge.py` is the only HTTP client. `cli.py` composes these responsibilities.
 
 ## Dependency direction
 
@@ -10,11 +10,12 @@ The CLI constructs a `ProjectLayout`, `UnrealBridge`, and `MCPServer`; the trans
 
 ## Invariants
 
-- Only `capabilities`, `editor_state`, `operation_status`, `blueprint_inspect`, `blueprint_create`, `blueprint_compile`, `blueprint_save`, `blueprint_component_edit`, and `blueprint_default_edit` appear in the tool catalog.
+- Only `capabilities`, `editor_state`, `operation_status`, `blueprint_inspect`, `blueprint_create`, `blueprint_compile`, `blueprint_save`, `blueprint_component_edit`, `blueprint_default_edit`, and `blueprint_member_edit` appear in the tool catalog.
 - Tool arguments are exact objects with no additional fields.
 - `blueprint_inspect` has three mutually exclusive shapes: discovery, exact inspection, or cursor continuation; Python bounds paths, sections, cursor size, and page size before HTTP.
 - Every mutation requires a caller-generated 32-lowercase-hex `operation_id`. Existing-asset mutations also require the current 40-lowercase-hex `expected_snapshot`.
 - Component operations use one exact discriminated shape; class/component property edits accept only the bounded shared value forms.
+- Member operations use exact add/rename/update/remove shapes with canonical K2 type/default records, stable member identities, and reject-only type/removal policy.
 - HTTP always targets the literal IPv4 loopback address and authenticates with the generated token.
 - Generated records and HTTP messages are read with explicit byte limits and strict record shapes.
 - A stale heartbeat, dead process, unsafe token format, project identity change, timeout, or version mismatch produces a stable bounded error. A mutation HTTP timeout becomes `outcome_unknown`, prompting `operation_status` reconciliation.

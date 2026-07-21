@@ -32,6 +32,7 @@ _COMPONENT_ID = {
     "maxLength": 32,
     "pattern": "^[0-9a-f]{32}$",
 }
+_MEMBER_ID = _COMPONENT_ID
 _PROPERTY_VALUE = {
     "oneOf": [
         {"type": "boolean"},
@@ -45,6 +46,110 @@ _PROPERTY_VALUE = {
     ]
 }
 
+_K2_TERMINAL = {
+    "type": "object",
+    "properties": {
+        "category": {
+            "type": "string",
+            "enum": [
+                "boolean", "byte", "int", "int64", "real", "name", "string", "text",
+                "enum", "struct", "object", "class", "softobject", "softclass",
+            ],
+        },
+        "subcategory": {"type": "string", "maxLength": 64},
+        "type_object": _PATH,
+    },
+    "required": ["category"],
+    "additionalProperties": False,
+}
+_K2_TYPE = {
+    "type": "object",
+    "properties": {
+        **_K2_TERMINAL["properties"],
+        "container": {"type": "string", "enum": ["none", "array", "set", "map"]},
+        "value_type": _K2_TERMINAL,
+    },
+    "required": ["category", "container"],
+    "additionalProperties": False,
+}
+_DEFAULT_ATOM = {
+    "oneOf": [
+        {
+            "type": "object",
+            "properties": {
+                "kind": {"const": "literal"},
+                "value": {"oneOf": [{"type": "boolean"}, {"type": "number"}, {"type": "string", "maxLength": 4096}]},
+            },
+            "required": ["kind", "value"],
+            "additionalProperties": False,
+        },
+        {
+            "type": "object",
+            "properties": {
+                "kind": {"const": "reference"},
+                "path": {"type": "string", "maxLength": 512, "pattern": r"^(|/(?!.*\.\.)[^\\]+)$"},
+            },
+            "required": ["kind", "path"],
+            "additionalProperties": False,
+        },
+    ]
+}
+_K2_DEFAULT = {
+    "oneOf": [
+        {
+            "type": "object",
+            "properties": {"kind": {"const": "engine_default"}},
+            "required": ["kind"],
+            "additionalProperties": False,
+        },
+        *_DEFAULT_ATOM["oneOf"],
+        {
+            "type": "object",
+            "properties": {
+                "kind": {"type": "string", "enum": ["array", "set"]},
+                "items": {"type": "array", "maxItems": 64, "items": _DEFAULT_ATOM},
+            },
+            "required": ["kind", "items"],
+            "additionalProperties": False,
+        },
+        {
+            "type": "object",
+            "properties": {
+                "kind": {"const": "map"},
+                "entries": {
+                    "type": "array",
+                    "maxItems": 64,
+                    "items": {
+                        "type": "object",
+                        "properties": {"key": _DEFAULT_ATOM, "value": _DEFAULT_ATOM},
+                        "required": ["key", "value"],
+                        "additionalProperties": False,
+                    },
+                },
+            },
+            "required": ["kind", "entries"],
+            "additionalProperties": False,
+        },
+    ]
+}
+_MEMBER_METADATA = {
+    "type": "object",
+    "properties": {
+        "category": {"type": "string", "maxLength": 128},
+        "tooltip": {"type": "string", "maxLength": 512},
+        "instance_editable": {"type": "boolean"},
+        "blueprint_visible": {"type": "boolean"},
+        "blueprint_read_only": {"type": "boolean"},
+        "expose_on_spawn": {"type": "boolean"},
+        "private": {"type": "boolean"},
+        "save_game": {"type": "boolean"},
+        "advanced_display": {"type": "boolean"},
+        "replication": {"type": "string", "enum": ["none", "replicated"]},
+    },
+    "minProperties": 1,
+    "additionalProperties": False,
+}
+
 
 def _mutation_properties(**extra: object) -> dict[str, object]:
     return {
@@ -56,6 +161,15 @@ def _mutation_properties(**extra: object) -> dict[str, object]:
 
 
 def _component_shape(operation: str, required: list[str], **extra: object) -> dict[str, object]:
+    return {
+        "type": "object",
+        "properties": _mutation_properties(operation={"const": operation}, **extra),
+        "required": ["operation_id", "asset_path", "expected_snapshot", "operation", *required],
+        "additionalProperties": False,
+    }
+
+
+def _member_shape(operation: str, required: list[str], **extra: object) -> dict[str, object]:
     return {
         "type": "object",
         "properties": _mutation_properties(operation={"const": operation}, **extra),
@@ -129,6 +243,7 @@ TOOLS: Final = (
                         },
                         "graph_id": _COMPONENT_ID,
                         "component_id": _COMPONENT_ID,
+                        "member_id": _MEMBER_ID,
                         "property_names": {
                             "type": "array",
                             "minItems": 1,
@@ -233,6 +348,50 @@ TOOLS: Final = (
             ),
             "required": ["operation_id", "asset_path", "expected_snapshot", "property_name", "value"],
             "additionalProperties": False,
+        },
+    },
+    {
+        "name": "blueprint_member_edit",
+        "description": "Add, rename, update, or safely remove one typed Actor Blueprint member variable.",
+        "inputSchema": {
+            "oneOf": [
+                _member_shape(
+                    "add", ["name", "type"],
+                    name={"type": "string", "minLength": 1, "maxLength": 128},
+                    type=_K2_TYPE,
+                    default=_K2_DEFAULT,
+                    metadata=_MEMBER_METADATA,
+                ),
+                _member_shape(
+                    "rename", ["member_id", "new_name"],
+                    member_id=_MEMBER_ID,
+                    new_name={"type": "string", "minLength": 1, "maxLength": 128},
+                ),
+                _member_shape(
+                    "update", ["member_id", "field", "type", "policy"],
+                    member_id=_MEMBER_ID,
+                    field={"const": "type"},
+                    type=_K2_TYPE,
+                    policy={"const": "reject_if_referenced"},
+                ),
+                _member_shape(
+                    "update", ["member_id", "field", "default"],
+                    member_id=_MEMBER_ID,
+                    field={"const": "default"},
+                    default=_K2_DEFAULT,
+                ),
+                _member_shape(
+                    "update", ["member_id", "field", "metadata"],
+                    member_id=_MEMBER_ID,
+                    field={"const": "metadata"},
+                    metadata=_MEMBER_METADATA,
+                ),
+                _member_shape(
+                    "remove", ["member_id", "policy"],
+                    member_id=_MEMBER_ID,
+                    policy={"const": "reject_if_referenced"},
+                ),
+            ]
         },
     },
 )

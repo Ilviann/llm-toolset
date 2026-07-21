@@ -1,0 +1,56 @@
+{
+  "inspect_before_edit": {
+    "mode": "inspect",
+    "asset_path": "/Game/Actors/BP_Door.BP_Door",
+    "sections": ["variables"],
+    "include_inherited": true
+  },
+  "add_typed_member": {
+    "operation_id": "44444444444444444444444444444444",
+    "asset_path": "/Game/Actors/BP_Door.BP_Door",
+    "expected_snapshot": "0123456789abcdef0123456789abcdef01234567",
+    "operation": "add",
+    "name": "Health",
+    "type": {"category": "int", "container": "none"},
+    "default": {"kind": "literal", "value": 100},
+    "metadata": {
+      "category": "Stats",
+      "tooltip": "Current health points",
+      "instance_editable": true,
+      "blueprint_visible": true,
+      "save_game": true,
+      "replication": "replicated"
+    }
+  },
+  "inspect_returned_member": {
+    "mode": "inspect",
+    "asset_path": "/Game/Actors/BP_Door.BP_Door",
+    "sections": ["variables"],
+    "member_id": "fedcba9876543210fedcba9876543210"
+  },
+  "rename_using_returned_member_id_and_snapshot": {
+    "operation_id": "55555555555555555555555555555555",
+    "asset_path": "/Game/Actors/BP_Door.BP_Door",
+    "expected_snapshot": "89abcdef0123456789abcdef0123456789abcdef",
+    "operation": "rename",
+    "member_id": "fedcba9876543210fedcba9876543210",
+    "name": "MaximumHealth"
+  },
+  "update_default_using_latest_snapshot": {
+    "operation_id": "66666666666666666666666666666666",
+    "asset_path": "/Game/Actors/BP_Door.BP_Door",
+    "expected_snapshot": "fedcba9876543210fedcba9876543210fedcba98",
+    "operation": "update",
+    "member_id": "fedcba9876543210fedcba9876543210",
+    "field": "default",
+    "default": {"kind": "literal", "value": 125}
+  },
+  "remove_only_if_unreferenced": {
+    "operation_id": "77777777777777777777777777777777",
+    "asset_path": "/Game/Actors/BP_Door.BP_Door",
+    "expected_snapshot": "abcdef0123456789abcdef0123456789abcdef01",
+    "operation": "remove",
+    "member_id": "fedcba9876543210fedcba9876543210",
+    "policy": "reject_if_referenced"
+  }
+}

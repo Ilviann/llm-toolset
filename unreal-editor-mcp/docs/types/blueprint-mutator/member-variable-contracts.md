@@ -1,0 +1,9 @@
+# Blueprint member-variable contracts
+
+`blueprint_member_edit` performs one `add`, `rename`, `update`, or `remove` operation on an Actor Blueprint. Every call carries `operation_id`, exact `asset_path`, and the current `expected_snapshot`. Existing members are selected only by their stable 32-character `VarGuid`; inherited members remain inspectable but immutable.
+
+`add` requires an exact legal cross-kind-unique name and one canonical K2 type, with optional tagged default and metadata. `rename` preserves the member identity and updates Unreal-owned variable references. `update` changes exactly one field family: `type`, `default`, or `metadata`. Type updates require `policy: "reject_if_referenced"` and reset the old incompatible default to the new type's engine default. `remove` requires the same reject-only policy. No operation cascades node deletion, leaves orphaned references, or attempts graph repair.
+
+Supported metadata includes category, tooltip, instance editability, Blueprint visibility/read-only, expose-on-spawn, private, save-game, advanced-display, and replication mode `none` or `replicated`. Expose-on-spawn requires a visible, non-private, instance-editable variable. Live K2 rules reject replicated sets/maps. RepNotify mode, condition, and notification-function name are inspectable, but any mutation that would create, remove, rename, or otherwise alter that relationship is deferred to Phase 6.
+
+Every variable record reports type, tagged default, metadata, ownership/editability, replication, and a bounded reference summary with graph/node identities. Results contain the operation, concise member record, reference summary, reconstructed identities, dirty state, and new authoritative snapshot. Preflight rejection occurs before opening a transaction; accepted edits are transactional and unexpected failed read-back is restored through Undo.

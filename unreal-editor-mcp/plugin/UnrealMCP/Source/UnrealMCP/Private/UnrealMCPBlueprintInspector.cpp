@@ -8,16 +8,20 @@
 #include "EdGraph/EdGraph.h"
 #include "EdGraph/EdGraphNode.h"
 #include "EdGraph/EdGraphPin.h"
+#include "EdGraphSchema_K2.h"
 #include "Engine/Blueprint.h"
 #include "Engine/SCS_Node.h"
 #include "Engine/SimpleConstructionScript.h"
 #include "GameFramework/Actor.h"
 #include "HAL/PlatformTime.h"
+#include "K2Node.h"
+#include "Kismet2/BlueprintEditorUtils.h"
 #include "Misc/PackageName.h"
 #include "Misc/SecureHash.h"
 #include "Serialization/JsonSerializer.h"
 #include "Serialization/JsonWriter.h"
 #include "UnrealMCPVersion.h"
+#include "UnrealMCPK2TypeCodec.h"
 #include "UnrealMCPPropertyCodec.h"
 #include "UObject/Package.h"
 #include "UObject/SoftObjectPath.h"
@@ -177,6 +181,17 @@ FString ContainerName(EPinContainerType Type)
     }
 }
 
+FString VariableTypeFingerprint(const FEdGraphPinType& Type)
+{
+    const UObject* KeyTypeObject = Type.PinSubCategoryObject.Get();
+    const UObject* ValueTypeObject = Type.PinValueType.TerminalSubCategoryObject.Get();
+    return Type.PinCategory.ToString() + TEXT("|") + Type.PinSubCategory.ToString() + TEXT("|")
+        + (KeyTypeObject != nullptr ? KeyTypeObject->GetPathName() : FString()) + TEXT("|")
+        + ContainerName(Type.ContainerType) + TEXT("|") + Type.PinValueType.TerminalCategory.ToString() + TEXT("|")
+        + Type.PinValueType.TerminalSubCategory.ToString() + TEXT("|")
+        + (ValueTypeObject != nullptr ? ValueTypeObject->GetPathName() : FString());
+}
+
 TSharedRef<FJsonObject> PinType(const FEdGraphPinType& Type)
 {
     const TSharedRef<FJsonObject> Value = MakeShared<FJsonObject>();
@@ -192,6 +207,95 @@ TSharedRef<FJsonObject> PinType(const FEdGraphPinType& Type)
         Value->SetStringField(TEXT("type_object"), TypeObject->GetPathName());
     }
     return Value;
+}
+
+TSharedRef<FJsonObject> VariableReferences(UBlueprint* Blueprint, const FName VariableName)
+{
+    TArray<UK2Node*> Nodes;
+    TArray<UEdGraph*> AllGraphs;
+    Blueprint->GetAllGraphs(AllGraphs);
+    for (UEdGraph* Graph : AllGraphs)
+    {
+        if (Graph == nullptr) continue;
+        for (UEdGraphNode* GraphNode : Graph->Nodes)
+        {
+            UK2Node* Node = Cast<UK2Node>(GraphNode);
+            if (Node != nullptr && Node->ReferencesVariable(VariableName, nullptr)) Nodes.Add(Node);
+        }
+    }
+    const bool bReferenced = !Nodes.IsEmpty() || FBlueprintEditorUtils::IsVariableUsed(Blueprint, VariableName);
+    Nodes.Sort([](const UK2Node& Left, const UK2Node& Right)
+    {
+        const UEdGraph* LeftGraph = Left.GetGraph();
+        const UEdGraph* RightGraph = Right.GetGraph();
+        return (LeftGraph != nullptr ? GuidString(LeftGraph->GraphGuid) : FString()) + GuidString(Left.NodeGuid)
+            < (RightGraph != nullptr ? GuidString(RightGraph->GraphGuid) : FString()) + GuidString(Right.NodeGuid);
+    });
+    const TSharedRef<FJsonObject> Summary = MakeShared<FJsonObject>();
+    Summary->SetBoolField(TEXT("referenced"), bReferenced);
+    Summary->SetNumberField(TEXT("reference_count"), Nodes.Num());
+    Summary->SetBoolField(TEXT("unresolved_references"), bReferenced && Nodes.IsEmpty());
+    Summary->SetBoolField(TEXT("references_truncated"), Nodes.Num() > UnrealMCP::MaxVariableReferences);
+    TArray<TSharedPtr<FJsonValue>> References;
+    const int32 Count = FMath::Min(Nodes.Num(), UnrealMCP::MaxVariableReferences);
+    for (int32 Index = 0; Index < Count; ++Index)
+    {
+        UK2Node* Node = Nodes[Index];
+        if (Node == nullptr) continue;
+        const TSharedRef<FJsonObject> Reference = MakeShared<FJsonObject>();
+        const UEdGraph* Graph = Node->GetGraph();
+        Reference->SetStringField(TEXT("graph_id"), Graph != nullptr ? GuidString(Graph->GraphGuid) : FString());
+        Reference->SetStringField(TEXT("node_id"), GuidString(Node->NodeGuid));
+        Reference->SetStringField(TEXT("node_class"), Node->GetClass()->GetPathName());
+        Reference->SetStringField(TEXT("title"), Node->GetNodeTitle(ENodeTitleType::ListView).ToString().Left(256));
+        References.Add(MakeShared<FJsonValueObject>(Reference));
+    }
+    Summary->SetArrayField(TEXT("references"), References);
+    return Summary;
+}
+
+TSharedRef<FJsonObject> VariableMetadata(const FBPVariableDescription& Variable)
+{
+    const TSharedRef<FJsonObject> Metadata = MakeShared<FJsonObject>();
+    Metadata->SetStringField(TEXT("category"), Variable.Category.ToString().Left(128));
+    Metadata->SetStringField(TEXT("tooltip"), Variable.HasMetaData(TEXT("tooltip")) ? Variable.GetMetaData(TEXT("tooltip")).Left(512) : FString());
+    Metadata->SetBoolField(TEXT("instance_editable"), (Variable.PropertyFlags & CPF_Edit) != 0
+        && (Variable.PropertyFlags & CPF_DisableEditOnInstance) == 0);
+    Metadata->SetBoolField(TEXT("blueprint_visible"), (Variable.PropertyFlags & CPF_BlueprintVisible) != 0);
+    Metadata->SetBoolField(TEXT("blueprint_read_only"), (Variable.PropertyFlags & CPF_BlueprintReadOnly) != 0);
+    Metadata->SetBoolField(TEXT("expose_on_spawn"), Variable.HasMetaData(FBlueprintMetadata::MD_ExposeOnSpawn));
+    Metadata->SetBoolField(TEXT("private"), Variable.HasMetaData(FBlueprintMetadata::MD_Private));
+    Metadata->SetBoolField(TEXT("save_game"), (Variable.PropertyFlags & CPF_SaveGame) != 0);
+    Metadata->SetBoolField(TEXT("advanced_display"), (Variable.PropertyFlags & CPF_AdvancedDisplay) != 0);
+    return Metadata;
+}
+
+TSharedRef<FJsonObject> VariableReplication(const FBPVariableDescription& Variable)
+{
+    const TSharedRef<FJsonObject> Replication = MakeShared<FJsonObject>();
+    const bool bRepNotify = !Variable.RepNotifyFunc.IsNone() || (Variable.PropertyFlags & CPF_RepNotify) != 0;
+    Replication->SetStringField(TEXT("mode"), bRepNotify ? TEXT("rep_notify")
+        : (Variable.PropertyFlags & CPF_Net) != 0 ? TEXT("replicated") : TEXT("none"));
+    Replication->SetStringField(TEXT("condition"), StaticEnum<ELifetimeCondition>()->GetNameStringByValue(Variable.ReplicationCondition));
+    Replication->SetStringField(TEXT("rep_notify_function"), Variable.RepNotifyFunc.ToString());
+    Replication->SetBoolField(TEXT("rep_notify_mutable"), false);
+    return Replication;
+}
+
+FString VariableDefaultText(UBlueprint* Blueprint, const FBPVariableDescription& Variable)
+{
+    if (Blueprint != nullptr && Blueprint->GeneratedClass != nullptr)
+    {
+        UObject* Defaults = Blueprint->GeneratedClass->GetDefaultObject(false);
+        FProperty* Property = Blueprint->GeneratedClass->FindPropertyByName(Variable.VarName);
+        if (Defaults != nullptr && Property != nullptr)
+        {
+            FString Text;
+            Property->ExportText_InContainer(0, Text, Defaults, Defaults->GetArchetype(), Defaults, PPF_None);
+            return Text;
+        }
+    }
+    return Variable.DefaultValue;
 }
 
 FString GraphKind(const UBlueprint* Blueprint, const UEdGraph* Graph)
@@ -410,7 +514,7 @@ bool BuildInspection(
     FUnrealMCPError& OutError)
 {
     OutScanTruncated = false;
-    if (!HasOnlyFields(Arguments, {TEXT("mode"), TEXT("asset_path"), TEXT("sections"), TEXT("graph_id"), TEXT("component_id"),
+    if (!HasOnlyFields(Arguments, {TEXT("mode"), TEXT("asset_path"), TEXT("sections"), TEXT("graph_id"), TEXT("component_id"), TEXT("member_id"),
         TEXT("property_names"), TEXT("include_inherited"), TEXT("page_size")}))
     {
         OutError = {TEXT("invalid_argument"), TEXT("Inspection arguments contain an unknown field")};
@@ -461,6 +565,13 @@ bool BuildInspection(
         && (!Arguments.TryGetStringField(TEXT("component_id"), ComponentFilter) || ComponentFilter.Len() != 32))
     {
         OutError = {TEXT("invalid_argument"), TEXT("component_id must be a 32-character stable component identity")};
+        return false;
+    }
+    FString MemberFilter;
+    if (Arguments.HasField(TEXT("member_id"))
+        && (!Arguments.TryGetStringField(TEXT("member_id"), MemberFilter) || MemberFilter.Len() != 32))
+    {
+        OutError = {TEXT("invalid_argument"), TEXT("member_id must be a 32-character stable member identity")};
         return false;
     }
     TSet<FString> PropertyNames;
@@ -639,26 +750,49 @@ bool BuildInspection(
         }
     }
 
+    bool bMemberFound = MemberFilter.IsEmpty();
     for (const TPair<UBlueprint*, FString>& Owner : Owners)
     {
         for (const FBPVariableDescription& Variable : Owner.Key->NewVariables)
         {
-            if (Sections.Contains(TEXT("variables")))
+            const FString Id = GuidString(Variable.VarGuid);
+            const bool bSelected = MemberFilter.IsEmpty() || Id == MemberFilter;
+            if (bSelected) bMemberFound = true;
+            const FString EffectiveDefault = VariableDefaultText(Owner.Key, Variable);
+            if (Sections.Contains(TEXT("variables")) && bSelected)
             {
                 const TSharedRef<FJsonObject> Value = Record(TEXT("variable"));
-                const FString Id = GuidString(Variable.VarGuid);
                 Value->SetStringField(TEXT("id"), Id);
                 Value->SetBoolField(TEXT("identity_stable"), !Id.IsEmpty());
                 Value->SetStringField(TEXT("name"), Variable.VarName.ToString());
                 Value->SetStringField(TEXT("owner_blueprint"), Owner.Value);
                 Value->SetBoolField(TEXT("inherited"), Owner.Key != Blueprint);
-                Value->SetObjectField(TEXT("type"), PinType(Variable.VarType));
-                Value->SetStringField(TEXT("default_value"), Variable.DefaultValue.Left(512));
+                Value->SetStringField(TEXT("ownership"), Owner.Key == Blueprint ? TEXT("local") : TEXT("inherited"));
+                Value->SetBoolField(TEXT("editable"), Owner.Key == Blueprint && !Id.IsEmpty());
+                Value->SetObjectField(TEXT("type"), UnrealMCP::K2TypeCodec::EncodeType(Variable.VarType));
+                Value->SetObjectField(TEXT("default"), UnrealMCP::K2TypeCodec::EncodeDefault(Variable.VarType, EffectiveDefault));
+                Value->SetObjectField(TEXT("metadata"), VariableMetadata(Variable));
+                Value->SetObjectField(TEXT("replication"), VariableReplication(Variable));
+                Value->SetObjectField(TEXT("reference_summary"), VariableReferences(Blueprint, Variable.VarName));
                 AddRecord(OutRecords, Value);
             }
+            TArray<FString> MetadataFingerprint;
+            for (const FBPVariableMetaDataEntry& Entry : Variable.MetaDataArray)
+            {
+                MetadataFingerprint.Add(Entry.DataKey.ToString() + TEXT("=") + Entry.DataValue);
+            }
+            MetadataFingerprint.Sort();
             Fingerprint.Add(TEXT("variable|") + Owner.Value + TEXT("|") + GuidString(Variable.VarGuid) + TEXT("|") + Variable.VarName.ToString()
-                + TEXT("|") + Variable.VarType.PinCategory.ToString() + TEXT("|") + Variable.DefaultValue);
+                + TEXT("|") + VariableTypeFingerprint(Variable.VarType) + TEXT("|") + EffectiveDefault
+                + TEXT("|") + Variable.Category.ToString() + TEXT("|") + LexToString(Variable.PropertyFlags)
+                + TEXT("|") + Variable.RepNotifyFunc.ToString() + TEXT("|") + LexToString(static_cast<int32>(Variable.ReplicationCondition))
+                + TEXT("|") + FString::Join(MetadataFingerprint, TEXT(";")));
         }
+    }
+    if (!bMemberFound)
+    {
+        OutError = {TEXT("not_found"), TEXT("The requested member identity was not found")};
+        return false;
     }
 
     TArray<TPair<UEdGraph*, FString>> Graphs;

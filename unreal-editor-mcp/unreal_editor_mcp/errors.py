@@ -36,6 +36,9 @@ class ErrorCode(str, Enum):
     OUTCOME_UNKNOWN = "outcome_unknown"
     UNSUPPORTED_PROPERTY = "unsupported_property"
     INVALID_COMPONENT = "invalid_component"
+    INVALID_MEMBER = "invalid_member"
+    UNSUPPORTED_TYPE = "unsupported_type"
+    REFERENCED_MEMBER = "referenced_member"
     INTERNAL_ERROR = "internal_error"
 
 

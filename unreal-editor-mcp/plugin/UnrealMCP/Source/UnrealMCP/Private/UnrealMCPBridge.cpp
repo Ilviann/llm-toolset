@@ -45,7 +45,8 @@ FString Header(const FHttpServerRequest& Request, const TCHAR* LowercaseName)
 bool IsMutationCommand(const FString& Command)
 {
     return Command == TEXT("blueprint_create") || Command == TEXT("blueprint_compile") || Command == TEXT("blueprint_save")
-        || Command == TEXT("blueprint_component_edit") || Command == TEXT("blueprint_default_edit");
+        || Command == TEXT("blueprint_component_edit") || Command == TEXT("blueprint_default_edit")
+        || Command == TEXT("blueprint_member_edit");
 }
 
 FString AuthenticationBinding(const FString& ProjectHash, const FString& BridgeInstanceId, const FString& Token)
@@ -188,7 +189,8 @@ bool FUnrealMCPBridge::HandleRequest(const FHttpServerRequest& Request, const FH
     }
     if (Command != TEXT("capabilities") && Command != TEXT("editor_state") && Command != TEXT("operation_status")
         && Command != TEXT("blueprint_inspect") && Command != TEXT("blueprint_create") && Command != TEXT("blueprint_compile")
-        && Command != TEXT("blueprint_save") && Command != TEXT("blueprint_component_edit") && Command != TEXT("blueprint_default_edit"))
+        && Command != TEXT("blueprint_save") && Command != TEXT("blueprint_component_edit") && Command != TEXT("blueprint_default_edit")
+        && Command != TEXT("blueprint_member_edit"))
     {
         Complete(UnrealMCP::Protocol::Error(EHttpServerResponseCodes::BadRequest, TEXT("invalid_argument"), TEXT("Unknown or unavailable command")));
         return true;
@@ -335,7 +337,7 @@ TSharedPtr<FJsonObject> FUnrealMCPBridge::Capabilities() const
     Result->SetBoolField(TEXT("bridge_ready"), bReady);
     Result->SetArrayField(TEXT("commands"), Strings({TEXT("capabilities"), TEXT("editor_state"), TEXT("operation_status"),
         TEXT("blueprint_inspect"), TEXT("blueprint_create"), TEXT("blueprint_compile"), TEXT("blueprint_save"),
-        TEXT("blueprint_component_edit"), TEXT("blueprint_default_edit")}));
+        TEXT("blueprint_component_edit"), TEXT("blueprint_default_edit"), TEXT("blueprint_member_edit")}));
 
     const TSharedRef<FJsonObject> Features = MakeShared<FJsonObject>();
     Features->SetBoolField(TEXT("blueprint_inspection"), true);
@@ -346,6 +348,7 @@ TSharedPtr<FJsonObject> FUnrealMCPBridge::Capabilities() const
     Features->SetBoolField(TEXT("reliable_mutations"), true);
     Features->SetBoolField(TEXT("blueprint_components"), true);
     Features->SetBoolField(TEXT("blueprint_defaults"), true);
+    Features->SetBoolField(TEXT("blueprint_member_variables"), true);
     Features->SetBoolField(TEXT("editor_lifecycle"), false);
     Features->SetBoolField(TEXT("project_build"), false);
     Result->SetObjectField(TEXT("features"), Features);
@@ -372,6 +375,7 @@ TSharedPtr<FJsonObject> FUnrealMCPBridge::Capabilities() const
     Limits->SetNumberField(TEXT("retained_operations"), UnrealMCP::MaxRetainedOperations);
     Limits->SetNumberField(TEXT("operation_lifetime_ms"), static_cast<int32>(UnrealMCP::OperationLifetimeSeconds * 1000.0));
     Limits->SetNumberField(TEXT("property_names"), UnrealMCP::MaxPropertyNames);
+    Limits->SetNumberField(TEXT("variable_references"), UnrealMCP::MaxVariableReferences);
     Result->SetObjectField(TEXT("limits"), Limits);
 
     const TSharedRef<FJsonObject> Listener = MakeShared<FJsonObject>();

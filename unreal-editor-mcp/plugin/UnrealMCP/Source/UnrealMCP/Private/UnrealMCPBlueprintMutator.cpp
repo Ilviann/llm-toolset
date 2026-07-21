@@ -6,15 +6,18 @@
 #include "Engine/BlueprintGeneratedClass.h"
 #include "Engine/SCS_Node.h"
 #include "Engine/SimpleConstructionScript.h"
+#include "EdGraphSchema_K2.h"
 #include "Components/ActorComponent.h"
 #include "Components/SceneComponent.h"
 #include "Editor.h"
 #include "GameFramework/Actor.h"
 #include "HAL/FileManager.h"
 #include "HAL/PlatformFileManager.h"
+#include "K2Node.h"
 #include "Kismet2/CompilerResultsLog.h"
 #include "Kismet2/KismetEditorUtilities.h"
 #include "Kismet2/BlueprintEditorUtils.h"
+#include "Kismet2/Kismet2NameValidators.h"
 #include "Logging/TokenizedMessage.h"
 #include "Misc/PackageName.h"
 #include "Misc/Paths.h"
@@ -22,6 +25,7 @@
 #include "SubobjectDataSubsystem.h"
 #include "UnrealMCPBlueprintInspector.h"
 #include "UnrealMCPPropertyCodec.h"
+#include "UnrealMCPK2TypeCodec.h"
 #include "UnrealMCPVersion.h"
 #include "UObject/Package.h"
 #include "UObject/SavePackage.h"
@@ -608,6 +612,217 @@ bool RestoreFailedTransaction(FUnrealMCPError& OutError)
     OutError = {TEXT("internal_error"), TEXT("An unexpected mutation result could not be restored through Undo")};
     return false;
 }
+
+FString GuidString(const FGuid& Guid)
+{
+    return Guid.IsValid() ? Guid.ToString(EGuidFormats::Digits).ToLower() : FString();
+}
+
+FBPVariableDescription* FindLocalMember(UBlueprint* Blueprint, const FString& Identity)
+{
+    if (Blueprint == nullptr || Identity.Len() != 32) return nullptr;
+    for (FBPVariableDescription& Variable : Blueprint->NewVariables)
+    {
+        if (GuidString(Variable.VarGuid) == Identity) return &Variable;
+    }
+    return nullptr;
+}
+
+FBPVariableDescription* FindLocalMemberByName(UBlueprint* Blueprint, const FString& Name)
+{
+    if (Blueprint == nullptr) return nullptr;
+    for (FBPVariableDescription& Variable : Blueprint->NewVariables)
+    {
+        if (Variable.VarName.ToString() == Name) return &Variable;
+    }
+    return nullptr;
+}
+
+bool ValidateMemberName(UBlueprint* Blueprint, const FString& Name, const FName ExistingName, FUnrealMCPError& OutError)
+{
+    if (Name.IsEmpty() || Name.Len() > 128 || FName(*Name).IsNone() || !FName(*Name).IsValidXName())
+    {
+        OutError = {TEXT("invalid_member"), TEXT("The member name is not one legal bounded Blueprint name")};
+        return false;
+    }
+    FKismetNameValidator Validator(Blueprint, ExistingName);
+    if (Validator.IsValid(Name) != EValidatorResult::Ok)
+    {
+        OutError = {TEXT("invalid_member"), TEXT("The member name collides with an inherited or cross-kind Blueprint member")};
+        return false;
+    }
+    return true;
+}
+
+TSharedRef<FJsonObject> MemberReferences(UBlueprint* Blueprint, const FName VariableName)
+{
+    TArray<UK2Node*> Nodes;
+    TArray<UEdGraph*> AllGraphs;
+    Blueprint->GetAllGraphs(AllGraphs);
+    for (UEdGraph* Graph : AllGraphs)
+    {
+        if (Graph == nullptr) continue;
+        for (UEdGraphNode* GraphNode : Graph->Nodes)
+        {
+            UK2Node* Node = Cast<UK2Node>(GraphNode);
+            if (Node != nullptr && Node->ReferencesVariable(VariableName, nullptr)) Nodes.Add(Node);
+        }
+    }
+    const bool bReferenced = !Nodes.IsEmpty() || FBlueprintEditorUtils::IsVariableUsed(Blueprint, VariableName);
+    Nodes.Sort([](const UK2Node& Left, const UK2Node& Right)
+    {
+        const FString LeftGraph = Left.GetGraph() != nullptr ? GuidString(Left.GetGraph()->GraphGuid) : FString();
+        const FString RightGraph = Right.GetGraph() != nullptr ? GuidString(Right.GetGraph()->GraphGuid) : FString();
+        return LeftGraph + GuidString(Left.NodeGuid) < RightGraph + GuidString(Right.NodeGuid);
+    });
+    const TSharedRef<FJsonObject> Summary = MakeShared<FJsonObject>();
+    Summary->SetBoolField(TEXT("referenced"), bReferenced);
+    Summary->SetNumberField(TEXT("reference_count"), Nodes.Num());
+    Summary->SetBoolField(TEXT("unresolved_references"), bReferenced && Nodes.IsEmpty());
+    Summary->SetBoolField(TEXT("references_truncated"), Nodes.Num() > UnrealMCP::MaxVariableReferences);
+    TArray<TSharedPtr<FJsonValue>> References;
+    for (int32 Index = 0; Index < FMath::Min(Nodes.Num(), UnrealMCP::MaxVariableReferences); ++Index)
+    {
+        UK2Node* Node = Nodes[Index];
+        if (Node == nullptr) continue;
+        const TSharedRef<FJsonObject> Reference = MakeShared<FJsonObject>();
+        Reference->SetStringField(TEXT("graph_id"), Node->GetGraph() != nullptr ? GuidString(Node->GetGraph()->GraphGuid) : FString());
+        Reference->SetStringField(TEXT("node_id"), GuidString(Node->NodeGuid));
+        Reference->SetStringField(TEXT("node_class"), Node->GetClass()->GetPathName());
+        Reference->SetStringField(TEXT("title"), Node->GetNodeTitle(ENodeTitleType::ListView).ToString().Left(256));
+        References.Add(MakeShared<FJsonValueObject>(Reference));
+    }
+    Summary->SetArrayField(TEXT("references"), References);
+    return Summary;
+}
+
+void SetPropertyFlag(uint64& Flags, EPropertyFlags Flag, bool bEnabled)
+{
+    if (bEnabled) Flags |= static_cast<uint64>(Flag);
+    else Flags &= ~static_cast<uint64>(Flag);
+}
+
+bool ReadMetadataBool(const FJsonObject& Metadata, const TCHAR* Name, bool& InOut, FUnrealMCPError& OutError)
+{
+    if (!Metadata.HasField(Name)) return true;
+    if (!Metadata.TryGetBoolField(Name, InOut))
+    {
+        OutError = {TEXT("invalid_argument"), FString::Printf(TEXT("metadata.%s must be boolean"), Name)};
+        return false;
+    }
+    return true;
+}
+
+bool ValidateAndApplyMetadata(
+    FBPVariableDescription& Variable,
+    const TSharedPtr<FJsonObject>& Metadata,
+    bool bApply,
+    FUnrealMCPError& OutError)
+{
+    if (!Metadata.IsValid() || Metadata->Values.IsEmpty()
+        || !HasOnlyFields(*Metadata, {TEXT("category"), TEXT("tooltip"), TEXT("instance_editable"), TEXT("blueprint_visible"),
+            TEXT("blueprint_read_only"), TEXT("expose_on_spawn"), TEXT("private"), TEXT("save_game"), TEXT("advanced_display"), TEXT("replication")}))
+    {
+        OutError = {TEXT("invalid_argument"), TEXT("metadata must contain one or more supported exact fields")};
+        return false;
+    }
+    FString Category = Variable.Category.ToString();
+    FString Tooltip = Variable.HasMetaData(TEXT("tooltip")) ? Variable.GetMetaData(TEXT("tooltip")) : FString();
+    FString Replication;
+    bool bInstanceEditable = (Variable.PropertyFlags & CPF_Edit) != 0 && (Variable.PropertyFlags & CPF_DisableEditOnInstance) == 0;
+    bool bBlueprintVisible = (Variable.PropertyFlags & CPF_BlueprintVisible) != 0;
+    bool bBlueprintReadOnly = (Variable.PropertyFlags & CPF_BlueprintReadOnly) != 0;
+    bool bExposeOnSpawn = Variable.HasMetaData(FBlueprintMetadata::MD_ExposeOnSpawn);
+    bool bPrivate = Variable.HasMetaData(FBlueprintMetadata::MD_Private);
+    bool bSaveGame = (Variable.PropertyFlags & CPF_SaveGame) != 0;
+    bool bAdvancedDisplay = (Variable.PropertyFlags & CPF_AdvancedDisplay) != 0;
+    if ((Metadata->HasField(TEXT("category")) && (!Metadata->TryGetStringField(TEXT("category"), Category) || Category.Len() > 128))
+        || (Metadata->HasField(TEXT("tooltip")) && (!Metadata->TryGetStringField(TEXT("tooltip"), Tooltip) || Tooltip.Len() > 512))
+        || !ReadMetadataBool(*Metadata, TEXT("instance_editable"), bInstanceEditable, OutError)
+        || !ReadMetadataBool(*Metadata, TEXT("blueprint_visible"), bBlueprintVisible, OutError)
+        || !ReadMetadataBool(*Metadata, TEXT("blueprint_read_only"), bBlueprintReadOnly, OutError)
+        || !ReadMetadataBool(*Metadata, TEXT("expose_on_spawn"), bExposeOnSpawn, OutError)
+        || !ReadMetadataBool(*Metadata, TEXT("private"), bPrivate, OutError)
+        || !ReadMetadataBool(*Metadata, TEXT("save_game"), bSaveGame, OutError)
+        || !ReadMetadataBool(*Metadata, TEXT("advanced_display"), bAdvancedDisplay, OutError)
+        || (Metadata->HasField(TEXT("replication")) && !Metadata->TryGetStringField(TEXT("replication"), Replication)))
+    {
+        if (OutError.Code.IsEmpty()) OutError = {TEXT("invalid_argument"), TEXT("metadata contains an invalid bounded value")};
+        return false;
+    }
+    if (bExposeOnSpawn && (!bInstanceEditable || !bBlueprintVisible || bPrivate))
+    {
+        OutError = {TEXT("invalid_member"), TEXT("Expose-on-spawn requires a visible, non-private, instance-editable variable")};
+        return false;
+    }
+    if (!Replication.IsEmpty() && Replication != TEXT("none") && Replication != TEXT("replicated"))
+    {
+        OutError = {TEXT("invalid_argument"), TEXT("replication must be none or replicated; RepNotify changes are deferred")};
+        return false;
+    }
+    if (!Replication.IsEmpty() && !Variable.RepNotifyFunc.IsNone())
+    {
+        OutError = {TEXT("invalid_member"), TEXT("RepNotify relationships are inspectable but immutable until Phase 6")};
+        return false;
+    }
+    if (Replication == TEXT("replicated") && (Variable.VarType.IsSet() || Variable.VarType.IsMap()))
+    {
+        OutError = {TEXT("invalid_member"), TEXT("The live Blueprint capability does not support replicated set or map variables")};
+        return false;
+    }
+    if (!bApply) return true;
+    Variable.Category = FText::FromString(Category);
+    if (Tooltip.IsEmpty()) Variable.RemoveMetaData(TEXT("tooltip")); else Variable.SetMetaData(TEXT("tooltip"), Tooltip);
+    SetPropertyFlag(Variable.PropertyFlags, CPF_Edit, true);
+    SetPropertyFlag(Variable.PropertyFlags, CPF_DisableEditOnInstance, !bInstanceEditable);
+    SetPropertyFlag(Variable.PropertyFlags, CPF_BlueprintVisible, bBlueprintVisible);
+    SetPropertyFlag(Variable.PropertyFlags, CPF_BlueprintReadOnly, bBlueprintReadOnly);
+    SetPropertyFlag(Variable.PropertyFlags, CPF_SaveGame, bSaveGame);
+    SetPropertyFlag(Variable.PropertyFlags, CPF_AdvancedDisplay, bAdvancedDisplay);
+    if (bExposeOnSpawn) Variable.SetMetaData(FBlueprintMetadata::MD_ExposeOnSpawn, TEXT("true"));
+    else Variable.RemoveMetaData(FBlueprintMetadata::MD_ExposeOnSpawn);
+    if (bPrivate) Variable.SetMetaData(FBlueprintMetadata::MD_Private, TEXT("true"));
+    else Variable.RemoveMetaData(FBlueprintMetadata::MD_Private);
+    if (!Replication.IsEmpty())
+    {
+        SetPropertyFlag(Variable.PropertyFlags, CPF_Net, Replication == TEXT("replicated"));
+        SetPropertyFlag(Variable.PropertyFlags, CPF_RepNotify, false);
+        Variable.RepNotifyFunc = NAME_None;
+        Variable.ReplicationCondition = COND_None;
+    }
+    return true;
+}
+
+bool ReadInspectedMember(
+    FUnrealMCPBlueprintInspector& Inspector,
+    const FString& ObjectPath,
+    const FString& MemberId,
+    TSharedPtr<FJsonObject>& OutMember,
+    FUnrealMCPError& OutError)
+{
+    const TSharedRef<FJsonObject> Arguments = MakeShared<FJsonObject>();
+    Arguments->SetStringField(TEXT("mode"), TEXT("inspect"));
+    Arguments->SetStringField(TEXT("asset_path"), ObjectPath);
+    Arguments->SetStringField(TEXT("member_id"), MemberId);
+    Arguments->SetArrayField(TEXT("sections"), {MakeShared<FJsonValueString>(TEXT("variables"))});
+    Arguments->SetNumberField(TEXT("page_size"), 1);
+    TSharedPtr<FJsonObject> Inspection;
+    if (!Inspector.Execute(Arguments, Inspection, OutError) || !Inspection.IsValid()) return false;
+    const TArray<TSharedPtr<FJsonValue>>* Records = nullptr;
+    if (!Inspection->TryGetArrayField(TEXT("records"), Records) || Records == nullptr || Records->Num() != 1)
+    {
+        OutError = {TEXT("internal_error"), TEXT("Member read-back did not return one exact variable record")};
+        return false;
+    }
+    const TSharedPtr<FJsonObject>* Record = nullptr;
+    if (!(*Records)[0].IsValid() || !(*Records)[0]->TryGetObject(Record) || Record == nullptr || !Record->IsValid())
+    {
+        OutError = {TEXT("internal_error"), TEXT("Member read-back returned an invalid variable record")};
+        return false;
+    }
+    OutMember = *Record;
+    return true;
+}
 }
 
 FUnrealMCPBlueprintMutator::FUnrealMCPBlueprintMutator(
@@ -649,6 +864,7 @@ bool FUnrealMCPBlueprintMutator::Execute(
     if (Command == TEXT("blueprint_save")) return Save(Arguments, OutResult, OutError);
     if (Command == TEXT("blueprint_component_edit")) return ComponentEdit(Arguments, OutResult, OutError);
     if (Command == TEXT("blueprint_default_edit")) return DefaultEdit(Arguments, OutResult, OutError);
+    if (Command == TEXT("blueprint_member_edit")) return MemberEdit(Arguments, OutResult, OutError);
     OutError = {TEXT("invalid_argument"), TEXT("Unknown Blueprint mutation command")};
     return false;
 }
@@ -1142,5 +1358,273 @@ bool FUnrealMCPBlueprintMutator::DefaultEdit(
         return false;
     }
     OutResult = BuildEditResult(Blueprint, ObjectPath, Snapshot, TEXT("set_property"), Changed);
+    return true;
+}
+
+bool FUnrealMCPBlueprintMutator::MemberEdit(
+    const TSharedPtr<FJsonObject>& Arguments,
+    TSharedPtr<FJsonObject>& OutResult,
+    FUnrealMCPError& OutError)
+{
+    if (!RequireMutationPreconditions(*Arguments, OutError)) return false;
+    FString Operation;
+    if (!Arguments->TryGetStringField(TEXT("operation"), Operation))
+    {
+        OutError = {TEXT("invalid_argument"), TEXT("blueprint_member_edit requires one typed operation")};
+        return false;
+    }
+    TSet<FString> Allowed = {TEXT("operation_id"), TEXT("asset_path"), TEXT("expected_snapshot"), TEXT("operation")};
+    if (Operation == TEXT("add")) Allowed.Append({TEXT("name"), TEXT("type"), TEXT("default"), TEXT("metadata")});
+    else if (Operation == TEXT("rename")) Allowed.Append({TEXT("member_id"), TEXT("new_name")});
+    else if (Operation == TEXT("update")) Allowed.Append({TEXT("member_id"), TEXT("field"), TEXT("type"), TEXT("default"), TEXT("metadata"), TEXT("policy")});
+    else if (Operation == TEXT("remove")) Allowed.Append({TEXT("member_id"), TEXT("policy")});
+    else
+    {
+        OutError = {TEXT("invalid_argument"), TEXT("Unknown member edit operation")};
+        return false;
+    }
+    for (const TPair<FString, TSharedPtr<FJsonValue>>& Pair : Arguments->Values)
+    {
+        if (!Allowed.Contains(Pair.Key))
+        {
+            OutError = {TEXT("invalid_argument"), TEXT("The member edit contains a field not accepted by its operation")};
+            return false;
+        }
+    }
+
+    FString RawAsset;
+    if (!Arguments->TryGetStringField(TEXT("asset_path"), RawAsset))
+    {
+        OutError = {TEXT("invalid_argument"), TEXT("asset_path must identify one exact Blueprint asset")};
+        return false;
+    }
+    const TSharedRef<FJsonObject> AssetOnly = MakeShared<FJsonObject>();
+    AssetOnly->SetStringField(TEXT("asset_path"), RawAsset);
+    UBlueprint* Blueprint = nullptr;
+    FString ObjectPath;
+    FString PackageName;
+    if (!ResolveMutableBlueprint(*AssetOnly, Blueprint, ObjectPath, PackageName, OutError)
+        || !ValidateExpectedSnapshot(Inspector, *Arguments, ObjectPath, OutError)) return false;
+    if (Blueprint->BlueprintType != BPTYPE_Normal)
+    {
+        OutError = {TEXT("unsupported_type"), TEXT("This live Blueprint kind does not support member-variable editing")};
+        return false;
+    }
+
+    FString MemberId;
+    FString Name;
+    FString NewName;
+    FString Field;
+    FString Policy;
+    FBPVariableDescription* Variable = nullptr;
+    TSharedRef<FJsonObject> References = MakeShared<FJsonObject>();
+    FEdGraphPinType NewType;
+    FString NewDefault;
+    const TSharedPtr<FJsonObject>* TypeObject = nullptr;
+    const TSharedPtr<FJsonObject>* DefaultObject = nullptr;
+    const TSharedPtr<FJsonObject>* MetadataObject = nullptr;
+
+    if (Operation == TEXT("add"))
+    {
+        if (!Arguments->TryGetStringField(TEXT("name"), Name) || !ValidateMemberName(Blueprint, Name, NAME_None, OutError)
+            || !Arguments->TryGetObjectField(TEXT("type"), TypeObject) || TypeObject == nullptr
+            || !UnrealMCP::K2TypeCodec::DecodeType(*TypeObject, NewType, OutError)) return false;
+        if (Arguments->HasField(TEXT("default")))
+        {
+            if (!Arguments->TryGetObjectField(TEXT("default"), DefaultObject) || DefaultObject == nullptr
+                || !UnrealMCP::K2TypeCodec::DecodeDefault(NewType, *DefaultObject, NewDefault, OutError)) return false;
+        }
+        if (Arguments->HasField(TEXT("metadata")))
+        {
+            if (!Arguments->TryGetObjectField(TEXT("metadata"), MetadataObject) || MetadataObject == nullptr) return false;
+            FBPVariableDescription Preview;
+            Preview.VarType = NewType;
+            Preview.PropertyFlags = CPF_Edit | CPF_BlueprintVisible | CPF_DisableEditOnInstance;
+            if (!ValidateAndApplyMetadata(Preview, *MetadataObject, false, OutError)) return false;
+        }
+    }
+    else
+    {
+        if (Operation == TEXT("update")
+            && (!Arguments->TryGetStringField(TEXT("field"), Field)
+                || (Field != TEXT("type") && Field != TEXT("default") && Field != TEXT("metadata"))))
+        {
+            OutError = {TEXT("invalid_argument"), TEXT("update requires field type, default, or metadata")};
+            return false;
+        }
+        if (!Arguments->TryGetStringField(TEXT("member_id"), MemberId)
+            || (Variable = FindLocalMember(Blueprint, MemberId)) == nullptr)
+        {
+            OutError = {TEXT("stale_precondition"), TEXT("The requested stable local member identity is unavailable")};
+            return false;
+        }
+        Name = Variable->VarName.ToString();
+        References = MemberReferences(Blueprint, Variable->VarName);
+        if (Operation == TEXT("remove") || (Operation == TEXT("update") && Field == TEXT("type")))
+        {
+            if (!Arguments->TryGetStringField(TEXT("policy"), Policy) || Policy != TEXT("reject_if_referenced"))
+            {
+                OutError = {TEXT("invalid_argument"), TEXT("Removal and type change require policy reject_if_referenced")};
+                return false;
+            }
+            if (References->GetBoolField(TEXT("referenced")))
+            {
+                OutError = {TEXT("referenced_member"), TEXT("The member is referenced and the reject-only policy forbids this mutation")};
+                OutError.Details->SetStringField(TEXT("member_id"), MemberId);
+                OutError.Details->SetNumberField(TEXT("reference_count"), References->GetNumberField(TEXT("reference_count")));
+                return false;
+            }
+        }
+        if ((Operation == TEXT("rename") || Operation == TEXT("remove")
+            || (Operation == TEXT("update") && Field == TEXT("type")))
+            && !Variable->RepNotifyFunc.IsNone())
+        {
+            OutError = {TEXT("invalid_member"), TEXT("RepNotify relationships are inspectable but immutable until Phase 6")};
+            return false;
+        }
+    }
+
+    if (Operation == TEXT("rename"))
+    {
+        if (!Arguments->TryGetStringField(TEXT("new_name"), NewName) || NewName == Name
+            || !ValidateMemberName(Blueprint, NewName, Variable->VarName, OutError)) return false;
+    }
+    else if (Operation == TEXT("update"))
+    {
+        if (Field == TEXT("type"))
+        {
+            if (!HasOnlyFields(*Arguments, {TEXT("operation_id"), TEXT("asset_path"), TEXT("expected_snapshot"), TEXT("operation"),
+                    TEXT("member_id"), TEXT("field"), TEXT("type"), TEXT("policy")})
+                || !Arguments->TryGetObjectField(TEXT("type"), TypeObject) || TypeObject == nullptr
+                || !UnrealMCP::K2TypeCodec::DecodeType(*TypeObject, NewType, OutError)) return false;
+            if ((NewType.IsSet() || NewType.IsMap()) && (Variable->PropertyFlags & CPF_Net) != 0)
+            {
+                OutError = {TEXT("invalid_member"), TEXT("Replicated members cannot change to a live K2 set or map type")};
+                return false;
+            }
+        }
+        else if (Field == TEXT("default"))
+        {
+            if (!HasOnlyFields(*Arguments, {TEXT("operation_id"), TEXT("asset_path"), TEXT("expected_snapshot"), TEXT("operation"),
+                    TEXT("member_id"), TEXT("field"), TEXT("default")})
+                || !Arguments->TryGetObjectField(TEXT("default"), DefaultObject) || DefaultObject == nullptr
+                || !UnrealMCP::K2TypeCodec::DecodeDefault(Variable->VarType, *DefaultObject, NewDefault, OutError)) return false;
+        }
+        else if (Field == TEXT("metadata"))
+        {
+            if (!HasOnlyFields(*Arguments, {TEXT("operation_id"), TEXT("asset_path"), TEXT("expected_snapshot"), TEXT("operation"),
+                    TEXT("member_id"), TEXT("field"), TEXT("metadata")})
+                || !Arguments->TryGetObjectField(TEXT("metadata"), MetadataObject) || MetadataObject == nullptr
+                || !ValidateAndApplyMetadata(*Variable, *MetadataObject, false, OutError)) return false;
+        }
+        else
+        {
+            OutError = {TEXT("invalid_argument"), TEXT("update field must be type, default, or metadata")};
+            return false;
+        }
+    }
+    else if (Operation == TEXT("remove")
+        && (!HasOnlyFields(*Arguments, {TEXT("operation_id"), TEXT("asset_path"), TEXT("expected_snapshot"), TEXT("operation"), TEXT("member_id"), TEXT("policy")})))
+    {
+        OutError = {TEXT("invalid_argument"), TEXT("remove accepts only member_id and reject_if_referenced policy")};
+        return false;
+    }
+
+    bool bApplied = false;
+    if (Operation == TEXT("rename"))
+    {
+        FBlueprintEditorUtils::RenameMemberVariable(Blueprint, Variable->VarName, FName(*NewName));
+        Variable = FindLocalMember(Blueprint, MemberId);
+        bApplied = Variable != nullptr && Variable->VarName.ToString() == NewName;
+    }
+    else
+    {
+        const FScopedTransaction Transaction(FText::FromString(TEXT("Unreal MCP member edit")));
+        Blueprint->Modify();
+        if (Operation == TEXT("add"))
+        {
+            bApplied = FBlueprintEditorUtils::AddMemberVariable(Blueprint, FName(*Name), NewType, NewDefault);
+            Variable = FindLocalMemberByName(Blueprint, Name);
+            bApplied = bApplied && Variable != nullptr && Variable->VarGuid.IsValid();
+            if (bApplied && MetadataObject != nullptr)
+            {
+                bApplied = ValidateAndApplyMetadata(*Variable, *MetadataObject, true, OutError);
+                if (bApplied) FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(Blueprint);
+            }
+            if (bApplied) MemberId = GuidString(Variable->VarGuid);
+        }
+        else if (Operation == TEXT("remove"))
+        {
+            FBlueprintEditorUtils::RemoveMemberVariable(Blueprint, Variable->VarName);
+            bApplied = FindLocalMember(Blueprint, MemberId) == nullptr;
+        }
+        else if (Field == TEXT("type"))
+        {
+            Variable->VarType = NewType;
+            Variable->DefaultValue.Reset();
+            const UClass* ObjectClass = Cast<UClass>(NewType.PinSubCategoryObject.Get());
+            SetPropertyFlag(Variable->PropertyFlags, CPF_DisableEditOnTemplate,
+                NewType.PinCategory == UEdGraphSchema_K2::PC_Object && ObjectClass != nullptr && ObjectClass->IsChildOf(AActor::StaticClass()));
+            FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(Blueprint);
+            Variable = FindLocalMember(Blueprint, MemberId);
+            bApplied = Variable != nullptr && Variable->VarType == NewType;
+        }
+        else if (Field == TEXT("default"))
+        {
+            Variable->DefaultValue = NewDefault;
+            FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(Blueprint);
+            Variable = FindLocalMember(Blueprint, MemberId);
+            bApplied = Variable != nullptr && Variable->DefaultValue == NewDefault;
+        }
+        else
+        {
+            bApplied = ValidateAndApplyMetadata(*Variable, *MetadataObject, true, OutError);
+            if (bApplied)
+            {
+                FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(Blueprint);
+                Variable = FindLocalMember(Blueprint, MemberId);
+                bApplied = Variable != nullptr;
+            }
+        }
+    }
+    if (!bApplied)
+    {
+        RestoreFailedTransaction(OutError);
+        if (OutError.Code.IsEmpty()) OutError = {TEXT("invalid_member"), TEXT("Unreal rejected the member edit without a committed change")};
+        return false;
+    }
+
+    TSharedPtr<FJsonObject> Member;
+    TSharedPtr<FJsonObject> ResultReferences = References;
+    if (Operation != TEXT("remove"))
+    {
+        if (!ReadInspectedMember(Inspector, ObjectPath, MemberId, Member, OutError))
+        {
+            RestoreFailedTransaction(OutError);
+            return false;
+        }
+        const TSharedPtr<FJsonObject>* ReadReferences = nullptr;
+        if (Member->TryGetObjectField(TEXT("reference_summary"), ReadReferences) && ReadReferences != nullptr)
+        {
+            ResultReferences = *ReadReferences;
+        }
+    }
+    else
+    {
+        Member = MakeShared<FJsonObject>();
+        Member->SetStringField(TEXT("id"), MemberId);
+        Member->SetStringField(TEXT("name"), Name);
+        Member->SetBoolField(TEXT("removed"), true);
+    }
+    FString Snapshot;
+    if (!ReadSnapshot(Inspector, ObjectPath, Snapshot, OutError))
+    {
+        RestoreFailedTransaction(OutError);
+        return false;
+    }
+    OutResult = BuildEditResult(Blueprint, ObjectPath, Snapshot, Operation, Member,
+        Operation == TEXT("add") ? TArray<FString>{MemberId} : TArray<FString>{});
+    OutResult->SetObjectField(TEXT("member"), Member);
+    OutResult->SetObjectField(TEXT("reference_summary"), ResultReferences);
     return true;
 }

@@ -15,10 +15,11 @@ class FakeBridge:
     def call(self, command, arguments=None):
         self.calls.append((command, arguments))
         if command == "capabilities":
-            return {"bridge_version": "0.4.0", "commands": [
+            return {"bridge_version": "0.5.0", "commands": [
                 "capabilities", "editor_state", "operation_status", "blueprint_inspect",
                 "blueprint_create", "blueprint_compile", "blueprint_save",
                 "blueprint_component_edit", "blueprint_default_edit",
+                "blueprint_member_edit",
             ]}
         if command == "blueprint_inspect":
             return {"mode": "discover", "snapshot_id": "a" * 40, "records": []}
@@ -35,12 +36,13 @@ class ServerStdioTests(unittest.TestCase):
         bridge = FakeBridge()
         server = MCPServer(bridge)
         initialized = server.handle({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2025-06-18"}})
-        self.assertEqual(initialized["result"]["serverInfo"]["version"], "0.4.0")
+        self.assertEqual(initialized["result"]["serverInfo"]["version"], "0.5.0")
         listed = server.handle({"jsonrpc": "2.0", "id": 2, "method": "tools/list"})
         self.assertEqual([tool["name"] for tool in listed["result"]["tools"]], [
             "capabilities", "editor_state", "operation_status", "blueprint_inspect",
             "blueprint_create", "blueprint_compile", "blueprint_save",
             "blueprint_component_edit", "blueprint_default_edit",
+            "blueprint_member_edit",
         ])
         called = server.handle({"jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": {"name": "capabilities", "arguments": {}}})
         payload = json.loads(called["result"]["content"][0]["text"])
@@ -62,6 +64,7 @@ class ServerStdioTests(unittest.TestCase):
             {"mode": "discover", "package_path": "/Game/Actors", "asset_name": "BP_Light", "page_size": 10},
             {"mode": "discover", "package_path": "/Engine", "asset_name": "BP_Light"},
             {"mode": "inspect", "asset_path": "/Game/Actors/BP_Light.BP_Light", "sections": ["summary", "nodes"], "include_inherited": True},
+            {"mode": "inspect", "asset_path": "/Game/Actors/BP_Light.BP_Light", "sections": ["variables"], "member_id": "e" * 32},
             {"mode": "inspect", "asset_path": "/ProjectPlugin/BP_Light.BP_Light"},
             {"cursor": "a" * 32, "page_size": 25},
         )
@@ -83,7 +86,7 @@ class ServerStdioTests(unittest.TestCase):
                 response = server.handle({"jsonrpc": "2.0", "id": 5, "method": "tools/call", "params": {"name": "blueprint_inspect", "arguments": arguments}})
                 self.assertEqual(response["error"]["code"], -32602)
 
-    def test_phase_four_mutation_schemas_are_exact(self):
+    def test_released_mutation_schemas_are_exact(self):
         server = MCPServer(FakeBridge())
         operation_id = "a" * 32
         snapshot = "b" * 40
@@ -98,6 +101,22 @@ class ServerStdioTests(unittest.TestCase):
                 "operation": "set_property", "component_id": "c" * 32, "property_name": "bVisible", "value": False}),
             ("blueprint_default_edit", {"operation_id": operation_id, "asset_path": "/Game/Actors/BP_Light", "expected_snapshot": snapshot,
                 "property_name": "InitialLifeSpan", "value": 12.5}),
+            ("blueprint_member_edit", {"operation_id": operation_id, "asset_path": "/Game/Actors/BP_Light", "expected_snapshot": snapshot,
+                "operation": "add", "name": "Health", "type": {"category": "int", "container": "none"},
+                "default": {"kind": "literal", "value": 100},
+                "metadata": {"category": "Stats", "instance_editable": True, "blueprint_visible": True, "replication": "replicated"}}),
+            ("blueprint_member_edit", {"operation_id": operation_id, "asset_path": "/Game/Actors/BP_Light", "expected_snapshot": snapshot,
+                "operation": "rename", "member_id": "e" * 32, "new_name": "HitPoints"}),
+            ("blueprint_member_edit", {"operation_id": operation_id, "asset_path": "/Game/Actors/BP_Light", "expected_snapshot": snapshot,
+                "operation": "update", "member_id": "e" * 32, "field": "type",
+                "type": {"category": "string", "container": "array"}, "policy": "reject_if_referenced"}),
+            ("blueprint_member_edit", {"operation_id": operation_id, "asset_path": "/Game/Actors/BP_Light", "expected_snapshot": snapshot,
+                "operation": "update", "member_id": "e" * 32, "field": "default",
+                "default": {"kind": "array", "items": [{"kind": "literal", "value": "a"}]}}),
+            ("blueprint_member_edit", {"operation_id": operation_id, "asset_path": "/Game/Actors/BP_Light", "expected_snapshot": snapshot,
+                "operation": "update", "member_id": "e" * 32, "field": "metadata", "metadata": {"save_game": True}}),
+            ("blueprint_member_edit", {"operation_id": operation_id, "asset_path": "/Game/Actors/BP_Light", "expected_snapshot": snapshot,
+                "operation": "remove", "member_id": "e" * 32, "policy": "reject_if_referenced"}),
             ("operation_status", {"operation_id": operation_id, "bridge_instance_id": "d" * 32}),
         )
         for name, arguments in valid:
@@ -114,6 +133,12 @@ class ServerStdioTests(unittest.TestCase):
                 "operation": "remove", "component_id": "short"}),
             ("blueprint_default_edit", {"operation_id": operation_id, "asset_path": "/Game/BP_A", "expected_snapshot": snapshot,
                 "property_name": "Unsafe", "value": {"nested": True}}),
+            ("blueprint_member_edit", {"operation_id": operation_id, "asset_path": "/Game/BP_A", "expected_snapshot": snapshot,
+                "operation": "add", "name": "Bad", "type": {"category": "wildcard", "container": "none"}}),
+            ("blueprint_member_edit", {"operation_id": operation_id, "asset_path": "/Game/BP_A", "expected_snapshot": snapshot,
+                "operation": "remove", "member_id": "e" * 32, "policy": "cascade"}),
+            ("blueprint_member_edit", {"operation_id": operation_id, "asset_path": "/Game/BP_A", "expected_snapshot": snapshot,
+                "operation": "update", "member_id": "e" * 32, "field": "metadata", "metadata": {}}),
         )
         for name, arguments in invalid:
             with self.subTest(name=name, arguments=arguments):

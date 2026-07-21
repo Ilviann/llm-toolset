@@ -1,5 +1,12 @@
 # Unreal Editor MCP history
 
+## 0.5.0 — 2026-07-21
+
+- Added bounded typed Blueprint member-variable inspection with stable GUID identity, ownership/editability, canonical K2 types, tagged defaults, validated metadata, replication/RepNotify relationships, and reference summaries.
+- Added transactional `blueprint_member_edit` operations for add, identity-preserving rename, single-field update, and safe removal, with reject-only reference policies for type changes and deletion.
+- Added a shared live K2 type/default codec covering supported scalar, container, enum, struct, and hard/soft object/class categories without accepting serialized engine structures.
+- Added schema, bridge, native Automation, Undo/Redo, compile/save, and cross-process restart coverage proving typed members and defaults persist through the production bridge.
+
 ## 0.4.0 — 2026-07-21
 
 - Added caller-generated operation IDs, process/bridge identity, canonical request digests, retained terminal replay, conflict detection, queued cancellation, expiry/bounds, `operation_status`, and explicit unknown-outcome recovery for every mutation.

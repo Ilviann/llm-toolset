@@ -83,6 +83,8 @@ def _validate_object(
         raise SchemaValidationError(f"{path} property names must be strings")
     if "maxProperties" in schema and len(value) > int(schema["maxProperties"]):
         raise SchemaValidationError(f"{path} has too many properties")
+    if len(value) < int(schema.get("minProperties", 0)):
+        raise SchemaValidationError(f"{path} has too few properties")
     required = schema.get("required", ())
     missing = [name for name in required if name not in value]
     if missing:

@@ -11,7 +11,7 @@ from unreal_editor_mcp.errors import BridgeError, ErrorCode
 from unreal_editor_mcp.project import ProjectLayout
 
 
-RECORD = DiscoveryRecord("a" * 40, 123, 15485, "0.4.0", "5.8.0", 1)
+RECORD = DiscoveryRecord("a" * 40, 123, 15485, "0.5.0", "5.8.0", 1)
 
 
 class FakeResponse:
@@ -76,7 +76,7 @@ class BridgeTests(unittest.TestCase):
 
     @patch("unreal_editor_mcp.bridge.read_token", return_value="b" * 64)
     @patch("unreal_editor_mcp.bridge.read_discovery", return_value=RECORD)
-    def test_sends_phase_four_mutation_arguments(self, _discovery, _token):
+    def test_sends_released_mutation_arguments(self, _discovery, _token):
         operation_id = "c" * 32
         snapshot = "d" * 40
         calls = (
@@ -87,6 +87,9 @@ class BridgeTests(unittest.TestCase):
                 "operation": "add", "component_class": "/Script/Engine.SceneComponent", "name": "Root"}),
             ("blueprint_default_edit", {"operation_id": operation_id, "asset_path": "/Game/BP_New.BP_New", "expected_snapshot": snapshot,
                 "property_name": "InitialLifeSpan", "value": 1.0}),
+            ("blueprint_member_edit", {"operation_id": operation_id, "asset_path": "/Game/BP_New.BP_New", "expected_snapshot": snapshot,
+                "operation": "add", "name": "Health", "type": {"category": "int", "container": "none"},
+                "default": {"kind": "literal", "value": 100}}),
         )
         bridge = self._bridge()
         for command, arguments in calls:

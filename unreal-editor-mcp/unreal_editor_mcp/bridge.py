@@ -19,7 +19,7 @@ MAX_REQUEST_BYTES = 64 * 1024
 MAX_RESPONSE_BYTES = 256 * 1024
 MUTATING_COMMANDS = {
     "blueprint_create", "blueprint_compile", "blueprint_save",
-    "blueprint_component_edit", "blueprint_default_edit",
+    "blueprint_component_edit", "blueprint_default_edit", "blueprint_member_edit",
 }
 
 
@@ -56,6 +56,7 @@ class UnrealBridge:
             "blueprint_save",
             "blueprint_component_edit",
             "blueprint_default_edit",
+            "blueprint_member_edit",
         }:
             raise BridgeError("Unsupported bridge command", code=ErrorCode.INVALID_ARGUMENT)
         record = read_discovery(self.layout)
