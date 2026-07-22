@@ -15,6 +15,7 @@ class FUnrealMCPBlueprintActionCatalog;
 class FUnrealMCPBlueprintGraphEditor;
 class FUnrealMCPBlueprintMutator;
 class FUnrealMCPGameplayFrameworkEditor;
+class FUnrealMCPGameDataService;
 class FUnrealMCPOperationLedger;
 class IHttpRouter;
 
@@ -50,6 +51,7 @@ private:
     TUniquePtr<FUnrealMCPBlueprintGraphEditor> BlueprintGraphEditor;
     TUniquePtr<FUnrealMCPBlueprintMutator> BlueprintMutator;
     TUniquePtr<FUnrealMCPGameplayFrameworkEditor> GameplayFrameworkEditor;
+    TUniquePtr<FUnrealMCPGameDataService> GameDataService;
     TUniquePtr<FUnrealMCPOperationLedger> OperationLedger;
     FString BridgeInstanceId;
     FTSTicker::FDelegateHandle HeartbeatHandle;

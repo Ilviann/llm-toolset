@@ -15,11 +15,11 @@ class FakeBridge:
     def call(self, command, arguments=None):
         self.calls.append((command, arguments))
         if command == "capabilities":
-            return {"bridge_version": "0.15.0", "commands": [
+            return {"bridge_version": "0.16.0", "commands": [
                 "capabilities", "editor_state", "operation_status", "blueprint_inspect", "blueprint_action_catalog", "blueprint_graph_edit",
                 "blueprint_create", "blueprint_compile", "blueprint_save",
                 "blueprint_component_edit", "blueprint_default_edit",
-                "blueprint_member_edit", "gameplay_framework_edit",
+                "blueprint_member_edit", "gameplay_framework_edit", "game_data_inspect", "game_data_edit",
             ]}
         if command == "blueprint_inspect":
             return {"mode": "discover", "snapshot_id": "a" * 40, "records": []}
@@ -36,13 +36,13 @@ class ServerStdioTests(unittest.TestCase):
         bridge = FakeBridge()
         server = MCPServer(bridge)
         initialized = server.handle({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2025-06-18"}})
-        self.assertEqual(initialized["result"]["serverInfo"]["version"], "0.15.0")
+        self.assertEqual(initialized["result"]["serverInfo"]["version"], "0.16.0")
         listed = server.handle({"jsonrpc": "2.0", "id": 2, "method": "tools/list"})
         self.assertEqual([tool["name"] for tool in listed["result"]["tools"]], [
             "capabilities", "editor_state", "operation_status", "blueprint_inspect", "blueprint_action_catalog", "blueprint_graph_edit",
             "blueprint_create", "blueprint_compile", "blueprint_save",
             "blueprint_component_edit", "blueprint_default_edit",
-            "blueprint_member_edit", "gameplay_framework_edit",
+            "blueprint_member_edit", "gameplay_framework_edit", "game_data_inspect", "game_data_edit",
         ])
         called = server.handle({"jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": {"name": "capabilities", "arguments": {}}})
         payload = json.loads(called["result"]["content"][0]["text"])
@@ -322,6 +322,59 @@ class ServerStdioTests(unittest.TestCase):
         self.assertTrue(response["result"]["isError"])
         payload = json.loads(response["result"]["content"][0]["text"])
         self.assertEqual(payload["code"], "editor_unavailable")
+
+    def test_phase_seventeen_game_data_schemas_are_exact_and_bounded(self):
+        server = MCPServer(FakeBridge())
+        operation_id = "a" * 32
+        snapshot = "b" * 40
+        member = {"name": "Damage", "type": {"category": "int", "container": "none"},
+                  "default": {"kind": "literal", "value": 25}}
+        valid = (
+            ("game_data_inspect", {"target": "user_defined_struct", "asset_path": "/Game/Data/ST_Weapon.ST_Weapon"}),
+            ("game_data_inspect", {"target": "data_table", "asset_path": "/Game/Data/DT_Weapons.DT_Weapons",
+                                   "row_names": ["Pistol", "Rifle"], "page_size": 10}),
+            ("game_data_inspect", {"cursor": "c" * 32, "page_size": 50}),
+            ("game_data_edit", {"operation_id": operation_id, "target": "user_defined_struct", "operation": "create",
+                                "asset_path": "/Game/Data/ST_Weapon", "members": [member]}),
+            ("game_data_edit", {"operation_id": operation_id, "target": "user_defined_struct", "operation": "add_member",
+                                "asset_path": "/Game/Data/ST_Weapon.ST_Weapon", "expected_snapshot": snapshot, "member": member}),
+            ("game_data_edit", {"operation_id": operation_id, "target": "user_defined_struct", "operation": "reorder_member",
+                                "asset_path": "/Game/Data/ST_Weapon.ST_Weapon", "expected_snapshot": snapshot,
+                                "member_id": "c" * 32, "relative_to_member_id": "d" * 32, "position": "above"}),
+            ("game_data_edit", {"operation_id": operation_id, "target": "data_table", "operation": "create",
+                                "asset_path": "/Game/Data/DT_Weapons", "row_struct": "/Game/Data/ST_Weapon.ST_Weapon",
+                                "rows": [{"row_name": "Rifle", "values": {"Damage": 42, "Tags": ["primary"],
+                                    "Tuning": {"kind": "struct", "fields": {"Scale": 1.5}},
+                                    "Lookup": {"kind": "map", "entries": [{"key": "body", "value": 1.0}]}}}]}),
+            ("game_data_edit", {"operation_id": operation_id, "target": "data_table", "operation": "replace_row",
+                                "asset_path": "/Game/Data/DT_Weapons.DT_Weapons", "expected_snapshot": snapshot,
+                                "row_name": "Rifle", "values": {"Damage": 45}, "preserve_unspecified": True}),
+            ("game_data_edit", {"operation_id": operation_id, "target": "data_table", "operation": "batch",
+                                "asset_path": "/Game/Data/DT_Weapons.DT_Weapons", "expected_snapshot": snapshot,
+                                "upserts": [{"row_name": "Pistol", "values": {"Damage": 30}}], "remove_rows": ["Old"]}),
+        )
+        for name, arguments in valid:
+            with self.subTest(name=name, arguments=arguments):
+                response = server.handle({"jsonrpc": "2.0", "id": 17, "method": "tools/call",
+                                          "params": {"name": name, "arguments": arguments}})
+                self.assertNotIn("error", response)
+        invalid = (
+            ("game_data_inspect", {"target": "user_defined_struct", "asset_path": "/Game/ST.ST", "row_names": ["x"]}),
+            ("game_data_inspect", {"target": "data_table", "asset_path": "/Game/DT.DT", "page_size": 101}),
+            ("game_data_edit", {"operation_id": operation_id, "target": "user_defined_struct", "operation": "create",
+                                "asset_path": "/Game/ST", "members": []}),
+            ("game_data_edit", {"operation_id": operation_id, "target": "data_table", "operation": "add_row",
+                                "asset_path": "/Game/DT.DT", "expected_snapshot": snapshot, "row_name": "Rifle",
+                                "values": {"Unsafe": {"kind": "raw", "value": "(X=1)"}}}),
+            ("game_data_edit", {"operation_id": operation_id, "target": "data_table", "operation": "batch",
+                                "asset_path": "/Game/DT.DT", "expected_snapshot": snapshot,
+                                "upserts": [{"row_name": str(index), "values": {}} for index in range(65)], "remove_rows": []}),
+        )
+        for name, arguments in invalid:
+            with self.subTest(name=name, arguments=arguments):
+                response = server.handle({"jsonrpc": "2.0", "id": 18, "method": "tools/call",
+                                          "params": {"name": name, "arguments": arguments}})
+                self.assertEqual(response["error"]["code"], -32602)
 
     def test_stdio_stdout_is_protocol_only_and_closes(self):
         bridge = FakeBridge()

@@ -1,6 +1,6 @@
 # Unreal Editor MCP
 
-Unreal Editor MCP 0.15.0 is an offline-first MCP bridge for Unreal Engine 5.8+. It pairs a dependency-free Python 3.10+ stdio server with an editor-only C++ plugin. This release exposes exactly thirteen tools:
+Unreal Editor MCP 0.16.0 is an offline-first MCP bridge for Unreal Engine 5.8+. It pairs a dependency-free Python 3.10+ stdio server with an editor-only C++ plugin. This release exposes exactly fifteen tools:
 
 - `capabilities` reports the exact Python/plugin/Unreal versions, commands, features, listener state, effective limits, and published Blueprint-family matrix.
 - `editor_state` reports project identity, bridge readiness, play/simulate/save/GC state, and concise queued-operation state.
@@ -15,8 +15,10 @@ Unreal Editor MCP 0.15.0 is an offline-first MCP bridge for Unreal Engine 5.8+. 
 - `blueprint_default_edit` edits one supported Blueprint-generated class-default property.
 - `blueprint_member_edit` adds, renames, updates, or safely removes one typed Blueprint variable, function, local variable, macro, or custom-event shell.
 - `gameplay_framework_edit` assigns only the active project's default GameMode or GameInstance class with stale-value and project-identity preconditions.
+- `game_data_inspect` reads one user-defined struct schema or bounded page of typed Data Table rows from an exact asset snapshot.
+- `game_data_edit` creates or atomically edits user-defined structs and typed Data Table rows with validation, saving, and read-back.
 
-Phase 16 adds RPC custom events, typed Actor/component replication settings, exact per-family multiplayer capabilities, and narrow default GameMode/GameInstance assignment. General Project Settings, world overrides, runtime server/client control, editor lifecycle, builds, Blueprint reparenting, filesystem access, console access, unrestricted reflection, and code execution remain unavailable.
+Phase 17 adds bounded user-defined struct authoring and typed Data Table creation, inspection, schema evolution, row editing, and batch updates. CSV/JSON filesystem import/export, Curve Tables, Data Assets, arbitrary UObject assets, supplied struct code, General Project Settings beyond the narrow framework operation, world overrides, runtime server/client control, editor lifecycle, builds, Blueprint reparenting, console access, unrestricted reflection, and code execution remain unavailable.
 
 ## Security model
 
@@ -30,7 +32,7 @@ Treat the project `Saved/` directory as generated state and keep it out of sourc
 
 1. Copy [`plugin/UnrealMCP`](plugin/UnrealMCP) to `<YourProject>/Plugins/UnrealMCP` or add this repository's `plugin/` folder as an `AdditionalPluginDirectories` entry in a disposable development `.uproject`.
 2. Enable the `UnrealMCP` plugin and compile the project's Editor target with Unreal 5.8 or a newer version that passes the included public-API probes.
-3. Open the project. Look for `Unreal MCP 0.15.0 ready on 127.0.0.1:15485` in the editor log.
+3. Open the project. Look for `Unreal MCP 0.16.0 ready on 127.0.0.1:15485` in the editor log.
 4. Install the Python package offline from this folder:
 
    ```sh
@@ -122,7 +124,17 @@ GameInstance uses the shared creation, inspection, default/member editing, actio
 
 A practical GameInstance default is a user-defined instance-editable variable such as a session region, profile slot, or matchmaking preference. Add the member, compile so the generated-class property exists, then use `blueprint_default_edit` with the newest snapshot. Inspect the exact property through `class_defaults` to verify it.
 
-Use `blueprint_action_catalog` to discover callbacks exposed by `UGameInstance`, including `ReceiveInit` (`Init`), `ReceiveShutdown` (`Shutdown`), `HandleNetworkError`, and `HandleTravelError`. Add the returned action through `blueprint_graph_edit`; the live catalog suppresses a unique callback once it exists. The bridge saves the class but does not select it in Project Settings. Assign the saved GameInstance class manually until the narrow Phase 16 project-assignment operation is released. See [`examples/game-instance-workflow.json`](examples/game-instance-workflow.json).
+Use `blueprint_action_catalog` to discover callbacks exposed by `UGameInstance`, including `ReceiveInit` (`Init`), `ReceiveShutdown` (`Shutdown`), `HandleNetworkError`, and `HandleTravelError`. Add the returned action through `blueprint_graph_edit`; the live catalog suppresses a unique callback once it exists. Assign a compatible, clean, saved class through `gameplay_framework_edit` when it should become the active project's default GameInstance. See [`examples/game-instance-workflow.json`](examples/game-instance-workflow.json).
+
+## User-defined structs and Data Tables
+
+Create a user-defined struct with one to 64 complete member declarations. Members use the shared canonical K2 type/default forms and retain stable Unreal GUID identities across rename and safe reorder operations. Add, rename, default update, and reorder compile the structure before saving; type changes and removals require `"policy": "reject_if_referenced"` and reject when the bounded dependency scan finds a Data Table, Blueprint, or other package referencer.
+
+Create a Data Table from one exact live native `FTableRowBase` descendant or user-defined struct, then inspect its reflected schema and sorted rows. Reads accept at most 64 exact `row_names`; pagination cursors are single-use and remain bound to the query-independent asset snapshot. Row writes resolve every field against the live `FProperty` and support finite scalars, enum names, tagged compatible references, tagged structs, arrays, sets, and maps. Instanced object graphs, delegates, interfaces, transient/editor-only references, unknown fields, incompatible values, and unrestricted serialization text reject.
+
+`add_row`, `replace_row`, `rename_row`, and `remove_row` affect one named row. A mixed `batch` stages at most 64 combined upserts and removals before opening its transaction, so duplicate names, case conflicts, missing fields, overlaps, or one invalid value reject without partial changes. `preserve_unspecified: true` is explicit and valid only for an existing row; otherwise omitted fields take the row struct's live defaults.
+
+Every accepted game-data edit saves non-interactively and returns the new snapshot plus concise changed-name read-back. Unexpected save or read-back failure restores and re-saves the prior state. The focused shooter-balance sequence in [`examples/game-data-workflow.json`](examples/game-data-workflow.json) demonstrates schema creation, table creation, filtered inspection, a preserved partial replacement, an atomic batch, and safe schema-removal policy.
 
 ## Blueprint action catalog
 
@@ -442,13 +454,13 @@ Custom-event metadata accepts `rpc_mode` (`not_replicated`, `server`, `client`, 
 
 Compilation and saving remain explicit. Both require `operation_id`, `asset_path`, and the latest `expected_snapshot`. `blueprint_compile` returns `compile_succeeded: false` rather than a tool error when the compiler completed and found Blueprint errors. `blueprint_save` does not compile implicitly. Re-inspect after compile because Unreal may reconstruct identities; save only the current returned snapshot.
 
-See [`examples/creation-workflow.json`](examples/creation-workflow.json), [`examples/game-mode-game-state-workflow.json`](examples/game-mode-game-state-workflow.json), [`examples/game-instance-workflow.json`](examples/game-instance-workflow.json), [`examples/multiplayer-framework-workflow.json`](examples/multiplayer-framework-workflow.json), and the remaining focused files under [`examples/`](examples/) for complete inspect-before-edit/discover sequences.
+See [`examples/creation-workflow.json`](examples/creation-workflow.json), [`examples/game-mode-game-state-workflow.json`](examples/game-mode-game-state-workflow.json), [`examples/game-instance-workflow.json`](examples/game-instance-workflow.json), [`examples/multiplayer-framework-workflow.json`](examples/multiplayer-framework-workflow.json), [`examples/game-data-workflow.json`](examples/game-data-workflow.json), and the remaining focused files under [`examples/`](examples/) for complete inspect-before-edit/discover sequences.
 
 If saving fails, confirm that the package directory is writable and that source-control policy has not made the existing `.uasset` read-only. If compilation fails, inspect the returned diagnostics, correct the Blueprint in the editor or through later editing phases, compile again, and save only after `compile_succeeded` becomes true.
 
 ## Limits
 
-The plugin publishes these authoritative defaults through `capabilities`: 64 KiB requests, 256 KiB responses, eight queued requests, JSON depth 16, strings up to 4096 characters, and a five-second Game-thread dispatch deadline. Inspection uses 25 records by default and allows 100 per page, scans at most 2,048 registry candidates, accepts at most 4,096 structural records, retains 32 cursors for 30 seconds, allows 32 targeted properties, returns at most 16 changed defaults per component, and lists at most 64 member or callable references. Action cataloging returns at most 50 results, scans at most 20,000 spawners for one second, retains 32 catalogs and 256 actions for 60 seconds, and permits one Game-thread catalog at a time. Graph editing permits 2,048 nodes per graph, 256 pins per changed-node result, integer coordinates within ±1,000,000, 64 links per pin, and 512 canonical pin-default characters. Function, macro, and custom-event signatures accept at most 32 parameters. K2 container defaults hold at most 64 items or map entries. The operation ledger retains 128 operations for 15 minutes. Compilation returns at most 64 diagnostic messages of 512 characters each. Discovery heartbeats are valid for ten seconds. Python HTTP calls default to three seconds and can be configured from `0.05` to `30` seconds.
+The plugin publishes these authoritative defaults through `capabilities`: 64 KiB requests, 256 KiB responses, eight queued requests, JSON depth 16, strings up to 4096 characters, and a five-second Game-thread dispatch deadline. Inspection uses 25 records by default and allows 100 per page, scans at most 2,048 registry candidates, accepts at most 4,096 structural records, retains 32 cursors for 30 seconds, allows 32 targeted properties, returns at most 16 changed defaults per component, and lists at most 64 member or callable references. Action cataloging returns at most 50 results, scans at most 20,000 spawners for one second, retains 32 catalogs and 256 actions for 60 seconds, and permits one Game-thread catalog at a time. Graph editing permits 2,048 nodes per graph, 256 pins per changed-node result, integer coordinates within ±1,000,000, 64 links per pin, and 512 canonical pin-default characters. Function, macro, and custom-event signatures accept at most 32 parameters. K2 container defaults hold at most 64 items or map entries. Game-data schemas and nested structs contain at most 64 fields, containers hold at most 64 items, reflected values nest to depth four, one edit touches at most 64 rows, inspection refuses tables above 2,048 rows, and destructive schema scans examine at most 256 dependencies. The operation ledger retains 128 operations for 15 minutes. Compilation returns at most 64 diagnostic messages of 512 characters each. Discovery heartbeats are valid for ten seconds. Python HTTP calls default to three seconds and can be configured from `0.05` to `30` seconds.
 
 ## Offline development and tests
 
@@ -481,4 +493,4 @@ Run the cross-process bridge acceptance test:
 python3 scripts/run_headless_integration.py
 ```
 
-The 0.15.0 native baseline is Unreal 5.8.0 on Apple Silicon macOS 26.5.2 with Xcode 26.1.1. Windows and Linux path/process branches are unit-tested through injected adapters; native Windows validation remains part of applicable feature work rather than a standalone roadmap gate.
+The 0.16.0 native baseline is Unreal 5.8.0 on Apple Silicon macOS 26.5.2 with Xcode 26.1.1. Windows and Linux path/process branches are unit-tested through injected adapters.

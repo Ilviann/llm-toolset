@@ -10,4 +10,5 @@ Each file in this directory documents one implemented cohesive component: what i
 - [`blueprint-graph-editor.md`](blueprint-graph-editor.md) — transactional action-backed node lifecycle, typed pin defaults, wildcard-aware connections, bounded conversions, identity completion, and read-back.
 - [`blueprint-mutator.md`](blueprint-mutator.md) — safe published-family Blueprint creation, compilation, package saving, diagnostics, cleanup, and read-back.
 - [`gameplay-framework-editor.md`](gameplay-framework-editor.md) — narrow verified default GameMode/GameInstance project assignment and config restoration.
+- [`game-data-service.md`](game-data-service.md) — bounded user-defined struct schemas, typed Data Table rows, dependencies, transactions, saving, and cursors.
 - [`automated-verification.md`](automated-verification.md) — Python, native, public-API-probe, and cross-process verification boundaries.

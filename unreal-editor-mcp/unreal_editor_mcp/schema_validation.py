@@ -96,10 +96,16 @@ def _validate_object(
         unknown = [name for name in value if name not in properties]
         if unknown:
             raise SchemaValidationError(f"{path} has unknown field {unknown[0]!r}")
+    property_names = schema.get("propertyNames")
+    if isinstance(property_names, Mapping):
+        for name in value:
+            _validate(name, property_names, root, f"{path} property name")
     for name, item in value.items():
         child = properties.get(name)
         if isinstance(child, Mapping):
             _validate(item, child, root, f"{path}.{name}")
+        elif isinstance(schema.get("additionalProperties"), Mapping):
+            _validate(item, schema["additionalProperties"], root, f"{path}.{name}")
 
 
 def _validate_array(

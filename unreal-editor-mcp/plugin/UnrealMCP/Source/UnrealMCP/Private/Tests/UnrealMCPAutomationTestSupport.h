@@ -59,6 +59,7 @@
 #include "UnrealMCPBlueprintFamilyPolicy.h"
 #include "UnrealMCPBlueprintMutator.h"
 #include "UnrealMCPGameplayFrameworkEditor.h"
+#include "UnrealMCPGameDataService.h"
 #include "UnrealMCPCompatibility.h"
 #include "UnrealMCPProtocol.h"
 #include "UnrealMCPOperationLedger.h"

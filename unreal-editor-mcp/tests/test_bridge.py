@@ -11,7 +11,7 @@ from unreal_editor_mcp.errors import BridgeError, ErrorCode
 from unreal_editor_mcp.project import ProjectLayout
 
 
-RECORD = DiscoveryRecord("a" * 40, 123, 15485, "0.15.0", "5.8.0", 1)
+RECORD = DiscoveryRecord("a" * 40, 123, 15485, "0.16.0", "5.8.0", 1)
 
 
 class FakeResponse:
@@ -97,6 +97,10 @@ class BridgeTests(unittest.TestCase):
             ("gameplay_framework_edit", {"operation_id": operation_id, "project_hash": "a" * 40,
                 "setting": "default_game_instance", "class_path": "/Script/Engine.GameInstance",
                 "expected_class": "/Game/BP_GameInstance.BP_GameInstance_C"}),
+            ("game_data_inspect", {"target": "data_table", "asset_path": "/Game/DT_Weapons.DT_Weapons", "page_size": 10}),
+            ("game_data_edit", {"operation_id": operation_id, "target": "data_table", "operation": "add_row",
+                "asset_path": "/Game/DT_Weapons.DT_Weapons", "expected_snapshot": snapshot,
+                "row_name": "Rifle", "values": {"Damage": 42}}),
         )
         bridge = self._bridge()
         for command, arguments in calls:
@@ -161,6 +165,13 @@ class BridgeTests(unittest.TestCase):
             })
         self.assertEqual(caught.exception.code, ErrorCode.OUTCOME_UNKNOWN)
         self.assertEqual(caught.exception.details["operation_id"], "c" * 32)
+        with self.assertRaises(BridgeError) as caught:
+            self._bridge(TimeoutConnection).call("game_data_edit", {
+                "operation_id": "f" * 32, "target": "data_table", "operation": "remove_row",
+                "asset_path": "/Game/DT_Test.DT_Test", "expected_snapshot": "d" * 40, "row_name": "Test",
+            })
+        self.assertEqual(caught.exception.code, ErrorCode.OUTCOME_UNKNOWN)
+        self.assertEqual(caught.exception.details["operation_id"], "f" * 32)
         with self.assertRaises(BridgeError) as caught:
             self._bridge(TimeoutConnection).call("blueprint_graph_edit", {
                 "operation_id": "e" * 32,

@@ -19,15 +19,15 @@ class ReleaseContractTests(unittest.TestCase):
         native = re.search(r'Version\[\].*TEXT\("([^"]+)"\)', header)
         self.assertIsNotNone(native)
         versions = {project["project"]["version"], plugin["VersionName"], native.group(1), unreal_editor_mcp.__version__}
-        self.assertEqual(versions, {"0.15.0"})
+        self.assertEqual(versions, {"0.16.0"})
 
-    def test_only_released_phase_sixteen_commands_are_registered(self):
+    def test_only_released_phase_seventeen_commands_are_registered(self):
         names = [tool["name"] for tool in TOOLS]
         self.assertEqual(names, [
             "capabilities", "editor_state", "operation_status", "blueprint_inspect", "blueprint_action_catalog", "blueprint_graph_edit",
             "blueprint_create", "blueprint_compile", "blueprint_save",
             "blueprint_component_edit", "blueprint_default_edit",
-            "blueprint_member_edit", "gameplay_framework_edit",
+            "blueprint_member_edit", "gameplay_framework_edit", "game_data_inspect", "game_data_edit",
         ])
         bridge_source = (ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private/UnrealMCPBridge.cpp").read_text(encoding="utf-8")
         for command in names:
@@ -53,6 +53,18 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertIn('TEXT("gameplay_framework_edit")', bridge)
         self.assertIn('TEXT("blueprint_families")', bridge)
         self.assertIn('TEXT("game_instance_family"), true', bridge)
+
+    def test_phase_seventeen_game_data_is_published_and_covered(self):
+        bridge = (ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private/UnrealMCPBridge.cpp").read_text(encoding="utf-8")
+        service = (ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private/UnrealMCPGameDataService.cpp").read_text(encoding="utf-8")
+        test = (ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private/Tests/UnrealMCPAutomationTestsPhase17.cpp").read_text(encoding="utf-8")
+        for command in ["game_data_inspect", "game_data_edit"]:
+            self.assertIn(f'TEXT("{command}")', bridge)
+        for feature in ["user_defined_struct_authoring", "typed_data_tables", "game_data_batch_editing"]:
+            self.assertIn(f'TEXT("{feature}"), true', bridge)
+        for operation in ["add_member", "reorder_member", "add_row", "replace_row", "rename_row", "remove_row", "batch"]:
+            self.assertIn(f'TEXT("{operation}")', service)
+        self.assertIn('UnrealMCP.Phase17.GameDataAuthoring', test)
 
     def test_every_docs_directory_has_an_index(self):
         for directory in [path for path in (ROOT / "docs").rglob("*") if path.is_dir()]:

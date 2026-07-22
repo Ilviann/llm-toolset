@@ -15,7 +15,7 @@ The remaining order is optimized for attaching agents to an existing multiplayer
 - [x] [Phase 14 — GameMode and GameState families](docs/todo/phase-14.md) — Formalize GameMode and GameState family support.
 - [x] [Phase 15 — GameInstance family](docs/todo/phase-15.md) — Add GameInstance family support.
 - [x] [Phase 16 — Multiplayer Blueprint authoring and framework assignment](docs/todo/phase-16.md) — Add RPC custom events, replication settings, and narrow GameMode/GameInstance project assignment.
-- [ ] [Phase 17 — User-defined structs and Data Tables](docs/todo/phase-17.md) — Add bounded row-schema and typed game-design table authoring.
+- [x] [Phase 17 — User-defined structs and Data Tables](docs/todo/phase-17.md) — Add bounded row-schema and typed game-design table authoring.
 - [ ] [Phase 18 — Widget Blueprint family and widget trees](docs/todo/phase-18.md) — Add Widget Blueprint creation, inspection, compilation, saving, and widget-tree editing.
 - [ ] [Phase 19 — UMG layout, styling, bindings, and UI logic](docs/todo/phase-19.md) — Complete practical HUD and menu authoring on the Widget Blueprint family.
 - [ ] [Phase 20 — Complete function replacement](docs/todo/phase-20.md) — Add transactional replacement of one complete user-owned function.

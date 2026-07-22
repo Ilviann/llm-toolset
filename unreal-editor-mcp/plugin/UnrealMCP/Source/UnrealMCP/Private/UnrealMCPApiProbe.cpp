@@ -31,6 +31,10 @@
 #include "K2Node_Tunnel.h"
 #include "ScopedTransaction.h"
 #include "SubobjectDataSubsystem.h"
+#include "DataTableEditorUtils.h"
+#include "Factories/DataTableFactory.h"
+#include "Kismet2/StructureEditorUtils.h"
+#include "StructUtils/UserDefinedStruct.h"
 
 namespace UnrealMCP::ApiProbe
 {
@@ -56,6 +60,8 @@ void RequirePublicTypes()
     static_assert(TIsDerivedFrom<AGameModeBase, AActor>::Value);
     static_assert(TIsDerivedFrom<AGameMode, AGameModeBase>::Value);
     static_assert(TIsDerivedFrom<UGameMapsSettings, UObject>::Value);
+    static_assert(TIsDerivedFrom<UUserDefinedStruct, UScriptStruct>::Value);
+    static_assert(TIsDerivedFrom<UDataTableFactory, UFactory>::Value);
     static_assert(TIsDerivedFrom<AGameStateBase, AActor>::Value);
     static_assert(TIsDerivedFrom<AGameState, AGameStateBase>::Value);
     (void)FHttpServerModule::IsAvailable;
@@ -69,5 +75,9 @@ void RequirePublicTypes()
     (void)&UEdGraphSchema_K2::BreakSinglePinLink;
     (void)FEditorFileUtils::SaveDirtyPackages;
     (void)&UGameMapsSettings::SetGlobalDefaultGameMode;
+    (void)&FStructureEditorUtils::CreateUserDefinedStruct;
+    (void)&FStructureEditorUtils::MoveVariable;
+    (void)&FDataTableEditorUtils::AddRow;
+    (void)&FDataTableEditorUtils::RenameRow;
 }
 }

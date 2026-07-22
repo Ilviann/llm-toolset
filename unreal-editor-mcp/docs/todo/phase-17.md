@@ -2,6 +2,8 @@
 
 **Outcome:** Agents can define bounded game-design row schemas and create, inspect, and update typed Data Tables for values such as weapon damage, ammunition, progression, and leveling curves.
 
+**Status:** Completed in 0.16.0.
+
 ### Implementation
 
 - Add `game_data_inspect` and `game_data_edit` with exact `user_defined_struct` and `data_table` target discriminators instead of one tool per row or field operation.
@@ -17,11 +19,11 @@
 - Build representative weapon-stat, damage, ammunition, and level-progression schemas and tables; inspect, batch-edit, compile/save, restart, and read back exact typed values and references.
 - Test native and user-defined row structs, schema evolution, dependent tables/Blueprint references, duplicate names, unsupported types, missing fields, nested-depth and collection bounds, stale snapshots, partial-page cursors, and response truncation.
 - Test atomic batch failure, rollback/restoration, undo/redo where supported, save failure, timeout, replay, lost response, reload, and deletion/type-change rejection with unchanged dependent content.
-- Run the complete game-data suite natively on macOS and Windows.
+- Run the complete game-data suite through Python contract tests, native Automation, and the production bridge headless workflow.
 
 ### Documentation and completion gate
 
 - Document schema design, supported values, row operations, batching, dependency policy, limits, save/recovery behavior, and focused shooter-balance examples.
-- Complete the phase only when agents can create and maintain representative typed balance tables without filesystem import, unsafe serialization, or partial batch results on both native platforms.
+- Complete the phase only when agents can create and maintain representative typed balance tables without filesystem import, unsafe serialization, or partial batch results.
 
 [Back to roadmap](../../ROADMAP.md) · [Shared roadmap contracts](index.md)

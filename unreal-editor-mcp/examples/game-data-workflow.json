@@ -1,0 +1,111 @@
+{
+  "create_weapon_schema": {
+    "operation_id": "11111111111111111111111111111111",
+    "target": "user_defined_struct",
+    "operation": "create",
+    "asset_path": "/Game/Balance/ST_WeaponStats",
+    "members": [
+      {
+        "name": "Damage",
+        "type": {"category": "int", "container": "none"},
+        "default": {"kind": "literal", "value": 25},
+        "tooltip": "Base damage before multipliers"
+      },
+      {
+        "name": "AmmoType",
+        "type": {"category": "name", "container": "none"},
+        "default": {"kind": "literal", "value": "Rifle"}
+      },
+      {
+        "name": "MagazineSize",
+        "type": {"category": "int", "container": "none"},
+        "default": {"kind": "literal", "value": 30}
+      },
+      {
+        "name": "HeadshotMultiplier",
+        "type": {"category": "real", "subcategory": "double", "container": "none"},
+        "default": {"kind": "literal", "value": 1.5}
+      }
+    ]
+  },
+  "inspect_schema_for_member_ids": {
+    "target": "user_defined_struct",
+    "asset_path": "/Game/Balance/ST_WeaponStats.ST_WeaponStats"
+  },
+  "create_weapon_table": {
+    "operation_id": "22222222222222222222222222222222",
+    "target": "data_table",
+    "operation": "create",
+    "asset_path": "/Game/Balance/DT_WeaponStats",
+    "row_struct": "/Game/Balance/ST_WeaponStats.ST_WeaponStats",
+    "rows": [
+      {
+        "row_name": "AssaultRifle",
+        "values": {
+          "Damage": 31,
+          "AmmoType": "Rifle",
+          "MagazineSize": 30,
+          "HeadshotMultiplier": 1.65
+        }
+      },
+      {
+        "row_name": "Pistol",
+        "values": {
+          "Damage": 22,
+          "AmmoType": "Pistol",
+          "MagazineSize": 15,
+          "HeadshotMultiplier": 1.8
+        }
+      }
+    ]
+  },
+  "inspect_one_row": {
+    "target": "data_table",
+    "asset_path": "/Game/Balance/DT_WeaponStats.DT_WeaponStats",
+    "row_names": ["AssaultRifle"],
+    "page_size": 1
+  },
+  "replace_damage_and_preserve_other_fields": {
+    "operation_id": "33333333333333333333333333333333",
+    "target": "data_table",
+    "operation": "replace_row",
+    "asset_path": "/Game/Balance/DT_WeaponStats.DT_WeaponStats",
+    "expected_snapshot": "0123456789abcdef0123456789abcdef01234567",
+    "row_name": "AssaultRifle",
+    "values": {"Damage": 34},
+    "preserve_unspecified": true
+  },
+  "atomic_balance_batch": {
+    "operation_id": "44444444444444444444444444444444",
+    "target": "data_table",
+    "operation": "batch",
+    "asset_path": "/Game/Balance/DT_WeaponStats.DT_WeaponStats",
+    "expected_snapshot": "89abcdef0123456789abcdef0123456789abcdef",
+    "upserts": [
+      {
+        "row_name": "AssaultRifle",
+        "values": {"HeadshotMultiplier": 1.7},
+        "preserve_unspecified": true
+      },
+      {
+        "row_name": "BurstRifle",
+        "values": {
+          "Damage": 28,
+          "AmmoType": "Rifle",
+          "MagazineSize": 24,
+          "HeadshotMultiplier": 1.75
+        }
+      }
+    ],
+    "remove_rows": ["Pistol"]
+  },
+  "remove_schema_member_only_when_unreferenced": {
+    "operation_id": "55555555555555555555555555555555",
+    "target": "user_defined_struct",
+    "operation": "remove_member",
+    "asset_path": "/Game/Balance/ST_WeaponStats.ST_WeaponStats",
+    "expected_snapshot": "fedcba9876543210fedcba9876543210fedcba98",
+    "member_id": "0123456789abcdef0123456789abcdef",
+    "policy": "reject_if_referenced"
+  }
+}

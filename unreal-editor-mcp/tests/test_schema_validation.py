@@ -41,3 +41,15 @@ class SchemaValidationTests(unittest.TestCase):
         validate_tool_arguments(2, schema)
         with self.assertRaises(SchemaValidationError):
             validate_tool_arguments("b", schema)
+
+    def test_validates_typed_additional_properties_and_property_names(self):
+        schema = {
+            "type": "object",
+            "maxProperties": 2,
+            "propertyNames": {"type": "string", "pattern": "^[A-Z][A-Za-z]*$"},
+            "additionalProperties": {"type": "integer", "minimum": 0},
+        }
+        validate_tool_arguments({"Damage": 42}, schema)
+        for value in ({"damage": 42}, {"Damage": -1}, {"Damage": 1.5}):
+            with self.subTest(value=value), self.assertRaises(SchemaValidationError):
+                validate_tool_arguments(value, schema)

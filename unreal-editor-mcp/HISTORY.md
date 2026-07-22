@@ -1,5 +1,13 @@
 # Unreal Editor MCP history
 
+## 0.16.0 — 2026-07-23
+
+- Added `game_data_inspect` and reconciled `game_data_edit` for bounded user-defined struct schemas and typed Data Tables, bringing the released surface to fifteen exact tools.
+- Added stable struct-member identities, safe schema evolution, bounded dependency rejection for destructive changes, typed row creation and inspection, and transactional add/replace/rename/remove/batch row authoring.
+- Added one reflected row-value codec for scalars, enums, common/native/user structs, arrays, sets, maps, and compatible references with strict depth, field, collection, row, dependency, mutation-scope, and unsupported-property limits.
+- Added package saving, snapshot/cursor/replay contracts, explicit failure restoration, Python schema coverage, native Phase 17 Automation coverage, public API probes, architecture/type documentation, and a focused shooter-balance workflow example.
+- Verified Phase 17 with Python contract tests, Unreal 5.8 native Automation, normal and forced-unity builds, and the production bridge restart workflow.
+
 ## 0.15.0 — 2026-07-23
 
 - Added exact custom-event RPC metadata and inspection for non-replicated, server, owning-client, and multicast modes with live family restrictions and reliable/unreliable semantics.

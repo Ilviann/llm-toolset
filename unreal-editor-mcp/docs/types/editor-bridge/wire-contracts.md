@@ -1,6 +1,6 @@
 # Native wire contracts
 
-The HTTP request has exactly two fields: `command` is one of the thirteen commands released through Phase 16 and `arguments` follows its exact owning shape. `gameplay_framework_edit` is a ledger-backed mutation with fixed setting, project hash, exact class, and stale current-class fields. Authentication remains one exact bearer header.
+The HTTP request has exactly two fields: `command` is one of the fifteen commands released through Phase 17 and `arguments` follows its exact owning shape. `game_data_edit` is ledger-backed; `game_data_inspect` is read-only and cursor-capable. Authentication remains one exact bearer header.
 
 A success is `{ok:true,result:<object>}`. A failure is `{ok:false,error:{code,message,details,retryable}}`. Native errors use the same stable codes accepted by Python and never contain exceptions, addresses, tokens, absolute project paths, or unbounded logs.
 

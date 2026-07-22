@@ -43,7 +43,7 @@ def wait_until_ready(layout: ProjectLayout, process: subprocess.Popen[bytes], de
         try:
             record = read_discovery(layout)
             result = UnrealBridge(layout, timeout=2.0).call("capabilities")
-            if result.get("bridge_ready") is True and record.bridge_version == "0.15.0":
+            if result.get("bridge_ready") is True and record.bridge_version == "0.16.0":
                 return
         except Exception as error:
             last_error = str(error)
@@ -98,7 +98,7 @@ def send_without_reading(layout: ProjectLayout, command: str, arguments: dict[st
         headers={
             "Authorization": "Bearer " + read_token(layout),
             "Content-Type": "application/json",
-            "X-Unreal-MCP-Version": "0.15.0",
+            "X-Unreal-MCP-Version": "0.16.0",
         },
     )
     connection.close()
@@ -132,6 +132,143 @@ def collect_inspection(bridge: UnrealBridge, arguments: dict[str, object]) -> di
         records.extend(page.get("records", []))
         cursor = page.get("next_cursor")
     raise AssertionError("inspection exceeded the retained cursor-page bound")
+
+
+def collect_game_data(bridge: UnrealBridge, arguments: dict[str, object]) -> dict[str, object]:
+    """Consume one game-data cursor chain while retaining its first-page metadata."""
+    result = bridge.call("game_data_inspect", arguments)
+    records = list(result.get("records", []))
+    snapshot = result.get("snapshot_id")
+    cursor = result.get("next_cursor")
+    for _ in range(63):
+        if not isinstance(cursor, str):
+            merged = dict(result)
+            merged["records"] = records
+            merged.pop("next_cursor", None)
+            return merged
+        page = bridge.call("game_data_inspect", {"cursor": cursor, "page_size": 100})
+        if page.get("snapshot_id") != snapshot:
+            raise AssertionError("game-data cursor continuation changed snapshots")
+        records.extend(page.get("records", []))
+        cursor = page.get("next_cursor")
+    raise AssertionError("game-data inspection exceeded the retained cursor-page bound")
+
+
+def author_phase_seventeen_game_data(
+    bridge: UnrealBridge,
+    layout: ProjectLayout,
+    bridge_instance_id: str,
+) -> dict[str, object]:
+    struct_package = "/Game/UnrealMCPPhase17/ST_WeaponStats"
+    struct_path = struct_package + ".ST_WeaponStats"
+    table_package = "/Game/UnrealMCPPhase17/DT_WeaponStats"
+    table_path = table_package + ".DT_WeaponStats"
+    created_struct = bridge.call("game_data_edit", {
+        "operation_id": uuid.uuid4().hex,
+        "target": "user_defined_struct",
+        "operation": "create",
+        "asset_path": struct_package,
+        "members": [
+            {
+                "name": "Damage",
+                "type": {"category": "int", "container": "none"},
+                "default": {"kind": "literal", "value": 25},
+            },
+            {
+                "name": "AmmoType",
+                "type": {"category": "string", "container": "none"},
+                "default": {"kind": "literal", "value": "Rifle"},
+            },
+        ],
+    })
+    if created_struct.get("saved") is not True or created_struct.get("dirty") is not False:
+        raise AssertionError(f"Phase 17 schema creation contract mismatch: {created_struct!r}")
+    struct_inspection = collect_game_data(bridge, {
+        "target": "user_defined_struct", "asset_path": struct_path, "page_size": 1,
+    })
+    members = {record.get("name"): record for record in struct_inspection.get("records", [])}
+    if set(members) != {"Damage", "AmmoType"} or not isinstance(members["Damage"].get("id"), str):
+        raise AssertionError(f"Phase 17 schema inspection mismatch: {struct_inspection!r}")
+
+    created_table = bridge.call("game_data_edit", {
+        "operation_id": uuid.uuid4().hex,
+        "target": "data_table",
+        "operation": "create",
+        "asset_path": table_package,
+        "row_struct": struct_path,
+        "rows": [
+            {"row_name": "Pistol", "values": {"Damage": 22, "AmmoType": "Pistol"}},
+            {"row_name": "Rifle", "values": {"Damage": 42, "AmmoType": "Rifle"}},
+        ],
+    })
+    if created_table.get("saved") is not True or created_table.get("dirty") is not False:
+        raise AssertionError(f"Phase 17 table creation contract mismatch: {created_table!r}")
+    table_inspection = collect_game_data(bridge, {
+        "target": "data_table", "asset_path": table_path, "page_size": 1,
+    })
+    if [record.get("name") for record in table_inspection.get("records", [])] != ["Pistol", "Rifle"]:
+        raise AssertionError(f"Phase 17 table cursor ordering mismatch: {table_inspection!r}")
+    filtered = collect_game_data(bridge, {
+        "target": "data_table", "asset_path": table_path, "row_names": ["Rifle"], "page_size": 1,
+    })
+    if filtered.get("snapshot_id") != table_inspection.get("snapshot_id") \
+            or [record.get("name") for record in filtered.get("records", [])] != ["Rifle"]:
+        raise AssertionError(f"Phase 17 filtered snapshot mismatch: {filtered!r}")
+
+    dependent_struct = collect_game_data(bridge, {
+        "target": "user_defined_struct", "asset_path": struct_path,
+    })
+    try:
+        bridge.call("game_data_edit", {
+            "operation_id": uuid.uuid4().hex,
+            "target": "user_defined_struct",
+            "operation": "remove_member",
+            "asset_path": struct_path,
+            "expected_snapshot": dependent_struct["snapshot_id"],
+            "member_id": members["Damage"]["id"],
+            "policy": "reject_if_referenced",
+        })
+    except BridgeError as error:
+        if error.code is not ErrorCode.REFERENCED_SCHEMA:
+            raise
+    else:
+        raise AssertionError("Phase 17 destructive schema edit ignored its dependent Data Table")
+    if collect_game_data(bridge, {
+        "target": "user_defined_struct", "asset_path": struct_path,
+    }).get("snapshot_id") != dependent_struct.get("snapshot_id"):
+        raise AssertionError("Phase 17 referenced schema rejection changed the struct snapshot")
+
+    operation_id = uuid.uuid4().hex
+    send_without_reading(layout, "game_data_edit", {
+        "operation_id": operation_id,
+        "target": "data_table",
+        "operation": "batch",
+        "asset_path": table_path,
+        "expected_snapshot": table_inspection["snapshot_id"],
+        "upserts": [
+            {"row_name": "Rifle", "values": {"Damage": 45}, "preserve_unspecified": True},
+        ],
+        "remove_rows": ["Pistol"],
+    })
+    status = reconcile_operation(bridge, operation_id, bridge_instance_id)
+    batch = status.get("result") if status.get("state") == "committed" else None
+    if not isinstance(batch, dict) or batch.get("changed_count") != 2:
+        raise AssertionError(f"Phase 17 lost batch response did not reconcile: {status!r}")
+    final_table = collect_game_data(bridge, {
+        "target": "data_table", "asset_path": table_path,
+    })
+    rows = final_table.get("records", [])
+    if len(rows) != 1 or rows[0].get("name") != "Rifle" \
+            or rows[0].get("values", {}).get("Damage") != 45 \
+            or rows[0].get("values", {}).get("AmmoType") != "Rifle" \
+            or final_table.get("snapshot_id") != batch.get("snapshot_id"):
+        raise AssertionError(f"Phase 17 batch read-back mismatch: {final_table!r}")
+    return {
+        "struct_path": struct_path,
+        "struct_snapshot": dependent_struct["snapshot_id"],
+        "table_path": table_path,
+        "table_snapshot": final_table["snapshot_id"],
+    }
 
 
 def author_phase_fourteen_families(bridge: UnrealBridge) -> dict[str, dict[str, object]]:
@@ -435,6 +572,7 @@ def run_automation(executable: Path, project: Path, environment: dict[str, str],
         "GameInstanceFamily",
         "MultiplayerAuthoring",
         "FrameworkAssignment",
+        "GameDataAuthoring",
     )
     if test_filter == "UnrealMCP":
         expected = all_expected
@@ -464,6 +602,8 @@ def run_automation(executable: Path, project: Path, environment: dict[str, str],
         expected = tuple(name for name in all_expected if name == "GameInstanceFamily")
     elif test_filter == "UnrealMCP.Phase16":
         expected = tuple(name for name in all_expected if name in {"MultiplayerAuthoring", "FrameworkAssignment"})
+    elif test_filter == "UnrealMCP.Phase17":
+        expected = tuple(name for name in all_expected if name == "GameDataAuthoring")
     else:
         leaf = test_filter.rsplit(".", 1)[-1]
         expected = (leaf,) if leaf in all_expected else ()
@@ -531,6 +671,9 @@ def main() -> int:
         (phase_fourteen_dir / f"{name}.uasset").unlink(missing_ok=True)
     phase_fifteen_fixture = layout.root / "Content" / "UnrealMCPPhase15" / "BP_GameInstance.uasset"
     phase_fifteen_fixture.unlink(missing_ok=True)
+    phase_seventeen_dir = layout.root / "Content" / "UnrealMCPPhase17"
+    for name in ("ST_WeaponStats", "DT_WeaponStats"):
+        (phase_seventeen_dir / f"{name}.uasset").unlink(missing_ok=True)
     environment = dict(os.environ)
     environment["DEVELOPER_DIR"] = str(developer)
     if sys.argv[1:] == ["--automation-only"]:
@@ -555,9 +698,10 @@ def main() -> int:
                 "capabilities", "editor_state", "operation_status", "blueprint_inspect", "blueprint_action_catalog", "blueprint_graph_edit",
                 "blueprint_create", "blueprint_compile", "blueprint_save",
                 "blueprint_component_edit", "blueprint_default_edit", "blueprint_member_edit", "gameplay_framework_edit",
+                "game_data_inspect", "game_data_edit",
             ]:
                 raise AssertionError("released command catalog mismatch")
-            if capabilities.get("bridge_version") != "0.15.0" or state.get("bridge_ready") is not True:
+            if capabilities.get("bridge_version") != "0.16.0" or state.get("bridge_ready") is not True:
                 raise AssertionError("capability/state contract mismatch")
             if capabilities.get("features", {}).get("blueprint_mutation") is not True:
                 raise AssertionError("Phase 6 mutation capability is unavailable")
@@ -587,6 +731,9 @@ def main() -> int:
                             "typed_replication_settings", "gameplay_framework_assignment"):
                 if capabilities.get("features", {}).get(feature) is not True:
                     raise AssertionError(f"Phase 16 multiplayer capability is unavailable: {feature}")
+            for feature in ("user_defined_struct_authoring", "typed_data_tables", "game_data_batch_editing"):
+                if capabilities.get("features", {}).get(feature) is not True:
+                    raise AssertionError(f"Phase 17 game-data capability is unavailable: {feature}")
             family_matrix = capabilities.get("blueprint_families", [])
             if [record.get("family") for record in family_matrix] != [
                 "actor", "game_mode_base", "game_mode", "game_state_base", "game_state", "game_instance",
@@ -608,6 +755,12 @@ def main() -> int:
             }
             if any(capabilities.get("limits", {}).get(name) != value for name, value in expected_graph_limits.items()):
                 raise AssertionError(f"Phase 13 graph limits mismatch: {capabilities.get('limits')!r}")
+            expected_game_data_limits = {
+                "game_data_fields": 64, "game_data_rows": 2048, "game_data_batch_rows": 64,
+                "game_data_collection_items": 64, "game_data_depth": 4, "game_data_dependencies": 256,
+            }
+            if any(capabilities.get("limits", {}).get(name) != value for name, value in expected_game_data_limits.items()):
+                raise AssertionError(f"Phase 17 game-data limits mismatch: {capabilities.get('limits')!r}")
             if capabilities.get("asset_access") != {
                 "read_scope": "all_mounted_content",
                 "mutation_scope": "project_content_and_local_project_plugins",
@@ -642,6 +795,9 @@ def main() -> int:
                 raise AssertionError(f"Actor Blueprint creation contract mismatch: {created!r}")
             phase_fourteen_families = author_phase_fourteen_families(bridge)
             phase_fifteen_game_instance = author_phase_fifteen_game_instance(bridge)
+            phase_seventeen_game_data = author_phase_seventeen_game_data(
+                bridge, layout, capabilities["bridge_instance_id"],
+            )
             asset_path = "/Game/UnrealMCPPhase4/BP_ComponentFixture.BP_ComponentFixture"
             created = bridge.call("blueprint_default_edit", {
                 "operation_id": uuid.uuid4().hex,
@@ -1283,6 +1439,20 @@ def main() -> int:
             })
             if restored_game_mode.get("verified") is not True or restored_game_instance.get("verified") is not True:
                 raise AssertionError("Phase 16 framework settings did not survive restart and restore")
+            reloaded_struct = collect_game_data(reloaded_bridge, {
+                "target": "user_defined_struct", "asset_path": phase_seventeen_game_data["struct_path"],
+            })
+            reloaded_table = collect_game_data(reloaded_bridge, {
+                "target": "data_table", "asset_path": phase_seventeen_game_data["table_path"],
+            })
+            if reloaded_struct.get("snapshot_id") != phase_seventeen_game_data["struct_snapshot"] \
+                    or reloaded_table.get("snapshot_id") != phase_seventeen_game_data["table_snapshot"]:
+                raise AssertionError("Phase 17 game-data snapshots changed after restart")
+            reloaded_rows = reloaded_table.get("records", [])
+            if len(reloaded_rows) != 1 or reloaded_rows[0].get("name") != "Rifle" \
+                    or reloaded_rows[0].get("values", {}).get("Damage") != 45 \
+                    or reloaded_rows[0].get("values", {}).get("AmmoType") != "Rifle":
+                raise AssertionError(f"Phase 17 typed rows changed after restart: {reloaded_table!r}")
             reloaded = collect_inspection(reloaded_bridge, {
                 "mode": "inspect",
                 "asset_path": "/Game/UnrealMCPPhase4/BP_ComponentFixture.BP_ComponentFixture",
@@ -1559,7 +1729,7 @@ def main() -> int:
             pass
         else:
             raise AssertionError("a live discovery heartbeat remained after editor termination")
-    print("Phase 16 integration passed: multiplayer Blueprint authoring, framework assignment/restore, restart, and clean unload")
+    print("Phase 17 integration passed: typed game-data authoring, dependency safety, replay, restart, and clean unload")
     return 0
 
 
