@@ -40,6 +40,18 @@ Treat the project `Saved/` directory as generated state and keep it out of sourc
    .venv/bin/python -m pip install --no-build-isolation --no-deps .
    ```
 
+### Package the binary plugin
+
+Set `UNREAL_MCP_ENGINE_ROOT` to the Unreal installation root, then run the standard Unreal AutomationTool `BuildPlugin` workflow through the repository script:
+
+```sh
+python3 scripts/package_plugin.py
+```
+
+On macOS, also set `UNREAL_MCP_DEVELOPER_DIR` to the compatible Xcode `Contents/Developer` directory. The script packages the plugin into `<workspace>/build/unreal-editor-mcp` by default, replacing that output directory's existing contents, and verifies that the result contains an installed plugin descriptor and compiled binaries. Copy the resulting directory to `<YourProject>/Plugins/UnrealMCP` for deployment against the same Unreal Engine version.
+
+Use `--output <path>` to select another destination, `--target-platforms Mac` (or another `+`-separated UAT platform list) to restrict target platforms, and `--dry-run` to validate and print the fixed argument array without building. Run `python3 scripts/package_plugin.py --help` for all options. Packaging is offline and uses only the configured Unreal installation and local compiler toolchain.
+
 The default port is `15485`. To select another unprivileged port, add this to the project's editor-per-project configuration before startup:
 
 ```ini

@@ -82,6 +82,20 @@ env DEVELOPER_DIR="$UNREAL_MCP_DEVELOPER_DIR" \
 
 UnrealBuildTool writes normal logs and caches outside the repository. Sandboxed development environments must explicitly permit those writes rather than redirecting or disabling Unreal's standard behavior.
 
+## Binary plugin packaging
+
+`scripts/package_plugin.py` invokes the configured engine's platform-appropriate `RunUAT` launcher with the standard `BuildPlugin` command. It accepts the engine only through `UNREAL_MCP_ENGINE_ROOT` or `--engine-root`, keeps the plugin descriptor fixed to `plugin/UnrealMCP/UnrealMCP.uplugin`, and passes every UAT argument as a subprocess array. On macOS it also requires `UNREAL_MCP_DEVELOPER_DIR`, `DEVELOPER_DIR`, or `--developer-dir` and exports the resolved value as `DEVELOPER_DIR` for the child build.
+
+From the application directory, package for the host's installed platforms with:
+
+```sh
+python3 scripts/package_plugin.py
+```
+
+The default destination is the workspace-level `build/unreal-editor-mcp` directory. AutomationTool clears this destination before packaging, so the wrapper rejects broad, source-overlapping, engine-overlapping, and other protected output paths before launch. After a successful UAT exit, the wrapper requires the output descriptor to have `Installed: true` and requires at least one file under `Binaries/`.
+
+Use `--target-platforms` with Unreal's `+`-separated platform names when the installed engine and host toolchain support an explicit target set. Use `--dry-run` to validate paths and show the exact command without changing the output. The workflow must remain offline; prepare every engine platform component and compiler toolchain before packaging.
+
 ## Initial verified baseline
 
 The following combination generated project files and compiled the empty `UnrealMCPTestEditor` target successfully on 2026-07-21:
