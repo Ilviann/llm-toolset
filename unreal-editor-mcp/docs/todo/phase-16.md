@@ -1,27 +1,27 @@
-# Phase 16 — Complete function replacement
+# Phase 16 — Multiplayer Blueprint authoring and framework assignment
 
-**Outcome:** Agents can replace one complete user-owned function as a single prevalidated operation while preserving unrelated Blueprint content.
+**Outcome:** Agents can author the replication and RPC contracts used by a multiplayer shooter and can activate the project's default GameMode and GameInstance through a narrow, observable settings operation.
 
 ### Implementation
 
-- Add `blueprint_block_replace` using the existing member, action-catalog, type/value, graph-edit, operation-ledger, and diagnostic primitives rather than a second mutation engine.
-- Limit the first contract to one complete user-owned function. Treat the function entry, result, parameters, and locals as the complete declared boundary; keep arbitrary graph regions, events, custom events, and macros unsupported.
-- Define required entry and result identities, owned nodes, local variables, replacement operations, action signatures, limits, expected fingerprints, explicit node positions, and current-snapshot preconditions.
-- Preflight without supplied code or free-form Blueprint text. Use an isolated non-transient scratch Blueprint/package or a semantic preflight proven behaviorally equivalent to live spawning; do not assume transient-graph node spawning matches a live graph.
-- Compile the isolated candidate, compare planned postconditions, and remove all scratch objects and registrations before touching the live Blueprint.
-- Apply the validated live replacement as one reconciled editor transaction. Preserve unrelated graphs, nodes, variables, metadata, links, positions, bookmarks, comments, and prior dirty state; explicitly restore on any unexpected result.
-- Require explicit positions for changed nodes. Automatic layout remains unsupported until Phase 18.
+- Extend custom-event metadata and inspection with live Unreal RPC semantics: not replicated, server, owning client, or multicast, plus reliability where the selected mode permits it. Preserve the custom-event node identity and reject unsupported signatures, family/graph contexts, conflicting flags, and forged function metadata before mutation.
+- Add typed Actor and ActorComponent replication settings through the existing default/component mutation paths, including the live-supported equivalents of actor replication, movement replication, relevancy, dormancy, priority/update frequency, and component replication. Do not expose unrestricted reflection.
+- Retain and exercise the released replicated-variable and RepNotify contracts, including lifetime conditions and notification-function coupling. Publish exact per-family multiplayer capabilities rather than implying every setting is valid on every Actor-derived class.
+- Add `gameplay_framework_edit` for only the configured project's default GameMode and GameInstance class assignments. Resolve exact compatible saved Blueprint-generated or native classes, report the old/new setting and restart requirement, and keep world-specific overrides, arbitrary config keys, config paths, and general Project Settings mutation unavailable.
+- Reuse operation IDs, stale preconditions, exact project identity, bounded diagnostics, atomic config persistence, read-back verification, and lost-response reconciliation. A rejected or failed assignment must preserve the prior on-disk setting.
+- Keep runtime server control, client input injection, gameplay cheats, console commands, and arbitrary PIE operations outside the model-facing surface.
 
 ### Verification
 
-- Replace representative pure and impure user-owned functions with parameters, results, locals, internal branches, cycles, latent restrictions, and supported conversions.
-- Test invalid boundaries, stale snapshots, expired actions, compile failure, timeout, lost response, rollback, undo/redo, save/reload, and unchanged-content fingerprints.
-- Prove scratch preflight/live parity for every supported node family. Prove failed preflight creates no live transaction and unexpected live failure restores exact inspected structure and prior dirty state.
-- Run the complete function-replacement and preservation suites natively on macOS and Windows.
+- Create and read back representative replicated Character/Pawn/PlayerState components, replicated and RepNotify variables, and reliable/unreliable server, client, and multicast custom events.
+- Test invalid RPC parameters, incompatible family/graph contexts, conflicting reliability/mode combinations, component and actor replication dependencies, stale snapshots, undo/redo, compile/save/reload, timeout, replay, and lost-response recovery.
+- Assign and restore compatible native and Blueprint default GameMode/GameInstance classes; test missing, unsaved, wrong-family, stale, read-only, source-controlled, and write-failure cases without accepting arbitrary config mutation.
+- Add internal automation-only multiplayer behavioral coverage proving authored RPC/function flags, replication descriptors, notification relationships, and framework settings behave as represented. Do not add model-facing runtime-control tools.
+- Run the complete suite natively on macOS and Windows and require identical model-facing contracts.
 
 ### Documentation and completion gate
 
-- Document function ownership, declared boundaries, scratch preflight, explicit positions, preservation guarantees, limits, operation recovery, and when atomic actions remain preferable.
-- Complete the phase only when unrelated-content fingerprints remain stable across successful, rejected, timed-out, and replayed function replacements on both native platforms.
+- Document authority/ownership implications, RPC delivery limitations, replication settings, RepNotify coupling, framework assignment, restart behavior, manual world overrides, and focused multiplayer-shooter examples.
+- Complete the phase only when the supported multiplayer contracts survive compile/save/restart, settings failures restore exactly, and automation verifies the represented networking semantics on both native platforms.
 
 [Back to roadmap](../../ROADMAP.md) · [Shared roadmap contracts](index.md)

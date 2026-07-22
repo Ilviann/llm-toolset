@@ -1,23 +1,24 @@
-# Phase 23 — Optional editor-target builds
+# Phase 23 — Optional configured editor launch
 
-**Outcome:** Agents can opt in to narrowly configured editor-target builds only while the configured project editor is stopped.
+**Outcome:** Agents can opt in to launching only the configured Unreal project/editor instance and wait for its exact authenticated bridge.
 
 ### Implementation
 
-- Extend `project_build` with a typed `build_editor_target` operation while keeping the tool in opt-in large mode.
-- Let the model select only targets and configurations from a bounded published allowlist. Never accept executable paths, project paths, shell fragments, environment variables, compiler/linker flags, working directories, or arbitrary arguments.
-- Reuse the Phase 22 fixed platform adapters, stopped-editor precondition, durable lifecycle reconciliation, process bounds, retention, cancellation escalation, and child-process cleanup.
-- Normalize compiler diagnostics and keep raw subprocess output off MCP stdout except inside valid bounded tool results.
+- Add the single `editor_lifecycle` tool only in opt-in large mode with a typed `launch` operation. Keep normal state reporting in the existing editor-state surface.
+- Accept no executable path, project path, environment variable, or arbitrary process argument from the model. Configure and validate absolute editor and `.uproject` paths at MCP startup and expose only bounded availability information.
+- Launch one detached configured editor instance through narrow platform adapters.
+- Detect the exact project-specific authenticated bridge and distinguish `starting`, `ready`, `already_running`, cancelled, timed out, and failed startup.
+- Bound concurrent launches, startup duration, retained results, discovery work, diagnostics, and child-process cleanup.
 
 ### Verification
 
-- Test target and configuration allowlists, fixed command construction, missing tools, invalid selections, editor-running and uncertain-state rejection, timeout, cancellation, nonzero exit, oversized logs, normalized diagnostics, replay, and process-tree cleanup.
-- Run native offline editor-target builds from packaged configuration on macOS and Windows without network access or runtime downloads. Unit test Linux construction separately.
-- Prove that tool arguments cannot alter the executable, project, environment, working directory, command template, or unrestricted flags.
+- Test missing and malformed configuration, paths with spaces, another project or process on the port, repeated launches, version mismatch, timeout, cancellation, and abnormal startup.
+- Run launch, readiness, cancellation, and recovery natively on macOS and Windows. Unit test Linux command construction without claiming native support.
+- Prove the model cannot substitute executables, projects, environment values, shell fragments, or arbitrary arguments.
 
 ### Documentation and completion gate
 
-- Document configured allowlists, offline tool preparation, lifecycle interaction, bounded diagnostics, cancellation, platform behavior, and default-mode exclusion.
-- Complete the phase only when fixed native editor-target builds are reproducible from clean documented configuration on macOS and Windows.
+- Document opt-in launch configuration, platform paths, states, cancellation, recovery, limits, and default-mode exclusion.
+- Complete the phase only when configured launch reaches the exact authenticated bridge without arbitrary process execution on native macOS and Windows.
 
 [Back to roadmap](../../ROADMAP.md) · [Shared roadmap contracts](index.md)

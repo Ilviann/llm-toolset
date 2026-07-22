@@ -22,14 +22,18 @@ Keep the authoritative checklist in [`ROADMAP.md`](../../ROADMAP.md) synchronize
 - [Phase 13 — Wildcards, conversions, and complete atomic graph editing](phase-13.md) — Add wildcard specialization, explicit conversion insertion, and complete atomic graph editing.
 - [Phase 14 — GameMode and GameState families](phase-14.md) — Formalize GameMode and GameState family support.
 - [Phase 15 — GameInstance family](phase-15.md) — Add GameInstance family support.
-- [Phase 16 — Complete function replacement](phase-16.md) — Add transactional replacement of one complete user-owned function.
-- [Phase 17 — Event, custom-event, and macro replacement](phase-17.md) — Extend bounded replacement to events, custom events, and macros.
-- [Phase 18 — Deterministic changed-node layout](phase-18.md) — Add deterministic layout for changed nodes.
-- [Phase 19 — Optional configured editor launch](phase-19.md) — Add optional configured editor launch.
-- [Phase 20 — Optional graceful editor shutdown](phase-20.md) — Add optional graceful editor shutdown.
-- [Phase 21 — Optional durable editor restart](phase-21.md) — Add optional durable editor restart.
-- [Phase 22 — Optional editor-offline project-file generation](phase-22.md) — Add optional editor-offline project-file generation.
-- [Phase 23 — Optional editor-target builds](phase-23.md) — Add optional editor-target builds.
+- [Phase 16 — Multiplayer Blueprint authoring and framework assignment](phase-16.md) — Add RPC custom events, replication settings, and narrow GameMode/GameInstance project assignment.
+- [Phase 17 — User-defined structs and Data Tables](phase-17.md) — Add bounded row-schema and typed game-design table authoring.
+- [Phase 18 — Widget Blueprint family and widget trees](phase-18.md) — Add Widget Blueprint creation, inspection, compilation, saving, and widget-tree editing.
+- [Phase 19 — UMG layout, styling, bindings, and UI logic](phase-19.md) — Complete practical HUD and menu authoring on the Widget Blueprint family.
+- [Phase 20 — Complete function replacement](phase-20.md) — Add transactional replacement of one complete user-owned function.
+- [Phase 21 — Event, custom-event, and macro replacement](phase-21.md) — Extend bounded replacement to events, custom events, and macros.
+- [Phase 22 — Deterministic changed-node layout](phase-22.md) — Add deterministic layout for changed nodes.
+- [Phase 23 — Optional configured editor launch](phase-23.md) — Add optional configured editor launch.
+- [Phase 24 — Optional graceful editor shutdown](phase-24.md) — Add optional graceful editor shutdown.
+- [Phase 25 — Optional durable editor restart](phase-25.md) — Add optional durable editor restart.
+- [Phase 26 — Optional editor-offline project-file generation](phase-26.md) — Add optional editor-offline project-file generation.
+- [Phase 27 — Optional editor-target builds](phase-27.md) — Add optional editor-target builds.
 
 ## Shared roadmap contracts
 
@@ -56,9 +60,13 @@ Keep the public surface compact. Add typed operations to these remaining tool fa
 | `blueprint_member_edit` | 5 | Perform one typed variable, function, macro, or custom-event mutation |
 | `blueprint_action_catalog` | 8 | Discover a bounded set of context-valid graph actions without mutation |
 | `blueprint_graph_edit` | 11 | Perform one typed node, pin, connection, position, or removal mutation |
-| `blueprint_block_replace` | 16 | Replace one complete bounded logic unit as a prevalidated transaction |
-| `editor_lifecycle` | 19 | Run one opt-in configured launch, restart, or graceful-shutdown operation |
-| `project_build` | 22 | Run one opt-in configured project-generation or editor-target build operation |
+| `gameplay_framework_edit` | 16 | Assign only the configured project's default GameMode or GameInstance class |
+| `game_data_inspect` | 17 | Inspect one bounded user-defined struct or Data Table schema/row page |
+| `game_data_edit` | 17 | Create or mutate one bounded user-defined struct or Data Table transaction |
+| `widget_tree_edit` | 18 | Perform one typed Widget Blueprint tree, widget-default, slot, layout, style, or binding mutation |
+| `blueprint_block_replace` | 20 | Replace one complete bounded logic unit as a prevalidated transaction |
+| `editor_lifecycle` | 23 | Run one opt-in configured launch, restart, or graceful-shutdown operation |
+| `project_build` | 26 | Run one opt-in configured project-generation or editor-target build operation |
 
 Lifecycle and build tools remain absent from the default model context. Use an opt-in large mode for them. Measure the Blueprint schemas and use nested operation discriminators if context cost becomes excessive; the default mode must still support the complete Blueprint-authoring workflow.
 
@@ -69,15 +77,15 @@ Lifecycle and build tools remain absent from the default model context. Use an o
 - Publish explicit operation states such as `queued`, `executing`, `committed`, `rejected`, and `outcome_unknown`. Never report cancellation after a mutation has committed.
 - Cancellation may remove queued work or stop preflight work, but it must not interrupt an active Unreal mutation at an unsafe point. A lost response must be reconciled through `operation_status` before retry.
 - The ledger is process-scoped unless a later operation explicitly defines durable restart state. If the bridge instance changes and no result is available, return `outcome_unknown` and require inspection before further mutation.
-- Reject mutation while the target Blueprint is compiling, saving, loading, being reinstanced, undergoing undo/redo, or otherwise unable to provide stable preconditions.
-- Use one editor transaction per accepted atomic mutation. Prevalidate before opening it, verify postconditions before commit, and implement explicit restoration for unexpected failure. Do not assume that cancelling a transaction restores arbitrary object state.
+- Reject mutation while the target asset is compiling, saving, loading, being reinstanced, undergoing undo/redo, or otherwise unable to provide stable preconditions.
+- Use one editor transaction per accepted atomic asset mutation where Unreal supports it. Prevalidate before opening it, verify postconditions before commit, and implement explicit restoration for unexpected failure. Config-file operations must use atomic persistence and verified restoration instead of pretending to be editor transactions. Do not assume that cancelling a transaction restores arbitrary object state.
 
 ### Blueprint identity, type, and property contracts
 
 - Use Unreal long package names and object/class paths at the model boundary; reject raw filesystem paths and traversal.
-- Read-only operations may inspect any content mount visible to the project. The Blueprint being mutated must remain confined to `/Game` or a content mount owned by a plugin physically inside the current project's local `Plugins/` directory.
+- Read-only operations may inspect any content mount visible to the project. An asset being mutated must remain confined to `/Game` or a content mount owned by a plugin physically inside the current project's local `Plugins/` directory.
 - A referenced class or asset is not itself a mutation target. Permit type-compatible native classes and packageable assets from visible mounted content while rejecting transient, editor-only, unresolved, incompatible, or unsafe references.
-- Give components, members, graphs, nodes, pins, inspection snapshots, and bridge instances explicit identities. Mutation targets must have stable identities; an unavailable identity is not silently replaced by a name lookup.
+- Give components, Blueprint members, struct members, table schemas/rows, widgets/slots, graphs, nodes, pins, inspection snapshots, and bridge instances explicit identities. Mutation targets must have stable identities; an unavailable identity is not silently replaced by a name lookup.
 - Require the current structural snapshot and all relevant object identities for mutation. Return `stale_precondition` instead of retargeting reconstructed or replacement objects.
 - Reuse one bounded canonical K2 type and reflected-property codec across inspection and mutation. Add a type or value form only with read/write round-trip tests and explicit unsupported behavior.
 - Validate every MCP argument against its published schema in Python and again against the live Unreal object, graph schema, property metadata, and family capabilities in C++.
@@ -100,13 +108,13 @@ Increment the minor version after each completed feature phase and the patch ver
 
 The following are not part of the committed remaining roadmap unless separately authorized:
 
-- Arbitrary selected-region block replacement beyond the complete logic-unit boundaries supported in Phases 16 and 17.
+- Arbitrary selected-region block replacement beyond the complete logic-unit boundaries supported in Phases 20 and 21.
 - General filesystem access or C++ source modification.
 - Arbitrary shell commands, compiler arguments, console commands, UObject calls, unrestricted reflection mutation, expressions, or supplied-code evaluation.
 - Unrestricted whole-Blueprint text import/export or wholesale Blueprint replacement.
-- Blueprint reparenting, project-settings mutation, timelines, event dispatchers, interface authoring, and specialized asset families unless added through a later roadmap update.
-- Level Blueprint, Widget Blueprint, Animation Blueprint, Control Rig, Niagara, Material, Behavior Tree, or StateTree authoring.
-- Play-in-Editor input injection, screenshots, runtime object mutation, or automated gameplay assertions.
+- Blueprint reparenting, project-settings mutation beyond the narrow Phase 16 gameplay-framework assignments, timelines, event-dispatcher authoring, interface authoring, and specialized asset families not named in this roadmap.
+- Level Blueprint, Animation Blueprint, Control Rig, Niagara, Material, Behavior Tree, StateTree, or Widget-animation authoring.
+- General Play-in-Editor input injection, screenshots, runtime object mutation, or agent-driven gameplay assertions. Phase 16 may add internal automation-only multiplayer behavioral verification without exposing runtime-control tools.
 - Cloud services, accounts, telemetry, dependency downloads, or a game-side network listener.
 
 ## Primary Unreal 5.8 API references

@@ -1,26 +1,23 @@
-# Phase 22 — Optional editor-offline project-file generation
+# Phase 22 — Deterministic changed-node layout
 
-**Outcome:** Agents can opt in to narrowly configured project-file generation only while the configured project editor is stopped.
+**Outcome:** Block replacement can lay out changed nodes predictably without moving or otherwise altering untouched Blueprint content.
 
 ### Implementation
 
-- Keep C++ source editing outside this application. Pair with `rooted-files-mcp` for separately configured confined text edits.
-- Add the single `project_build` tool in opt-in large mode with a typed `generate_project_files` operation.
-- Resolve Unreal Build Tool or platform scripts from validated startup configuration and the installed engine layout. Use fixed templates owned by narrow platform adapters.
-- Accept no executable path, project path, shell fragment, environment variable, compiler flag, linker flag, working directory, or arbitrary argument from a tool call.
-- Refuse generation while the authenticated configured editor is running or its lifecycle state is uncertain. Reconcile with durable lifecycle operations before starting.
-- Bound process count, queueing, duration, output capture, diagnostic count and size, retained operation results, cancellation escalation, and child-process cleanup.
-- Keep subprocess output off MCP stdout except inside valid bounded tool results.
+- Add a deterministic bounded layout option to `blueprint_block_replace`; keep explicit caller-supplied positions supported.
+- Lay out changed nodes only. Preserve untouched positions and handle execution flow, data dependencies, cycles, comments, graph bounds, macro tunnels, and inserted conversion nodes predictably.
+- Include layout inputs and policy in preflight, operation identity, limits, expected fingerprints, transaction application, and postcondition verification.
+- Reject layouts that exceed graph, node, iteration, coordinate, transaction-work, or Game-thread limits before touching the live Blueprint.
 
 ### Verification
 
-- Test fixed command construction, paths with spaces, missing tools, editor-running and uncertain-state rejection, timeout, cancellation, nonzero exit, oversized logs, retained-result replay, and process-tree cleanup.
-- Run native offline project generation from packaged configuration on macOS and Windows without network access or runtime downloads. Unit test Linux construction separately.
-- Prove that tool arguments cannot alter the executable, project, environment, working directory, command template, or fixed arguments.
+- Test deterministic placement across functions, event handlers, custom events, and macros with branches, joins, cycles, comments, external links, and inserted conversion nodes.
+- Prove repeated equivalent plans produce identical changed-node positions and preserve all untouched positions and unrelated-content fingerprints.
+- Test bounds, timeout, rollback, undo/redo, save/reload, replay, and lost-response recovery natively on macOS and Windows.
 
 ### Documentation and completion gate
 
-- Document offline engine/tool preparation, lifecycle interaction, bounded output, cancellation, platform behavior, default-mode exclusion, and use with the confined file MCP.
-- Complete the phase only when fixed native project generation is reproducible from clean documented configuration on macOS and Windows.
+- Document the layout policy, determinism, bounds, preservation guarantees, explicit-position alternative, and recovery behavior.
+- Complete the phase only when layout is deterministic and unrelated-content fingerprints remain stable across success, rejection, failure, timeout, and replay on both native platforms.
 
 [Back to roadmap](../../ROADMAP.md) · [Shared roadmap contracts](index.md)
