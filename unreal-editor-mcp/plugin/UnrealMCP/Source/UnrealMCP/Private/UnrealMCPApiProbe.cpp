@@ -14,6 +14,7 @@
 #include "IHttpRouter.h"
 #include "GameFramework/GameMode.h"
 #include "GameFramework/GameModeBase.h"
+#include "GameMapsSettings.h"
 #include "GameFramework/GameState.h"
 #include "GameFramework/GameStateBase.h"
 #include "Kismet2/BlueprintEditorUtils.h"
@@ -54,6 +55,7 @@ void RequirePublicTypes()
     static_assert(TIsDerivedFrom<USubobjectDataSubsystem, UEngineSubsystem>::Value);
     static_assert(TIsDerivedFrom<AGameModeBase, AActor>::Value);
     static_assert(TIsDerivedFrom<AGameMode, AGameModeBase>::Value);
+    static_assert(TIsDerivedFrom<UGameMapsSettings, UObject>::Value);
     static_assert(TIsDerivedFrom<AGameStateBase, AActor>::Value);
     static_assert(TIsDerivedFrom<AGameState, AGameStateBase>::Value);
     (void)FHttpServerModule::IsAvailable;
@@ -66,5 +68,6 @@ void RequirePublicTypes()
     (void)&UEdGraphSchema_K2::TrySetDefaultValue;
     (void)&UEdGraphSchema_K2::BreakSinglePinLink;
     (void)FEditorFileUtils::SaveDirtyPackages;
+    (void)&UGameMapsSettings::SetGlobalDefaultGameMode;
 }
 }

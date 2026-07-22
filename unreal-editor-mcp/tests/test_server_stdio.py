@@ -15,11 +15,11 @@ class FakeBridge:
     def call(self, command, arguments=None):
         self.calls.append((command, arguments))
         if command == "capabilities":
-            return {"bridge_version": "0.14.0", "commands": [
+            return {"bridge_version": "0.15.0", "commands": [
                 "capabilities", "editor_state", "operation_status", "blueprint_inspect", "blueprint_action_catalog", "blueprint_graph_edit",
                 "blueprint_create", "blueprint_compile", "blueprint_save",
                 "blueprint_component_edit", "blueprint_default_edit",
-                "blueprint_member_edit",
+                "blueprint_member_edit", "gameplay_framework_edit",
             ]}
         if command == "blueprint_inspect":
             return {"mode": "discover", "snapshot_id": "a" * 40, "records": []}
@@ -36,13 +36,13 @@ class ServerStdioTests(unittest.TestCase):
         bridge = FakeBridge()
         server = MCPServer(bridge)
         initialized = server.handle({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2025-06-18"}})
-        self.assertEqual(initialized["result"]["serverInfo"]["version"], "0.14.0")
+        self.assertEqual(initialized["result"]["serverInfo"]["version"], "0.15.0")
         listed = server.handle({"jsonrpc": "2.0", "id": 2, "method": "tools/list"})
         self.assertEqual([tool["name"] for tool in listed["result"]["tools"]], [
             "capabilities", "editor_state", "operation_status", "blueprint_inspect", "blueprint_action_catalog", "blueprint_graph_edit",
             "blueprint_create", "blueprint_compile", "blueprint_save",
             "blueprint_component_edit", "blueprint_default_edit",
-            "blueprint_member_edit",
+            "blueprint_member_edit", "gameplay_framework_edit",
         ])
         called = server.handle({"jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": {"name": "capabilities", "arguments": {}}})
         payload = json.loads(called["result"]["content"][0]["text"])
@@ -103,8 +103,12 @@ class ServerStdioTests(unittest.TestCase):
                 "operation": "add", "component_class": "/Script/Engine.SceneComponent", "name": "Root"}),
             ("blueprint_component_edit", {"operation_id": operation_id, "asset_path": "/Game/Actors/BP_Light", "expected_snapshot": snapshot,
                 "operation": "set_property", "component_id": "c" * 32, "property_name": "bVisible", "value": False}),
+            ("blueprint_component_edit", {"operation_id": operation_id, "asset_path": "/Game/Actors/BP_Light", "expected_snapshot": snapshot,
+                "operation": "set_replication", "component_id": "c" * 32, "replicates": True}),
             ("blueprint_default_edit", {"operation_id": operation_id, "asset_path": "/Game/Actors/BP_Light", "expected_snapshot": snapshot,
                 "property_name": "InitialLifeSpan", "value": 12.5}),
+            ("blueprint_default_edit", {"operation_id": operation_id, "asset_path": "/Game/Actors/BP_Light", "expected_snapshot": snapshot,
+                "replication_setting": "dormancy", "value": "DORM_Awake"}),
             ("blueprint_member_edit", {"operation_id": operation_id, "asset_path": "/Game/Actors/BP_Light", "expected_snapshot": snapshot,
                 "operation": "add", "name": "Health", "type": {"category": "int", "container": "none"},
                 "default": {"kind": "literal", "value": 100},
@@ -156,12 +160,18 @@ class ServerStdioTests(unittest.TestCase):
                      "default": {"kind": "literal", "value": "ready"}},
                 ]}, "metadata": {"category": "Events", "call_in_editor": True}}),
             ("blueprint_member_edit", {"operation_id": operation_id, "asset_path": "/Game/Actors/BP_Light", "expected_snapshot": snapshot,
+                "target": "custom_event", "operation": "add", "graph_id": "8" * 32, "name": "ServerFire",
+                "signature": {"parameters": []}, "metadata": {"rpc_mode": "server", "reliability": "reliable"}}),
+            ("blueprint_member_edit", {"operation_id": operation_id, "asset_path": "/Game/Actors/BP_Light", "expected_snapshot": snapshot,
                 "target": "custom_event", "operation": "remove", "custom_event_id": "9" * 32,
                 "policy": "reject_if_referenced"}),
             ("blueprint_member_edit", {"operation_id": operation_id, "asset_path": "/Game/Actors/BP_Light", "expected_snapshot": snapshot,
                 "operation": "update", "member_id": "e" * 32, "field": "metadata",
                 "metadata": {"replication": "rep_notify", "rep_notify_function": "OnRep_Health", "replication_condition": "COND_OwnerOnly"}}),
             ("operation_status", {"operation_id": operation_id, "bridge_instance_id": "d" * 32}),
+            ("gameplay_framework_edit", {"operation_id": operation_id, "project_hash": "e" * 40,
+                "setting": "default_game_mode", "class_path": "/Game/Framework/BP_Mode.BP_Mode_C",
+                "expected_class": "/Script/Engine.GameModeBase"}),
         )
         for name, arguments in valid:
             with self.subTest(name=name, arguments=arguments):
@@ -177,6 +187,8 @@ class ServerStdioTests(unittest.TestCase):
                 "operation": "remove", "component_id": "short"}),
             ("blueprint_default_edit", {"operation_id": operation_id, "asset_path": "/Game/BP_A", "expected_snapshot": snapshot,
                 "property_name": "Unsafe", "value": {"nested": True}}),
+            ("blueprint_default_edit", {"operation_id": operation_id, "asset_path": "/Game/BP_A", "expected_snapshot": snapshot,
+                "replication_setting": "net_priority", "value": -1}),
             ("blueprint_member_edit", {"operation_id": operation_id, "asset_path": "/Game/BP_A", "expected_snapshot": snapshot,
                 "operation": "add", "name": "Bad", "type": {"category": "wildcard", "container": "none"}}),
             ("blueprint_member_edit", {"operation_id": operation_id, "asset_path": "/Game/BP_A", "expected_snapshot": snapshot,
@@ -195,6 +207,11 @@ class ServerStdioTests(unittest.TestCase):
             ("blueprint_member_edit", {"operation_id": operation_id, "asset_path": "/Game/BP_A", "expected_snapshot": snapshot,
                 "target": "custom_event", "operation": "add", "graph_id": "8" * 32, "name": "Bad",
                 "signature": {"parameters": [{"name": "Bad", "direction": "input", "type": {"category": "int", "container": "none"}}]}}),
+            ("blueprint_member_edit", {"operation_id": operation_id, "asset_path": "/Game/BP_A", "expected_snapshot": snapshot,
+                "target": "custom_event", "operation": "add", "graph_id": "8" * 32, "name": "BadRpc",
+                "signature": {"parameters": []}, "metadata": {"rpc_mode": "broadcast"}}),
+            ("gameplay_framework_edit", {"operation_id": operation_id, "project_hash": "short",
+                "setting": "default_game_mode", "class_path": "/Script/Engine.GameModeBase", "expected_class": ""}),
         )
         for name, arguments in invalid:
             with self.subTest(name=name, arguments=arguments):

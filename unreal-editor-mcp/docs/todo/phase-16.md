@@ -2,6 +2,8 @@
 
 **Outcome:** Agents can author the replication and RPC contracts used by a multiplayer shooter and can activate the project's default GameMode and GameInstance through a narrow, observable settings operation.
 
+**Status:** Completed in 0.15.0.
+
 ### Implementation
 
 - Extend custom-event metadata and inspection with live Unreal RPC semantics: not replicated, server, owning client, or multicast, plus reliability where the selected mode permits it. Preserve the custom-event node identity and reject unsupported signatures, family/graph contexts, conflicting flags, and forged function metadata before mutation.

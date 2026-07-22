@@ -12,6 +12,7 @@ public class UnrealMCP : ModuleRules
             "BlueprintGraph",
             "CoreUObject",
             "Engine",
+            "EngineSettings",
             "HTTPServer",
             "Json",
             "Kismet",

@@ -9,4 +9,5 @@ Each file in this directory documents one implemented cohesive component: what i
 - [`blueprint-action-catalog.md`](blueprint-action-catalog.md) — bounded live graph-action discovery, filters, opaque identities, caching, and invalidation.
 - [`blueprint-graph-editor.md`](blueprint-graph-editor.md) — transactional action-backed node lifecycle, typed pin defaults, wildcard-aware connections, bounded conversions, identity completion, and read-back.
 - [`blueprint-mutator.md`](blueprint-mutator.md) — safe published-family Blueprint creation, compilation, package saving, diagnostics, cleanup, and read-back.
+- [`gameplay-framework-editor.md`](gameplay-framework-editor.md) — narrow verified default GameMode/GameInstance project assignment and config restoration.
 - [`automated-verification.md`](automated-verification.md) — Python, native, public-API-probe, and cross-process verification boundaries.

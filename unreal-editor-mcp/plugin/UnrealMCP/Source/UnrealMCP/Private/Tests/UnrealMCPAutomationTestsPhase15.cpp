@@ -30,7 +30,7 @@ bool FUnrealMCPPhase15GameInstanceFamilyTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("GameInstance graph editing is published"), Operations->GetBoolField(TEXT("graph_edit")));
     TestFalse(TEXT("GameInstance component editing is not published"), Operations->GetBoolField(TEXT("components")));
     TestFalse(TEXT("GameInstance parent changes stay excluded"), Operations->GetBoolField(TEXT("parent_change")));
-    TestFalse(TEXT("GameInstance project assignment stays excluded"),
+    TestTrue(TEXT("GameInstance project assignment is published"),
         Operations->GetBoolField(TEXT("project_settings_assignment")));
     TestEqual(TEXT("GameInstance classifies exactly"),
         Classify(UGameInstance::StaticClass()).Name, FString(TEXT("game_instance")));

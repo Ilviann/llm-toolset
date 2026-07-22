@@ -1,5 +1,33 @@
 #include "UnrealMCPBlueprintCallableMutationSupport.h"
 
+namespace
+{
+const TMap<FString, FString> ReplicationProperties = {
+    {TEXT("replicates"), TEXT("bReplicates")}, {TEXT("replicate_movement"), TEXT("bReplicateMovement")},
+    {TEXT("always_relevant"), TEXT("bAlwaysRelevant")}, {TEXT("only_relevant_to_owner"), TEXT("bOnlyRelevantToOwner")},
+    {TEXT("use_owner_relevancy"), TEXT("bNetUseOwnerRelevancy")}, {TEXT("dormancy"), TEXT("NetDormancy")},
+    {TEXT("net_priority"), TEXT("NetPriority")}, {TEXT("net_update_frequency"), TEXT("NetUpdateFrequency")},
+    {TEXT("min_net_update_frequency"), TEXT("MinNetUpdateFrequency")}};
+
+bool ReadBoolProperty(UObject* Object, const TCHAR* Name, bool& Out)
+{
+    const FBoolProperty* Property = Object != nullptr ? FindFProperty<FBoolProperty>(Object->GetClass(), Name) : nullptr;
+    if (Property == nullptr) return false;
+    Out = Property->GetPropertyValue_InContainer(Object);
+    return true;
+}
+
+bool ReadNumberProperty(UObject* Object, const TCHAR* Name, double& Out)
+{
+    const FNumericProperty* Property = Object != nullptr ? FindFProperty<FNumericProperty>(Object->GetClass(), Name) : nullptr;
+    if (Property == nullptr) return false;
+    const void* Address = Property->ContainerPtrToValuePtr<void>(Object);
+    Out = Property->IsFloatingPoint() ? Property->GetFloatingPointPropertyValue(Address)
+        : static_cast<double>(Property->GetSignedIntPropertyValue(Address));
+    return true;
+}
+}
+
 
 bool FUnrealMCPBlueprintMutator::ComponentEdit(
     const TSharedPtr<FJsonObject>& Arguments,
@@ -21,6 +49,7 @@ bool FUnrealMCPBlueprintMutator::ComponentEdit(
     else if (Operation == TEXT("reparent")) Allowed.Append({TEXT("component_id"), TEXT("new_parent_id")});
     else if (Operation == TEXT("set_root")) Allowed.Add(TEXT("component_id"));
     else if (Operation == TEXT("set_property")) Allowed.Append({TEXT("component_id"), TEXT("property_name"), TEXT("value")});
+    else if (Operation == TEXT("set_replication")) Allowed.Append({TEXT("component_id"), TEXT("replicates")});
     else
     {
         OutError = {TEXT("invalid_argument"), TEXT("Unknown component edit operation")};
@@ -61,6 +90,7 @@ bool FUnrealMCPBlueprintMutator::ComponentEdit(
     FString NewName;
     FString ComponentClassPath;
     FString PropertyName;
+    bool bReplicates = false;
     USCS_Node* Node = nullptr;
     USCS_Node* ParentNode = nullptr;
     FSubobjectDataHandle Handle;
@@ -180,6 +210,33 @@ bool FUnrealMCPBlueprintMutator::ComponentEdit(
             OutError = {TEXT("invalid_argument"), TEXT("set_property requires one exact property_name and value")};
             return false;
         }
+        if (PropertyName == TEXT("bReplicates"))
+        {
+            OutError = {TEXT("invalid_argument"), TEXT("Use the typed set_replication operation for component replication")};
+            return false;
+        }
+    }
+    else if (Operation == TEXT("set_replication"))
+    {
+        if (!Arguments->TryGetBoolField(TEXT("replicates"), bReplicates)
+            || !UnrealMCP::BlueprintFamilyPolicy::SupportsComponentReplication(Blueprint->ParentClass))
+        {
+            OutError = {TEXT("invalid_component"), TEXT("This Blueprint family does not support typed component replication")};
+            return false;
+        }
+        bool bActorReplicates = false;
+        UObject* Defaults = Blueprint->GeneratedClass != nullptr ? Blueprint->GeneratedClass->GetDefaultObject(false) : nullptr;
+        if (bReplicates && !ReadBoolProperty(Defaults, TEXT("bReplicates"), bActorReplicates))
+        {
+            OutError = {TEXT("unsupported_property"), TEXT("The live Actor default does not expose its replication setting")};
+            return false;
+        }
+        if (bReplicates && !bActorReplicates)
+        {
+            OutError = {TEXT("invalid_component"), TEXT("The owning Actor default must replicate before a component can replicate")};
+            return false;
+        }
+        PropertyName = TEXT("bReplicates");
     }
 
     bool bApplied = false;
@@ -247,7 +304,9 @@ bool FUnrealMCPBlueprintMutator::ComponentEdit(
         {
             Node->ComponentTemplate->Modify();
             bApplied = UnrealMCP::PropertyCodec::Set(
-                Node->ComponentTemplate, PropertyName, Arguments->Values.FindRef(TEXT("value")), Changed, OutError);
+                Node->ComponentTemplate, PropertyName,
+                Operation == TEXT("set_replication") ? MakeShared<FJsonValueBoolean>(bReplicates) : Arguments->Values.FindRef(TEXT("value")),
+                Changed, OutError);
             if (bApplied)
             {
                 FBlueprintEditorUtils::MarkBlueprintAsModified(Blueprint);
@@ -285,17 +344,21 @@ bool FUnrealMCPBlueprintMutator::DefaultEdit(
 {
     using namespace UnrealMCP::BlueprintMutationPrivate;
     if (!RequireMutationPreconditions(*Arguments, OutError)) return false;
-    if (!HasOnlyFields(*Arguments, {TEXT("operation_id"), TEXT("asset_path"), TEXT("expected_snapshot"), TEXT("property_name"), TEXT("value")}))
+    const bool bReplication = Arguments->HasField(TEXT("replication_setting"));
+    if (!HasOnlyFields(*Arguments, bReplication
+        ? std::initializer_list<const TCHAR*>{TEXT("operation_id"), TEXT("asset_path"), TEXT("expected_snapshot"), TEXT("replication_setting"), TEXT("value")}
+        : std::initializer_list<const TCHAR*>{TEXT("operation_id"), TEXT("asset_path"), TEXT("expected_snapshot"), TEXT("property_name"), TEXT("value")}))
     {
-        OutError = {TEXT("invalid_argument"), TEXT("blueprint_default_edit accepts only operation metadata, property_name, and value")};
+        OutError = {TEXT("invalid_argument"), TEXT("blueprint_default_edit accepts one exact property or typed replication setting")};
         return false;
     }
     FString RawAsset;
     FString PropertyName;
     if (!Arguments->TryGetStringField(TEXT("asset_path"), RawAsset)
-        || !Arguments->TryGetStringField(TEXT("property_name"), PropertyName) || !Arguments->HasField(TEXT("value")))
+        || !(bReplication ? Arguments->TryGetStringField(TEXT("replication_setting"), PropertyName)
+            : Arguments->TryGetStringField(TEXT("property_name"), PropertyName)) || !Arguments->HasField(TEXT("value")))
     {
-        OutError = {TEXT("invalid_argument"), TEXT("blueprint_default_edit requires asset_path, property_name, and value")};
+        OutError = {TEXT("invalid_argument"), TEXT("blueprint_default_edit requires asset_path, one setting, and value")};
         return false;
     }
     const TSharedRef<FJsonObject> AssetOnly = MakeShared<FJsonObject>();
@@ -313,6 +376,84 @@ bool FUnrealMCPBlueprintMutator::DefaultEdit(
     if (Defaults == nullptr)
     {
         OutError = {TEXT("busy"), TEXT("The generated-class default object is unavailable"), MakeShared<FJsonObject>(), true};
+        return false;
+    }
+    if (bReplication)
+    {
+        const FString* ReflectedName = ReplicationProperties.Find(PropertyName);
+        if (ReflectedName == nullptr || !UnrealMCP::BlueprintFamilyPolicy::SupportsActorReplication(Blueprint->ParentClass))
+        {
+            OutError = {TEXT("unsupported_property"), TEXT("This Blueprint family does not support the selected Actor replication setting")};
+            return false;
+        }
+        PropertyName = *ReflectedName;
+        bool bValue = false;
+        double Number = 0.0;
+        if ((PropertyName == TEXT("bReplicates") || PropertyName == TEXT("bReplicateMovement")
+                || PropertyName == TEXT("bAlwaysRelevant") || PropertyName == TEXT("bOnlyRelevantToOwner")
+                || PropertyName == TEXT("bNetUseOwnerRelevancy"))
+            && !Arguments->Values.FindRef(TEXT("value"))->TryGetBool(bValue))
+        {
+            OutError = {TEXT("invalid_argument"), TEXT("The selected replication setting requires a Boolean value")};
+            return false;
+        }
+        if ((PropertyName == TEXT("NetPriority") || PropertyName == TEXT("NetUpdateFrequency") || PropertyName == TEXT("MinNetUpdateFrequency"))
+            && (!Arguments->Values.FindRef(TEXT("value"))->TryGetNumber(Number) || !FMath::IsFinite(Number)
+                || Number < (PropertyName == TEXT("MinNetUpdateFrequency") ? 0.0 : 0.01) || Number > 1000.0))
+        {
+            OutError = {TEXT("invalid_argument"), TEXT("The selected replication rate or priority is outside its supported range")};
+            return false;
+        }
+        bool bActorReplicates = false;
+        bool bMovement = false;
+        bool bAlways = false;
+        bool bOwnerOnly = false;
+        ReadBoolProperty(Defaults, TEXT("bReplicates"), bActorReplicates);
+        ReadBoolProperty(Defaults, TEXT("bReplicateMovement"), bMovement);
+        ReadBoolProperty(Defaults, TEXT("bAlwaysRelevant"), bAlways);
+        ReadBoolProperty(Defaults, TEXT("bOnlyRelevantToOwner"), bOwnerOnly);
+        if (PropertyName == TEXT("bReplicateMovement") && bValue && !bActorReplicates)
+        {
+            OutError = {TEXT("invalid_argument"), TEXT("Actor replication must be enabled before movement replication")};
+            return false;
+        }
+        if (PropertyName == TEXT("bReplicates") && !bValue && bMovement)
+        {
+            OutError = {TEXT("invalid_argument"), TEXT("Disable movement replication before Actor replication")};
+            return false;
+        }
+        if (PropertyName == TEXT("bReplicates") && !bValue && Blueprint->SimpleConstructionScript != nullptr)
+        {
+            for (USCS_Node* Candidate : Blueprint->SimpleConstructionScript->GetAllNodes())
+            {
+                const UActorComponent* Component = Candidate != nullptr ? Cast<UActorComponent>(Candidate->ComponentTemplate) : nullptr;
+                if (Component != nullptr && Component->GetIsReplicated())
+                {
+                    OutError = {TEXT("invalid_argument"), TEXT("Disable local component replication before Actor replication")};
+                    return false;
+                }
+            }
+        }
+        if ((PropertyName == TEXT("bAlwaysRelevant") && bValue && bOwnerOnly)
+            || (PropertyName == TEXT("bOnlyRelevantToOwner") && bValue && bAlways))
+        {
+            OutError = {TEXT("invalid_argument"), TEXT("Always-relevant and owner-only relevancy cannot both be enabled")};
+            return false;
+        }
+        double Update = 0.0;
+        double Minimum = 0.0;
+        ReadNumberProperty(Defaults, TEXT("NetUpdateFrequency"), Update);
+        ReadNumberProperty(Defaults, TEXT("MinNetUpdateFrequency"), Minimum);
+        if ((PropertyName == TEXT("NetUpdateFrequency") && Number < Minimum)
+            || (PropertyName == TEXT("MinNetUpdateFrequency") && Number > Update))
+        {
+            OutError = {TEXT("invalid_argument"), TEXT("Minimum net update frequency cannot exceed net update frequency")};
+            return false;
+        }
+    }
+    else if (ReplicationProperties.FindKey(PropertyName) != nullptr)
+    {
+        OutError = {TEXT("invalid_argument"), TEXT("Use replication_setting for bounded Actor replication defaults")};
         return false;
     }
     TSharedPtr<FJsonObject> Changed;

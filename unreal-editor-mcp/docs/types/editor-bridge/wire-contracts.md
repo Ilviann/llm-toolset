@@ -1,6 +1,6 @@
 # Native wire contracts
 
-The HTTP request has exactly two fields: `command` is one of the twelve commands released through Phase 15; `arguments` is empty for `capabilities` and `editor_state`, follows the status contract for `operation_status`, follows one exact inspector shape for `blueprint_inspect`, follows the exact graph/snapshot/filter shape for `blueprint_action_catalog`, follows one exact node-lifecycle, pin-default, or wildcard/conversion-aware connection shape for `blueprint_graph_edit`, or follows the owning mutation shape. `blueprint_member_edit` keeps variable shapes and exact `function`, `local_variable`, `macro`, and `custom_event` target discriminators. Authentication is one `Authorization: Bearer <64 lowercase hex>` header. Requests with duplicate/missing authorization, an unknown command, fields, or invalid arguments are rejected before Blueprint access.
+The HTTP request has exactly two fields: `command` is one of the thirteen commands released through Phase 16 and `arguments` follows its exact owning shape. `gameplay_framework_edit` is a ledger-backed mutation with fixed setting, project hash, exact class, and stale current-class fields. Authentication remains one exact bearer header.
 
 A success is `{ok:true,result:<object>}`. A failure is `{ok:false,error:{code,message,details,retryable}}`. Native errors use the same stable codes accepted by Python and never contain exceptions, addresses, tokens, absolute project paths, or unbounded logs.
 

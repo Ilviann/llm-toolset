@@ -50,7 +50,7 @@ for (const TPair<UBlueprint*, FString>& Owner : Owners)
                     : bOverride ? TEXT("custom_event_override") : TEXT("local"));
                 Value->SetBoolField(TEXT("editable"), bEditable);
                 Value->SetObjectField(TEXT("signature"), Signature);
-                Value->SetObjectField(TEXT("metadata"), CallableMetadata(Event->GetUserDefinedMetaData(), Event->bCallInEditor));
+                Value->SetObjectField(TEXT("metadata"), CustomEventMetadata(Event));
                 Value->SetObjectField(TEXT("reference_summary"), References);
                 const TSharedRef<FJsonObject> Relationship = MakeShared<FJsonObject>();
                 Relationship->SetStringField(TEXT("graph_id"), GuidString(EventGraph->GraphGuid));
@@ -98,6 +98,8 @@ for (const TPair<UBlueprint*, FString>& Owner : Owners)
                 + EventId + TEXT("|") + Event->CustomFunctionName.ToString() + TEXT("|") + LexToString(bOverride)
                 + TEXT("|") + Metadata.Category.ToString() + TEXT("|") + Metadata.ToolTip.ToString()
                 + TEXT("|") + Metadata.Keywords.ToString() + TEXT("|") + LexToString(Event->bCallInEditor));
+            Sink.Fingerprint.Add(TEXT("custom_event_rpc|") + EventId + TEXT("|")
+                + LexToString(Event->FunctionFlags & (FUNC_Net | FUNC_NetReliable | FUNC_NetServer | FUNC_NetClient | FUNC_NetMulticast)));
         }
     }
 }

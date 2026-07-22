@@ -18,6 +18,7 @@
 #include "UnrealMCPBlueprintGraphEditor.h"
 #include "UnrealMCPBlueprintFamilyPolicy.h"
 #include "UnrealMCPBlueprintMutator.h"
+#include "UnrealMCPGameplayFrameworkEditor.h"
 #include "UnrealMCPProtocol.h"
 #include "UnrealMCPOperationLedger.h"
 #include "UnrealMCPVersion.h"
@@ -49,7 +50,8 @@ bool IsMutationCommand(const FString& Command)
 {
     return Command == TEXT("blueprint_create") || Command == TEXT("blueprint_compile") || Command == TEXT("blueprint_save")
         || Command == TEXT("blueprint_component_edit") || Command == TEXT("blueprint_default_edit")
-        || Command == TEXT("blueprint_member_edit") || Command == TEXT("blueprint_graph_edit");
+        || Command == TEXT("blueprint_member_edit") || Command == TEXT("blueprint_graph_edit")
+        || Command == TEXT("gameplay_framework_edit");
 }
 
 FString AuthenticationBinding(const FString& ProjectHash, const FString& BridgeInstanceId, const FString& Token)
@@ -160,6 +162,7 @@ void FUnrealMCPBridge::Stop()
     Router.Reset();
     BlueprintGraphEditor.Reset();
     BlueprintMutator.Reset();
+    GameplayFrameworkEditor.Reset();
     BlueprintActionCatalog.Reset();
     BlueprintInspector.Reset();
     Token.Reset();
@@ -196,7 +199,7 @@ bool FUnrealMCPBridge::HandleRequest(const FHttpServerRequest& Request, const FH
         && Command != TEXT("blueprint_inspect") && Command != TEXT("blueprint_create") && Command != TEXT("blueprint_compile")
         && Command != TEXT("blueprint_save") && Command != TEXT("blueprint_component_edit") && Command != TEXT("blueprint_default_edit")
         && Command != TEXT("blueprint_member_edit") && Command != TEXT("blueprint_action_catalog")
-        && Command != TEXT("blueprint_graph_edit"))
+        && Command != TEXT("blueprint_graph_edit") && Command != TEXT("gameplay_framework_edit"))
     {
         Complete(UnrealMCP::Protocol::Error(EHttpServerResponseCodes::BadRequest, TEXT("invalid_argument"), TEXT("Unknown or unavailable command")));
         return true;
@@ -316,6 +319,11 @@ bool FUnrealMCPBridge::Execute(const FString& Command, const TSharedPtr<FJsonObj
         OutResult = EditorState();
         return true;
     }
+    if (Command == TEXT("gameplay_framework_edit"))
+    {
+        if (!GameplayFrameworkEditor) GameplayFrameworkEditor = MakeUnique<FUnrealMCPGameplayFrameworkEditor>(ProjectHash);
+        return GameplayFrameworkEditor->Execute(Arguments, OutResult, OutError);
+    }
     if (!BlueprintInspector)
     {
         BlueprintInspector = MakeUnique<FUnrealMCPBlueprintInspector>();
@@ -363,7 +371,8 @@ TSharedPtr<FJsonObject> FUnrealMCPBridge::Capabilities() const
     Result->SetBoolField(TEXT("bridge_ready"), bReady);
     Result->SetArrayField(TEXT("commands"), Strings({TEXT("capabilities"), TEXT("editor_state"), TEXT("operation_status"),
         TEXT("blueprint_inspect"), TEXT("blueprint_action_catalog"), TEXT("blueprint_graph_edit"), TEXT("blueprint_create"), TEXT("blueprint_compile"),
-        TEXT("blueprint_save"), TEXT("blueprint_component_edit"), TEXT("blueprint_default_edit"), TEXT("blueprint_member_edit")}));
+        TEXT("blueprint_save"), TEXT("blueprint_component_edit"), TEXT("blueprint_default_edit"), TEXT("blueprint_member_edit"),
+        TEXT("gameplay_framework_edit")}));
 
     const TSharedRef<FJsonObject> Features = MakeShared<FJsonObject>();
     Features->SetBoolField(TEXT("blueprint_inspection"), true);
@@ -391,6 +400,10 @@ TSharedPtr<FJsonObject> FUnrealMCPBridge::Capabilities() const
     Features->SetBoolField(TEXT("game_mode_families"), true);
     Features->SetBoolField(TEXT("game_state_families"), true);
     Features->SetBoolField(TEXT("game_instance_family"), true);
+    Features->SetBoolField(TEXT("multiplayer_blueprint_authoring"), true);
+    Features->SetBoolField(TEXT("custom_event_rpcs"), true);
+    Features->SetBoolField(TEXT("typed_replication_settings"), true);
+    Features->SetBoolField(TEXT("gameplay_framework_assignment"), true);
     Features->SetBoolField(TEXT("editor_lifecycle"), false);
     Features->SetBoolField(TEXT("project_build"), false);
     Result->SetObjectField(TEXT("features"), Features);

@@ -313,6 +313,19 @@ static TSharedRef<FJsonObject> CallableMetadata(const FKismetUserDeclaredFunctio
     return Metadata;
 }
 
+static TSharedRef<FJsonObject> CustomEventMetadata(UK2Node_CustomEvent* Event)
+{
+    const TSharedRef<FJsonObject> Metadata = CallableMetadata(Event->GetUserDefinedMetaData(), Event->bCallInEditor);
+    const uint32 Flags = Event->FunctionFlags & (FUNC_Net | FUNC_NetReliable | FUNC_NetServer | FUNC_NetClient | FUNC_NetMulticast);
+    const bool bNet = (Flags & FUNC_Net) != 0;
+    const FString Mode = !bNet ? TEXT("not_replicated")
+        : (Flags & FUNC_NetServer) != 0 ? TEXT("server")
+        : (Flags & FUNC_NetClient) != 0 ? TEXT("client") : TEXT("multicast");
+    Metadata->SetStringField(TEXT("rpc_mode"), Mode);
+    Metadata->SetStringField(TEXT("reliability"), bNet && (Flags & FUNC_NetReliable) != 0 ? TEXT("reliable") : TEXT("unreliable"));
+    return Metadata;
+}
+
 static TSharedRef<FJsonObject> FunctionSignature(const UK2Node_FunctionEntry* Entry, const TArray<UK2Node_FunctionResult*>& Results)
 {
     const int32 Flags = Entry->GetFunctionFlags();

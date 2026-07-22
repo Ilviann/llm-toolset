@@ -231,6 +231,108 @@ static bool ValidateFunctionMetadata(const TSharedPtr<FJsonObject>& Metadata, FU
     return true;
 }
 
+struct FCustomEventRpcSpec
+{
+    FString Mode = TEXT("not_replicated");
+    FString Reliability = TEXT("unreliable");
+    bool bSupplied = false;
+};
+
+static bool ReadCustomEventRpc(const UK2Node_CustomEvent* Event, FCustomEventRpcSpec& Out, FUnrealMCPError& OutError)
+{
+    if (Event == nullptr) return true;
+    const uint32 Flags = Event->FunctionFlags & (FUNC_Net | FUNC_NetReliable | FUNC_NetServer | FUNC_NetClient | FUNC_NetMulticast);
+    const bool bNet = (Flags & FUNC_Net) != 0;
+    const int32 Directions = ((Flags & FUNC_NetServer) != 0 ? 1 : 0) + ((Flags & FUNC_NetClient) != 0 ? 1 : 0)
+        + ((Flags & FUNC_NetMulticast) != 0 ? 1 : 0);
+    if ((!bNet && Flags != 0) || (bNet && Directions != 1))
+    {
+        OutError = {TEXT("invalid_member"), TEXT("The custom event contains conflicting or forged network function flags")};
+        return false;
+    }
+    if (bNet)
+    {
+        Out.Mode = (Flags & FUNC_NetServer) != 0 ? TEXT("server")
+            : (Flags & FUNC_NetClient) != 0 ? TEXT("client") : TEXT("multicast");
+        Out.Reliability = (Flags & FUNC_NetReliable) != 0 ? TEXT("reliable") : TEXT("unreliable");
+    }
+    return true;
+}
+
+static bool ValidateCustomEventMetadata(
+    UBlueprint* Blueprint,
+    const UK2Node_CustomEvent* Event,
+    const TSharedPtr<FJsonObject>& Metadata,
+    FCustomEventRpcSpec& OutRpc,
+    FUnrealMCPError& OutError)
+{
+    if (!Metadata.IsValid() || Metadata->Values.IsEmpty()
+        || !HasOnlyFields(*Metadata, {TEXT("category"), TEXT("tooltip"), TEXT("keywords"), TEXT("call_in_editor"),
+            TEXT("rpc_mode"), TEXT("reliability")}))
+    {
+        OutError = {TEXT("invalid_argument"), TEXT("Custom-event metadata must contain supported exact fields")};
+        return false;
+    }
+    FString Text;
+    bool bCallInEditor = Event != nullptr && Event->bCallInEditor;
+    if ((Metadata->HasField(TEXT("category")) && (!Metadata->TryGetStringField(TEXT("category"), Text) || Text.Len() > 128))
+        || (Metadata->HasField(TEXT("tooltip")) && (!Metadata->TryGetStringField(TEXT("tooltip"), Text) || Text.Len() > 512))
+        || (Metadata->HasField(TEXT("keywords")) && (!Metadata->TryGetStringField(TEXT("keywords"), Text) || Text.Len() > 256))
+        || (Metadata->HasField(TEXT("call_in_editor")) && !Metadata->TryGetBoolField(TEXT("call_in_editor"), bCallInEditor))
+        || !ReadCustomEventRpc(Event, OutRpc, OutError))
+    {
+        if (OutError.Code.IsEmpty()) OutError = {TEXT("invalid_argument"), TEXT("Custom-event metadata contains an invalid bounded value")};
+        return false;
+    }
+    OutRpc.bSupplied = Metadata->HasField(TEXT("rpc_mode")) || Metadata->HasField(TEXT("reliability"));
+    if (Metadata->HasField(TEXT("rpc_mode")) && !Metadata->TryGetStringField(TEXT("rpc_mode"), OutRpc.Mode)) return false;
+    if (Metadata->HasField(TEXT("reliability")) && !Metadata->TryGetStringField(TEXT("reliability"), OutRpc.Reliability)) return false;
+    if (OutRpc.Mode != TEXT("not_replicated") && OutRpc.Mode != TEXT("server")
+        && OutRpc.Mode != TEXT("client") && OutRpc.Mode != TEXT("multicast"))
+    {
+        OutError = {TEXT("invalid_argument"), TEXT("rpc_mode must be not_replicated, server, client, or multicast")};
+        return false;
+    }
+    if (OutRpc.Reliability != TEXT("unreliable") && OutRpc.Reliability != TEXT("reliable"))
+    {
+        OutError = {TEXT("invalid_argument"), TEXT("reliability must be unreliable or reliable")};
+        return false;
+    }
+    if (OutRpc.Mode == TEXT("not_replicated"))
+    {
+        if (Metadata->HasField(TEXT("reliability")) && OutRpc.Reliability != TEXT("unreliable"))
+        {
+            OutError = {TEXT("invalid_argument"), TEXT("A non-replicated custom event cannot be reliable")};
+            return false;
+        }
+        OutRpc.Reliability = TEXT("unreliable");
+    }
+    if (Blueprint == nullptr || !UnrealMCP::BlueprintFamilyPolicy::SupportsRpcMode(Blueprint->ParentClass, OutRpc.Mode))
+    {
+        OutError = {TEXT("invalid_member"), TEXT("The selected Blueprint family does not support this RPC mode")};
+        return false;
+    }
+    if (OutRpc.Mode != TEXT("not_replicated") && bCallInEditor)
+    {
+        OutError = {TEXT("invalid_member"), TEXT("Replicated custom events cannot also be call-in-editor events")};
+        return false;
+    }
+    return true;
+}
+
+static void ApplyCustomEventRpc(UK2Node_CustomEvent* Event, const FCustomEventRpcSpec& Rpc)
+{
+    if (Event == nullptr || !Rpc.bSupplied) return;
+    Event->FunctionFlags &= ~(FUNC_Net | FUNC_NetReliable | FUNC_NetServer | FUNC_NetClient | FUNC_NetMulticast);
+    if (Rpc.Mode != TEXT("not_replicated"))
+    {
+        Event->FunctionFlags |= FUNC_Net;
+        Event->FunctionFlags |= Rpc.Mode == TEXT("server") ? FUNC_NetServer
+            : Rpc.Mode == TEXT("client") ? FUNC_NetClient : FUNC_NetMulticast;
+        if (Rpc.Reliability == TEXT("reliable")) Event->FunctionFlags |= FUNC_NetReliable;
+    }
+}
+
 static bool ValidateMacroMetadata(const TSharedPtr<FJsonObject>& Metadata, FUnrealMCPError& OutError)
 {
     if (!Metadata.IsValid() || Metadata->Values.IsEmpty()
@@ -545,6 +647,12 @@ static bool ValidateAndApplyMetadata(
     if (FinalReplication != TEXT("none") && FinalReplication != TEXT("replicated") && FinalReplication != TEXT("rep_notify"))
     {
         OutError = {TEXT("invalid_argument"), TEXT("replication must be none, replicated, or rep_notify")};
+        return false;
+    }
+    if (FinalReplication != TEXT("none") && (Blueprint == nullptr
+        || !UnrealMCP::BlueprintFamilyPolicy::SupportsReplicatedVariables(Blueprint->ParentClass)))
+    {
+        OutError = {TEXT("invalid_member"), TEXT("The selected Blueprint family does not support replicated member variables")};
         return false;
     }
     if (FinalReplication != TEXT("rep_notify") && Metadata->HasField(TEXT("rep_notify_function")))

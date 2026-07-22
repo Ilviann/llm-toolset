@@ -26,6 +26,7 @@ _SNAPSHOT_ID = {
     "maxLength": 40,
     "pattern": "^[0-9a-f]{40}$",
 }
+_PROJECT_HASH = _SNAPSHOT_ID
 _COMPONENT_ID = {
     "type": "string",
     "minLength": 32,
@@ -203,6 +204,19 @@ _FUNCTION_METADATA = {
     "minProperties": 1,
     "additionalProperties": False,
 }
+_CUSTOM_EVENT_METADATA = {
+    "type": "object",
+    "properties": {
+        **_FUNCTION_METADATA["properties"],
+        "rpc_mode": {
+            "type": "string",
+            "enum": ["not_replicated", "server", "client", "multicast"],
+        },
+        "reliability": {"type": "string", "enum": ["unreliable", "reliable"]},
+    },
+    "minProperties": 1,
+    "additionalProperties": False,
+}
 _MACRO_METADATA = {
     "type": "object",
     "properties": {
@@ -321,7 +335,7 @@ TOOLS: Final = (
     },
     {
         "name": "blueprint_inspect",
-        "description": "Discover supported Actor-derived Blueprint families or inspect selected structure, family capabilities, and editable defaults through bounded snapshot pages.",
+        "description": "Discover supported Blueprint families or inspect selected structure, family capabilities, and editable defaults through bounded snapshot pages.",
         "inputSchema": {
             "oneOf": [
                 {
@@ -467,7 +481,7 @@ TOOLS: Final = (
     },
     {
         "name": "blueprint_create",
-        "description": "Reliably create, compile, save, and verify one new supported Actor-derived Blueprint without overwriting content.",
+        "description": "Reliably create, compile, save, and verify one new supported Blueprint without overwriting content.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -531,6 +545,11 @@ TOOLS: Final = (
                     property_name={"type": "string", "minLength": 1, "maxLength": 128},
                     value=_PROPERTY_VALUE,
                 ),
+                _component_shape(
+                    "set_replication", ["component_id", "replicates"],
+                    component_id=_COMPONENT_ID,
+                    replicates={"type": "boolean"},
+                ),
             ]
         },
     },
@@ -538,13 +557,39 @@ TOOLS: Final = (
         "name": "blueprint_default_edit",
         "description": "Set one supported editable property on a supported Blueprint family's generated-class default object.",
         "inputSchema": {
-            "type": "object",
-            "properties": _mutation_properties(
-                property_name={"type": "string", "minLength": 1, "maxLength": 128},
-                value=_PROPERTY_VALUE,
-            ),
-            "required": ["operation_id", "asset_path", "expected_snapshot", "property_name", "value"],
-            "additionalProperties": False,
+            "oneOf": [
+                {
+                    "type": "object",
+                    "properties": _mutation_properties(
+                        property_name={"type": "string", "minLength": 1, "maxLength": 128},
+                        value=_PROPERTY_VALUE,
+                    ),
+                    "required": ["operation_id", "asset_path", "expected_snapshot", "property_name", "value"],
+                    "additionalProperties": False,
+                },
+                *[
+                    {
+                        "type": "object",
+                        "properties": _mutation_properties(
+                            replication_setting={"const": setting},
+                            value=value_schema,
+                        ),
+                        "required": ["operation_id", "asset_path", "expected_snapshot", "replication_setting", "value"],
+                        "additionalProperties": False,
+                    }
+                    for setting, value_schema in (
+                        ("replicates", {"type": "boolean"}),
+                        ("replicate_movement", {"type": "boolean"}),
+                        ("always_relevant", {"type": "boolean"}),
+                        ("only_relevant_to_owner", {"type": "boolean"}),
+                        ("use_owner_relevancy", {"type": "boolean"}),
+                        ("dormancy", {"type": "string", "enum": ["DORM_Never", "DORM_Awake", "DORM_DormantAll", "DORM_DormantPartial", "DORM_Initial"]}),
+                        ("net_priority", {"type": "number", "minimum": 0.01, "maximum": 1000.0}),
+                        ("net_update_frequency", {"type": "number", "minimum": 0.01, "maximum": 1000.0}),
+                        ("min_net_update_frequency", {"type": "number", "minimum": 0.0, "maximum": 1000.0}),
+                    )
+                ],
+            ]
         },
     },
     {
@@ -685,7 +730,7 @@ TOOLS: Final = (
                     graph_id=_COMPONENT_ID,
                     name={"type": "string", "minLength": 1, "maxLength": 128},
                     signature=_CUSTOM_EVENT_SIGNATURE,
-                    metadata=_FUNCTION_METADATA,
+                    metadata=_CUSTOM_EVENT_METADATA,
                 ),
                 _scoped_member_shape(
                     "custom_event", "rename", ["custom_event_id", "new_name"],
@@ -703,7 +748,7 @@ TOOLS: Final = (
                     "custom_event", "update", ["custom_event_id", "field", "metadata"],
                     custom_event_id=_CUSTOM_EVENT_ID,
                     field={"const": "metadata"},
-                    metadata=_FUNCTION_METADATA,
+                    metadata=_CUSTOM_EVENT_METADATA,
                 ),
                 _scoped_member_shape(
                     "custom_event", "remove", ["custom_event_id", "policy"],
@@ -711,6 +756,26 @@ TOOLS: Final = (
                     policy={"const": "reject_if_referenced"},
                 ),
             ]
+        },
+    },
+    {
+        "name": "gameplay_framework_edit",
+        "description": "Assign only this project's default GameMode or GameInstance class with a stale-value precondition and verified config persistence.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "operation_id": _OPERATION_ID,
+                "project_hash": _PROJECT_HASH,
+                "setting": {"type": "string", "enum": ["default_game_mode", "default_game_instance"]},
+                "class_path": _PATH,
+                "expected_class": {
+                    "type": "string",
+                    "maxLength": 512,
+                    "pattern": r"^(|/(?!.*\.\.)[^\\]+)$",
+                },
+            },
+            "required": ["operation_id", "project_hash", "setting", "class_path", "expected_class"],
+            "additionalProperties": False,
         },
     },
 )

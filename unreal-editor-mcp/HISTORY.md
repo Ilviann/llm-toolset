@@ -1,5 +1,12 @@
 # Unreal Editor MCP history
 
+## 0.15.0 — 2026-07-23
+
+- Added exact custom-event RPC metadata and inspection for non-replicated, server, owning-client, and multicast modes with live family restrictions and reliable/unreliable semantics.
+- Added bounded typed Actor and component replication edits, dependency validation, live multiplayer capability records, and retained replicated-variable/RepNotify coupling.
+- Added reconciled `gameplay_framework_edit` for only the active project's default GameMode and GameInstance, using exact saved compatible classes, stale current-value checks, verified config replacement, and failure restoration.
+- Added a multiplayer/framework workflow example, Python schema/release coverage, two Phase 16 native Automation cases, and cross-process assignment/restart/restore verification.
+
 ## 0.14.0 — 2026-07-22
 
 - Added `UGameInstance` as an explicit `uobject_derived` Blueprint family while preserving the existing Actor, GameMode, and GameState classifications and rejecting arbitrary UObject families.

@@ -1,0 +1,76 @@
+{
+  "notes": [
+    "Replace placeholder operation, snapshot, graph, component, and project identities with live values.",
+    "Inspect after every mutation and compile/save the final Blueprint before assigning it as a project default.",
+    "RPC delivery still depends on Unreal authority, ownership, relevancy, and an active replicated Actor channel."
+  ],
+  "enable_actor_replication": {
+    "tool": "blueprint_default_edit",
+    "arguments": {
+      "operation_id": "11111111111111111111111111111111",
+      "asset_path": "/Game/Characters/BP_Soldier.BP_Soldier",
+      "expected_snapshot": "0123456789abcdef0123456789abcdef01234567",
+      "replication_setting": "replicates",
+      "value": true
+    }
+  },
+  "enable_movement_replication": {
+    "tool": "blueprint_default_edit",
+    "arguments": {
+      "operation_id": "22222222222222222222222222222222",
+      "asset_path": "/Game/Characters/BP_Soldier.BP_Soldier",
+      "expected_snapshot": "1111111111111111111111111111111111111111",
+      "replication_setting": "replicate_movement",
+      "value": true
+    }
+  },
+  "enable_component_replication": {
+    "tool": "blueprint_component_edit",
+    "arguments": {
+      "operation_id": "33333333333333333333333333333333",
+      "asset_path": "/Game/Characters/BP_Soldier.BP_Soldier",
+      "expected_snapshot": "2222222222222222222222222222222222222222",
+      "operation": "set_replication",
+      "component_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "replicates": true
+    }
+  },
+  "add_reliable_server_rpc": {
+    "tool": "blueprint_member_edit",
+    "arguments": {
+      "operation_id": "44444444444444444444444444444444",
+      "asset_path": "/Game/Characters/BP_Soldier.BP_Soldier",
+      "expected_snapshot": "3333333333333333333333333333333333333333",
+      "target": "custom_event",
+      "operation": "add",
+      "graph_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "name": "ServerFire",
+      "signature": {
+        "parameters": [
+          {"name": "AimOrigin", "type": {"category": "struct", "container": "none", "type_object": "/Script/CoreUObject.Vector"}}
+        ]
+      },
+      "metadata": {"category": "Networking", "rpc_mode": "server", "reliability": "reliable"}
+    }
+  },
+  "assign_default_game_mode": {
+    "tool": "gameplay_framework_edit",
+    "arguments": {
+      "operation_id": "55555555555555555555555555555555",
+      "project_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "setting": "default_game_mode",
+      "class_path": "/Game/Framework/BP_ShooterGameMode.BP_ShooterGameMode_C",
+      "expected_class": "/Script/Engine.GameModeBase"
+    }
+  },
+  "assign_default_game_instance": {
+    "tool": "gameplay_framework_edit",
+    "arguments": {
+      "operation_id": "66666666666666666666666666666666",
+      "project_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "setting": "default_game_instance",
+      "class_path": "/Game/Framework/BP_ShooterGameInstance.BP_ShooterGameInstance_C",
+      "expected_class": "/Script/Engine.GameInstance"
+    }
+  }
+}

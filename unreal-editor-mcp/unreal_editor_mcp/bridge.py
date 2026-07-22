@@ -21,6 +21,7 @@ MUTATING_COMMANDS = {
     "blueprint_create", "blueprint_compile", "blueprint_save",
     "blueprint_component_edit", "blueprint_default_edit", "blueprint_member_edit",
     "blueprint_graph_edit",
+    "gameplay_framework_edit",
 }
 
 
@@ -60,6 +61,7 @@ class UnrealBridge:
             "blueprint_component_edit",
             "blueprint_default_edit",
             "blueprint_member_edit",
+            "gameplay_framework_edit",
         }:
             raise BridgeError("Unsupported bridge command", code=ErrorCode.INVALID_ARGUMENT)
         record = read_discovery(self.layout)

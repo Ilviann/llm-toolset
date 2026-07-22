@@ -9,3 +9,4 @@ References in this directory are grouped by the component that owns the contract
 - [`blueprint-action-catalog/`](blueprint-action-catalog/index.md) — graph-action queries, records, opaque identities, limits, caching, and invalidation.
 - [`blueprint-graph-editor/`](blueprint-graph-editor/index.md) — action-backed graph-node lifecycle, typed pin defaults, wildcard-aware connections, bounded conversions, persistent identities, and results.
 - [`blueprint-mutator/`](blueprint-mutator/index.md) — published-family Blueprint creation, compile/save, components/defaults, member variables, functions, locals, macros, custom events, diagnostics, mutation scope, and cleanup contracts.
+- [`gameplay-framework-editor/`](gameplay-framework-editor/index.md) — exact default GameMode/GameInstance assignment, persistence, results, and exclusions.

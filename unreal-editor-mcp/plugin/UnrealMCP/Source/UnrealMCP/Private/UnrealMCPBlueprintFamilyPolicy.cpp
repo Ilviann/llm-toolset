@@ -11,6 +11,7 @@
 #include "GameFramework/GameState.h"
 #include "GameFramework/GameStateBase.h"
 #include "Kismet2/BlueprintEditorUtils.h"
+#include "UnrealMCPPropertyCodec.h"
 #include "UObject/UnrealType.h"
 
 namespace UnrealMCP::BlueprintFamilyPolicy
@@ -22,7 +23,14 @@ FFamilyInfo MakeFamily(const TCHAR* Name, const UClass* NativeBase)
     return {Name, NativeBase != nullptr ? NativeBase->GetPathName() : FString(), true};
 }
 
-TSharedRef<FJsonObject> PublishedOperations(bool bComponents)
+TArray<TSharedPtr<FJsonValue>> StringValues(std::initializer_list<const TCHAR*> Values)
+{
+    TArray<TSharedPtr<FJsonValue>> Result;
+    for (const TCHAR* Value : Values) Result.Add(MakeShared<FJsonValueString>(Value));
+    return Result;
+}
+
+TSharedRef<FJsonObject> PublishedOperations(const FFamilyInfo& Family)
 {
     const TSharedRef<FJsonObject> Operations = MakeShared<FJsonObject>();
     for (const TCHAR* Name : {TEXT("discover"), TEXT("inspect"), TEXT("create"), TEXT("compile"), TEXT("save"),
@@ -31,10 +39,30 @@ TSharedRef<FJsonObject> PublishedOperations(bool bComponents)
     {
         Operations->SetBoolField(Name, true);
     }
-    Operations->SetBoolField(TEXT("components"), bComponents);
+    Operations->SetBoolField(TEXT("components"), Family.Name != TEXT("game_instance"));
     Operations->SetBoolField(TEXT("parent_change"), false);
-    Operations->SetBoolField(TEXT("project_settings_assignment"), false);
+    Operations->SetBoolField(TEXT("project_settings_assignment"), Family.Name == TEXT("game_mode_base")
+        || Family.Name == TEXT("game_mode") || Family.Name == TEXT("game_instance"));
     return Operations;
+}
+
+TSharedRef<FJsonObject> PublishedMultiplayer(const FFamilyInfo& Family)
+{
+    const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+    const bool bActorReplication = Family.Name == TEXT("actor") || Family.Name == TEXT("game_state_base")
+        || Family.Name == TEXT("game_state");
+    Result->SetBoolField(TEXT("actor_replication"), bActorReplication);
+    Result->SetBoolField(TEXT("component_replication"), bActorReplication);
+    Result->SetBoolField(TEXT("replicated_variables"), bActorReplication);
+    if (Family.Name == TEXT("actor"))
+        Result->SetArrayField(TEXT("rpc_modes"), StringValues({TEXT("not_replicated"), TEXT("server"), TEXT("client"), TEXT("multicast")}));
+    else if (Family.Name == TEXT("game_mode_base") || Family.Name == TEXT("game_mode"))
+        Result->SetArrayField(TEXT("rpc_modes"), StringValues({TEXT("not_replicated"), TEXT("server")}));
+    else if (Family.Name == TEXT("game_state_base") || Family.Name == TEXT("game_state"))
+        Result->SetArrayField(TEXT("rpc_modes"), StringValues({TEXT("not_replicated"), TEXT("multicast")}));
+    else
+        Result->SetArrayField(TEXT("rpc_modes"), StringValues({TEXT("not_replicated")}));
+    return Result;
 }
 }
 
@@ -97,6 +125,32 @@ bool Supports(const UClass* Class, EOperation Operation)
     }
 }
 
+bool SupportsActorReplication(const UClass* Class)
+{
+    const FString Family = Classify(Class).Name;
+    return Family == TEXT("actor") || Family == TEXT("game_state_base") || Family == TEXT("game_state");
+}
+
+bool SupportsComponentReplication(const UClass* Class)
+{
+    return SupportsActorReplication(Class);
+}
+
+bool SupportsReplicatedVariables(const UClass* Class)
+{
+    return SupportsActorReplication(Class);
+}
+
+bool SupportsRpcMode(const UClass* Class, const FString& Mode)
+{
+    if (Mode == TEXT("not_replicated")) return Classify(Class).bSupported;
+    const FString Family = Classify(Class).Name;
+    if (Family == TEXT("actor")) return Mode == TEXT("server") || Mode == TEXT("client") || Mode == TEXT("multicast");
+    if (Family == TEXT("game_mode_base") || Family == TEXT("game_mode")) return Mode == TEXT("server");
+    if (Family == TEXT("game_state_base") || Family == TEXT("game_state")) return Mode == TEXT("multicast");
+    return false;
+}
+
 TSharedRef<FJsonObject> BuildLiveCapabilities(const UBlueprint* Blueprint)
 {
     const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
@@ -137,6 +191,26 @@ TSharedRef<FJsonObject> BuildLiveCapabilities(const UBlueprint* Blueprint)
     Result->SetBoolField(TEXT("event_graphs"), Family.bSupported && bEventGraph);
     Result->SetBoolField(TEXT("local_variables"), Family.bSupported && bNormalBlueprint);
     Result->SetBoolField(TEXT("overrides"), Family.bSupported && bOverrides);
+    const TSharedRef<FJsonObject> Multiplayer = PublishedMultiplayer(Family);
+    TArray<TSharedPtr<FJsonValue>> Settings;
+    UObject* Defaults = Blueprint != nullptr && Blueprint->GeneratedClass != nullptr
+        ? Blueprint->GeneratedClass->GetDefaultObject(false) : nullptr;
+    if (Defaults != nullptr && SupportsActorReplication(ParentClass))
+    {
+        for (const TPair<const TCHAR*, const TCHAR*>& Entry : {
+            TPair<const TCHAR*, const TCHAR*>(TEXT("replicates"), TEXT("bReplicates")),
+            {TEXT("replicate_movement"), TEXT("bReplicateMovement")}, {TEXT("always_relevant"), TEXT("bAlwaysRelevant")},
+            {TEXT("only_relevant_to_owner"), TEXT("bOnlyRelevantToOwner")}, {TEXT("use_owner_relevancy"), TEXT("bNetUseOwnerRelevancy")},
+            {TEXT("dormancy"), TEXT("NetDormancy")}, {TEXT("net_priority"), TEXT("NetPriority")},
+            {TEXT("net_update_frequency"), TEXT("NetUpdateFrequency")}, {TEXT("min_net_update_frequency"), TEXT("MinNetUpdateFrequency")}})
+        {
+            FString Kind;
+            if (UnrealMCP::PropertyCodec::IsSupportedEditable(Defaults->GetClass()->FindPropertyByName(Entry.Value), Kind))
+                Settings.Add(MakeShared<FJsonValueString>(Entry.Key));
+        }
+    }
+    Multiplayer->SetArrayField(TEXT("actor_replication_settings"), Settings);
+    Result->SetObjectField(TEXT("multiplayer"), Multiplayer);
     const TSharedRef<FJsonObject> GraphTypes = MakeShared<FJsonObject>();
     GraphTypes->SetBoolField(TEXT("event"), Family.bSupported && bEventGraph);
     GraphTypes->SetBoolField(TEXT("function"), Family.bSupported && bNormalBlueprint);
@@ -162,7 +236,8 @@ TArray<TSharedPtr<FJsonValue>> BuildPublishedMatrix()
         Record->SetStringField(TEXT("native_base_class"), Family.NativeBaseClass);
         Record->SetStringField(TEXT("inheritance_category"),
             Family.Name == TEXT("game_instance") ? TEXT("uobject_derived") : TEXT("actor_derived"));
-        Record->SetObjectField(TEXT("operations"), PublishedOperations(Family.Name != TEXT("game_instance")));
+        Record->SetObjectField(TEXT("operations"), PublishedOperations(Family));
+        Record->SetObjectField(TEXT("multiplayer"), PublishedMultiplayer(Family));
         Result.Add(MakeShared<FJsonValueObject>(Record));
     }
     return Result;

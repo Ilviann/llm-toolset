@@ -2,7 +2,7 @@
 
 ## Ownership
 
-`FUnrealMCPBlueprintMutator` remains the bridge-facing facade for the six released mutation commands after operation admission and Game-thread dispatch. Lifecycle/create/compile/save, component/default, member-variable, function, local-variable, macro, and custom-event behavior live in separate `UnrealMCPBlueprintMutator*.cpp` translation units. Private mutation-common and callable-support headers own shared target, scope, snapshot, result, signature, metadata, and read-back helpers without expanding the module API.
+`FUnrealMCPBlueprintMutator` remains the bridge-facing facade for the six Blueprint mutation commands. Phase 16 extends component/default units with typed replication and custom events with exact RPC metadata; project settings remain in the separate gameplay-framework editor.
 
 ## Dependency direction
 
@@ -22,6 +22,8 @@ The HTTP bridge owns one inspector and constructs the mutator facade with a refe
 - Scoped member edits add/rename/update/remove one user-owned function, local variable, macro, or custom event. Complete signatures are prevalidated; function entry/results, macro tunnels, and custom-event event-graph placement are preserved. Call/macro references reject signature change/removal, and locals use public scope-aware Blueprint utilities.
 - Reference safety uses one typed bounded scanner for member variables, functions, locals, macros, and custom events. Mutation policy reads the typed result directly; JSON reference summaries are created only for returned wire records.
 - RepNotify changes require one valid impure zero-parameter/zero-return user function and live lifetime condition. Coupled signature/removal changes reject; function rename preserves the relationship.
+- Actor/component replication uses fixed discriminators and validates Actor-before-movement/component, relevancy conflicts, positive priorities/rates, and min/max frequency coupling. Replicated members reject on families without a meaningful replicated instance.
+- Local custom events preserve node identity while setting only Unreal's supported net flags. Family-invalid modes, reliable non-RPCs, call-in-editor RPCs, conflicting/forged flags, and unsupported signatures reject before mutation.
 - Each accepted edit uses one editor transaction, checks its structural snapshot before mutation, verifies the postcondition through authoritative inspection, and explicitly undoes an unexpected failure. Compilation and saving remain separate operations.
 - Every mutation result reports operation identity/state, the exact asset, new snapshot, dirty state, and a concise change record; creation/compile/save also return bounded diagnostics.
 

@@ -21,7 +21,7 @@ The HTTP bridge owns one inspector and supplies already-authenticated JSON argum
 - Inspection never opens a transaction, compiles, saves, changes selection, or intentionally marks a package dirty. The inspector checks package dirty state and compile status before returning.
 - Variable records expose canonical K2 types/tagged defaults, metadata, ownership/editability, replication and validated mutable RepNotify relationships, plus at most 64 exact loaded graph/node references and an unresolved-reference signal.
 - Variables, functions, locals, macros, and custom events obtain reference summaries from the same typed bounded scanner used by mutation preflight; collectors encode that result only when producing records.
-- Function records distinguish user-owned, inherited, override, and interface functions. Macro records expose pure/impure signatures, metadata, required tunnel identities, graph relationships, and macro-instance references. Custom-event records remain distinct from custom-event overrides, inherited events, and native override events and expose exact event-graph placement. Parameter records preserve order/direction/reference/const/default forms. Local records carry stable GUIDs, exact function scope, type/default, editability, and scope-aware references.
+- Function and macro records retain their ownership/signature contracts. Custom-event records remain distinct from overrides and inherited/native events and now expose exact event-graph placement plus live `rpc_mode` and `reliability`.
 
 ## Verification
 

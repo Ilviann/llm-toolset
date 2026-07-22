@@ -64,6 +64,7 @@ bool FUnrealMCPBlueprintMutator::CustomEventEdit(
     FCustomEventSignatureSpec Signature;
     const TSharedPtr<FJsonObject>* SignatureObject = nullptr;
     const TSharedPtr<FJsonObject>* MetadataObject = nullptr;
+    FCustomEventRpcSpec Rpc;
     UnrealMCP::BlueprintReferences::FScanResult ReferenceScan;
 
     if (Operation == TEXT("add"))
@@ -80,7 +81,7 @@ bool FUnrealMCPBlueprintMutator::CustomEventEdit(
         }
         if (Arguments->HasField(TEXT("metadata"))
             && (!Arguments->TryGetObjectField(TEXT("metadata"), MetadataObject) || MetadataObject == nullptr
-                || !ValidateFunctionMetadata(*MetadataObject, OutError))) return false;
+                || !ValidateCustomEventMetadata(Blueprint, nullptr, *MetadataObject, Rpc, OutError))) return false;
     }
     else
     {
@@ -92,6 +93,12 @@ bool FUnrealMCPBlueprintMutator::CustomEventEdit(
             return false;
         }
         Name = Event->CustomFunctionName.ToString();
+        if (!ReadCustomEventRpc(Event, Rpc, OutError)
+            || !UnrealMCP::BlueprintFamilyPolicy::SupportsRpcMode(Blueprint->ParentClass, Rpc.Mode))
+        {
+            if (OutError.Code.IsEmpty()) OutError = {TEXT("invalid_member"), TEXT("The custom event has unsupported network semantics for this family")};
+            return false;
+        }
         ReferenceScan = UnrealMCP::BlueprintReferences::ScanCustomEvent(Blueprint, Event);
         if (Operation == TEXT("rename"))
         {
@@ -127,7 +134,7 @@ bool FUnrealMCPBlueprintMutator::CustomEventEdit(
                 if (!HasOnlyFields(*Arguments, {TEXT("operation_id"), TEXT("asset_path"), TEXT("expected_snapshot"), TEXT("target"), TEXT("operation"),
                         TEXT("custom_event_id"), TEXT("field"), TEXT("metadata")})
                     || !Arguments->TryGetObjectField(TEXT("metadata"), MetadataObject) || MetadataObject == nullptr
-                    || !ValidateFunctionMetadata(*MetadataObject, OutError)) return false;
+                    || !ValidateCustomEventMetadata(Blueprint, Event, *MetadataObject, Rpc, OutError)) return false;
             }
             else
             {
@@ -174,6 +181,7 @@ bool FUnrealMCPBlueprintMutator::CustomEventEdit(
                     bool bCallInEditor = Event->bCallInEditor;
                     ApplyCallableMetadata(Event->GetUserDefinedMetaData(), &bCallInEditor, *MetadataObject);
                     Event->bCallInEditor = bCallInEditor;
+                    ApplyCustomEventRpc(Event, Rpc);
                 }
                 EventId = GuidString(Event->NodeGuid);
                 bApplied = bApplied && EventId.Len() == 32;
@@ -202,6 +210,7 @@ bool FUnrealMCPBlueprintMutator::CustomEventEdit(
             bool bCallInEditor = Event->bCallInEditor;
             ApplyCallableMetadata(Event->GetUserDefinedMetaData(), &bCallInEditor, *MetadataObject);
             Event->bCallInEditor = bCallInEditor;
+            ApplyCustomEventRpc(Event, Rpc);
             FBlueprintEditorUtils::MarkBlueprintAsModified(Blueprint);
             bApplied = true;
         }

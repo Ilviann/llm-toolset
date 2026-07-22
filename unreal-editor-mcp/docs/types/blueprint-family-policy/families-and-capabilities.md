@@ -1,6 +1,6 @@
 # Families and capabilities
 
-`capabilities.blueprint_families` contains six ordered records: `actor`, `game_mode_base`, `game_mode`, `game_state_base`, `game_state`, and `game_instance`. Each record reports its exact native base class, inheritance category, and Boolean operation support for discovery, inspection, creation, compile, save, class defaults, components, variables, functions, locals, macros, custom events, action cataloging, and graph editing. Actor/GameMode/GameState records are `actor_derived`; GameInstance is `uobject_derived`. `parent_change` and `project_settings_assignment` are false for every family. GameInstance alone reports `components: false`.
+`capabilities.blueprint_families` contains the six ordered family records. Each adds `multiplayer` with exact Actor/component/variable replication Booleans and supported RPC modes. Parent change is always false; project assignment is true only for the two GameMode families and GameInstance. GameInstance alone reports components false.
 
 Classification uses the live native or generated class. Descendants of `AGameMode` remain `game_mode`; other descendants of `AGameModeBase` are `game_mode_base`. The equivalent nearest-family rule applies to `AGameState` and `AGameStateBase`. Other `AActor` descendants are `actor`. `UGameInstance` descendants are `game_instance`; unrelated UObject classes remain unsupported.
 
@@ -12,4 +12,4 @@ GameInstance reuses class-default, member, callable, action, graph, compile, sav
 
 The live action catalog remains authoritative for callbacks and inherited functions. Representative GameMode events include `K2_PostLogin`, `HandleStartingNewPlayer`, and, for `AGameMode`, `K2_OnSetMatchState`/match-state overrides. GameState action coverage includes inherited Actor events and callable state/time functions such as `GetServerWorldTimeSeconds`, `HasBegunPlay`, `HasMatchStarted`, and `HasMatchEnded`. Native non-Blueprint callbacks remain visible only through their exposed actions or inherited behavior; the bridge does not synthesize override graphs.
 
-Actor-family component semantics are unchanged: local SCS components are editable, while inherited and native components remain read-only. GameInstance has no supported component semantics; its inspection produces no component records and its component mutations return `invalid_component` without changing the snapshot. The bridge does not assign any gameplay-framework family in Project Settings or reparent an existing Blueprint.
+Actor-family component ownership is unchanged. The bridge can assign only the active project's default GameMode or GameInstance through the separate exact settings command; it does not reparent Blueprints or change world overrides.

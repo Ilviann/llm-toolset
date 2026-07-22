@@ -20,7 +20,11 @@ bool FUnrealMCPPhase14GameplayFrameworkFamiliesTest::RunTest(const FString& Para
         const TSharedPtr<FJsonObject> Operations = Record->GetObjectField(TEXT("operations"));
         TestTrue(TEXT("published families support the shared authoring path"), Operations->GetBoolField(TEXT("graph_edit")));
         TestFalse(TEXT("Blueprint parent changes stay excluded"), Operations->GetBoolField(TEXT("parent_change")));
-        TestFalse(TEXT("project-settings assignment stays excluded"), Operations->GetBoolField(TEXT("project_settings_assignment")));
+        const FString Family = Record->GetStringField(TEXT("family"));
+        const bool bSupportsProjectAssignment = Family == TEXT("game_mode_base") || Family == TEXT("game_mode")
+            || Family == TEXT("game_instance");
+        TestEqual(TEXT("project-settings assignment is published only for assignable framework families"),
+            Operations->GetBoolField(TEXT("project_settings_assignment")), bSupportsProjectAssignment);
     }
     TestFalse(TEXT("arbitrary UObject classes stay outside the published family policy"),
         Supports(UObject::StaticClass(), EOperation::Inspect));

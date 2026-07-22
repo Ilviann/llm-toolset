@@ -11,7 +11,7 @@ from unreal_editor_mcp.errors import BridgeError, ErrorCode
 from unreal_editor_mcp.project import ProjectLayout
 
 
-RECORD = DiscoveryRecord("a" * 40, 123, 15485, "0.14.0", "5.8.0", 1)
+RECORD = DiscoveryRecord("a" * 40, 123, 15485, "0.15.0", "5.8.0", 1)
 
 
 class FakeResponse:
@@ -94,6 +94,9 @@ class BridgeTests(unittest.TestCase):
                 "operation": "connect_pins", "graph_id": "e" * 32,
                 "from_node_id": "f" * 32, "from_pin_id": "1" * 32,
                 "to_node_id": "2" * 32, "to_pin_id": "3" * 32}),
+            ("gameplay_framework_edit", {"operation_id": operation_id, "project_hash": "a" * 40,
+                "setting": "default_game_instance", "class_path": "/Script/Engine.GameInstance",
+                "expected_class": "/Game/BP_GameInstance.BP_GameInstance_C"}),
         )
         bridge = self._bridge()
         for command, arguments in calls:
