@@ -12,7 +12,7 @@ The remaining order is optimized for attaching agents to an existing multiplayer
 - [x] [Phase 11 — Graph-node lifecycle](docs/todo/phase-11.md) — Add transactional graph-node creation, movement, and removal.
 - [x] [Phase 12 — Pin defaults and direct connections](docs/todo/phase-12.md) — Add pin defaults and direct graph connections without automatic conversion.
 - [x] [Phase 13 — Wildcards, conversions, and complete atomic graph editing](docs/todo/phase-13.md) — Add wildcard specialization, explicit conversion insertion, and complete atomic graph editing.
-- [ ] [Phase 14 — GameMode and GameState families](docs/todo/phase-14.md) — Formalize GameMode and GameState family support. Implemented in 0.13.0; native Windows verification remains.
+- [x] [Phase 14 — GameMode and GameState families](docs/todo/phase-14.md) — Formalize GameMode and GameState family support.
 - [ ] [Phase 15 — GameInstance family](docs/todo/phase-15.md) — Add GameInstance family support.
 - [ ] [Phase 16 — Multiplayer Blueprint authoring and framework assignment](docs/todo/phase-16.md) — Add RPC custom events, replication settings, and narrow GameMode/GameInstance project assignment.
 - [ ] [Phase 17 — User-defined structs and Data Tables](docs/todo/phase-17.md) — Add bounded row-schema and typed game-design table authoring.

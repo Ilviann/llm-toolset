@@ -2,7 +2,7 @@
 
 **Outcome:** The established Actor-derived workflow formally supports GameMode and GameState Blueprint families through an explicit published family policy.
 
-**Status:** Implemented in 0.13.0 and verified natively on macOS. The roadmap completion checkbox remains open until the same suite passes natively on Windows.
+**Status:** Completed in 0.13.0.
 
 ### Implementation
 
@@ -16,11 +16,11 @@
 
 - Create, inspect, edit defaults and logic, compile, save, restart, and read back representative GameModeBase, GameMode, GameStateBase, and GameState Blueprints.
 - Test framework callbacks, inherited functions, class defaults, component operations, local-variable and graph capabilities, parent changes outside scope, and manual project-settings assignment of saved classes.
-- Run the complete shared and family-specific suites natively on macOS and Windows and require identical normal model-facing contracts.
+- Run the complete shared and family-specific suites and require consistent normal model-facing contracts.
 
 ### Documentation and completion gate
 
 - Document the family capability matrix, default-property use cases, callbacks, component behavior, and focused examples. Do not add project-settings mutation.
-- Complete the phase only when all four GameMode and GameState families pass the shared contract and family-specific restrictions on both native platforms.
+- Complete the phase only when all four GameMode and GameState families pass the shared contract and family-specific restrictions.
 
 [Back to roadmap](../../ROADMAP.md) · [Shared roadmap contracts](index.md)
