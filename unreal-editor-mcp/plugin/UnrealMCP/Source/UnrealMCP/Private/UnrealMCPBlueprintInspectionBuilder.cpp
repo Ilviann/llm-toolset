@@ -11,6 +11,8 @@ bool BuildInspection(
     const FJsonObject& Arguments,
     TArray<TSharedPtr<FJsonValue>>& OutRecords,
     FString& OutSnapshot,
+    FString& OutBlueprintFamily,
+    TSharedPtr<FJsonObject>& OutFamilyCapabilities,
     bool& OutScanTruncated,
     FUnrealMCPError& OutError)
 {
@@ -43,11 +45,14 @@ bool BuildInspection(
         OutError = {TEXT("wrong_type"), TEXT("The requested asset is not a Blueprint")};
         return false;
     }
-    if (Blueprint->ParentClass == nullptr || !Blueprint->ParentClass->IsChildOf(AActor::StaticClass()))
+    if (!UnrealMCP::BlueprintFamilyPolicy::Supports(
+        Blueprint->ParentClass, UnrealMCP::BlueprintFamilyPolicy::EOperation::Inspect))
     {
-        OutError = {TEXT("wrong_type"), TEXT("The requested Blueprint is not Actor-derived")};
+        OutError = {TEXT("wrong_type"), TEXT("The requested Blueprint does not belong to a published authoring family")};
         return false;
     }
+    OutBlueprintFamily = UnrealMCP::BlueprintFamilyPolicy::Classify(Blueprint->ParentClass).Name;
+    OutFamilyCapabilities = UnrealMCP::BlueprintFamilyPolicy::BuildLiveCapabilities(Blueprint);
     UPackage* Package = Blueprint->GetOutermost();
     const bool bDirtyBefore = Package->IsDirty();
     const EBlueprintStatus StatusBefore = Blueprint->Status;

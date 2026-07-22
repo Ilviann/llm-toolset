@@ -1,4 +1,4 @@
-# Actor Blueprint mutator
+# Blueprint-family mutator
 
 ## Ownership
 
@@ -10,7 +10,8 @@ The HTTP bridge owns one inspector and constructs the mutator facade with a refe
 
 ## Invariants
 
-- `blueprint_create` accepts one native or Blueprint-generated Actor parent class path and one destination long package name. It rejects unsuitable, abstract, deprecated, skeleton, reinstanced, editor-only, missing, non-Actor, or compile-error parents before package creation.
+- `blueprint_create` accepts one native or Blueprint-generated parent from the explicit published family policy and one destination long package name. It rejects unsuitable, abstract, deprecated, skeleton, reinstanced, editor-only, missing, unpublished-family, or compile-error parents before package creation.
+- Creation and every existing-asset mutation resolve family eligibility before changing state and return the exact `blueprint_family` plus live family capabilities.
 - Mutation is confined to `/Game` and mounted content beneath a symlink-free local project-plugin directory containing a `.uplugin` descriptor. Engine, external-plugin, unavailable, and symlink-escaping mounts reject.
 - Existing loaded objects, packages, registry assets, or package files reject as `already_exists`, including case-only collisions on case-insensitive hosts. Creation never chooses a new name and never overwrites.
 - Initial compilation and package saving finish before registry publication. Compile, save, or read-back failure deletes only the newly created file, removes any publication, moves the failed package out of the requested namespace, and marks its objects for collection so the same destination can be retried.
@@ -26,4 +27,4 @@ The HTTP bridge owns one inspector and constructs the mutator facade with a refe
 
 ## Verification
 
-Run the Python suite, compile the disposable Editor target with normal/adaptive unity and forced unity, run all `UnrealMCP` Automation Tests, and run the complete cross-process script. Phase 4 covers component/default behavior, Phase 5 variables, Phase 6 functions/locals/RepNotify, and Phase 7 macro/custom-event signatures, tunnel/event-graph restrictions, collisions, reference rejection, Undo/Redo, compile/save, and restart read-back. The cross-process test deliberately loses one component response, reconciles it, then verifies the complete saved authoring contract after restart.
+Run the Python suite, compile the disposable Editor target with normal/adaptive unity and forced unity, run all `UnrealMCP` Automation Tests, and run the complete cross-process script. Phase 4 covers component/default behavior, Phase 5 variables, Phase 6 functions/locals/RepNotify, Phase 7 macro/custom-event signatures, and Phase 14 all four GameMode/GameState families through defaults, components, members, framework actions, compile/save, and restart read-back.

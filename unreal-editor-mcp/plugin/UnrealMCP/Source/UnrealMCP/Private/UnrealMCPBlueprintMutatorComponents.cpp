@@ -46,7 +46,8 @@ bool FUnrealMCPBlueprintMutator::ComponentEdit(
     UBlueprint* Blueprint = nullptr;
     FString ObjectPath;
     FString PackageName;
-    if (!ResolveMutableBlueprint(*AssetOnly, Blueprint, ObjectPath, PackageName, OutError)
+    if (!ResolveMutableBlueprint(*AssetOnly, Blueprint, ObjectPath, PackageName, OutError,
+        UnrealMCP::BlueprintFamilyPolicy::EOperation::Components)
         || !ValidateExpectedSnapshot(Inspector, *Arguments, ObjectPath, OutError))
     {
         return false;
@@ -302,7 +303,8 @@ bool FUnrealMCPBlueprintMutator::DefaultEdit(
     UBlueprint* Blueprint = nullptr;
     FString ObjectPath;
     FString PackageName;
-    if (!ResolveMutableBlueprint(*AssetOnly, Blueprint, ObjectPath, PackageName, OutError)
+    if (!ResolveMutableBlueprint(*AssetOnly, Blueprint, ObjectPath, PackageName, OutError,
+        UnrealMCP::BlueprintFamilyPolicy::EOperation::ClassDefaults)
         || !ValidateExpectedSnapshot(Inspector, *Arguments, ObjectPath, OutError))
     {
         return false;

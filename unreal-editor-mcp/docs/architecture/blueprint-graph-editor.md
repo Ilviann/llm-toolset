@@ -2,7 +2,7 @@
 
 ## Ownership
 
-`FUnrealMCPBlueprintGraphEditor` is the mutating `blueprint_graph_edit` facade after operation admission and Game-thread dispatch. It owns exact request decoding, mutable Actor Blueprint/graph/node/pin resolution, protected-target policy, graph/position/default/link/conversion bounds, directed-cycle rejection, atomic graph transactions, persistent identity completion, live-schema pin operations, reconstruction tracking, postcondition verification, and concise change records. `FUnrealMCPBlueprintActionCatalog` continues to own opaque action identities and freshly re-resolves/re-filters a retained rebuild signature for `add_node`; the graph editor invokes only that resolved live spawner.
+`FUnrealMCPBlueprintGraphEditor` is the mutating `blueprint_graph_edit` facade after operation admission and Game-thread dispatch. It owns exact request decoding, published-family Blueprint/graph/node/pin resolution, protected-target policy, graph/position/default/link/conversion bounds, directed-cycle rejection, atomic graph transactions, persistent identity completion, live-schema pin operations, reconstruction tracking, postcondition verification, and concise change records. `FUnrealMCPBlueprintActionCatalog` continues to own opaque action identities and freshly re-resolves/re-filters a retained rebuild signature for `add_node`; the graph editor invokes only that resolved live spawner.
 
 ## Dependency direction
 
@@ -10,7 +10,7 @@ The bridge constructs the graph editor from the shared inspector and action cata
 
 ## Invariants
 
-- The released operations are `add_node`, `move_node`, `remove_node`, `set_pin_default`, `connect_pins`, and `disconnect_pins`. Every request carries an operation ID, exact mutable Actor Blueprint path, current snapshot, stable local graph GUID, and all operation-specific action/node/pin identities.
+- The released operations are `add_node`, `move_node`, `remove_node`, `set_pin_default`, `connect_pins`, and `disconnect_pins`. Every request carries an operation ID, exact mutable supported-family Blueprint path, current snapshot, stable local graph GUID, and all operation-specific action/node/pin identities.
 - Only locally owned K2 event graphs, editable user-function graphs, and local macro graphs are mutable. Inherited, interface, construction, delegate/signature, intermediate, transient, non-K2, and other read-only graphs reject before a transaction.
 - Creation requires a live retained action bound to the same bridge, asset/class, graph/schema, snapshot, normalized query, and optional pin context. The rebuild signature is re-resolved and live-filtered; cached UObject pointers are never invocation authority.
 - A spawner may return a new node or an existing unique node. New nodes and every pin must have persistent GUIDs. Existing nodes are not repositioned and are reported with `returned_existing: true`.

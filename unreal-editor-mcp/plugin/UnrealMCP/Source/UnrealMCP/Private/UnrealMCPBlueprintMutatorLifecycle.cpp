@@ -142,7 +142,8 @@ bool FUnrealMCPBlueprintMutator::Compile(
     UBlueprint* Blueprint = nullptr;
     FString ObjectPath;
     FString PackageName;
-    if (!ResolveMutableBlueprint(*Arguments, Blueprint, ObjectPath, PackageName, OutError))
+    if (!ResolveMutableBlueprint(*Arguments, Blueprint, ObjectPath, PackageName, OutError,
+        UnrealMCP::BlueprintFamilyPolicy::EOperation::Compile))
     {
         return false;
     }
@@ -174,7 +175,8 @@ bool FUnrealMCPBlueprintMutator::Save(
     UBlueprint* Blueprint = nullptr;
     FString ObjectPath;
     FString PackageName;
-    if (!ResolveMutableBlueprint(*Arguments, Blueprint, ObjectPath, PackageName, OutError))
+    if (!ResolveMutableBlueprint(*Arguments, Blueprint, ObjectPath, PackageName, OutError,
+        UnrealMCP::BlueprintFamilyPolicy::EOperation::Save))
     {
         return false;
     }

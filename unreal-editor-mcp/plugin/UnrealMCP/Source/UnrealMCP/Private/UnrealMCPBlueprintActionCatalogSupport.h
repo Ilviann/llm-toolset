@@ -238,6 +238,7 @@ static FString ActionSignature(
 static TSharedRef<FJsonObject> MakeResult(
     const FString& BridgeInstanceId,
     const FString& AssetPath,
+    const FString& BlueprintFamily,
     const FString& GraphId,
     const FString& SnapshotId,
     const TArray<TSharedPtr<FJsonValue>>& Actions,
@@ -249,6 +250,7 @@ static TSharedRef<FJsonObject> MakeResult(
     const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
     Result->SetStringField(TEXT("bridge_instance_id"), BridgeInstanceId);
     Result->SetStringField(TEXT("asset_path"), AssetPath);
+    Result->SetStringField(TEXT("blueprint_family"), BlueprintFamily);
     Result->SetStringField(TEXT("graph_id"), GraphId);
     Result->SetStringField(TEXT("snapshot_id"), SnapshotId);
     Result->SetArrayField(TEXT("actions"), Actions);

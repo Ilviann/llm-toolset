@@ -465,6 +465,8 @@ static TSharedRef<FJsonObject> BuildResult(
     Changed->SetBoolField(TEXT("returned_existing"), bReturnedExisting);
     const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
     Result->SetStringField(TEXT("asset_path"), Request.AssetPath);
+    Result->SetStringField(TEXT("blueprint_family"), UnrealMCP::BlueprintFamilyPolicy::Classify(Blueprint->ParentClass).Name);
+    Result->SetObjectField(TEXT("family_capabilities"), UnrealMCP::BlueprintFamilyPolicy::BuildLiveCapabilities(Blueprint));
     Result->SetStringField(TEXT("edit"), Request.Operation);
     Result->SetStringField(TEXT("graph_id"), Request.GraphId);
     Result->SetStringField(TEXT("snapshot_id"), Snapshot);
@@ -825,6 +827,8 @@ static bool ExecutePinEdit(
     }
     const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
     Result->SetStringField(TEXT("asset_path"), Request.AssetPath);
+    Result->SetStringField(TEXT("blueprint_family"), UnrealMCP::BlueprintFamilyPolicy::Classify(Blueprint->ParentClass).Name);
+    Result->SetObjectField(TEXT("family_capabilities"), UnrealMCP::BlueprintFamilyPolicy::BuildLiveCapabilities(Blueprint));
     Result->SetStringField(TEXT("edit"), Request.Operation);
     Result->SetStringField(TEXT("graph_id"), Request.GraphId);
     Result->SetStringField(TEXT("snapshot_id"), NewSnapshot);
@@ -883,9 +887,11 @@ bool FUnrealMCPBlueprintGraphEditor::Execute(
     if (!DecodeRequest(Arguments, Request, OutError) || !ValidateMutationScope(Request.PackageName, OutError)) return false;
     const FAssetData Asset = FAssetRegistryModule::GetRegistry().GetAssetByObjectPath(FSoftObjectPath(Request.AssetPath));
     UBlueprint* Blueprint = Cast<UBlueprint>(Asset.GetAsset());
-    if (Blueprint == nullptr || Blueprint->GeneratedClass == nullptr || !Blueprint->GeneratedClass->IsChildOf(AActor::StaticClass()))
+    if (Blueprint == nullptr || Blueprint->GeneratedClass == nullptr
+        || !UnrealMCP::BlueprintFamilyPolicy::Supports(
+            Blueprint->GeneratedClass, UnrealMCP::BlueprintFamilyPolicy::EOperation::GraphEdit))
     {
-        OutError = {TEXT("not_found"), TEXT("The requested Actor Blueprint was not found")};
+        OutError = {TEXT("not_found"), TEXT("The requested Blueprint family is unavailable for graph editing")};
         return false;
     }
     if (Blueprint->bBeingCompiled)

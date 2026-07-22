@@ -1,21 +1,21 @@
 # Unreal Editor MCP
 
-Unreal Editor MCP 0.12.0 is an offline-first MCP bridge for Unreal Engine 5.8+. It pairs a dependency-free Python 3.10+ stdio server with an editor-only C++ plugin. This release exposes exactly twelve tools:
+Unreal Editor MCP 0.13.0 is an offline-first MCP bridge for Unreal Engine 5.8+. It pairs a dependency-free Python 3.10+ stdio server with an editor-only C++ plugin. This release exposes exactly twelve tools:
 
-- `capabilities` reports the exact Python/plugin/Unreal versions, commands, features, listener state, and effective limits.
+- `capabilities` reports the exact Python/plugin/Unreal versions, commands, features, listener state, effective limits, and published Blueprint-family matrix.
 - `editor_state` reports project identity, bridge readiness, play/simulate/save/GC state, and concise queued-operation state.
 - `operation_status` reconciles or safely cancels one retained mutation by operation and bridge identity.
-- `blueprint_inspect` discovers Actor Blueprints across mounted content and returns bounded pages of one selected Blueprint's structure.
+- `blueprint_inspect` discovers supported Actor-derived Blueprint families across mounted content and returns bounded pages of one selected Blueprint's structure.
 - `blueprint_action_catalog` discovers bounded context-valid function, variable, event, flow-control, cast, literal, and operator actions for one exact Blueprint graph snapshot.
 - `blueprint_graph_edit` creates, moves, removes, configures, or connects graph nodes and pins, including wildcard specialization and explicitly requested bounded conversions.
-- `blueprint_create` creates, compiles, saves, and verifies one new Actor Blueprint without overwriting content.
-- `blueprint_compile` explicitly compiles one mutable Actor Blueprint and returns bounded diagnostics.
-- `blueprint_save` explicitly saves one mutable Actor Blueprint package without interactive dialogs.
+- `blueprint_create` creates, compiles, saves, and verifies one new supported Blueprint family without overwriting content.
+- `blueprint_compile` explicitly compiles one mutable supported-family Blueprint and returns bounded diagnostics.
+- `blueprint_save` explicitly saves one mutable supported-family Blueprint package without interactive dialogs.
 - `blueprint_component_edit` adds, removes, renames, reparents, roots, or edits one local Actor component.
 - `blueprint_default_edit` edits one supported Blueprint-generated class-default property.
 - `blueprint_member_edit` adds, renames, updates, or safely removes one typed Blueprint variable, function, local variable, macro, or custom-event shell.
 
-Phase 13 completes atomic Actor Blueprint graph editing: reliable creation, components/defaults, typed variables, callable shells, compilation/saving, action discovery, node lifecycle, pin defaults, direct links, live wildcard specialization, and explicit bounded conversion insertion. Editor lifecycle, builds, filesystem access, console access, unrestricted reflection, and code execution remain unavailable.
+Phase 14 formalizes GameModeBase, GameMode, GameStateBase, and GameState as explicit families in the established Actor-derived workflow. Every exact operation reports its family; capabilities publish the family/operation matrix; inspection reports live defaults, components, event graphs, locals, overrides, and graph types. Editor lifecycle, builds, Blueprint reparenting, project-settings mutation, filesystem access, console access, unrestricted reflection, and code execution remain unavailable.
 
 ## Security model
 
@@ -29,7 +29,7 @@ Treat the project `Saved/` directory as generated state and keep it out of sourc
 
 1. Copy [`plugin/UnrealMCP`](plugin/UnrealMCP) to `<YourProject>/Plugins/UnrealMCP` or add this repository's `plugin/` folder as an `AdditionalPluginDirectories` entry in a disposable development `.uproject`.
 2. Enable the `UnrealMCP` plugin and compile the project's Editor target with Unreal 5.8 or a newer version that passes the included public-API probes.
-3. Open the project. Look for `Unreal MCP 0.12.0 ready on 127.0.0.1:15485` in the editor log.
+3. Open the project. Look for `Unreal MCP 0.13.0 ready on 127.0.0.1:15485` in the editor log.
 4. Install the Python package offline from this folder:
 
    ```sh
@@ -63,7 +63,7 @@ Use an absolute `.uproject` path. The committed [`examples/lm-studio.json`](exam
 
 Start the Unreal project before calling a tool. `capabilities` remains available to diagnose an exact-version mismatch; other operations reject the mismatch. MCP stdout contains protocol messages only, while diagnostics go to stderr.
 
-## Actor Blueprint inspection
+## Blueprint-family inspection
 
 Read-only discovery covers every mounted content namespace visible to the project: project content under `/Game`, engine content under `/Engine`, and enabled plugin content under each plugin's virtual mount. Omitting `package_path` searches across all of them within the published scan ceiling. Prefer an exact, narrow mount/package filter when known:
 
@@ -102,6 +102,18 @@ Results are flat records with a `section` discriminator and a structural `snapsh
 The cursor is bound to the original normalized query and snapshot. If graph structure, identities, defaults, or links change before continuation, the call returns `stale_precondition`. Re-inspect after compile, undo/redo, reload, or node reconstruction even when Unreal retained the same GUIDs.
 
 Component, variable, function, local-variable, macro, custom-event, graph, node, and pin records use Unreal GUIDs where available and report `identity_stable: false` rather than inventing an ID otherwise. Callable records keep user functions, overrides, interfaces, macros, ordinary custom events, custom-event overrides, and inherited declarations distinct. They return complete signatures, metadata, graph relationships, required nodes, and bounded references. Supported properties use compact bounded Boolean, finite-number, string/name/text, enum/flags, common struct, and compatible visible asset/class reference encodings. Unsupported fields remain explicit with `supported: false`; arbitrary UObject graphs are never serialized.
+
+Discovery asset records include `blueprint_family` and `native_family_class`. Every exact inspection page includes `blueprint_family` and `family_capabilities`; these fields remain present on cursor continuations. Generic Actor-derived Blueprints report `actor`. Descendants of `AGameModeBase`, `AGameMode`, `AGameStateBase`, and `AGameState` report `game_mode_base`, `game_mode`, `game_state_base`, and `game_state` respectively.
+
+## GameMode and GameState families
+
+The four gameplay-framework families reuse the complete Actor-derived path: creation, targeted defaults, local SCS components, variables, function/local shells, macros, custom events, live action discovery, graph editing, compile diagnostics, saving, operation reconciliation, and restart read-back. Check `capabilities.blueprint_families` before authoring; `parent_change` and `project_settings_assignment` are explicitly false for every family.
+
+Useful GameMode defaults include `GameStateClass`, `PlayerControllerClass`, `DefaultPawnClass`, `bUseSeamlessTravel`, and, for `AGameMode`, `bDelayedStart` and `MinRespawnDelay`. GameState families support safe inherited Actor defaults and `ServerWorldTimeSecondsUpdateFrequency`. Property support remains a live reflected decision, so inspect a targeted `class_defaults` property before writing it.
+
+Use the action catalog for inherited framework behavior instead of guessing an override node. Representative actions include GameMode login/match callbacks and callable functions such as `GetDefaultPawnClassForController` or `GetMatchState`; GameState families expose inherited Actor events and state/time functions such as `GetServerWorldTimeSeconds`, `HasBegunPlay`, `HasMatchStarted`, and `HasMatchEnded`. Unreal's live graph filter decides what is valid in the selected graph.
+
+Local components use the same ownership rules as Actor Blueprints: local SCS components are editable; inherited and native components are read-only. The bridge saves the Blueprint class but intentionally does not assign it as the project's active GameMode or GameState. Make that assignment manually in Unreal Project Settings or world settings after saving. See [`examples/game-mode-game-state-workflow.json`](examples/game-mode-game-state-workflow.json) for focused requests.
 
 ## Blueprint action catalog
 
@@ -407,7 +419,7 @@ Rename preserves the macro graph or custom-event node identity. Signature change
 
 Compilation and saving remain explicit. Both require `operation_id`, `asset_path`, and the latest `expected_snapshot`. `blueprint_compile` returns `compile_succeeded: false` rather than a tool error when the compiler completed and found Blueprint errors. `blueprint_save` does not compile implicitly. Re-inspect after compile because Unreal may reconstruct identities; save only the current returned snapshot.
 
-See [`examples/creation-workflow.json`](examples/creation-workflow.json), [`examples/component-default-workflow.json`](examples/component-default-workflow.json), [`examples/member-variable-workflow.json`](examples/member-variable-workflow.json), [`examples/function-local-workflow.json`](examples/function-local-workflow.json), [`examples/macro-custom-event-workflow.json`](examples/macro-custom-event-workflow.json), [`examples/action-catalog-workflow.json`](examples/action-catalog-workflow.json), [`examples/graph-node-lifecycle-workflow.json`](examples/graph-node-lifecycle-workflow.json), and [`examples/pin-default-connection-workflow.json`](examples/pin-default-connection-workflow.json) for complete inspect-before-edit/discover sequences.
+See [`examples/creation-workflow.json`](examples/creation-workflow.json), [`examples/game-mode-game-state-workflow.json`](examples/game-mode-game-state-workflow.json), [`examples/component-default-workflow.json`](examples/component-default-workflow.json), [`examples/member-variable-workflow.json`](examples/member-variable-workflow.json), [`examples/function-local-workflow.json`](examples/function-local-workflow.json), [`examples/macro-custom-event-workflow.json`](examples/macro-custom-event-workflow.json), [`examples/action-catalog-workflow.json`](examples/action-catalog-workflow.json), [`examples/graph-node-lifecycle-workflow.json`](examples/graph-node-lifecycle-workflow.json), and [`examples/pin-default-connection-workflow.json`](examples/pin-default-connection-workflow.json) for complete inspect-before-edit/discover sequences.
 
 If saving fails, confirm that the package directory is writable and that source-control policy has not made the existing `.uasset` read-only. If compilation fails, inspect the returned diagnostics, correct the Blueprint in the editor or through later editing phases, compile again, and save only after `compile_succeeded` becomes true.
 
@@ -446,4 +458,4 @@ Run the cross-process bridge acceptance test:
 python3 scripts/run_headless_integration.py
 ```
 
-The 0.12.0 native baseline is Unreal 5.8.0 on Apple Silicon macOS 26.5.2 with Xcode 26.1.1. Windows and Linux path/process branches are unit-tested through injected adapters; native Windows validation remains part of applicable feature work rather than a standalone roadmap gate.
+The 0.13.0 native baseline is Unreal 5.8.0 on Apple Silicon macOS 26.5.2 with Xcode 26.1.1. Windows and Linux path/process branches are unit-tested through injected adapters; native Windows validation remains part of applicable feature work rather than a standalone roadmap gate.

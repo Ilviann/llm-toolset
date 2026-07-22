@@ -2,7 +2,7 @@
 
 ## Ownership
 
-`unreal_editor_mcp/` owns the Python 3.10+ process. `stdio.py` bounds newline-delimited JSON-RPC and keeps stdout protocol-only. `server.py` negotiates MCP, publishes the twelve Phase 13 tools, validates arguments, and converts domain failures to MCP tool errors. `project.py`, `platforms.py`, and `discovery.py` resolve one project and validate generated state. `bridge.py` is the only HTTP client. `cli.py` composes these responsibilities.
+`unreal_editor_mcp/` owns the Python 3.10+ process. `stdio.py` bounds newline-delimited JSON-RPC and keeps stdout protocol-only. `server.py` negotiates MCP, publishes the twelve Phase 14 tools, validates arguments, and converts domain failures to MCP tool errors. `project.py`, `platforms.py`, and `discovery.py` resolve one project and validate generated state. `bridge.py` is the only HTTP client. `cli.py` composes these responsibilities.
 
 ## Dependency direction
 
@@ -10,7 +10,7 @@ The CLI constructs a `ProjectLayout`, `UnrealBridge`, and `MCPServer`; the trans
 
 ## Invariants
 
-- Only `capabilities`, `editor_state`, `operation_status`, `blueprint_inspect`, `blueprint_action_catalog`, `blueprint_graph_edit`, `blueprint_create`, `blueprint_compile`, `blueprint_save`, `blueprint_component_edit`, `blueprint_default_edit`, and `blueprint_member_edit` appear in the tool catalog.
+- Only `capabilities`, `editor_state`, `operation_status`, `blueprint_inspect`, `blueprint_action_catalog`, `blueprint_graph_edit`, `blueprint_create`, `blueprint_compile`, `blueprint_save`, `blueprint_component_edit`, `blueprint_default_edit`, and `blueprint_member_edit` appear in the tool catalog. Their descriptions cover every family published by the native policy.
 - Tool arguments are exact objects with no additional fields.
 - `blueprint_inspect` has three mutually exclusive shapes: discovery, exact inspection, or cursor continuation; Python bounds paths, sections, cursor size, and page size before HTTP.
 - `blueprint_action_catalog` requires an exact asset, graph, and snapshot and bounds exact text/owner/function/member/family filters, optional node/pin context, and result count before HTTP.

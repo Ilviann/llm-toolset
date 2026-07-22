@@ -10,7 +10,7 @@ The editor bridge constructs the catalog facade with the bridge-instance identit
 
 ## Invariants
 
-- Every query requires one exact Actor Blueprint asset path, stable graph GUID, and current structural snapshot.
+- Every query requires one exact supported Blueprint-family asset path, stable graph GUID, and current structural snapshot. Results report the resolved family.
 - Optional filters are exact case-insensitive text, owner-class path, function name, member name, node family, and one exact node/pin context. Function and variable filters cannot be combined incompatibly.
 - Only `function_call`, `variable_get`, `variable_set`, `event`, `flow_control`, `cast`, `literal`, and `operator` records are released. Callers never supply a node class, field signature, or spawner; Phase 11 `add_node` accepts only the opaque retained ID.
 - Event spawners are accepted only for real event functions and are suppressed when their unique event already exists. Flow control covers direct supported K2 flow nodes and context-valid standard flow-control macro actions. Literal and operator classification precedes generic function-call classification.
@@ -24,4 +24,4 @@ The editor bridge constructs the catalog facade with the bridge-instance identit
 
 ## Verification
 
-`UnrealMCP.Phase8.ActionCatalog` retains coverage for the core families, identities, bounds, expiry, invalidation, stale snapshots, and non-mutation. `UnrealMCP.Phase10.ExpandedActionCatalog` covers unique events, latent restrictions, flow control, casts, literals, common and wildcard operators, event/function/macro graph restrictions, exact and pin-context filters, forged actions, cache reuse, stale snapshots, and non-mutation. The cross-process script verifies every released family after save and editor restart through the production Python client.
+`UnrealMCP.Phase8.ActionCatalog` retains coverage for the core families, identities, bounds, expiry, invalidation, stale snapshots, and non-mutation. `UnrealMCP.Phase10.ExpandedActionCatalog` covers expanded graph-action families and restrictions. `UnrealMCP.Phase14` adds GameMode/GameState inherited framework-call coverage. The cross-process script verifies every released family after save and editor restart through the production Python client.

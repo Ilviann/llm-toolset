@@ -42,7 +42,7 @@ def wait_until_ready(layout: ProjectLayout, process: subprocess.Popen[bytes], de
         try:
             record = read_discovery(layout)
             result = UnrealBridge(layout, timeout=2.0).call("capabilities")
-            if result.get("bridge_ready") is True and record.bridge_version == "0.12.0":
+            if result.get("bridge_ready") is True and record.bridge_version == "0.13.0":
                 return
         except Exception as error:
             last_error = str(error)
@@ -97,7 +97,7 @@ def send_without_reading(layout: ProjectLayout, command: str, arguments: dict[st
         headers={
             "Authorization": "Bearer " + read_token(layout),
             "Content-Type": "application/json",
-            "X-Unreal-MCP-Version": "0.12.0",
+            "X-Unreal-MCP-Version": "0.13.0",
         },
     )
     connection.close()
@@ -131,6 +131,117 @@ def collect_inspection(bridge: UnrealBridge, arguments: dict[str, object]) -> di
         records.extend(page.get("records", []))
         cursor = page.get("next_cursor")
     raise AssertionError("inspection exceeded the retained cursor-page bound")
+
+
+def author_phase_fourteen_families(bridge: UnrealBridge) -> dict[str, dict[str, object]]:
+    configs = {
+        "game_mode_base": ("/Script/Engine.GameModeBase", "bUseSeamlessTravel", True,
+                           "/Script/Engine.GameModeBase", "GetDefaultPawnClassForController"),
+        "game_mode": ("/Script/Engine.GameMode", "bDelayedStart", True,
+                      "/Script/Engine.GameMode", "GetMatchState"),
+        "game_state_base": ("/Script/Engine.GameStateBase", "ServerWorldTimeSecondsUpdateFrequency", 0.25,
+                            "/Script/Engine.GameStateBase", "GetServerWorldTimeSeconds"),
+        "game_state": ("/Script/Engine.GameState", "ServerWorldTimeSecondsUpdateFrequency", 0.75,
+                       "/Script/Engine.GameStateBase", "GetServerWorldTimeSeconds"),
+    }
+    authored: dict[str, dict[str, object]] = {}
+    for family, (parent, property_name, property_value, callable_owner, callable_name) in configs.items():
+        asset_name = "BP_" + "".join(part.title() for part in family.split("_"))
+        package_path = f"/Game/UnrealMCPPhase14/{asset_name}"
+        asset_path = f"{package_path}.{asset_name}"
+        created = bridge.call("blueprint_create", {
+            "operation_id": uuid.uuid4().hex,
+            "parent_class": parent,
+            "package_path": package_path,
+        })
+        if created.get("blueprint_family") != family or created.get("saved") is not True:
+            raise AssertionError(f"{family} creation contract mismatch: {created!r}")
+        capabilities = created.get("family_capabilities", {})
+        if any(capabilities.get(name) is not True for name in
+               ("class_defaults", "components", "event_graphs", "local_variables", "overrides")):
+            raise AssertionError(f"{family} live capability contract mismatch: {capabilities!r}")
+        edited = bridge.call("blueprint_default_edit", {
+            "operation_id": uuid.uuid4().hex,
+            "asset_path": asset_path,
+            "expected_snapshot": created["snapshot_id"],
+            "property_name": property_name,
+            "value": property_value,
+        })
+        component = bridge.call("blueprint_component_edit", {
+            "operation_id": uuid.uuid4().hex,
+            "asset_path": asset_path,
+            "expected_snapshot": edited["snapshot_id"],
+            "operation": "add",
+            "component_class": "/Script/Engine.RotatingMovementComponent",
+            "name": "FamilyMovement",
+        })
+        function = bridge.call("blueprint_member_edit", {
+            "operation_id": uuid.uuid4().hex,
+            "asset_path": asset_path,
+            "expected_snapshot": component["snapshot_id"],
+            "target": "function",
+            "operation": "add",
+            "name": "FamilyLogic",
+            "signature": {"access": "public", "pure": False, "const": False, "parameters": []},
+        })
+        function_id = function.get("function", {}).get("id")
+        local = bridge.call("blueprint_member_edit", {
+            "operation_id": uuid.uuid4().hex,
+            "asset_path": asset_path,
+            "expected_snapshot": function["snapshot_id"],
+            "target": "local_variable",
+            "operation": "add",
+            "function_id": function_id,
+            "name": "FamilyCounter",
+            "type": {"category": "int", "container": "none"},
+            "default": {"kind": "literal", "value": 14},
+        })
+        inspection = collect_inspection(bridge, {
+            "mode": "inspect",
+            "asset_path": asset_path,
+            "sections": ["summary", "components", "class_defaults", "functions", "local_variables", "graphs"],
+            "property_names": [property_name],
+            "page_size": 100,
+        })
+        event_graphs = [record for record in inspection.get("records", [])
+                        if record.get("section") == "graph" and record.get("kind") == "event"
+                        and record.get("inherited") is False]
+        if inspection.get("blueprint_family") != family or not event_graphs:
+            raise AssertionError(f"{family} inspection contract mismatch: {inspection!r}")
+        catalog = bridge.call("blueprint_action_catalog", {
+            "asset_path": asset_path,
+            "graph_id": event_graphs[0]["id"],
+            "expected_snapshot": inspection["snapshot_id"],
+            "node_family": "function_call",
+            "owner_class": callable_owner,
+            "function": callable_name,
+            "limit": 5,
+        })
+        if catalog.get("blueprint_family") != family or not catalog.get("actions"):
+            raise AssertionError(f"{family} framework action is unavailable: {catalog!r}")
+        compiled = bridge.call("blueprint_compile", {
+            "operation_id": uuid.uuid4().hex,
+            "asset_path": asset_path,
+            "expected_snapshot": local["snapshot_id"],
+        })
+        saved = bridge.call("blueprint_save", {
+            "operation_id": uuid.uuid4().hex,
+            "asset_path": asset_path,
+            "expected_snapshot": compiled["snapshot_id"],
+        })
+        if saved.get("compile_succeeded") is not True or saved.get("package_dirty") is not False:
+            raise AssertionError(f"{family} compile/save contract mismatch: {saved!r}")
+        authored[family] = {
+            "asset_path": asset_path,
+            "snapshot_id": saved["snapshot_id"],
+            "property_name": property_name,
+            "property_value": property_value,
+            "function_id": function_id,
+            "local_id": local.get("local_variable", {}).get("id"),
+            "callable_owner": callable_owner,
+            "callable_name": callable_name,
+        }
+    return authored
 
 
 def stop_editor(process: subprocess.Popen[bytes], timeout: float = 30.0) -> None:
@@ -172,6 +283,7 @@ def run_automation(executable: Path, project: Path, environment: dict[str, str],
         "GraphNodeLifecycle",
         "PinDefaultsAndDirectConnections",
         "WildcardsConversionsAndAtomicGraphEditing",
+        "GameModeAndGameStateFamilies",
     )
     if test_filter == "UnrealMCP":
         expected = all_expected
@@ -195,6 +307,8 @@ def run_automation(executable: Path, project: Path, environment: dict[str, str],
         expected = tuple(name for name in all_expected if name == "PinDefaultsAndDirectConnections")
     elif test_filter == "UnrealMCP.Phase13":
         expected = tuple(name for name in all_expected if name == "WildcardsConversionsAndAtomicGraphEditing")
+    elif test_filter == "UnrealMCP.Phase14":
+        expected = tuple(name for name in all_expected if name == "GameModeAndGameStateFamilies")
     else:
         leaf = test_filter.rsplit(".", 1)[-1]
         expected = (leaf,) if leaf in all_expected else ()
@@ -257,6 +371,9 @@ def main() -> int:
     layout = ProjectLayout.resolve(project)
     phase_four_fixture = layout.root / "Content" / "UnrealMCPPhase4" / "BP_ComponentFixture.uasset"
     phase_four_fixture.unlink(missing_ok=True)
+    phase_fourteen_dir = layout.root / "Content" / "UnrealMCPPhase14"
+    for name in ("BP_GameModeBase", "BP_GameMode", "BP_GameStateBase", "BP_GameState"):
+        (phase_fourteen_dir / f"{name}.uasset").unlink(missing_ok=True)
     environment = dict(os.environ)
     environment["DEVELOPER_DIR"] = str(developer)
     if sys.argv[1:] == ["--automation-only"]:
@@ -283,7 +400,7 @@ def main() -> int:
                 "blueprint_component_edit", "blueprint_default_edit", "blueprint_member_edit",
             ]:
                 raise AssertionError("released command catalog mismatch")
-            if capabilities.get("bridge_version") != "0.12.0" or state.get("bridge_ready") is not True:
+            if capabilities.get("bridge_version") != "0.13.0" or state.get("bridge_ready") is not True:
                 raise AssertionError("capability/state contract mismatch")
             if capabilities.get("features", {}).get("blueprint_mutation") is not True:
                 raise AssertionError("Phase 6 mutation capability is unavailable")
@@ -304,6 +421,19 @@ def main() -> int:
             for feature in ("blueprint_graph_wildcard_specialization", "blueprint_graph_automatic_conversion"):
                 if capabilities.get("features", {}).get(feature) is not True:
                     raise AssertionError(f"Phase 13 graph capability is unavailable: {feature}")
+            for feature in ("blueprint_family_policy", "game_mode_families", "game_state_families"):
+                if capabilities.get("features", {}).get(feature) is not True:
+                    raise AssertionError(f"Phase 14 family capability is unavailable: {feature}")
+            family_matrix = capabilities.get("blueprint_families", [])
+            if [record.get("family") for record in family_matrix] != [
+                "actor", "game_mode_base", "game_mode", "game_state_base", "game_state",
+            ]:
+                raise AssertionError(f"Phase 14 family matrix mismatch: {family_matrix!r}")
+            for record in family_matrix:
+                operations = record.get("operations", {})
+                if operations.get("graph_edit") is not True or operations.get("parent_change") is not False \
+                        or operations.get("project_settings_assignment") is not False:
+                    raise AssertionError(f"Phase 14 operation matrix mismatch: {record!r}")
             expected_graph_limits = {
                 "graph_nodes": 2048, "graph_pins_per_node": 256, "graph_coordinate": 1000000,
                 "graph_links_per_pin": 64, "graph_automatic_conversion_nodes": 1, "pin_default_chars": 512,
@@ -342,6 +472,7 @@ def main() -> int:
                 raise AssertionError(f"Actor Blueprint creation did not compile and save: {created!r}")
             if created.get("parent_class") != "/Script/Engine.Actor" or created.get("package_dirty") is not False:
                 raise AssertionError(f"Actor Blueprint creation contract mismatch: {created!r}")
+            phase_fourteen_families = author_phase_fourteen_families(bridge)
             asset_path = "/Game/UnrealMCPPhase4/BP_ComponentFixture.BP_ComponentFixture"
             lost_operation_id = uuid.uuid4().hex
             lost_arguments = {
@@ -945,6 +1076,44 @@ def main() -> int:
             })
             if reloaded.get("snapshot_id") != created_snapshot:
                 raise AssertionError("created Blueprint snapshot changed after editor restart")
+            for family, expected in phase_fourteen_families.items():
+                family_reloaded = collect_inspection(reloaded_bridge, {
+                    "mode": "inspect",
+                    "asset_path": expected["asset_path"],
+                    "sections": ["summary", "components", "class_defaults", "functions", "local_variables", "graphs"],
+                    "property_names": [expected["property_name"]],
+                    "page_size": 100,
+                })
+                if family_reloaded.get("blueprint_family") != family \
+                        or family_reloaded.get("snapshot_id") != expected["snapshot_id"]:
+                    raise AssertionError(f"{family} identity changed after restart: {family_reloaded!r}")
+                records = family_reloaded.get("records", [])
+                if not any(record.get("section") == "component" and record.get("name") == "FamilyMovement"
+                           for record in records):
+                    raise AssertionError(f"{family} component changed after restart")
+                if not any(record.get("section") == "class_default"
+                           and record.get("name") == expected["property_name"]
+                           and record.get("value") == expected["property_value"] for record in records):
+                    raise AssertionError(f"{family} default changed after restart")
+                if not any(record.get("section") == "function" and record.get("id") == expected["function_id"]
+                           for record in records):
+                    raise AssertionError(f"{family} function changed after restart")
+                if not any(record.get("section") == "local_variable" and record.get("id") == expected["local_id"]
+                           for record in records):
+                    raise AssertionError(f"{family} local variable changed after restart")
+                event_graphs = [record for record in records if record.get("section") == "graph"
+                                and record.get("kind") == "event" and record.get("inherited") is False]
+                catalog = reloaded_bridge.call("blueprint_action_catalog", {
+                    "asset_path": expected["asset_path"],
+                    "graph_id": event_graphs[0]["id"],
+                    "expected_snapshot": family_reloaded["snapshot_id"],
+                    "node_family": "function_call",
+                    "owner_class": expected["callable_owner"],
+                    "function": expected["callable_name"],
+                    "limit": 5,
+                })
+                if catalog.get("blueprint_family") != family or not catalog.get("actions"):
+                    raise AssertionError(f"{family} action changed after restart: {catalog!r}")
             parent_records = [record for record in reloaded.get("records", []) if record.get("section") == "parent_class"]
             if len(parent_records) != 1 or parent_records[0].get("class_path") != "/Script/Engine.Actor":
                 raise AssertionError("created Blueprint parent changed after editor restart")
@@ -1126,7 +1295,7 @@ def main() -> int:
             pass
         else:
             raise AssertionError("a live discovery heartbeat remained after editor termination")
-    print("Phase 13 integration passed: complete atomic graph editing, BeginPlay behavior, wildcard specialization, explicit conversion, reconciliation, restart, and clean unload")
+    print("Phase 14 integration passed: Actor graph editing plus GameMode/GameState family creation, defaults, components, logic, actions, restart, and clean unload")
     return 0
 
 

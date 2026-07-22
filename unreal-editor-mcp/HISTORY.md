@@ -1,5 +1,12 @@
 # Unreal Editor MCP history
 
+## 0.13.0 — 2026-07-22
+
+- Added one explicit shared Blueprint-family policy for generic Actor, GameModeBase, GameMode, GameStateBase, and GameState lineages, replacing scattered Actor-only eligibility checks across discovery, inspection, creation, mutation, cataloging, and graph editing.
+- Published the ordered family/operation matrix through `capabilities`, including explicit exclusions for Blueprint parent changes and project-settings assignment; discovery and every exact operation now report the resolved family, and inspection/mutation results report live family capabilities.
+- Reused the complete Actor-derived authoring path for all four gameplay-framework families, including safe class defaults, local components, variables, function locals, callbacks/actions, graph editing, compile/save, diagnostics, reconciliation, and restart read-back.
+- Added family-specific examples, public API probes, Python release-contract coverage, Phase 14 native Automation coverage, and cross-process creation/save/restart verification for all four families.
+
 ## 0.12.0 — 2026-07-22
 
 - Completed atomic Actor Blueprint graph editing with live-schema wildcard specialization, numeric promotion, pin/node reconstruction tracking, and directed-cycle rejection.

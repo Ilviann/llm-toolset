@@ -1,0 +1,13 @@
+# Families and capabilities
+
+`capabilities.blueprint_families` contains five ordered records: `actor`, `game_mode_base`, `game_mode`, `game_state_base`, and `game_state`. Each record reports its exact native base class, the common `actor_derived` inheritance category, and Boolean operation support for discovery, inspection, creation, compile, save, class defaults, components, variables, functions, locals, macros, custom events, action cataloging, and graph editing. `parent_change` and `project_settings_assignment` are false.
+
+Classification uses the live native or generated class. Descendants of `AGameMode` remain `game_mode`; other descendants of `AGameModeBase` are `game_mode_base`. The equivalent nearest-family rule applies to `AGameState` and `AGameStateBase`. Other `AActor` descendants are `actor`; non-Actor classes are unsupported until a later published family policy adds them.
+
+Discovery asset records add `blueprint_family` and `native_family_class`. Exact inspection pages, mutation results, action catalogs, and graph-edit results add `blueprint_family`. Exact inspection and mutation results also add `family_capabilities`, with live Booleans for `class_defaults`, `components`, `event_graphs`, `local_variables`, and `overrides`, plus `graph_types.event`, `graph_types.function`, and `graph_types.macro`.
+
+All four GameMode/GameState families reuse the Actor-derived contracts. Common GameMode defaults include `GameStateClass`, `PlayerControllerClass`, `DefaultPawnClass`, and `bUseSeamlessTravel`; `AGameMode` additionally exposes defaults such as `bDelayedStart` and `MinRespawnDelay`. GameState families expose safe editable Actor defaults and `ServerWorldTimeSecondsUpdateFrequency`. Exact property availability and codec support remain live-reflection decisions.
+
+The live action catalog remains authoritative for callbacks and inherited functions. Representative GameMode events include `K2_PostLogin`, `HandleStartingNewPlayer`, and, for `AGameMode`, `K2_OnSetMatchState`/match-state overrides. GameState action coverage includes inherited Actor events and callable state/time functions such as `GetServerWorldTimeSeconds`, `HasBegunPlay`, `HasMatchStarted`, and `HasMatchEnded`. Native non-Blueprint callbacks remain visible only through their exposed actions or inherited behavior; the bridge does not synthesize override graphs.
+
+Component semantics are unchanged: local SCS components are editable, while inherited and native components remain read-only. GameMode and GameState actors have runtime authority/replication semantics determined by Unreal, but the authoring bridge does not assign them in Project Settings or reparent an existing Blueprint.

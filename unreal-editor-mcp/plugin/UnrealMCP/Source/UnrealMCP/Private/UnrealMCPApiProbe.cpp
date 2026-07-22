@@ -12,6 +12,10 @@
 #include "FileHelpers.h"
 #include "HttpServerModule.h"
 #include "IHttpRouter.h"
+#include "GameFramework/GameMode.h"
+#include "GameFramework/GameModeBase.h"
+#include "GameFramework/GameState.h"
+#include "GameFramework/GameStateBase.h"
 #include "Kismet2/BlueprintEditorUtils.h"
 #include "Kismet2/CompilerResultsLog.h"
 #include "Kismet2/KismetEditorUtilities.h"
@@ -48,6 +52,10 @@ void RequirePublicTypes()
     static_assert(TIsDerivedFrom<UK2Node_MacroInstance, UK2Node>::Value);
     static_assert(TIsDerivedFrom<UK2Node_Tunnel, UK2Node>::Value);
     static_assert(TIsDerivedFrom<USubobjectDataSubsystem, UEngineSubsystem>::Value);
+    static_assert(TIsDerivedFrom<AGameModeBase, AActor>::Value);
+    static_assert(TIsDerivedFrom<AGameMode, AGameModeBase>::Value);
+    static_assert(TIsDerivedFrom<AGameStateBase, AActor>::Value);
+    static_assert(TIsDerivedFrom<AGameState, AGameStateBase>::Value);
     (void)FHttpServerModule::IsAvailable;
     (void)FAssetRegistryModule::GetRegistry;
     (void)FBlueprintActionDatabase::Get;

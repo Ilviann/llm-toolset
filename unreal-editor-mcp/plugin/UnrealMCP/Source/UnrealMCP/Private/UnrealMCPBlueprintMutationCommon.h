@@ -3,6 +3,7 @@
 #include "UnrealMCPBlueprintMutator.h"
 
 #include "UnrealMCPBlueprintReferenceScanner.h"
+#include "UnrealMCPBlueprintFamilyPolicy.h"
 
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "AssetRegistry/IAssetRegistry.h"
@@ -255,11 +256,12 @@ static bool ResolveParent(const FString& Path, UClass*& OutClass, FUnrealMCPErro
     const bool bGenerated = Cast<UBlueprintGeneratedClass>(OutClass) != nullptr;
     const bool bUnusableFlags = OutClass->HasAnyClassFlags(CLASS_Abstract | CLASS_Deprecated | CLASS_NewerVersionExists);
     const bool bTransientName = OutClass->GetName().StartsWith(TEXT("SKEL_")) || OutClass->GetName().StartsWith(TEXT("REINST_"));
-    if (!OutClass->IsChildOf(AActor::StaticClass()) || bUnusableFlags || bTransientName
+    if (!UnrealMCP::BlueprintFamilyPolicy::Supports(OutClass, UnrealMCP::BlueprintFamilyPolicy::EOperation::Create)
+        || bUnusableFlags || bTransientName
         || FKismetEditorUtilities::IsClassABlueprintSkeleton(OutClass) || IsEditorOnlyObject(OutClass)
         || (!bGenerated && !FKismetEditorUtilities::CanCreateBlueprintOfClass(OutClass)))
     {
-        OutError = {TEXT("invalid_parent"), TEXT("The parent must be a usable Blueprint-compatible Actor class")};
+        OutError = {TEXT("invalid_parent"), TEXT("The parent must belong to a published Blueprint family and be usable for creation")};
         return false;
     }
     if (bGenerated)
@@ -316,7 +318,8 @@ static bool ResolveMutableBlueprint(
     UBlueprint*& OutBlueprint,
     FString& OutObjectPath,
     FString& OutPackageName,
-    FUnrealMCPError& OutError)
+    FUnrealMCPError& OutError,
+    UnrealMCP::BlueprintFamilyPolicy::EOperation FamilyOperation = UnrealMCP::BlueprintFamilyPolicy::EOperation::Members)
 {
     if (!HasOnlyFields(Arguments, {TEXT("asset_path"), TEXT("operation_id"), TEXT("expected_snapshot")}))
     {
@@ -346,9 +349,9 @@ static bool ResolveMutableBlueprint(
         OutError = {TEXT("wrong_type"), TEXT("The requested asset is not a Blueprint")};
         return false;
     }
-    if (OutBlueprint->ParentClass == nullptr || !OutBlueprint->ParentClass->IsChildOf(AActor::StaticClass()))
+    if (!UnrealMCP::BlueprintFamilyPolicy::Supports(OutBlueprint->ParentClass, FamilyOperation))
     {
-        OutError = {TEXT("wrong_type"), TEXT("The requested Blueprint is not Actor-derived")};
+        OutError = {TEXT("wrong_type"), TEXT("The requested Blueprint does not belong to a published authoring family")};
         return false;
     }
     if (OutBlueprint->bBeingCompiled)
@@ -392,7 +395,11 @@ static TSharedRef<FJsonObject> BuildResult(
     bool bSaved)
 {
     const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+    const UnrealMCP::BlueprintFamilyPolicy::FFamilyInfo Family =
+        UnrealMCP::BlueprintFamilyPolicy::Classify(Blueprint->ParentClass);
     Result->SetStringField(TEXT("asset_path"), ObjectPath);
+    Result->SetStringField(TEXT("blueprint_family"), Family.Name);
+    Result->SetObjectField(TEXT("family_capabilities"), UnrealMCP::BlueprintFamilyPolicy::BuildLiveCapabilities(Blueprint));
     Result->SetStringField(TEXT("parent_class"), Blueprint->ParentClass != nullptr ? Blueprint->ParentClass->GetPathName() : FString());
     Result->SetStringField(TEXT("compile_state"), CompileState(Blueprint->Status));
     Result->SetBoolField(TEXT("compile_succeeded"), bCompileSucceeded);
@@ -605,7 +612,11 @@ static TSharedRef<FJsonObject> BuildEditResult(
     const TArray<FString>& ReconstructedIds = {})
 {
     const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+    const UnrealMCP::BlueprintFamilyPolicy::FFamilyInfo Family =
+        UnrealMCP::BlueprintFamilyPolicy::Classify(Blueprint->ParentClass);
     Result->SetStringField(TEXT("asset_path"), ObjectPath);
+    Result->SetStringField(TEXT("blueprint_family"), Family.Name);
+    Result->SetObjectField(TEXT("family_capabilities"), UnrealMCP::BlueprintFamilyPolicy::BuildLiveCapabilities(Blueprint));
     Result->SetStringField(TEXT("edit"), Edit);
     Result->SetStringField(TEXT("snapshot_id"), Snapshot);
     Result->SetBoolField(TEXT("package_dirty"), Blueprint->GetOutermost()->IsDirty());

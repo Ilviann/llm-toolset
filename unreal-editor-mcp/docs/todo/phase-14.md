@@ -2,6 +2,8 @@
 
 **Outcome:** The established Actor-derived workflow formally supports GameMode and GameState Blueprint families through an explicit published family policy.
 
+**Status:** Implemented in 0.13.0 and verified natively on macOS. The roadmap completion checkbox remains open until the same suite passes natively on Windows.
+
 ### Implementation
 
 - Replace Actor-only eligibility checks in discovery, inspection, creation, compile, save, and mutation resolution with an explicit published family policy.

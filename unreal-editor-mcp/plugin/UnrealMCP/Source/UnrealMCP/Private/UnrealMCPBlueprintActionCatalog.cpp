@@ -3,6 +3,7 @@
 #include "UnrealMCPBlueprintActionCatalogSupport.h"
 #include "UnrealMCPBlueprintActionCatalogQuery.h"
 #include "UnrealMCPBlueprintActionCatalogScanner.h"
+#include "UnrealMCPBlueprintFamilyPolicy.h"
 
 
 FUnrealMCPBlueprintActionCatalog::FUnrealMCPBlueprintActionCatalog(
@@ -194,7 +195,7 @@ bool FUnrealMCPBlueprintActionCatalog::BuildCachedResult(
         if (Retained == nullptr || !Retained->PublicRecord.IsValid()) return false;
         Actions.Add(MakeShared<FJsonValueObject>(Retained->PublicRecord));
     }
-    OutResult = MakeResult(BridgeInstanceId, Cache.AssetPath, Cache.GraphId, Cache.SnapshotId,
+    OutResult = MakeResult(BridgeInstanceId, Cache.AssetPath, Cache.BlueprintFamily, Cache.GraphId, Cache.SnapshotId,
         Actions, Cache.ScannedCount, Cache.bTruncated, Cache.bTimedOut,
         FMath::Max(0, static_cast<int32>((Cache.ExpiresAt - Now()) * 1000.0)));
     return true;
@@ -263,9 +264,11 @@ bool FUnrealMCPBlueprintActionCatalog::Execute(
     IAssetRegistry& Registry = FModuleManager::LoadModuleChecked<FAssetRegistryModule>(TEXT("AssetRegistry")).Get();
     const FAssetData Asset = Registry.GetAssetByObjectPath(FSoftObjectPath(AssetPath));
     UBlueprint* Blueprint = Cast<UBlueprint>(Asset.GetAsset());
-    if (Blueprint == nullptr || Blueprint->GeneratedClass == nullptr || !Blueprint->GeneratedClass->IsChildOf(AActor::StaticClass()))
+    if (Blueprint == nullptr || Blueprint->GeneratedClass == nullptr
+        || !UnrealMCP::BlueprintFamilyPolicy::Supports(
+            Blueprint->GeneratedClass, UnrealMCP::BlueprintFamilyPolicy::EOperation::ActionCatalog))
     {
-        OutError = {TEXT("not_found"), TEXT("The requested Actor Blueprint was not found")};
+        OutError = {TEXT("not_found"), TEXT("The requested Blueprint family is unavailable for action cataloging")};
         return false;
     }
     UPackage* Package = Blueprint->GetOutermost();
@@ -353,6 +356,7 @@ bool FUnrealMCPBlueprintActionCatalog::Execute(
     }
     FCachedCatalog Cache;
     Cache.AssetPath = AssetPath;
+    Cache.BlueprintFamily = UnrealMCP::BlueprintFamilyPolicy::Classify(Blueprint->GeneratedClass).Name;
     Cache.GraphId = GraphId;
     Cache.SnapshotId = SnapshotId;
     Cache.ScannedCount = ScannedCount;
@@ -374,7 +378,7 @@ bool FUnrealMCPBlueprintActionCatalog::Execute(
         PublicActions.Add(MakeShared<FJsonValueObject>(Record));
     }
     Catalogs.Add(QueryKey, Cache);
-    OutResult = MakeResult(BridgeInstanceId, AssetPath, GraphId, SnapshotId, PublicActions,
+    OutResult = MakeResult(BridgeInstanceId, AssetPath, Cache.BlueprintFamily, GraphId, SnapshotId, PublicActions,
         ScannedCount, Cache.bTruncated, Cache.bTimedOut,
         static_cast<int32>(UnrealMCP::ActionLifetimeSeconds * 1000.0));
     return true;

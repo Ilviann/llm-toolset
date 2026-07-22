@@ -59,6 +59,7 @@ private:
     {
         TArray<FString> ActionIds;
         FString AssetPath;
+        FString BlueprintFamily;
         FString GraphId;
         FString SnapshotId;
         int32 ScannedCount = 0;

@@ -1,4 +1,4 @@
-"""Small static tool catalog for the released Actor Blueprint surface."""
+"""Small static tool catalog for the released Blueprint-family surface."""
 
 from __future__ import annotations
 
@@ -321,7 +321,7 @@ TOOLS: Final = (
     },
     {
         "name": "blueprint_inspect",
-        "description": "Discover Actor Blueprints or inspect selected structure and editable defaults through bounded snapshot pages.",
+        "description": "Discover supported Actor-derived Blueprint families or inspect selected structure, family capabilities, and editable defaults through bounded snapshot pages.",
         "inputSchema": {
             "oneOf": [
                 {
@@ -467,7 +467,7 @@ TOOLS: Final = (
     },
     {
         "name": "blueprint_create",
-        "description": "Reliably create, compile, save, and verify one new Actor Blueprint without overwriting content.",
+        "description": "Reliably create, compile, save, and verify one new supported Actor-derived Blueprint without overwriting content.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -486,7 +486,7 @@ TOOLS: Final = (
     },
     {
         "name": "blueprint_compile",
-        "description": "Reliably compile one current Actor Blueprint snapshot and return bounded diagnostics.",
+        "description": "Reliably compile one current supported Blueprint-family snapshot and return bounded diagnostics.",
         "inputSchema": {
             "type": "object",
             "properties": _mutation_properties(),
@@ -496,7 +496,7 @@ TOOLS: Final = (
     },
     {
         "name": "blueprint_save",
-        "description": "Reliably save one current Actor Blueprint snapshot non-interactively.",
+        "description": "Reliably save one current supported Blueprint-family snapshot non-interactively.",
         "inputSchema": {
             "type": "object",
             "properties": _mutation_properties(),
@@ -506,7 +506,7 @@ TOOLS: Final = (
     },
     {
         "name": "blueprint_component_edit",
-        "description": "Perform one reconciled Actor Blueprint component hierarchy or component-default edit.",
+        "description": "Perform one reconciled component hierarchy or component-default edit in a supported Blueprint family.",
         "inputSchema": {
             "oneOf": [
                 _component_shape(
@@ -536,7 +536,7 @@ TOOLS: Final = (
     },
     {
         "name": "blueprint_default_edit",
-        "description": "Set one supported editable property on an Actor Blueprint generated-class default object.",
+        "description": "Set one supported editable property on a supported Blueprint family's generated-class default object.",
         "inputSchema": {
             "type": "object",
             "properties": _mutation_properties(
@@ -549,7 +549,7 @@ TOOLS: Final = (
     },
     {
         "name": "blueprint_member_edit",
-        "description": "Safely edit one Actor Blueprint variable, function, local, macro, or custom-event shell.",
+        "description": "Safely edit one variable, function, local, macro, or custom-event shell in a supported Blueprint family.",
         "inputSchema": {
             "oneOf": [
                 _member_shape(

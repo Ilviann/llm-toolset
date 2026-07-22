@@ -31,6 +31,7 @@
 #include "Serialization/JsonSerializer.h"
 #include "Serialization/JsonWriter.h"
 #include "UnrealMCPVersion.h"
+#include "UnrealMCPBlueprintFamilyPolicy.h"
 #include "UnrealMCPK2TypeCodec.h"
 #include "UnrealMCPPropertyCodec.h"
 #include "UObject/Package.h"
@@ -567,16 +568,16 @@ static void AddClassDefaultFingerprint(UBlueprint* Blueprint, TArray<FString>& F
     }
 }
 
-static bool AssetIsActorBlueprint(const FAssetData& Asset)
+static UnrealMCP::BlueprintFamilyPolicy::FFamilyInfo AssetBlueprintFamily(const FAssetData& Asset)
 {
     FString NativeParent;
     if (!Asset.GetTagValue(FBlueprintTags::NativeParentClassPath, NativeParent))
     {
-        return false;
+        return {};
     }
     const FString ObjectPath = FPackageName::ExportTextPathToObjectPath(NativeParent);
     UClass* NativeClass = FindObject<UClass>(nullptr, *ObjectPath);
-    return NativeClass != nullptr && NativeClass->IsChildOf(AActor::StaticClass());
+    return UnrealMCP::BlueprintFamilyPolicy::Classify(NativeClass);
 }
 
 

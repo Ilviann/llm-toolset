@@ -1,0 +1,56 @@
+{
+  "create_game_mode": {
+    "operation_id": "14141414141414141414141414141414",
+    "parent_class": "/Script/Engine.GameModeBase",
+    "package_path": "/Game/Framework/BP_ProjectGameMode"
+  },
+  "inspect_game_mode_capabilities_and_defaults": {
+    "mode": "inspect",
+    "asset_path": "/Game/Framework/BP_ProjectGameMode.BP_ProjectGameMode",
+    "sections": ["summary", "parent_class", "components", "class_defaults", "graphs"],
+    "property_names": ["GameStateClass", "DefaultPawnClass", "bUseSeamlessTravel"]
+  },
+  "set_game_state_class_using_latest_snapshot": {
+    "operation_id": "24242424242424242424242424242424",
+    "asset_path": "/Game/Framework/BP_ProjectGameMode.BP_ProjectGameMode",
+    "expected_snapshot": "0123456789abcdef0123456789abcdef01234567",
+    "property_name": "GameStateClass",
+    "value": "/Game/Framework/BP_ProjectGameState.BP_ProjectGameState_C"
+  },
+  "discover_game_mode_framework_action": {
+    "asset_path": "/Game/Framework/BP_ProjectGameMode.BP_ProjectGameMode",
+    "graph_id": "11111111111111111111111111111111",
+    "expected_snapshot": "89abcdef0123456789abcdef0123456789abcdef",
+    "owner_class": "/Script/Engine.GameModeBase",
+    "function": "GetDefaultPawnClassForController",
+    "node_family": "function_call",
+    "limit": 5
+  },
+  "create_game_state": {
+    "operation_id": "34343434343434343434343434343434",
+    "parent_class": "/Script/Engine.GameStateBase",
+    "package_path": "/Game/Framework/BP_ProjectGameState"
+  },
+  "inspect_game_state_defaults_and_graphs": {
+    "mode": "inspect",
+    "asset_path": "/Game/Framework/BP_ProjectGameState.BP_ProjectGameState",
+    "sections": ["summary", "components", "class_defaults", "functions", "local_variables", "graphs"],
+    "property_names": ["ServerWorldTimeSecondsUpdateFrequency"]
+  },
+  "set_game_state_time_update_frequency": {
+    "operation_id": "44444444444444444444444444444444",
+    "asset_path": "/Game/Framework/BP_ProjectGameState.BP_ProjectGameState",
+    "expected_snapshot": "fedcba9876543210fedcba9876543210fedcba98",
+    "property_name": "ServerWorldTimeSecondsUpdateFrequency",
+    "value": 0.25
+  },
+  "discover_game_state_framework_action": {
+    "asset_path": "/Game/Framework/BP_ProjectGameState.BP_ProjectGameState",
+    "graph_id": "22222222222222222222222222222222",
+    "expected_snapshot": "abcdef0123456789abcdef0123456789abcdef01",
+    "owner_class": "/Script/Engine.GameStateBase",
+    "function": "GetServerWorldTimeSeconds",
+    "node_family": "function_call",
+    "limit": 5
+  }
+}

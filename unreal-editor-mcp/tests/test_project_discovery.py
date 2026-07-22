@@ -28,7 +28,7 @@ class ProjectDiscoveryTests(unittest.TestCase):
             "project_hash": "a" * 40,
             "process_id": 123,
             "port": 15485,
-            "bridge_version": "0.12.0",
+            "bridge_version": "0.13.0",
             "unreal_version": "5.8.0-55116800",
             "updated_at_ms": 1_000_000,
         }

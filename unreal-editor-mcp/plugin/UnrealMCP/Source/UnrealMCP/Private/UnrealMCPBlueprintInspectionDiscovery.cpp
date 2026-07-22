@@ -64,7 +64,8 @@ bool BuildDiscovery(
     for (int32 Index = 0; Index < Assets.Num(); ++Index)
     {
         const FAssetData& Asset = Assets[Index];
-        if ((!AssetName.IsEmpty() && Asset.AssetName.ToString() != AssetName) || !AssetIsActorBlueprint(Asset))
+        const UnrealMCP::BlueprintFamilyPolicy::FFamilyInfo Family = AssetBlueprintFamily(Asset);
+        if ((!AssetName.IsEmpty() && Asset.AssetName.ToString() != AssetName) || !Family.bSupported)
         {
             continue;
         }
@@ -72,6 +73,8 @@ bool BuildDiscovery(
         Value->SetStringField(TEXT("asset_path"), Asset.GetObjectPathString());
         Value->SetStringField(TEXT("package_path"), Asset.PackagePath.ToString());
         Value->SetStringField(TEXT("asset_name"), Asset.AssetName.ToString());
+        Value->SetStringField(TEXT("blueprint_family"), Family.Name);
+        Value->SetStringField(TEXT("native_family_class"), Family.NativeBaseClass);
         FString Parent;
         if (Asset.GetTagValue(FBlueprintTags::ParentClassPath, Parent))
         {
@@ -79,7 +82,7 @@ bool BuildDiscovery(
         }
         Value->SetStringField(TEXT("parent_class"), Parent);
         AddRecord(OutRecords, Value);
-        Fingerprint.Add(Asset.GetObjectPathString() + TEXT("|") + Parent);
+        Fingerprint.Add(Asset.GetObjectPathString() + TEXT("|") + Parent + TEXT("|") + Family.Name);
     }
     OutSnapshot = HashLines(MoveTemp(Fingerprint));
     return true;

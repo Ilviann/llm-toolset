@@ -16,6 +16,7 @@
 #include "UnrealMCPBlueprintInspector.h"
 #include "UnrealMCPBlueprintActionCatalog.h"
 #include "UnrealMCPBlueprintGraphEditor.h"
+#include "UnrealMCPBlueprintFamilyPolicy.h"
 #include "UnrealMCPBlueprintMutator.h"
 #include "UnrealMCPProtocol.h"
 #include "UnrealMCPOperationLedger.h"
@@ -358,7 +359,7 @@ TSharedPtr<FJsonObject> FUnrealMCPBridge::Capabilities() const
     Result->SetStringField(TEXT("bridge_instance_id"), BridgeInstanceId);
     Result->SetStringField(TEXT("unreal_version"), FEngineVersion::Current().ToString(EVersionComponent::Changelist));
     Result->SetStringField(TEXT("platform"), FPlatformProperties::PlatformName());
-    Result->SetStringField(TEXT("mode"), TEXT("actor_authoring"));
+    Result->SetStringField(TEXT("mode"), TEXT("blueprint_family_authoring"));
     Result->SetBoolField(TEXT("bridge_ready"), bReady);
     Result->SetArrayField(TEXT("commands"), Strings({TEXT("capabilities"), TEXT("editor_state"), TEXT("operation_status"),
         TEXT("blueprint_inspect"), TEXT("blueprint_action_catalog"), TEXT("blueprint_graph_edit"), TEXT("blueprint_create"), TEXT("blueprint_compile"),
@@ -386,9 +387,13 @@ TSharedPtr<FJsonObject> FUnrealMCPBridge::Capabilities() const
     Features->SetBoolField(TEXT("blueprint_graph_direct_connections"), true);
     Features->SetBoolField(TEXT("blueprint_graph_wildcard_specialization"), true);
     Features->SetBoolField(TEXT("blueprint_graph_automatic_conversion"), true);
+    Features->SetBoolField(TEXT("blueprint_family_policy"), true);
+    Features->SetBoolField(TEXT("game_mode_families"), true);
+    Features->SetBoolField(TEXT("game_state_families"), true);
     Features->SetBoolField(TEXT("editor_lifecycle"), false);
     Features->SetBoolField(TEXT("project_build"), false);
     Result->SetObjectField(TEXT("features"), Features);
+    Result->SetArrayField(TEXT("blueprint_families"), UnrealMCP::BlueprintFamilyPolicy::BuildPublishedMatrix());
 
     const TSharedRef<FJsonObject> AssetAccess = MakeShared<FJsonObject>();
     AssetAccess->SetStringField(TEXT("read_scope"), TEXT("all_mounted_content"));

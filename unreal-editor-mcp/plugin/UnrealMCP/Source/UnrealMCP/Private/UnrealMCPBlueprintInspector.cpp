@@ -93,10 +93,12 @@ bool FUnrealMCPBlueprintInspector::ExecuteInitial(
     }
     TArray<TSharedPtr<FJsonValue>> Records;
     FString Snapshot;
+    FString BlueprintFamily;
+    TSharedPtr<FJsonObject> FamilyCapabilities;
     bool bScanTruncated = false;
     const bool bBuilt = Mode == TEXT("discover")
         ? BuildDiscovery(*Arguments, Records, Snapshot, bScanTruncated, OutError)
-        : BuildInspection(*Arguments, Records, Snapshot, bScanTruncated, OutError);
+        : BuildInspection(*Arguments, Records, Snapshot, BlueprintFamily, FamilyCapabilities, bScanTruncated, OutError);
     if (!bBuilt)
     {
         return false;
@@ -117,6 +119,12 @@ bool FUnrealMCPBlueprintInspector::ExecuteInitial(
     const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
     Result->SetStringField(TEXT("mode"), Mode);
     Result->SetStringField(TEXT("snapshot_id"), Snapshot);
+    if (Mode == TEXT("inspect"))
+    {
+        Result->SetStringField(TEXT("blueprint_family"), BlueprintFamily);
+        Result->SetObjectField(TEXT("family_capabilities"), FamilyCapabilities.IsValid()
+            ? FamilyCapabilities.ToSharedRef() : MakeShared<FJsonObject>());
+    }
     Result->SetArrayField(TEXT("records"), Page);
     Result->SetNumberField(TEXT("record_count"), Records.Num());
     Result->SetNumberField(TEXT("page_offset"), Offset);

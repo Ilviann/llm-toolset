@@ -17,6 +17,8 @@ bool BuildInspection(
     const FJsonObject& Arguments,
     TArray<TSharedPtr<FJsonValue>>& OutRecords,
     FString& OutSnapshot,
+    FString& OutBlueprintFamily,
+    TSharedPtr<FJsonObject>& OutFamilyCapabilities,
     bool& OutScanTruncated,
     FUnrealMCPError& OutError);
 }
