@@ -11,7 +11,7 @@ The HTTP bridge owns one inspector and supplies already-authenticated JSON argum
 ## Invariants
 
 - Omitting `package_path` discovers across every content mount visible to the project. Supplying it restricts discovery recursively below that normalized mount/package path. Exact optional asset-name matching, a 2,048-candidate ceiling, and no asset loading apply in either form.
-- Deep inspection resolves one exact object or package path in any visible mount, rejects missing, non-Blueprint, and unpublished-family assets, and loads only that target.
+- Deep inspection resolves one exact object or package path in any visible mount, rejects missing, non-Blueprint, and unpublished-family assets, and loads only that target. Summary output reports `actor_blueprint: false` for GameInstance.
 - Discovery records identify the resolved published family without loading candidates. Exact inspection pages and summary records report the family plus live defaults/components/event-graph/local/override/graph-type capabilities.
 - Read scope includes `/Game`, `/Engine`, enabled project plugins, enabled engine/marketplace plugins, and other mounted content. This does not grant mutation authority: mutation scope is `/Game` plus symlink-free content mounts owned by plugins physically located under the current project's local `Plugins/` directory.
 - Default inspection is shallow: summary, parent, compile state, components, typed variables, functions, macros, custom events, locals, and graphs. Nodes, pins, connections, and separate parameter records require explicit sections. Stable member/function/local/macro/custom-event filters select one exact declaration and its scoped records.
@@ -25,4 +25,4 @@ The HTTP bridge owns one inspector and supplies already-authenticated JSON argum
 
 ## Verification
 
-`UnrealMCP.Phase2` covers discovery, structure, paging, identity, and non-mutation. `UnrealMCP.Phase4` adds component/default read-back. `UnrealMCP.Phase5` adds exact variable inspection. `UnrealMCP.Phase6` adds function/local/RepNotify inspection. `UnrealMCP.Phase7` adds exact macro/custom-event signature, ownership, graph, required-node, and reference inspection. `UnrealMCP.Phase14` covers family classification and live capabilities for GameModeBase, GameMode, GameStateBase, and GameState before and after compile/save/restart.
+`UnrealMCP.Phase2` covers discovery, structure, paging, identity, and non-mutation. `UnrealMCP.Phase4` adds component/default read-back. `UnrealMCP.Phase5` adds exact variable inspection. `UnrealMCP.Phase6` adds function/local/RepNotify inspection. `UnrealMCP.Phase7` adds exact macro/custom-event signature, ownership, graph, required-node, and reference inspection. `UnrealMCP.Phase14` covers the four GameMode/GameState families; `UnrealMCP.Phase15` covers GameInstance capability, empty component, default/member/callable/graph, and restart read-back contracts.

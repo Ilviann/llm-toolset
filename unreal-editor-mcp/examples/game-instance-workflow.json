@@ -1,0 +1,60 @@
+{
+  "create_game_instance": {
+    "operation_id": "15151515151515151515151515151515",
+    "parent_class": "/Script/Engine.GameInstance",
+    "package_path": "/Game/Framework/BP_ProjectGameInstance"
+  },
+  "inspect_capabilities_and_graphs": {
+    "mode": "inspect",
+    "asset_path": "/Game/Framework/BP_ProjectGameInstance.BP_ProjectGameInstance",
+    "sections": ["summary", "components", "variables", "class_defaults", "functions", "local_variables", "graphs"],
+    "property_names": ["SessionRegion"]
+  },
+  "component_contract": "family_capabilities.components is false; blueprint_component_edit returns invalid_component without changing the snapshot",
+  "add_session_state_using_latest_snapshot": {
+    "operation_id": "25252525252525252525252525252525",
+    "asset_path": "/Game/Framework/BP_ProjectGameInstance.BP_ProjectGameInstance",
+    "expected_snapshot": "0123456789abcdef0123456789abcdef01234567",
+    "operation": "add",
+    "name": "SessionRegion",
+    "type": {"category": "string", "container": "none"},
+    "default": {"kind": "literal", "value": "offline"},
+    "metadata": {"category": "Session", "instance_editable": true, "blueprint_visible": true}
+  },
+  "compile_before_generated_default_edit": {
+    "operation_id": "35353535353535353535353535353535",
+    "asset_path": "/Game/Framework/BP_ProjectGameInstance.BP_ProjectGameInstance",
+    "expected_snapshot": "123456789abcdef0123456789abcdef012345678"
+  },
+  "set_session_default_using_compile_snapshot": {
+    "operation_id": "45454545454545454545454545454545",
+    "asset_path": "/Game/Framework/BP_ProjectGameInstance.BP_ProjectGameInstance",
+    "expected_snapshot": "23456789abcdef0123456789abcdef0123456789",
+    "property_name": "SessionRegion",
+    "value": "eu-central"
+  },
+  "discover_init_callback": {
+    "asset_path": "/Game/Framework/BP_ProjectGameInstance.BP_ProjectGameInstance",
+    "graph_id": "11111111111111111111111111111111",
+    "expected_snapshot": "3456789abcdef0123456789abcdef0123456789a",
+    "owner_class": "/Script/Engine.GameInstance",
+    "function": "ReceiveInit",
+    "node_family": "event",
+    "limit": 5
+  },
+  "add_init_callback_using_returned_action": {
+    "operation_id": "55555555555555555555555555555555",
+    "asset_path": "/Game/Framework/BP_ProjectGameInstance.BP_ProjectGameInstance",
+    "expected_snapshot": "3456789abcdef0123456789abcdef0123456789a",
+    "operation": "add_node",
+    "graph_id": "11111111111111111111111111111111",
+    "action_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "position": {"x": 160, "y": 120}
+  },
+  "save_after_compile_using_latest_snapshot": {
+    "operation_id": "65656565656565656565656565656565",
+    "asset_path": "/Game/Framework/BP_ProjectGameInstance.BP_ProjectGameInstance",
+    "expected_snapshot": "456789abcdef0123456789abcdef0123456789ab"
+  },
+  "project_assignment": "Assign the saved GameInstance class manually in Project Settings; project-settings mutation is not released in Phase 15"
+}

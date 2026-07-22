@@ -349,9 +349,23 @@ static bool ResolveMutableBlueprint(
         OutError = {TEXT("wrong_type"), TEXT("The requested asset is not a Blueprint")};
         return false;
     }
-    if (!UnrealMCP::BlueprintFamilyPolicy::Supports(OutBlueprint->ParentClass, FamilyOperation))
+    const UnrealMCP::BlueprintFamilyPolicy::FFamilyInfo Family =
+        UnrealMCP::BlueprintFamilyPolicy::Classify(OutBlueprint->ParentClass);
+    if (!Family.bSupported)
     {
         OutError = {TEXT("wrong_type"), TEXT("The requested Blueprint does not belong to a published authoring family")};
+        return false;
+    }
+    if (!UnrealMCP::BlueprintFamilyPolicy::Supports(OutBlueprint->ParentClass, FamilyOperation))
+    {
+        if (FamilyOperation == UnrealMCP::BlueprintFamilyPolicy::EOperation::Components)
+        {
+            OutError = {TEXT("invalid_component"), TEXT("The requested Blueprint family does not support components")};
+        }
+        else
+        {
+            OutError = {TEXT("wrong_type"), TEXT("The requested Blueprint family does not support this operation")};
+        }
         return false;
     }
     if (OutBlueprint->bBeingCompiled)

@@ -12,7 +12,7 @@ bool FUnrealMCPPhase14GameplayFrameworkFamiliesTest::RunTest(const FString& Para
     using namespace UnrealMCP::BlueprintFamilyPolicy;
 
     const TArray<TSharedPtr<FJsonValue>> Matrix = BuildPublishedMatrix();
-    TestEqual(TEXT("family matrix publishes generic Actor plus four gameplay families"), Matrix.Num(), 5);
+    TestEqual(TEXT("family matrix retains generic Actor plus all released gameplay families"), Matrix.Num(), 6);
     for (const TSharedPtr<FJsonValue>& Value : Matrix)
     {
         const TSharedPtr<FJsonObject> Record = Value->AsObject();
@@ -22,7 +22,7 @@ bool FUnrealMCPPhase14GameplayFrameworkFamiliesTest::RunTest(const FString& Para
         TestFalse(TEXT("Blueprint parent changes stay excluded"), Operations->GetBoolField(TEXT("parent_change")));
         TestFalse(TEXT("project-settings assignment stays excluded"), Operations->GetBoolField(TEXT("project_settings_assignment")));
     }
-    TestFalse(TEXT("non-Actor classes stay outside the published family policy"),
+    TestFalse(TEXT("arbitrary UObject classes stay outside the published family policy"),
         Supports(UObject::StaticClass(), EOperation::Inspect));
 
     struct FFixture

@@ -1,5 +1,12 @@
 # Unreal Editor MCP history
 
+## 0.14.0 — 2026-07-22
+
+- Added `UGameInstance` as an explicit `uobject_derived` Blueprint family while preserving the existing Actor, GameMode, and GameState classifications and rejecting arbitrary UObject families.
+- Published GameInstance support for creation, inspection, class defaults, variables, functions/locals, macros, custom events, action cataloging, graph editing, compile, save, diagnostics, and reconciliation, with components explicitly false in both published and live capabilities.
+- Added stable pre-mutation `invalid_component` rejection for GameInstance component requests, truthful non-Actor summary output, GameInstance session-default editing, and Init/Shutdown callback action and graph-node coverage.
+- Added a focused GameInstance example, Phase 15 native Automation coverage, Python release-contract checks, and cross-process creation/edit/compile/save/restart verification.
+
 ## 0.13.0 — 2026-07-22
 
 - Added one explicit shared Blueprint-family policy for generic Actor, GameModeBase, GameMode, GameStateBase, and GameState lineages, replacing scattered Actor-only eligibility checks across discovery, inspection, creation, mutation, cataloging, and graph editing.

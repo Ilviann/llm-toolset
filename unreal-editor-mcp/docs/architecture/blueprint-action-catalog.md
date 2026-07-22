@@ -24,4 +24,4 @@ The editor bridge constructs the catalog facade with the bridge-instance identit
 
 ## Verification
 
-`UnrealMCP.Phase8.ActionCatalog` retains coverage for the core families, identities, bounds, expiry, invalidation, stale snapshots, and non-mutation. `UnrealMCP.Phase10.ExpandedActionCatalog` covers expanded graph-action families and restrictions. `UnrealMCP.Phase14` adds GameMode/GameState inherited framework-call coverage. The cross-process script verifies every released family after save and editor restart through the production Python client.
+`UnrealMCP.Phase8.ActionCatalog` retains coverage for the core families, identities, bounds, expiry, invalidation, stale snapshots, and non-mutation. `UnrealMCP.Phase10.ExpandedActionCatalog` covers expanded graph-action families and restrictions. `UnrealMCP.Phase14` adds GameMode/GameState inherited framework-call coverage; `UnrealMCP.Phase15` adds GameInstance Init/Shutdown callback coverage. The cross-process script verifies every released family after save and editor restart through the production Python client.

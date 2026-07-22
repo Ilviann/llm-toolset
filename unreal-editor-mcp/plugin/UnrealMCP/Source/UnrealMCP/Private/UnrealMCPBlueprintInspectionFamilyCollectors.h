@@ -24,7 +24,8 @@ if (Sections.Contains(TEXT("summary")))
     Value->SetStringField(TEXT("asset_name"), Blueprint->GetName());
     Value->SetBoolField(TEXT("was_loaded"), bWasLoaded);
     Value->SetBoolField(TEXT("package_dirty"), bDirtyBefore);
-    Value->SetBoolField(TEXT("actor_blueprint"), true);
+    Value->SetBoolField(TEXT("actor_blueprint"),
+        Blueprint->ParentClass != nullptr && Blueprint->ParentClass->IsChildOf(AActor::StaticClass()));
     Value->SetStringField(TEXT("blueprint_family"), UnrealMCP::BlueprintFamilyPolicy::Classify(Blueprint->ParentClass).Name);
     Value->SetObjectField(TEXT("family_capabilities"), UnrealMCP::BlueprintFamilyPolicy::BuildLiveCapabilities(Blueprint));
     AddRecord(Sink.Records, Value);

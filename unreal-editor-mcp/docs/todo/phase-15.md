@@ -2,6 +2,8 @@
 
 **Outcome:** The established workflow supports UObject-based GameInstance Blueprints without weakening Actor-family restrictions or assuming component support.
 
+**Status:** Completed in 0.14.0.
+
 ### Implementation
 
 - Add the `UGameInstance` family through the Phase 14 family-policy and capability-matrix contracts.

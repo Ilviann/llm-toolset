@@ -2,7 +2,7 @@
 
 `blueprint_create` accepts exactly `operation_id`, `parent_class`, and `package_path`. `parent_class` is a bounded Unreal class object path such as `/Script/Engine.Actor` or `/Game/Actors/BP_Base.BP_Base_C`. `package_path` is a long package name without an object suffix, such as `/Game/Actors/BP_Door`.
 
-The parent must resolve to a usable class in the explicit Actor/GameMode/GameState family policy. Native parents must pass Unreal's live Blueprint-base policy. Blueprint-generated parents must not be skeleton, reinstanced, compiling, or in an error state. Abstract, deprecated, newer-version, editor-only, missing, and non-Actor classes reject as `invalid_parent`.
+The parent must resolve to a usable class in the explicit Actor/GameMode/GameState/GameInstance family policy. Native parents must pass Unreal's live Blueprint-base policy. Blueprint-generated parents must not be skeleton, reinstanced, compiling, or in an error state. Abstract, deprecated, newer-version, editor-only, missing, and unpublished-family classes reject as `invalid_parent`.
 
 `blueprint_compile` and `blueprint_save` each accept exactly `operation_id`, `asset_path`, and `expected_snapshot`. Package paths and canonical object paths are accepted; object names must match the package asset name. The asset must belong to a published Blueprint family inside the mutation scope. A mismatched structural snapshot returns `stale_precondition` before compile/save.
 
