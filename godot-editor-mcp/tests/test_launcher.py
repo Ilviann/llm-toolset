@@ -30,8 +30,14 @@ class EditorLauncherTests(unittest.TestCase):
 
     def test_missing_configuration_is_rejected(self) -> None:
         launcher = EditorLauncher(self.root, None)
-        with self.assertRaisesRegex(LauncherError, "set GODOT_EXECUTABLE"):
+        with self.assertRaisesRegex(
+            LauncherError, "--godot-executable or set GODOT_EXECUTABLE"
+        ):
             launcher.start(UnavailableBridge())  # type: ignore[arg-type]
+
+    def test_blank_configuration_is_treated_as_missing(self) -> None:
+        launcher = EditorLauncher(self.root, " \t ")
+        self.assertFalse(launcher.configured)
 
     def test_missing_project_raises_launcher_domain_error(self) -> None:
         with self.assertRaisesRegex(LauncherError, "project folder"):

@@ -105,7 +105,7 @@ means `small` and `large`.
 | `send_input` | Small+ | Inject one run-scoped Input Map action with automatic bounded release |
 | `wait_for_runtime_condition` | Small+ | Wait for one play, node, count, or built-in scalar property condition |
 | `select_node` | Large | Select one node in the editor for coordinated desktop inspection |
-| `start_editor` | Large | Start Godot for the configured project using `GODOT_EXECUTABLE` |
+| `start_editor` | Large | Start Godot for the configured project using the configured executable |
 
 Node paths are relative to the selected edited or runtime scene root. Use `.` for the root and, for
 example, `Player/Camera2D` for a child. Vector and color property values retain
@@ -230,13 +230,15 @@ execute arbitrary code or provide general filesystem access. Pair it with
 `rooted-files-mcp` when the model needs to edit GDScript or project configuration.
 
 `start_editor` is deliberately not a general process runner. It accepts no
-arguments from the model and launches only `GODOT_EXECUTABLE --editor --path`
-for the project configured when the MCP server starts. The executable must be
-an absolute path to an executable file. If the project editor is already
-connected, the tool returns `already_running`; repeated calls while a process
-started by this MCP server is still launching return `starting`. The plugin
-must already be installed and enabled in the project. The MCP server does not
-provide a tool to close the editor.
+arguments from the model and launches only the executable selected by
+`--godot-executable` or `GODOT_EXECUTABLE`, followed by `--editor --path` for
+the project configured when the MCP server starts. The command-line value takes
+precedence over the environment variable. The executable must be an absolute
+path to an executable file. If the project editor is already connected, the
+tool returns `already_running`; repeated calls while a process started by this
+MCP server is still launching return `starting`. The plugin must already be
+installed and enabled in the project. The MCP server does not provide a tool
+to close the editor.
 
 The fixed context cost depends on the selected mode. `tiny` omits the sixteen
 asset, settings, autoload, plugin-metadata, transaction, and gameplay workflow
@@ -756,8 +758,10 @@ Find Python with `command -v python3` on macOS/Linux or
 convenient for commands, but LM Studio should receive the interpreter executable.
 
 To enable the large-mode editor launcher, use `"mode", "large"` and configure
-the executable in the MCP server environment. `GODOT_EXECUTABLE` must be the
-absolute executable file, not an application folder. Typical values are:
+the executable with the `--godot-executable` argument or the
+`GODOT_EXECUTABLE` environment variable. The command-line argument takes
+precedence when both are present. The value must name the absolute executable
+file, not an application folder. Typical values are:
 
 - macOS: `/Applications/Godot.app/Contents/MacOS/Godot`
 - Linux: `/absolute/path/to/Godot`
@@ -785,17 +789,25 @@ Complete macOS example:
 ```
 
 For Linux, use the same structure with the Linux Python and Godot paths. For
-Windows, use the Windows configuration above, change `small` to `large`, and add:
+Windows, use the Windows configuration above, change `small` to `large`, and
+either add these two entries to `args`:
+
+```json
+"--godot-executable",
+"C:\\absolute\\folder\\chosen\\by\\the\\user\\Godot_v4.7-stable_win64.exe"
+```
+
+or add the environment entry:
 
 ```json
 "env": {
-  "GODOT_EXECUTABLE": "C:\\absolute\\path\\to\\Godot_v4.7-stable_win64.exe"
+  "GODOT_EXECUTABLE": "C:\\absolute\\folder\\chosen\\by\\the\\user\\Godot_v4.7-stable_win64.exe"
 }
 ```
 
 The launcher is unavailable in `tiny` and `small` modes. In `large` mode,
-`capabilities.editor_launcher.configured` reports whether the environment
-variable was provided without exposing its machine-specific value.
+`capabilities.editor_launcher.configured` reports whether either configuration
+source was provided without exposing its machine-specific value.
 
 Create the import-inbox folder before starting the MCP server. Omit the two
 `--import-root` arguments if asset import is not needed; `import_asset` then

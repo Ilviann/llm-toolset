@@ -244,7 +244,10 @@ class ToolDispatcher:
         if arguments:
             raise InvalidArgumentError("start_editor does not accept arguments")
         if self.launcher is None:
-            raise LauncherError("Godot executable is not configured; set GODOT_EXECUTABLE")
+            raise LauncherError(
+                "Godot executable is not configured; use --godot-executable "
+                "or set GODOT_EXECUTABLE"
+            )
         return self.launcher.start(self.bridge)
 
     def _import_asset(self, arguments: dict[str, Any]) -> dict[str, Any]:

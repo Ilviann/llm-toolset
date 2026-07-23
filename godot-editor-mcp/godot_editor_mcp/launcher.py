@@ -21,7 +21,8 @@ class EditorLauncher:
             self.project = Path(project).expanduser().resolve(strict=True)
         except (OSError, RuntimeError):
             raise LauncherError("Godot project folder does not exist") from None
-        self.executable = executable.strip() if executable else None
+        configured_executable = executable.strip() if executable else ""
+        self.executable = configured_executable or None
         self._process: subprocess.Popen[bytes] | None = None
 
     @property
@@ -68,15 +69,16 @@ class EditorLauncher:
     def _validated_executable(self) -> Path:
         if self.executable is None:
             raise LauncherError(
-                "Godot executable is not configured; set GODOT_EXECUTABLE"
+                "Godot executable is not configured; use --godot-executable "
+                "or set GODOT_EXECUTABLE"
             )
         candidate = Path(self.executable).expanduser()
         if not candidate.is_absolute():
-            raise LauncherError("GODOT_EXECUTABLE must be an absolute path")
+            raise LauncherError("Godot executable must be an absolute path")
         try:
             executable = candidate.resolve(strict=True)
         except OSError:
-            raise LauncherError("GODOT_EXECUTABLE does not exist") from None
+            raise LauncherError("Godot executable does not exist") from None
         if not executable.is_file() or not os.access(executable, os.X_OK):
-            raise LauncherError("GODOT_EXECUTABLE must be an executable file")
+            raise LauncherError("Godot executable must be an executable file")
         return executable

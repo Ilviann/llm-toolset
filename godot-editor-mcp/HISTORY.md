@@ -3,6 +3,16 @@
 This file records released changes. Planned work is tracked separately in
 [`ROADMAP.md`](ROADMAP.md).
 
+## 0.17.0 — 2026-07-24
+
+- Added `--godot-executable` as a portable command-line configuration for the
+  large-mode editor launcher, including Windows executables stored in
+  user-selected folders.
+- Retained `GODOT_EXECUTABLE` as the environment configuration and made the
+  command-line value take explicit precedence when both are supplied.
+- Added focused configuration-precedence and blank-value tests and updated the
+  launcher errors and setup examples for both configuration sources.
+
 ## 0.16.1 — 2026-07-15
 
 - Bounded the localhost editor bridge to 16 active clients and added a

@@ -107,7 +107,7 @@ func _init() -> void:
 	)
 	assert(plugin.enabled and plugin.installed and plugin.valid)
 	assert(plugin.name == "Godot MCP Bridge")
-	assert(plugin.version == "0.16.1")
+	assert(plugin.version == "0.17.0")
 
 	if ProjectSettings.has_setting(TEMP_KEY):
 		ProjectSettings.clear(TEMP_KEY)

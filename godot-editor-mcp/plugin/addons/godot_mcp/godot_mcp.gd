@@ -34,7 +34,7 @@ const SceneStateTracker := preload("scene_state_tracker.gd")
 const SceneTransaction := preload("scene_transaction.gd")
 const TokenStore := preload("token_store.gd")
 
-const BRIDGE_VERSION := "0.16.1"
+const BRIDGE_VERSION := "0.17.0"
 const BRIDGE_PROTOCOL_VERSION := "1"
 const DEFAULT_PORT := 6505
 const TOKEN_PATH := "res://.godot/godot_mcp_token"

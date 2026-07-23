@@ -18,7 +18,10 @@ Composition creates the MCP presentation, tool dispatcher, local asset/process s
 ## Invariants
 
 - The root shim and module entry delegate to the same CLI behavior.
-- Project, mode, port, and import-root validation occurs before stdio serving.
+- Project, mode, port, import-root, and editor-executable configuration occurs
+  before stdio serving.
+- `--godot-executable` takes precedence over the optional `GODOT_EXECUTABLE`
+  environment variable.
 - The package and installed Godot plugin are an exact-version pair.
 - No third-party runtime dependency or network/runtime download is introduced.
 

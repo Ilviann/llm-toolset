@@ -41,7 +41,20 @@ def build_parser() -> argparse.ArgumentParser:
         help="Plugin port (default: discover from the project, then 6505)",
     )
     parser.add_argument("--import-root", help="Folder containing assets staged for import")
+    parser.add_argument(
+        "--godot-executable",
+        help=(
+            "Absolute path to the Godot executable "
+            "(overrides GODOT_EXECUTABLE)"
+        ),
+    )
     return parser
+
+
+def _godot_executable(command_line_value: str | None) -> str | None:
+    if command_line_value is not None:
+        return command_line_value
+    return os.environ.get("GODOT_EXECUTABLE")
 
 
 def main() -> None:
@@ -49,7 +62,10 @@ def main() -> None:
     args = parser.parse_args()
     try:
         bridge = GodotBridge(args.project, port=args.port)
-        launcher = EditorLauncher(args.project, os.environ.get("GODOT_EXECUTABLE"))
+        launcher = EditorLauncher(
+            args.project,
+            _godot_executable(args.godot_executable),
+        )
         run(
             bridge,
             ProjectAssets(args.project, args.import_root),

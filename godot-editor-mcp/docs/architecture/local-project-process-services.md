@@ -19,7 +19,9 @@ Both expose narrow interfaces consumed by the tool dispatcher. Asset handling us
 - Protected `.godot` and `addons` destinations are rejected.
 - One file is imported at a time, bounded to 100 MiB and copied in bounded chunks.
 - Final publication never overwrites an existing destination on POSIX or Windows, including races.
-- `start_editor` accepts no model-provided executable or arguments and uses only an absolute executable from `GODOT_EXECUTABLE`.
+- `start_editor` accepts no model-provided executable or arguments and uses only
+  the absolute executable configured by `--godot-executable` or
+  `GODOT_EXECUTABLE`, in that precedence order.
 - POSIX sessions and Windows process groups remain isolated through explicit platform branches.
 
 ## Change and verification guide
