@@ -34,15 +34,25 @@ Keep the authoritative checklist in [`ROADMAP.md`](../../ROADMAP.md) synchronize
 - [Phase 25 — Optional durable editor restart](phase-25.md) — Add optional durable editor restart.
 - [Phase 26 — Optional editor-offline project-file generation](phase-26.md) — Add optional editor-offline project-file generation.
 - [Phase 27 — Optional editor-target builds](phase-27.md) — Add optional editor-target builds.
+- [Phase 28 — Level discovery, safe opening, and snapshot foundations](phase-28.md) — Add bounded map discovery, explicit safe map opening, and restart-stable level snapshots.
+- [Phase 29 — World Partition actor and instance inspection](phase-29.md) — Inspect bounded descriptor, actor, component, and reflected instance state without loading the entire world.
+- [Phase 30 — Transactional level actor editing and verified saving](phase-30.md) — Add stale-safe actor batches and honest per-package World Partition save verification.
+- [Phase 31 — Spline component inspection and editing](phase-31.md) — Add bounded mixed-point spline inspection, mutation, persistence, and metadata safety.
+- [Phase 32 — Retained operations and single-process multiplayer PIE lifecycle](phase-32.md) — Start and stop observable single-process PIE sessions, including a listen server and remote client.
+- [Phase 33 — Per-world runtime actor inspection and attributed diagnostics](phase-33.md) — Inspect exact server/client worlds with session-scoped actor identities and proven log attribution.
+- [Phase 34 — Bounded PIE test commands, waits, and Canyon acceptance](phase-34.md) — Add allowlisted test actions and complete the single-process Canyon Infantry acceptance flow.
+- [Phase 35 — Multi-process PIE companion and cross-process observation](phase-35.md) — Extend retained sessions through an authenticated local runtime companion for owned PIE processes.
 
 ## Shared roadmap contracts
 
 ### Process boundary
 
-The application remains an exact-version pair:
+Through Phase 34, the application remains an exact-version pair:
 
 1. A dependency-free Python 3.10+ MCP server using stdio JSON-RPC.
 2. An Unreal Editor C++ plugin using public editor APIs and a bounded authenticated localhost HTTP bridge.
+
+Phase 35 adds a minimal exact-version runtime companion module to the same plugin distribution for editor-owned multi-process PIE children. It connects outward to editor-owned authenticated IPC and does not expose a model-facing game listener.
 
 Python owns MCP framing, published schemas, exact argument validation, tool modes, project configuration, discovery, authenticated HTTP calls, timeouts, process orchestration, and stable error presentation. The C++ plugin owns credentials, listener lifecycle, authentication, Game-thread dispatch, Unreal object access, Blueprint operations, compiler diagnostics, transactions, package saving, mutation-result retention, and authoritative capabilities.
 
@@ -67,6 +77,14 @@ Keep the public surface compact. Add typed operations to these remaining tool fa
 | `blueprint_block_replace` | 20 | Replace one complete bounded logic unit as a prevalidated transaction |
 | `editor_lifecycle` | 23 | Run one opt-in configured launch, restart, or graceful-shutdown operation |
 | `project_build` | 26 | Run one opt-in configured project-generation or editor-target build operation |
+| `level_inspect` | 28 | Discover mounted maps and inspect bounded current-map, actor, component, property, and spline snapshot pages |
+| `level_open` | 28 | Safely open one exact mounted map without implicit save or discard |
+| `level_actor_edit` | 30 | Apply one stale-safe bounded actor/component/spline mutation batch in the current map |
+| `level_save` | 30 | Save and verify the current map and explicit affected external-actor packages |
+| `play_session_start` | 32 | Start one retained bounded PIE topology with exact effective settings and instance identities |
+| `play_session_stop` | 32 | Idempotently stop one retained PIE session and report cleanup |
+| `play_session_inspect` | 33 | Inspect one retained session or exact runtime world with bounded actor/property/log pages |
+| `play_session_command` | 34 | Run one allowlisted test action or bounded wait against an exact retained session instance |
 
 Lifecycle and build tools remain absent from the default model context. Use an opt-in large mode for them. Measure the Blueprint schemas and use nested operation discriminators if context cost becomes excessive; the default mode must still support the complete Blueprint-authoring workflow.
 
@@ -77,6 +95,7 @@ Lifecycle and build tools remain absent from the default model context. Use an o
 - Publish explicit operation states such as `queued`, `executing`, `committed`, `rejected`, and `outcome_unknown`. Never report cancellation after a mutation has committed.
 - Cancellation may remove queued work or stop preflight work, but it must not interrupt an active Unreal mutation at an unsafe point. A lost response must be reconciled through `operation_status` before retry.
 - The ledger is process-scoped unless a later operation explicitly defines durable restart state. If the bridge instance changes and no result is available, return `outcome_unknown` and require inspection before further mutation.
+- Retained PIE lifecycle and wait operations may remain nonterminal across HTTP requests. Publish bounded starting/running/stopping progress, allow cancellation only at safe points, and keep terminal replay semantics identical to short mutations.
 - Reject mutation while the target asset is compiling, saving, loading, being reinstanced, undergoing undo/redo, or otherwise unable to provide stable preconditions.
 - Use one editor transaction per accepted atomic asset mutation where Unreal supports it. Prevalidate before opening it, verify postconditions before commit, and implement explicit restoration for unexpected failure. Config-file operations must use atomic persistence and verified restoration instead of pretending to be editor transactions. Do not assume that cancelling a transaction restores arbitrary object state.
 
@@ -92,13 +111,30 @@ Lifecycle and build tools remain absent from the default model context. Use an o
 - Use one stable bounded error envelope with `code`, `message`, `details`, and `retryable`. Never return C++ exceptions, assertions, addresses, credentials, or unbounded logs.
 - Keep request bodies, JSON depth, strings, collections, scans, caches, operation state, diagnostics, response bytes, transaction work, and Game-thread time explicitly bounded and published through `capabilities`.
 
+### Level authoring contracts
+
+- Keep `level_inspect` read-only and use the separate ledger-backed `level_open` operation for map switching. Never implicitly save, discard, or prompt for dirty work.
+- Qualify stable Actor GUID and component identities by exact map identity. Require the current map snapshot and exact identities for every existing-object mutation.
+- Use World Partition actor descriptors for bounded discovery and exact or region loading for live instance work. Missing or failed cells and data layers are errors, not evidence that an actor is absent.
+- Prevalidate each complete actor/spline batch, transact where Unreal supports it, maintain explicit restoration for unexpected in-memory failure, and verify postconditions before reporting commit.
+- Treat a multi-package save as a verified batch, not an atomic filesystem transaction. Return per-package outcomes and explicit partial failure; never claim that Unreal rolled back already persisted external packages.
+
+### Retained PIE session contracts
+
+- Give sessions, operations, instances, world contexts, runtime actors, logs, and tests explicit bounded identities. Require both session and instance/world identity for every world-specific query or action.
+- A two-player listen server has a listen-server/host world and one remote-client world. Use a dedicated server plus two clients when three separate worlds are required.
+- Publish supported topology, player/client, process-mode, inspection, command, wait, and test policies through `capabilities`; reject unsupported modes rather than falling back to mutable editor preferences.
+- Single-process inspection remains editor-owned. Multi-process observation requires the Phase 35 exact-version companion and authenticated editor-owned IPC; never guess or scrape state from foreign child processes.
+- Allow only configured console commands, named tests, plugin-marked reflected test functions, and bounded predicates. Do not expose arbitrary input injection, `ProcessEvent`, runtime reflection mutation, or unrestricted console execution.
+- Return only diagnostics with a proven originating process/PIE instance. Exclude unattributable raw log entries instead of assigning them heuristically.
+
 ### Security baseline
 
 - Bind only to `127.0.0.1` and verify the actual listening address in native integration tests.
 - Authenticate every request with the high-entropy per-project credential and fail closed on credential, listener, route, or heartbeat faults.
 - Never expose the credential or absolute project path through discovery, capabilities, operation records, diagnostics, or logs.
 - Permit one bridge owner per configured port; bound queued requests and retained state; and cleanly release route, discovery, credentials, and pending work during shutdown.
-- Never expose arbitrary UObject calls, unrestricted reflection mutation, Python execution inside Unreal, console commands, supplied C++, arbitrary subprocess arguments, or general filesystem/process access.
+- Never expose arbitrary UObject calls, unrestricted reflection mutation, Python execution inside Unreal, unrestricted console commands, supplied C++, arbitrary subprocess arguments, or general filesystem/process access. Retained PIE commands remain confined to the capability-advertised test allowlists and exact plugin-marked functions.
 
 ### Release discipline
 
@@ -114,8 +150,8 @@ The following are not part of the committed remaining roadmap unless separately 
 - Unrestricted whole-Blueprint text import/export or wholesale Blueprint replacement.
 - Blueprint reparenting, project-settings mutation beyond the narrow Phase 16 gameplay-framework assignments, timelines, event-dispatcher authoring, interface authoring, and specialized asset families not named in this roadmap.
 - Level Blueprint, Animation Blueprint, Control Rig, Niagara, Material, Behavior Tree, StateTree, or Widget-animation authoring.
-- General Play-in-Editor input injection, screenshots, runtime object mutation, or agent-driven gameplay assertions. Phase 16 may add internal automation-only multiplayer behavioral verification without exposing runtime-control tools.
-- Cloud services, accounts, telemetry, dependency downloads, or a game-side network listener.
+- General Play-in-Editor input injection, screenshots, runtime object mutation beyond exact configured test functions, arbitrary gameplay assertions, or unrestricted raw-log capture.
+- Cloud services, accounts, telemetry, dependency downloads, or a model-facing game-side network listener.
 
 ## Primary Unreal 5.8 API references
 

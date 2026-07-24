@@ -1,6 +1,6 @@
 # Unreal Editor MCP Roadmap
 
-The remaining order is optimized for attaching agents to an existing multiplayer shooter: finish gameplay-framework coverage, complete multiplayer authoring, add game-design data, then add HUD/menu authoring. Logic-block ergonomics follow those usable workflows; editor lifecycle and build automation remain last.
+The remaining order preserves the existing Blueprint, UI, lifecycle, and build phases, then adds a bounded level-authoring and multiplayer PIE track. The appended track delivers the single-process Canyon workflow before introducing the optional multi-process runtime companion.
 
 - [x] [Phase 4 — Reliable mutations, Actor components, and defaults](docs/todo/phase-04.md) — Add reliable mutation delivery, Actor component editing, and Blueprint/component defaults.
 - [x] [Phase 5 — Blueprint member variables](docs/todo/phase-05.md) — Add typed Blueprint member-variable inspection and editing.
@@ -26,3 +26,11 @@ The remaining order is optimized for attaching agents to an existing multiplayer
 - [ ] [Phase 25 — Optional durable editor restart](docs/todo/phase-25.md) — Add optional durable editor restart.
 - [ ] [Phase 26 — Optional editor-offline project-file generation](docs/todo/phase-26.md) — Add optional editor-offline project-file generation.
 - [ ] [Phase 27 — Optional editor-target builds](docs/todo/phase-27.md) — Add optional editor-target builds.
+- [ ] [Phase 28 — Level discovery, safe opening, and snapshot foundations](docs/todo/phase-28.md) — Add bounded map discovery, explicit safe map opening, and restart-stable level snapshots.
+- [ ] [Phase 29 — World Partition actor and instance inspection](docs/todo/phase-29.md) — Inspect bounded descriptor, actor, component, and reflected instance state without loading the entire world.
+- [ ] [Phase 30 — Transactional level actor editing and verified saving](docs/todo/phase-30.md) — Add stale-safe actor batches and honest per-package World Partition save verification.
+- [ ] [Phase 31 — Spline component inspection and editing](docs/todo/phase-31.md) — Add bounded mixed-point spline inspection, mutation, persistence, and metadata safety.
+- [ ] [Phase 32 — Retained operations and single-process multiplayer PIE lifecycle](docs/todo/phase-32.md) — Start and stop observable single-process PIE sessions, including a listen server and remote client.
+- [ ] [Phase 33 — Per-world runtime actor inspection and attributed diagnostics](docs/todo/phase-33.md) — Inspect exact server/client worlds with session-scoped actor identities and proven log attribution.
+- [ ] [Phase 34 — Bounded PIE test commands, waits, and Canyon acceptance](docs/todo/phase-34.md) — Add allowlisted test actions and complete the single-process Canyon Infantry acceptance flow.
+- [ ] [Phase 35 — Multi-process PIE companion and cross-process observation](docs/todo/phase-35.md) — Extend retained sessions through an authenticated local runtime companion for owned PIE processes.
