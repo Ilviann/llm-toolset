@@ -64,16 +64,26 @@ void RequirePublicTypes()
     static_assert(TIsDerivedFrom<UDataTableFactory, UFactory>::Value);
     static_assert(TIsDerivedFrom<AGameStateBase, AActor>::Value);
     static_assert(TIsDerivedFrom<AGameState, AGameStateBase>::Value);
-    (void)FHttpServerModule::IsAvailable;
-    (void)FAssetRegistryModule::GetRegistry;
-    (void)FBlueprintActionDatabase::Get;
+    (void)&FHttpServerModule::IsAvailable;
+    (void)&FAssetRegistryModule::GetRegistry;
+    (void)&FBlueprintActionDatabase::Get;
     (void)&UEdGraphSchema_K2::CanCreateConnection;
     (void)&UEdGraphSchema_K2::TryCreateConnection;
     (void)&UEdGraphSchema_K2::CreateAutomaticConversionNodeAndConnections;
     (void)&UEdGraphSchema_K2::CreatePromotedConnection;
     (void)&UEdGraphSchema_K2::TrySetDefaultValue;
     (void)&UEdGraphSchema_K2::BreakSinglePinLink;
-    (void)FEditorFileUtils::SaveDirtyPackages;
+    using FSaveDirtyPackages = bool (*)(
+        bool,
+        bool,
+        bool,
+        bool,
+        bool,
+        bool,
+        bool*,
+        const FEditorFileUtils::FShouldIgnorePackageFunctionRef&,
+        bool);
+    (void)static_cast<FSaveDirtyPackages>(&FEditorFileUtils::SaveDirtyPackages);
     (void)&UGameMapsSettings::SetGlobalDefaultGameMode;
     (void)&FStructureEditorUtils::CreateUserDefinedStruct;
     (void)&FStructureEditorUtils::MoveVariable;

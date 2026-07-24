@@ -271,7 +271,7 @@ static TSharedRef<FJsonObject> LocalReferences(UBlueprint* Blueprint, UEdGraph* 
         UnrealMCP::BlueprintReferences::ScanLocalVariable(Blueprint, FunctionGraph, VariableName));
 }
 
-UK2Node_FunctionEntry* FunctionEntry(UEdGraph* Graph)
+static UK2Node_FunctionEntry* FunctionEntry(UEdGraph* Graph)
 {
     return Graph != nullptr ? Cast<UK2Node_FunctionEntry>(FBlueprintEditorUtils::GetEntryNode(Graph)) : nullptr;
 }

@@ -14,16 +14,18 @@ SPEC.loader.exec_module(package_plugin)
 
 class PackagePluginScriptTests(unittest.TestCase):
     def test_build_command_uses_fixed_plugin_and_output_arguments(self):
+        run_uat = Path("/Engine/RunUAT.sh")
+        output = Path("/Workspace With Spaces/build/unreal-editor-mcp")
         command = package_plugin.build_command(
-            Path("/Engine/RunUAT.sh"),
-            Path("/Workspace With Spaces/build/unreal-editor-mcp"),
+            run_uat,
+            output,
             "Mac",
             strict_includes=True,
             unversioned=False,
         )
-        self.assertEqual(command[0:2], ["/Engine/RunUAT.sh", "BuildPlugin"])
+        self.assertEqual(command[0:2], [str(run_uat), "BuildPlugin"])
         self.assertIn(f"-Plugin={package_plugin.PLUGIN_DESCRIPTOR}", command)
-        self.assertIn("-Package=/Workspace With Spaces/build/unreal-editor-mcp", command)
+        self.assertIn(f"-Package={output}", command)
         self.assertIn("-TargetPlatforms=Mac", command)
         self.assertIn("-StrictIncludes", command)
         self.assertNotIn("-Unversioned", command)

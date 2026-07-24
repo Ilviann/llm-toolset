@@ -116,7 +116,15 @@ bool FUnrealMCPBlueprintActionCatalog::ResolveForInvocation(
     };
 
     TSet<FObjectKey> ProcessedOwners;
-    TArray<UObject*> PriorityOwners = {Blueprint, Blueprint->SkeletonGeneratedClass, Blueprint->GeneratedClass};
+    TArray<UObject*> PriorityOwners;
+    const FString RetainedOwner = Retained->PublicRecord.IsValid()
+        ? Retained->PublicRecord->GetStringField(TEXT("owner_class"))
+        : FString();
+    if (!RetainedOwner.IsEmpty())
+    {
+        PriorityOwners.Add(FindObject<UClass>(nullptr, *RetainedOwner));
+    }
+    PriorityOwners.Append({Blueprint, Blueprint->SkeletonGeneratedClass, Blueprint->GeneratedClass});
     for (UClass* Class = Blueprint->GeneratedClass; Class != nullptr; Class = Class->GetSuperClass()) PriorityOwners.AddUnique(Class);
     for (UClass* Class = Blueprint->SkeletonGeneratedClass; Class != nullptr; Class = Class->GetSuperClass()) PriorityOwners.AddUnique(Class);
     for (UObject* Owner : PriorityOwners)

@@ -476,7 +476,7 @@ The plugin publishes these authoritative defaults through `capabilities`: 64 KiB
 
 ## Offline development and tests
 
-Configure `UNREAL_MCP_ENGINE_ROOT`, `UNREAL_MCP_TEST_UPROJECT`, and `UNREAL_MCP_DEVELOPER_DIR` as described in [`docs/development-environment.md`](docs/development-environment.md). The `ue-test/` directory is disposable and entirely ignored.
+Configure `UNREAL_MCP_ENGINE_ROOT` and `UNREAL_MCP_TEST_UPROJECT` as described in [`docs/development-environment.md`](docs/development-environment.md). macOS additionally requires `UNREAL_MCP_DEVELOPER_DIR`; Windows uses the configured engine's Win64 editor and installed Visual Studio toolchain. The `ue-test/` directory is disposable and entirely ignored.
 
 Run the dependency-free Python suite:
 
@@ -486,11 +486,21 @@ python3 -m unittest discover -s tests -v
 
 Compile the plugin and all public Unreal API probes:
 
+macOS:
+
 ```sh
 env DEVELOPER_DIR="$UNREAL_MCP_DEVELOPER_DIR" \
   "$UNREAL_MCP_ENGINE_ROOT/Engine/Build/BatchFiles/Mac/Build.sh" \
   UnrealMCPTestEditor Mac Development \
   -Project="$UNREAL_MCP_TEST_UPROJECT" -WaitMutex -NoHotReloadFromIDE
+```
+
+Windows PowerShell:
+
+```powershell
+& "$env:UNREAL_MCP_ENGINE_ROOT\Engine\Build\BatchFiles\Build.bat" `
+  UnrealMCPTestEditor Win64 Development `
+  "-Project=$env:UNREAL_MCP_TEST_UPROJECT" -WaitMutex -NoHotReloadFromIDE
 ```
 
 Run the Unreal Automation Tests:
@@ -505,4 +515,4 @@ Run the cross-process bridge acceptance test:
 python3 scripts/run_headless_integration.py
 ```
 
-The 0.16.0 native baseline is Unreal 5.8.0 on Apple Silicon macOS 26.5.2 with Xcode 26.1.1. Windows and Linux path/process branches are unit-tested through injected adapters.
+The headless runner selects `UnrealEditor` on macOS and Linux and `UnrealEditor-Cmd.exe` on Windows. The 0.16.0 native baseline is Unreal 5.8.0 on Apple Silicon macOS 26.5.2 with Xcode 26.1.1. Platform selection and environment requirements are unit-tested without requiring every host.

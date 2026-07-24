@@ -22,6 +22,7 @@ The HTTP bridge owns one inspector and supplies already-authenticated JSON argum
 - Variable records expose canonical K2 types/tagged defaults, metadata, ownership/editability, replication and validated mutable RepNotify relationships, plus at most 64 exact loaded graph/node references and an unresolved-reference signal.
 - Variables, functions, locals, macros, and custom events obtain reference summaries from the same typed bounded scanner used by mutation preflight; collectors encode that result only when producing records.
 - Function and macro records retain their ownership/signature contracts. Custom-event records remain distinct from overrides and inherited/native events and now expose exact event-graph placement plus live `rpc_mode` and `reliability`.
+- Private inspection helpers defined in shared headers retain internal linkage so adaptive non-unity builds do not emit duplicate symbols across inspector and graph-editor translation units.
 
 ## Verification
 

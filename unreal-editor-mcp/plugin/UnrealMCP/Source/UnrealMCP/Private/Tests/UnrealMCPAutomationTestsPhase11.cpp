@@ -56,7 +56,13 @@ bool FUnrealMCPPhase11GraphNodeLifecycleTest::RunTest(const FString& Parameters)
             if (Node != nullptr && Node->NodeGuid.ToString(EGuidFormats::Digits).ToLower() == Id) return Node;
         return nullptr;
     };
-    auto CatalogAction = [&](const FString& GraphId, const FString& Family, const FString& Function, const FString& Member, bool* Pure = nullptr) -> FString
+    auto CatalogAction = [&](
+        const FString& GraphId,
+        const FString& Family,
+        const FString& Function,
+        const FString& Member,
+        bool* Pure = nullptr,
+        const FString& OwnerClass = FString()) -> FString
     {
         const TSharedRef<FJsonObject> Query = MakeShared<FJsonObject>();
         Query->SetStringField(TEXT("asset_path"), AssetPath);
@@ -64,6 +70,7 @@ bool FUnrealMCPPhase11GraphNodeLifecycleTest::RunTest(const FString& Parameters)
         Query->SetStringField(TEXT("expected_snapshot"), InspectSnapshot(Inspector, AssetPath));
         Query->SetStringField(TEXT("node_family"), Family);
         Query->SetNumberField(TEXT("limit"), 50);
+        if (!OwnerClass.IsEmpty()) Query->SetStringField(TEXT("owner_class"), OwnerClass);
         if (!Function.IsEmpty()) Query->SetStringField(TEXT("function"), Function);
         if (!Member.IsEmpty()) Query->SetStringField(TEXT("member"), Member);
         TSharedPtr<FJsonObject> CatalogResult;
@@ -227,14 +234,26 @@ bool FUnrealMCPPhase11GraphNodeLifecycleTest::RunTest(const FString& Parameters)
         TPair<FString, FString>(FunctionGraphId, TEXT("function")),
         TPair<FString, FString>(MacroGraphId, TEXT("macro"))})
     {
-        const FString LiteralAction = CatalogAction(Target.Key, TEXT("literal"), TEXT("MakeLiteralInt"), FString());
+        const FString LiteralAction = CatalogAction(
+            Target.Key,
+            TEXT("literal"),
+            TEXT("MakeLiteralInt"),
+            FString(),
+            nullptr,
+            TEXT("/Script/Engine.KismetSystemLibrary"));
         if (!TestFalse(*FString::Printf(TEXT("literal catalogs in %s graph"), *Target.Value), LiteralAction.IsEmpty())) return false;
         FString NodeId;
         if (!TestTrue(*FString::Printf(TEXT("node creates in %s graph"), *Target.Value), AddAction(Target.Key, LiteralAction, 40, 80, NodeId))) return false;
         TestTrue(*FString::Printf(TEXT("node removes from %s graph"), *Target.Value), RemoveNode(Target.Key, NodeId));
     }
 
-    const FString ImpureAction = CatalogAction(EventGraphId, TEXT("function_call"), TEXT("PrintString"), FString(), &bPure);
+    const FString ImpureAction = CatalogAction(
+        EventGraphId,
+        TEXT("function_call"),
+        TEXT("PrintString"),
+        FString(),
+        &bPure,
+        TEXT("/Script/Engine.KismetSystemLibrary"));
     if (!TestFalse(TEXT("impure function action catalogs"), ImpureAction.IsEmpty())) return false;
     TestFalse(TEXT("impure function metadata is preserved"), bPure);
     FString ImpureNodeId;

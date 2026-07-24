@@ -110,6 +110,7 @@ bool FUnrealMCPPhase10ExpandedActionCatalogTest::RunTest(const FString& Paramete
     if (!TestNotNull(TEXT("event graph returns latent action"), Action.Get())) return false;
     TestTrue(TEXT("latent metadata is explicit"), Action->GetBoolField(TEXT("latent")));
     TSharedRef<FJsonObject> LatentFunction = CatalogArguments(FunctionGraphId, TEXT("function_call"));
+    LatentFunction->SetStringField(TEXT("owner_class"), TEXT("/Script/Engine.KismetSystemLibrary"));
     LatentFunction->SetStringField(TEXT("function"), TEXT("Delay"));
     TestTrue(TEXT("latent function restriction query executes"), Catalog.Execute(LatentFunction, Result, Error));
     TestEqual(TEXT("latent calls are unavailable in function graphs"), Result->GetIntegerField(TEXT("returned_count")), 0);
@@ -120,7 +121,11 @@ bool FUnrealMCPPhase10ExpandedActionCatalogTest::RunTest(const FString& Paramete
         {
             TSharedRef<FJsonObject> Query = CatalogArguments(GraphId, Family, 50);
             if (Family == TEXT("cast")) Query->SetStringField(TEXT("owner_class"), TEXT("/Script/Engine.Actor"));
-            if (Family == TEXT("literal")) Query->SetStringField(TEXT("function"), TEXT("MakeLiteralInt"));
+            if (Family == TEXT("literal"))
+            {
+                Query->SetStringField(TEXT("owner_class"), TEXT("/Script/Engine.KismetSystemLibrary"));
+                Query->SetStringField(TEXT("function"), TEXT("MakeLiteralInt"));
+            }
             if (!TestTrue(*FString::Printf(TEXT("%s catalogs in supported graph"), *Family), Catalog.Execute(Query, Result, Error)))
             { AddError(Error.Code + TEXT(": ") + Error.Message); return false; }
             if (!TestTrue(*FString::Printf(TEXT("%s returns a context-valid action"), *Family), Result->GetIntegerField(TEXT("returned_count")) > 0)) return false;
@@ -130,11 +135,13 @@ bool FUnrealMCPPhase10ExpandedActionCatalogTest::RunTest(const FString& Paramete
     }
 
     TSharedRef<FJsonObject> Operators = CatalogArguments(EventGraphId, TEXT("operator"), 50);
+    Operators->SetStringField(TEXT("owner_class"), TEXT("/Script/Engine.KismetMathLibrary"));
     TestTrue(TEXT("operator catalog executes"), Catalog.Execute(Operators, Result, Error));
     TestTrue(TEXT("operator family exposes wildcard candidates"), HasWildcard(Result));
     Action = FirstAction(Result);
     if (!TestNotNull(TEXT("operator query returns an action"), Action.Get())) return false;
     TSharedRef<FJsonObject> ExactOperator = CatalogArguments(EventGraphId, TEXT("operator"), 5);
+    ExactOperator->SetStringField(TEXT("owner_class"), TEXT("/Script/Engine.KismetMathLibrary"));
     ExactOperator->SetStringField(TEXT("function"), Action->GetStringField(TEXT("member_name")));
     TestTrue(TEXT("narrow exact operator filter executes"), Catalog.Execute(ExactOperator, Result, Error));
     TestTrue(TEXT("narrow exact operator filter resolves"), Result->GetIntegerField(TEXT("returned_count")) > 0);
@@ -159,6 +166,7 @@ bool FUnrealMCPPhase10ExpandedActionCatalogTest::RunTest(const FString& Paramete
     }
     if (!TestNotNull(TEXT("function fixture has an integer pin context"), IntegerContextPin)) return false;
     TSharedRef<FJsonObject> PinOperators = CatalogArguments(FunctionGraphId, TEXT("operator"), 20);
+    PinOperators->SetStringField(TEXT("owner_class"), TEXT("/Script/Engine.KismetMathLibrary"));
     const TSharedRef<FJsonObject> PinContext = MakeShared<FJsonObject>();
     PinContext->SetStringField(TEXT("node_id"), IntegerContextNode->NodeGuid.ToString(EGuidFormats::Digits).ToLower());
     PinContext->SetStringField(TEXT("pin_id"), IntegerContextPin->PinId.ToString(EGuidFormats::Digits).ToLower());

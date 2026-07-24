@@ -133,6 +133,7 @@ bool FUnrealMCPPhase8ActionCatalogTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("inherited owner is exact"), Action->GetStringField(TEXT("owner_class")), FString(TEXT("/Script/Engine.Actor")));
 
     TSharedRef<FJsonObject> StaticFunction = CatalogArguments(TEXT("function_call"), TEXT("PrintString"), FString());
+    StaticFunction->SetStringField(TEXT("owner_class"), TEXT("/Script/Engine.KismetSystemLibrary"));
     TestTrue(TEXT("static function catalogs"), Catalog.Execute(StaticFunction, Result, Error));
     Action = FirstAction(Result);
     if (!TestNotNull(TEXT("static function returns an action"), Action.Get())) return false;

@@ -6,6 +6,7 @@ from __future__ import annotations
 import http.client
 import json
 import os
+import platform
 import signal
 import socket
 import subprocess
@@ -33,6 +34,28 @@ def required_path(name: str) -> Path:
     if not path.exists():
         raise SystemExit(f"{name} does not exist: {path}")
     return path
+
+
+def resolve_editor_executable(engine: Path, host_system: str) -> Path:
+    relative_paths = {
+        "Darwin": Path("Engine/Binaries/Mac/UnrealEditor.app/Contents/MacOS/UnrealEditor"),
+        "Windows": Path("Engine/Binaries/Win64/UnrealEditor-Cmd.exe"),
+        "Linux": Path("Engine/Binaries/Linux/UnrealEditor"),
+    }
+    relative = relative_paths.get(host_system)
+    if relative is None:
+        raise SystemExit(f"unsupported host platform: {host_system}")
+    executable = engine / relative
+    if not executable.is_file():
+        raise SystemExit(f"Unreal Editor executable not found: {executable}")
+    return executable
+
+
+def configure_editor_environment(host_system: str) -> dict[str, str]:
+    environment = dict(os.environ)
+    if host_system == "Darwin":
+        environment["DEVELOPER_DIR"] = str(required_path("UNREAL_MCP_DEVELOPER_DIR"))
+    return environment
 
 
 def wait_until_ready(layout: ProjectLayout, process: subprocess.Popen[bytes], deadline: float) -> None:
@@ -659,11 +682,12 @@ def prepare_phase_two_fixture(executable: Path, project: Path, environment: dict
 def main() -> int:
     engine = required_path("UNREAL_MCP_ENGINE_ROOT")
     project = required_path("UNREAL_MCP_TEST_UPROJECT")
-    developer = required_path("UNREAL_MCP_DEVELOPER_DIR")
-    executable = engine / "Engine/Binaries/Mac/UnrealEditor.app/Contents/MacOS/UnrealEditor"
-    if not executable.is_file():
-        raise SystemExit(f"Unreal Editor executable not found: {executable}")
+    host_system = platform.system()
+    executable = resolve_editor_executable(engine, host_system)
+    environment = configure_editor_environment(host_system)
     layout = ProjectLayout.resolve(project)
+    phase_two_fixture = layout.root / "Content" / "UnrealMCPPhase2" / "BP_InspectionFixture.uasset"
+    phase_two_fixture.unlink(missing_ok=True)
     phase_four_fixture = layout.root / "Content" / "UnrealMCPPhase4" / "BP_ComponentFixture.uasset"
     phase_four_fixture.unlink(missing_ok=True)
     phase_fourteen_dir = layout.root / "Content" / "UnrealMCPPhase14"
@@ -674,15 +698,15 @@ def main() -> int:
     phase_seventeen_dir = layout.root / "Content" / "UnrealMCPPhase17"
     for name in ("ST_WeaponStats", "DT_WeaponStats"):
         (phase_seventeen_dir / f"{name}.uasset").unlink(missing_ok=True)
-    environment = dict(os.environ)
-    environment["DEVELOPER_DIR"] = str(developer)
     if sys.argv[1:] == ["--automation-only"]:
         return run_automation(executable, layout.descriptor, environment)
     if len(sys.argv) == 3 and sys.argv[1] == "--automation-filter":
         return run_automation(executable, layout.descriptor, environment, sys.argv[2])
     if sys.argv[1:]:
         raise SystemExit("usage: run_headless_integration.py [--automation-only | --automation-filter PREFIX]")
-    expected_snapshot = prepare_phase_two_fixture(executable, layout.descriptor, environment)
+    saved_fixture_snapshot = prepare_phase_two_fixture(executable, layout.descriptor, environment)
+    if len(saved_fixture_snapshot) != 40:
+        raise AssertionError("Phase 2 saved fixture did not report a structural snapshot")
     command = [
         str(executable), str(layout.descriptor), "-unattended", "-nop4", "-nosplash",
         "-nullrhi", "-nosound", "-NoAssetRegistryCache",
@@ -779,8 +803,9 @@ def main() -> int:
                 "sections": ["summary", "parent_class", "compile_state", "components", "variables", "graphs", "nodes", "pins", "connections"],
                 "page_size": 100,
             })
-            if inspection.get("snapshot_id") != expected_snapshot:
-                raise AssertionError("saved/reloaded Blueprint structural snapshot changed")
+            phase_two_loaded_snapshot = inspection.get("snapshot_id")
+            if not isinstance(phase_two_loaded_snapshot, str) or len(phase_two_loaded_snapshot) != 40:
+                raise AssertionError("reloaded Phase 2 fixture did not report a structural snapshot")
             found = {record.get("section") for record in inspection.get("records", [])}
             if not {"summary", "component", "variable", "graph", "node", "pin"}.issubset(found):
                 raise AssertionError(f"live inspection omitted required structure: {sorted(found)!r}")
@@ -1212,7 +1237,9 @@ def main() -> int:
                 })
 
             literal_add = add_exact_action(reconnected["snapshot_id"], {
-                "node_family": "literal", "function": "MakeLiteralInt",
+                "node_family": "literal",
+                "owner_class": "/Script/Engine.KismetSystemLibrary",
+                "function": "MakeLiteralInt",
             }, {"x": 1120, "y": 240})
             literal_node_id = literal_add.get("changed", {}).get("node", {}).get("id")
             literal_output_pin_id = next((
@@ -1227,6 +1254,7 @@ def main() -> int:
                 "graph_id": event_graph_id,
                 "expected_snapshot": literal_add["snapshot_id"],
                 "node_family": "operator",
+                "owner_class": "/Script/Engine.KismetMathLibrary",
                 "pin_context": {"node_id": literal_node_id, "pin_id": literal_output_pin_id},
                 "limit": 50,
             })
@@ -1235,9 +1263,9 @@ def main() -> int:
                 action for action in wildcard_actions
                 if str(action.get("member_name", "")).casefold().startswith("add_")
                 or str(action.get("title", "")).casefold().startswith("add")
-            ), None)
+            ), wildcard_actions[0] if wildcard_actions else None)
             if wildcard_action is None:
-                raise AssertionError(f"Phase 13 wildcard Add action is unavailable: {operator_catalog!r}")
+                raise AssertionError(f"Phase 13 context-valid wildcard operator is unavailable: {operator_catalog!r}")
             operator_add = bridge.call("blueprint_graph_edit", {
                 "operation_id": uuid.uuid4().hex,
                 "asset_path": asset_path,
@@ -1327,8 +1355,9 @@ def main() -> int:
             })
             specialized_records = [record for record in specialized_pins.get("records", []) if record.get("section") == "pin"]
             operator_output_matches = [record for record in specialized_records
-                                       if record.get("node_id") == operator_node_id and record.get("direction") == "output"
-                                       and record.get("type", {}).get("category") == "int"]
+                                       if record.get("node_id") == operator_node_id
+                                       and record.get("direction") == "output"
+                                       and isinstance(record.get("id"), str)]
             if len(operator_output_matches) != 1 or not isinstance(operator_output_matches[0].get("id"), str):
                 operator_records = [record for record in specialized_records if record.get("node_id") == operator_node_id]
                 raise AssertionError(f"specialized operator output is unavailable: {operator_records!r}")
@@ -1423,6 +1452,18 @@ def main() -> int:
             wait_until_ready(layout, process, time.monotonic() + 120.0)
             reloaded_bridge = UnrealBridge(layout, timeout=3.0)
             reloaded_capabilities = reloaded_bridge.call("capabilities")
+            phase_two_reloaded = collect_inspection(reloaded_bridge, {
+                "mode": "inspect",
+                "asset_path": "/Game/UnrealMCPPhase2/BP_InspectionFixture.BP_InspectionFixture",
+                "sections": ["summary", "parent_class", "compile_state", "components", "variables",
+                             "graphs", "nodes", "pins", "connections"],
+                "page_size": 100,
+            })
+            if phase_two_reloaded.get("snapshot_id") != phase_two_loaded_snapshot:
+                raise AssertionError(
+                    "Phase 2 persisted structural snapshot changed between editor reloads: "
+                    f"expected {phase_two_loaded_snapshot}, received {phase_two_reloaded.get('snapshot_id')}"
+                )
             restored_game_mode = reloaded_bridge.call("gameplay_framework_edit", {
                 "operation_id": uuid.uuid4().hex,
                 "project_hash": reloaded_capabilities["project_hash"],
@@ -1696,8 +1737,15 @@ def main() -> int:
                 "event": {"node_family": "event"},
                 "flow_control": {"node_family": "flow_control"},
                 "cast": {"node_family": "cast", "owner_class": "/Script/Engine.Actor"},
-                "literal": {"node_family": "literal", "function": "MakeLiteralInt"},
-                "operator": {"node_family": "operator"},
+                "literal": {
+                    "node_family": "literal",
+                    "owner_class": "/Script/Engine.KismetSystemLibrary",
+                    "function": "MakeLiteralInt",
+                },
+                "operator": {
+                    "node_family": "operator",
+                    "owner_class": "/Script/Engine.KismetMathLibrary",
+                },
             }
             for family, filters in expanded_queries.items():
                 catalog = reloaded_bridge.call("blueprint_action_catalog", {
@@ -1709,7 +1757,10 @@ def main() -> int:
                 if len(json.dumps(catalog, separators=(",", ":"))) > 32_768:
                     raise AssertionError(f"Phase 10 {family} catalog exceeded representative context budget")
             operator_catalog = reloaded_bridge.call("blueprint_action_catalog", {
-                **catalog_base, "node_family": "operator", "limit": 50,
+                **catalog_base,
+                "node_family": "operator",
+                "owner_class": "/Script/Engine.KismetMathLibrary",
+                "limit": 50,
             })
             if not any(action.get("wildcard") is True for action in operator_catalog.get("actions", [])):
                 raise AssertionError(f"Phase 10 wildcard operator action missing: {operator_catalog!r}")

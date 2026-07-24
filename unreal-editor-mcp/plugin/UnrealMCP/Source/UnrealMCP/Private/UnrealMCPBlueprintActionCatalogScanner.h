@@ -106,7 +106,12 @@ auto ProcessActions = [&](UObject* ActionOwner, const FBlueprintActionDatabase::
     }
 };
 TSet<FObjectKey> ProcessedOwners;
-TArray<UObject*> PriorityOwners = {Blueprint, Blueprint->SkeletonGeneratedClass, Blueprint->GeneratedClass};
+TArray<UObject*> PriorityOwners;
+if (!OwnerClassFilter.IsEmpty())
+{
+    PriorityOwners.Add(FindObject<UClass>(nullptr, *OwnerClassFilter));
+}
+PriorityOwners.Append({Blueprint, Blueprint->SkeletonGeneratedClass, Blueprint->GeneratedClass});
 for (UClass* Class = Blueprint->GeneratedClass; Class != nullptr; Class = Class->GetSuperClass()) PriorityOwners.AddUnique(Class);
 for (UClass* Class = Blueprint->SkeletonGeneratedClass; Class != nullptr; Class = Class->GetSuperClass()) PriorityOwners.AddUnique(Class);
 for (UObject* Owner : PriorityOwners)
