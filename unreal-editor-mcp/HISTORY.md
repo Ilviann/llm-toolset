@@ -1,5 +1,11 @@
 # Unreal Editor MCP history
 
+## Unreleased
+
+- Added a Windows tkinter deployment helper that selects an existing Unreal project, discovers or validates its Engine installation, builds an installed Win64 plugin with the local Visual Studio toolchain, strips implementation source and external debug artifacts while retaining module rules and precompiled metadata, and installs it with replace-safe staging.
+- The deployment GUI initializes its Engine selection from `UNREAL_MCP_ENGINE_ROOT` and preserves a valid configured value when the project is selected.
+- Added one-click LM Studio JSON generation for the selected checkout and `.uproject`, plus focused offline tests and deployment architecture/contracts.
+
 ## 0.16.0 — 2026-07-23
 
 - Added `game_data_inspect` and reconciled `game_data_edit` for bounded user-defined struct schemas and typed Data Tables, bringing the released surface to fifteen exact tools.

@@ -2,7 +2,7 @@
 
 ## Python boundary
 
-`tests/` uses `unittest` and injected bridge/platform collaborators. It covers MCP initialization/list/call, exact schemas, stdout purity, discovery and token validation, stale/dead process rejection, loopback targeting, authentication headers, response bounds, timeout/cancellation, stable errors, platform branches, release consistency, host-specific headless editor selection, and macOS-only developer-directory configuration. It does not require Unreal or a network.
+`tests/` uses `unittest` and injected bridge/platform collaborators. It covers MCP initialization/list/call, exact schemas, stdout purity, discovery and token validation, stale/dead process rejection, loopback targeting, authentication headers, response bounds, timeout/cancellation, stable errors, platform branches, release consistency, host-specific headless editor selection, macOS-only developer-directory configuration, and the Windows binary deployment helper's project/Engine discovery, filtering, replacement, and LM Studio configuration. It does not require Unreal or a network.
 
 ## Native boundary
 
