@@ -48,6 +48,12 @@ Set `UNREAL_MCP_ENGINE_ROOT` to the Unreal installation root, then run the stand
 python3 scripts/package_plugin.py
 ```
 
+On Windows Command Prompt, the equivalent runner locates the Python script relative to itself and forwards any additional arguments:
+
+```bat
+scripts\package_plugin.cmd
+```
+
 On macOS, also set `UNREAL_MCP_DEVELOPER_DIR` to the compatible Xcode `Contents/Developer` directory. The script packages the plugin into `<workspace>/build/unreal-editor-mcp` by default, replacing that output directory's existing contents, and verifies that the result contains an installed plugin descriptor and compiled binaries. Copy the resulting directory to `<YourProject>/Plugins/UnrealMCP` for deployment against the same Unreal Engine version.
 
 Use `--output <path>` to select another destination, `--target-platforms Mac` (or another `+`-separated UAT platform list) to restrict target platforms, and `--dry-run` to validate and print the fixed argument array without building. Run `python3 scripts/package_plugin.py --help` for all options. Packaging is offline and uses only the configured Unreal installation and local compiler toolchain.
@@ -513,6 +519,13 @@ Run the cross-process bridge acceptance test:
 
 ```sh
 python3 scripts/run_headless_integration.py
+```
+
+On Windows Command Prompt, use the matching runners; arguments such as `--automation-only` are forwarded to Python:
+
+```bat
+scripts\run_headless_integration.cmd --automation-only
+scripts\run_headless_integration.cmd
 ```
 
 The headless runner selects `UnrealEditor` on macOS and Linux and `UnrealEditor-Cmd.exe` on Windows. The 0.16.0 native baseline is Unreal 5.8.0 on Apple Silicon macOS 26.5.2 with Xcode 26.1.1. Platform selection and environment requirements are unit-tested without requiring every host.
