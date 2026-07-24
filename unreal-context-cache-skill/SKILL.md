@@ -1,6 +1,6 @@
 ---
 name: unreal-context-cache
-description: Maintain durable, indexed Markdown knowledge for workspaces containing Unreal Engine 5.8+ projects, including projects nested in Git repositories. Use when discovering or onboarding an Unreal workspace, reading project context, reconciling pulled or remote Git changes, implementing features, fixing bugs, reviewing architecture, or adding and changing Unreal C++, Blueprint, asset, or reflected data types. Discover every .uproject recursively, keep each project's docs and Git checkpoint separate, treat game-design documents as user-owned read-only input, and incrementally reconcile component and component-grouped type documentation.
+description: Maintain durable, indexed Markdown knowledge for workspaces containing Unreal Engine 5.8+ projects, including projects nested in Git repositories. Use when discovering or onboarding an Unreal workspace, reading project context, reconciling pulled or remote Git changes, implementing features, fixing bugs, reviewing architecture, or adding and changing Unreal C++, Blueprint, asset, or reflected data types. Discover every .uproject recursively, keep each project's docs and Git confirmation marker separate, treat game-design documents as user-owned read-only input, and incrementally reconcile component and component-grouped type documentation.
 ---
 
 # Unreal Context Cache
@@ -53,7 +53,7 @@ overwriting existing content:
 ```text
 docs/
 ├── index.md
-├── reconciliation-state.md  # Required only when the project is in Git
+├── .cache.md  # Required only when the project is in Git; exclude from index.md
 ├── gd/
 │   └── index.md
 ├── components/
@@ -72,10 +72,10 @@ Audit a project with:
 python <skill-dir>/scripts/audit_docs.py <project-root>
 ```
 
-For a project inside Git, require and validate its reconciliation state:
+For a project inside Git, require and validate its documentation marker:
 
 ```powershell
-python <skill-dir>/scripts/audit_docs.py <project-root> --require-git-state
+python <skill-dir>/scripts/audit_docs.py <project-root> --require-git-cache
 ```
 
 Repair reported structural or inventory problems after inspecting the affected documents. Every
@@ -97,8 +97,8 @@ internals that cannot be inspected.
 
 ## Reconcile pulled Git changes incrementally
 
-For an active project inside a Git repository, collect changes since its last successfully
-reconciled source commit:
+For an active project inside a Git repository, collect changes since the latest commit reachable
+from `HEAD` that changed `docs/.cache.md`:
 
 ```powershell
 python <skill-dir>/scripts/reconcile_git_changes.py <project-root>
@@ -117,26 +117,21 @@ reconcile current durable knowledge.
 - Review committed, staged, unstaged, and untracked changes separately.
 - Review changed paths outside the configured tracked paths for possible shared plugin, module,
   configuration, or tooling dependencies.
-- Use direct endpoint comparison from the documented source commit to the target source commit.
-- Do not require a full project reindex when the checkpoint and changed evidence are usable.
+- Add shared repository paths per run with `--add-tracked-path <repo-relative-path>`.
+- Use direct endpoint comparison from the confirmed documentation commit to the target commit.
+- Do not require a full project reindex when the marker history and changed evidence are usable.
 - Do not infer semantic changes from binary `.uasset` or `.umap` diffs; perform targeted editor or
   asset-registry inspection when needed.
 
-Advance an existing checkpoint only after relevant documentation is reconciled and the Git-aware
-documentation audit passes:
+After relevant documentation is reconciled and the Git-aware audit passes, refresh `.cache.md`
+before the user commits the documentation:
 
 ```powershell
-python <skill-dir>/scripts/update_reconciliation_state.py <project-root> --commit <target>
+python <skill-dir>/scripts/mark_docs_cache.py <project-root>
 ```
 
-Add `--initialize` only after a one-time full reconciliation or after the user identifies a
-trusted baseline. For initialization, run the normal audit first, create and index the state
-document, then run the Git-aware audit. Add shared repository paths with
-`--add-tracked-path <repo-relative-path>`.
-
-Record the last reconciled **source** commit, not a documentation commit. Never advance the
-checkpoint for uncommitted source changes. A later pass may see those changes after commit,
-verify that documentation already covers them, and then advance without unnecessary edits.
+The marker contains the current time and branch name. Git history supplies the authoritative
+confirmation commit. Do not list `.cache.md` in `docs/index.md`; it is operational metadata.
 
 ## Protect game-design documents
 
@@ -160,9 +155,10 @@ After implementing a feature or bug fix in the active project:
    Group type documentation by component directory.
 4. Update every affected `index.md`, including ancestor indexes when children were added, removed,
    renamed, or re-described.
-5. Run `audit_docs.py`, adding `--require-git-state` for a Git-managed project, and fix applicable
+5. Run `audit_docs.py`, adding `--require-git-cache` for a Git-managed project, and fix applicable
    errors.
-6. Advance the Git checkpoint only when reconciling a stable committed source target.
+6. Refresh `docs/.cache.md` after successful reconciliation so it is included in the next
+   documentation commit.
 7. Report which knowledge documents changed, or state that reconciliation found no knowledge
    change.
 
@@ -186,3 +182,5 @@ knowledge without implementing code.
 - Never derive documentation from `Binaries/`, `DerivedDataCache/`, `Intermediate/`, or `Saved/`
   except when a specific diagnostic task requires temporary inspection.
 - Preserve user-authored nuance and unrelated worktree changes.
+- Do not create a deployment package, archive, or ZIP for this skill unless the user explicitly
+  requests packaging in the current turn.

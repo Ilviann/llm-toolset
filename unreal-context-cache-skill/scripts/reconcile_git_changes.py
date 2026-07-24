@@ -13,11 +13,6 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 
-STATE_BLOCK_PATTERN = re.compile(
-    r"<!--\s*unreal-context-cache-state\s*\n(?P<body>.*?)\n-->",
-    re.DOTALL,
-)
-
 SOURCE_SUFFIXES = {
     ".c",
     ".cc",
@@ -41,12 +36,16 @@ class ReconciliationError(RuntimeError):
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Compare a documented source checkpoint with a target commit and report "
+            "Compare the latest confirmed documentation commit with a target and report "
             "committed plus local changes for one Unreal project."
         )
     )
     parser.add_argument("project_root", type=Path)
-    parser.add_argument("--from", dest="base", help="Base commit; defaults to project state")
+    parser.add_argument(
+        "--from",
+        dest="base",
+        help="Base commit; defaults to latest docs/.cache.md commit",
+    )
     parser.add_argument("--to", dest="target", default="HEAD", help="Target commit")
     parser.add_argument(
         "--add-tracked-path",
@@ -100,37 +99,23 @@ def normalize_repo_path(value: str) -> str:
     return path.as_posix()
 
 
-def parse_state(state_file: Path) -> tuple[str | None, list[str]]:
-    if not state_file.is_file():
-        return None, []
-    text = state_file.read_text(encoding="utf-8-sig").replace("\r\n", "\n")
-    matches = list(STATE_BLOCK_PATTERN.finditer(text))
-    if len(matches) != 1:
-        raise ReconciliationError(
-            f"{state_file} must contain exactly one unreal-context-cache-state marker"
-        )
-
-    checkpoint: str | None = None
-    tracked_paths: list[str] = []
-    schema: str | None = None
-    for raw_line in matches[0].group("body").splitlines():
-        line = raw_line.strip()
-        if not line or ":" not in line:
-            continue
-        key, value = (part.strip() for part in line.split(":", 1))
-        if key == "schema":
-            schema = value
-        elif key == "last-reconciled-source-commit":
-            checkpoint = value
-        elif key == "tracked-path":
-            tracked_paths.append(normalize_repo_path(value))
-    if schema != "1":
-        raise ReconciliationError(f"{state_file} uses an unsupported state schema")
-    return checkpoint, tracked_paths
-
-
 def resolve_commit(repository: Path, revision: str) -> str:
     return str(run_git(repository, "rev-parse", "--verify", f"{revision}^{{commit}}"))
+
+
+def latest_cache_commit(repository: Path, target: str, cache_path: str) -> str | None:
+    commit = str(
+        run_git(
+            repository,
+            "log",
+            "-1",
+            "--format=%H",
+            target,
+            "--",
+            cache_path,
+        )
+    )
+    return commit or None
 
 
 def parse_name_status(payload: bytes) -> list[dict[str, str]]:
@@ -253,20 +238,25 @@ def collect(args: argparse.Namespace) -> dict[str, Any]:
     except ValueError as exc:
         raise ReconciliationError("project root is not inside the resolved Git repository") from exc
 
-    state_file = project_root / "docs" / "reconciliation-state.md"
-    state_checkpoint, state_paths = parse_state(state_file)
-    base_input = args.base or state_checkpoint
+    cache_file = project_root / "docs" / ".cache.md"
+    cache_path = (
+        "docs/.cache.md"
+        if project_path == "."
+        else f"{project_path}/docs/.cache.md"
+    )
+    target = resolve_commit(repository, args.target)
+    history_base = latest_cache_commit(repository, target, cache_path)
+    base_input = args.base or history_base
     if not base_input:
         raise ReconciliationError(
-            "no base commit supplied and no documented checkpoint exists; "
-            "perform initial reconciliation or pass --from"
+            "no base commit supplied and docs/.cache.md has no reachable history; "
+            "perform initial reconciliation and commit the marker, or pass --from"
         )
 
     base = resolve_commit(repository, base_input)
-    target = resolve_commit(repository, args.target)
 
     tracked_paths: list[str] = []
-    for candidate in [project_path, *state_paths, *args.add_tracked_path]:
+    for candidate in [project_path, *args.add_tracked_path]:
         normalized = normalize_repo_path(candidate)
         if normalized not in tracked_paths:
             tracked_paths.append(normalized)
@@ -341,19 +331,20 @@ def collect(args: argparse.Namespace) -> dict[str, Any]:
     if any(change["category"] != "documentation" for change in local_changes):
         warnings.append(
             "Local non-documentation changes are reported separately and are not eligible "
-            "for checkpoint advancement until committed."
+            "for documentation confirmation until committed."
         )
     elif local_changes:
         warnings.append(
-            "Local documentation changes are present. Validate them before advancing or "
-            "committing the reconciliation state."
+            "Local documentation changes are present. Validate them and refresh docs/.cache.md "
+            "before committing."
         )
 
     return {
         "project_root": str(project_root),
         "repository_root": str(repository),
         "project_path": project_path,
-        "state_file": str(state_file),
+        "cache_file": str(cache_file),
+        "base_source": "explicit" if args.base else "cache-history",
         "base": base,
         "target": target,
         "base_is_ancestor": base_is_ancestor,
@@ -374,7 +365,7 @@ def collect(args: argparse.Namespace) -> dict[str, Any]:
             "untracked_in_scope": summarize(untracked),
         },
         "warnings": warnings,
-        "checkpoint_candidate": target,
+        "documentation_target": target,
     }
 
 
@@ -400,7 +391,7 @@ def print_human(report: dict[str, Any]) -> None:
         print("\nWarnings:")
         for warning in report["warnings"]:
             print(f"  - {warning}")
-    print(f'\nCheckpoint candidate: {report["checkpoint_candidate"]}')
+    print(f'\nDocumentation target: {report["documentation_target"]}')
 
 
 def main() -> int:

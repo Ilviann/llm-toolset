@@ -5,7 +5,7 @@ Use this schema when initializing, reading, auditing, or updating a project's `d
 ## Contents
 
 - [Canonical directories](#canonical-directories)
-- [Git reconciliation state](#git-reconciliation-state)
+- [Git documentation marker](#git-documentation-marker)
 - [Index contract](#index-contract)
 - [Game-design documents](#game-design-documents)
 - [Architectural components](#architectural-components)
@@ -26,17 +26,17 @@ Other concepts may be added in later versions. Do not invent additional top-leve
 to store temporary notes. Place durable knowledge in the closest existing concept or ask the user
 when none fits.
 
-## Git reconciliation state
+## Git documentation marker
 
-For a project inside a Git repository, maintain `docs/reconciliation-state.md` as operational
-Markdown metadata. List it in `docs/index.md`.
+For a project inside a Git repository, maintain `docs/.cache.md` as operational Markdown metadata.
+Do not list it in `docs/index.md`.
 
-The file records the source commit against which knowledge was last reconciled and repository
-paths that may affect the project. It does not replace architectural or data-type documentation.
-Read [`git-reconciliation.md`](git-reconciliation.md) for the complete schema and workflow.
+Refresh the file with the current time and branch name after documentation reconciliation and
+before the documentation commit. Git history of this file identifies the latest confirmed
+documentation commit. It does not replace component or type documentation.
 
-Do not create this file outside Git. Do not advance its checkpoint for uncommitted source changes
-or before documentation validation succeeds.
+Read [`git-reconciliation.md`](git-reconciliation.md) for the complete workflow. Do not create the
+marker outside Git or refresh it before documentation validation succeeds.
 
 ## Index contract
 
@@ -50,6 +50,9 @@ An index inventories its immediate children only:
 - Use relative Markdown links.
 - Keep descriptions synchronized when a document or directory changes purpose.
 - Do not list generated, transient, or hidden filesystem entries.
+
+Treat `docs/.cache.md` as the sole Markdown exception to the document inventory. Validate it
+separately for Git-managed projects and never list it in `docs/index.md`.
 
 Use this shape:
 
@@ -71,8 +74,7 @@ Use `None.` below an empty `Documents` or `Subfolders` heading. Omit neither hea
 not list itself, avoiding a circular self-entry.
 
 The project-level `docs/index.md` should describe the documentation set and link all three
-canonical top-level directories. For a Git-managed project, also list
-`reconciliation-state.md` under `Documents`.
+canonical top-level directories.
 
 ## Game-design documents
 

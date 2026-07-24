@@ -7,6 +7,7 @@ import argparse
 import json
 import re
 import sys
+from datetime import datetime
 from pathlib import Path
 from urllib.parse import unquote
 
@@ -17,13 +18,8 @@ REQUIRED_DIRECTORIES = (
     "types",
 )
 LINK_PATTERN = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
-STATE_BLOCK_PATTERN = re.compile(
-    r"<!--\s*unreal-context-cache-state\s*\n(?P<body>.*?)\n-->",
-    re.DOTALL,
-)
-FULL_OBJECT_ID_PATTERN = re.compile(
-    r"^(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})$"
-)
+CACHE_UPDATED_PATTERN = re.compile(r"^- Updated: `([^`]+)`$", re.MULTILINE)
+CACHE_BRANCH_PATTERN = re.compile(r"^- Branch: `([^`]+)`$", re.MULTILINE)
 
 
 def parse_args() -> argparse.Namespace:
@@ -33,9 +29,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("project_root", type=Path, help="Directory containing a .uproject")
     parser.add_argument("--json", action="store_true", dest="as_json")
     parser.add_argument(
-        "--require-git-state",
+        "--require-git-cache",
         action="store_true",
-        help="Require and validate docs/reconciliation-state.md",
+        help="Require and validate docs/.cache.md",
     )
     return parser.parse_args()
 
@@ -64,96 +60,52 @@ def inventory_entries(section: str) -> dict[str, bool]:
     return entries
 
 
-def state_fields(state_text: str) -> tuple[dict[str, str], list[str]] | None:
-    matches = list(STATE_BLOCK_PATTERN.finditer(state_text.replace("\r\n", "\n")))
-    if len(matches) != 1:
-        return None
-
-    fields: dict[str, str] = {}
-    tracked_paths: list[str] = []
-    for raw_line in matches[0].group("body").splitlines():
-        line = raw_line.strip()
-        if not line or ":" not in line:
-            continue
-        key, value = (part.strip() for part in line.split(":", 1))
-        if key == "tracked-path":
-            tracked_paths.append(value)
-        else:
-            fields[key] = value
-    return fields, tracked_paths
-
-
-def audit_state_file(state_file: Path) -> list[dict[str, str]]:
+def audit_cache_file(cache_file: Path) -> list[dict[str, str]]:
     issues: list[dict[str, str]] = []
     try:
-        state_text = state_file.read_text(encoding="utf-8-sig")
+        cache_text = cache_file.read_text(encoding="utf-8-sig")
     except (OSError, UnicodeError) as exc:
         return [
             {
                 "severity": "error",
-                "path": str(state_file),
-                "message": f"cannot read reconciliation state: {exc}",
+                "path": str(cache_file),
+                "message": f"cannot read documentation cache marker: {exc}",
             }
         ]
 
-    parsed = state_fields(state_text)
-    if parsed is None:
-        return [
-            {
-                "severity": "error",
-                "path": str(state_file),
-                "message": "expected exactly one unreal-context-cache-state marker",
-            }
-        ]
-
-    fields, tracked_paths = parsed
-    if fields.get("schema") != "1":
+    updated_matches = CACHE_UPDATED_PATTERN.findall(cache_text)
+    branch_matches = CACHE_BRANCH_PATTERN.findall(cache_text)
+    if len(updated_matches) != 1:
         issues.append(
             {
                 "severity": "error",
-                "path": str(state_file),
-                "message": "state marker schema must be 1",
+                "path": str(cache_file),
+                "message": "cache marker must contain exactly one Updated field",
             }
         )
-
-    checkpoint = fields.get("last-reconciled-source-commit", "")
-    if not FULL_OBJECT_ID_PATTERN.fullmatch(checkpoint):
-        issues.append(
-            {
-                "severity": "error",
-                "path": str(state_file),
-                "message": "last-reconciled-source-commit must be a full Git object ID",
-            }
-        )
-
-    if not tracked_paths:
-        issues.append(
-            {
-                "severity": "error",
-                "path": str(state_file),
-                "message": "state marker must contain at least one tracked-path",
-            }
-        )
-
-    for tracked_path in tracked_paths:
-        normalized = tracked_path.replace("\\", "/")
-        parts = [part for part in normalized.split("/") if part not in ("", ".")]
-        if (
-            normalized.startswith("/")
-            or re.match(r"^[A-Za-z]:", normalized)
-            or ".." in parts
-        ):
+    else:
+        try:
+            datetime.fromisoformat(updated_matches[0])
+        except ValueError:
             issues.append(
                 {
                     "severity": "error",
-                    "path": str(state_file),
-                    "message": f"tracked-path must be repository-relative: {tracked_path}",
+                    "path": str(cache_file),
+                    "message": "cache Updated field must be an ISO 8601 timestamp",
                 }
             )
+    if len(branch_matches) != 1 or not branch_matches[0].strip():
+        issues.append(
+            {
+                "severity": "error",
+                "path": str(cache_file),
+                "message": "cache marker must contain exactly one non-empty Branch field",
+            }
+        )
     return issues
 
 
-def audit(project_root: Path, require_git_state: bool = False) -> list[dict[str, str]]:
+def audit(project_root: Path, require_git_cache: bool = False) -> list[dict[str, str]]:
     issues: list[dict[str, str]] = []
     docs = project_root / "docs"
 
@@ -177,17 +129,17 @@ def audit(project_root: Path, require_git_state: bool = False) -> list[dict[str,
         )
         return issues
 
-    state_file = docs / "reconciliation-state.md"
-    if require_git_state and not state_file.is_file():
+    cache_file = docs / ".cache.md"
+    if require_git_cache and not cache_file.is_file():
         issues.append(
             {
                 "severity": "error",
-                "path": str(state_file),
-                "message": "missing required Git reconciliation state",
+                "path": str(cache_file),
+                "message": "missing required Git documentation cache marker",
             }
         )
-    if state_file.is_file():
-        issues.extend(audit_state_file(state_file))
+    if cache_file.is_file():
+        issues.extend(audit_cache_file(cache_file))
 
     for name in REQUIRED_DIRECTORIES:
         required = docs / name
@@ -238,7 +190,12 @@ def audit(project_root: Path, require_git_state: bool = False) -> list[dict[str,
         documents = sorted(
             path.name
             for path in directory.iterdir()
-            if path.is_file() and path.suffix.casefold() == ".md" and path.name != "index.md"
+            if (
+                path.is_file()
+                and path.suffix.casefold() == ".md"
+                and path.name != "index.md"
+                and not (directory == docs and path.name == ".cache.md")
+            )
         )
         subdirectories = sorted(path.name for path in directory.iterdir() if path.is_dir())
 
@@ -340,7 +297,7 @@ def main() -> int:
         print(f"error: project root is not a directory: {project_root}", file=sys.stderr)
         return 2
 
-    issues = audit(project_root, require_git_state=args.require_git_state)
+    issues = audit(project_root, require_git_cache=args.require_git_cache)
     if args.as_json:
         print(json.dumps({"project_root": str(project_root), "issues": issues}, indent=2))
     elif not issues:

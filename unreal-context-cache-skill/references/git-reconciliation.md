@@ -1,182 +1,147 @@
 # Git reconciliation
 
-Use incremental Git evidence to reconcile documentation after remote or pulled changes without
+Use `docs/.cache.md` history to reconcile documentation after remote or pulled changes without
 rescanning the complete Unreal project.
 
 ## Contents
 
-- [State document](#state-document)
-- [Tracked paths](#tracked-paths)
-- [Collection workflow](#collection-workflow)
-- [Reconciliation workflow](#reconciliation-workflow)
-- [Checkpoint rules](#checkpoint-rules)
+- [Cache marker](#cache-marker)
+- [Find the confirmed commit](#find-the-confirmed-commit)
+- [Collect changes](#collect-changes)
+- [Reconcile documentation](#reconcile-documentation)
+- [Refresh the marker](#refresh-the-marker)
 - [History and branch cases](#history-and-branch-cases)
 - [Binary assets](#binary-assets)
 - [When full reconciliation is necessary](#when-full-reconciliation-is-necessary)
 
-## State document
+## Cache marker
 
-Keep one checkpoint per Unreal project at `docs/reconciliation-state.md`. Use this exact marker:
+Keep one operational marker per Git-managed Unreal project at `docs/.cache.md`:
 
 ```markdown
-# Documentation reconciliation state
+# Documentation cache
 
-<!-- unreal-context-cache-state
-schema: 1
-last-reconciled-source-commit: 0123456789abcdef0123456789abcdef01234567
-tracked-path: MyGame
-tracked-path: Plugins/SharedGameplay
--->
-
-The checkpoint identifies the committed source tree against which this project's documentation
-was last reconciled. Tracked paths are relative to the Git repository root.
+- Updated: `2026-07-24T16:30:00.123456+03:00`
+- Branch: `feature/inventory`
 ```
 
-Use a full Git object ID. The state is machine-readable but remains inside a Markdown document.
-List the document in `docs/index.md`.
+Do not list this hidden marker in `docs/index.md`. It is the only Markdown file exempt from the
+index inventory.
 
-The checkpoint names a source commit, not the commit that contains the documentation update.
-This avoids a self-referencing commit cycle.
+The timestamp and branch name are informational. The Git commit that contains the marker change
+is the authoritative documentation confirmation.
 
-## Tracked paths
+## Find the confirmed commit
 
-Always include the project directory relative to the repository root. Use `.` when the Unreal
-project is at the repository root.
+From the repository root, find the latest marker commit reachable from the target:
 
-Add repository-relative paths for shared dependencies that can change project knowledge:
+```powershell
+git log -1 --format=%H <target> -- <project-path>/docs/.cache.md
+```
 
-- Shared plugins or modules
-- Shared configuration
-- Build, packaging, code-generation, or editor tooling
-- Common content or schemas
+Use `HEAD` as the default target. Compare that commit directly with the target tree.
 
-Reject absolute paths and paths containing `..`.
+If marker history does not exist, require an explicit `--from` commit or perform a one-time full
+reconciliation, refresh the marker, and commit it.
 
-The collector also reports committed paths outside the tracked scope. Review that list for newly
-introduced shared dependencies. Add a path to the state only when it can affect the project.
+## Collect changes
 
-## Collection workflow
-
-Run from any directory:
+Run:
 
 ```powershell
 python <skill-dir>/scripts/reconcile_git_changes.py <project-root>
 ```
 
-The default base comes from `last-reconciled-source-commit`; the default target is `HEAD`.
+The default base is the latest marker commit. The default target is `HEAD`.
 
-Override either endpoint when the user supplies a range:
+Override the range:
 
 ```powershell
 python <skill-dir>/scripts/reconcile_git_changes.py <project-root> --from <base> --to <target>
 ```
 
-The collector resolves both endpoints to full commit IDs and compares their trees directly. It
-reports:
-
-- Committed changes within tracked paths
-- Committed changes outside tracked paths
-- Staged changes within tracked paths
-- Unstaged changes within tracked paths
-- Untracked files within tracked paths
-- Path classifications and warnings
-
-Use `--json` for machine-readable output.
-
-The report is a candidate manifest. A changed filename or commit message is not sufficient
-evidence for a documentation claim.
-
-## Reconciliation workflow
-
-1. Capture the collector's resolved target before editing documentation.
-2. Review changed paths outside tracked scope and add newly relevant shared paths.
-3. Map relevant changed files to architectural components and durable data types.
-4. Read the affected documentation indexes, then the affected documents.
-5. Inspect focused source diffs and current files. Prefer current endpoint state over narrating
-   intermediate commits.
-6. Inspect staged, unstaged, and untracked changes separately; they are not part of the committed
-   target.
-7. Reconcile architecture and data-type documents.
-8. Preserve remote documentation edits and resolve conflicts from evidence.
-9. Update all affected indexes.
-10. Run the Git-aware documentation audit.
-11. Advance the checkpoint only when the checkpoint rules allow it.
-
-Net endpoint comparison is appropriate for current-state documentation: a change introduced and
-then reverted inside the range normally requires no durable documentation update.
-
-## Checkpoint rules
-
-Advance with:
+Temporarily include shared repository paths:
 
 ```powershell
-python <skill-dir>/scripts/update_reconciliation_state.py <project-root> --commit <target>
-```
-
-Run this only after:
-
-- All relevant committed changes through the target were inspected.
-- Architecture and data-type documentation was reconciled.
-- Binary changes received the necessary targeted inspection.
-- `audit_docs.py --require-git-state` passed.
-
-Do not advance for staged, unstaged, or untracked source changes. After those changes are
-committed, a later run can confirm that the documentation already covers them and advance without
-rewriting it.
-
-Initialize with:
-
-```powershell
-python <skill-dir>/scripts/update_reconciliation_state.py <project-root> --commit <target> --initialize
-```
-
-Initialize only after a one-time full reconciliation or when the user explicitly identifies a
-trusted documented baseline. Before initialization, run the normal documentation audit. After
-creating and indexing the state document, run `audit_docs.py --require-git-state`.
-
-Add shared paths while initializing or updating:
-
-```powershell
-python <skill-dir>/scripts/update_reconciliation_state.py <project-root> `
-  --commit <target> `
+python <skill-dir>/scripts/reconcile_git_changes.py <project-root> `
   --add-tracked-path Plugins/SharedGameplay
 ```
 
+The collector reports:
+
+- Committed changes inside the project and additional tracked paths
+- Committed changes outside that scope
+- Staged, unstaged, and untracked changes inside scope
+- Path classifications and warnings
+
+Use `--json` for machine-readable output. Treat the report as navigation, not sufficient evidence
+for documentation claims.
+
+## Reconcile documentation
+
+1. Capture the resolved base and target.
+2. Review outside-scope changes for shared dependencies.
+3. Map relevant files to components and durable types.
+4. Read affected indexes and documents.
+5. Inspect focused diffs and current endpoint files.
+6. Reconcile `docs/components/` and `docs/types/`.
+7. Preserve remote documentation edits.
+8. Update affected indexes.
+9. Run `audit_docs.py --require-git-cache`.
+10. Refresh the marker.
+
+Net endpoint comparison is appropriate for current-state documentation. A change introduced and
+reverted inside the range normally requires no durable documentation update.
+
+## Refresh the marker
+
+After successful documentation reconciliation and audit, run:
+
+```powershell
+python <skill-dir>/scripts/mark_docs_cache.py <project-root>
+```
+
+Run this before the user commits documentation so the confirmation marker and the knowledge
+changes share one commit.
+
+Do not refresh the marker merely because arbitrary Markdown changed. Refresh it only when the
+project's durable documentation is confirmed against the inspected source state.
+
+If two branches change the marker and conflict during merge, resolve the documentation first and
+refresh the marker with the merge branch and current time.
+
 ## History and branch cases
 
-If the base is not an ancestor of the target but both commits exist, compare the base tree
-directly with the target tree and warn about the branch change. The documentation describes the
-base snapshot, so direct endpoint comparison captures additions, removals, and replacements
-needed for the target snapshot.
+The branch stored in the marker is informational because branches can be renamed, merged, or
+deleted. Always use the marker's Git history for the base commit.
 
-If the base object is unavailable after a shallow clone, garbage collection, or rewritten
-history:
+If the marker commit is not an ancestor of the target but both commits exist, compare their trees
+directly and review removals and replacements carefully.
+
+If marker history is unavailable after a shallow clone or rewritten history:
 
 1. Fetch the missing history when authorized and practical.
-2. Otherwise ask the user for a known replacement baseline.
-3. Fall back to a targeted or full reconciliation if no trustworthy baseline is available.
+2. Otherwise ask for an explicit replacement base.
+3. Fall back to a targeted or full reconciliation if no trustworthy base exists.
 
-Do not silently substitute a merge base; it may omit facts that existed in the documented base
-but no longer exist in the target.
+Do not silently substitute a merge base; it may omit facts present in the previously confirmed
+documentation snapshot.
 
 ## Binary assets
 
-Git identifies changed `.uasset` and `.umap` paths but usually cannot provide their semantics.
-Use targeted Unreal Editor output, asset-registry data, exported text, source references, or
+Git identifies changed `.uasset` and `.umap` paths but usually cannot provide semantics. Use
+targeted Unreal Editor output, asset-registry data, exported text, source references, or
 user-provided evidence.
 
-Do not update detailed type or architecture claims from a binary filename alone. Record an
-unknown or request inspection when the necessary evidence is unavailable.
+Do not update detailed type or component claims from a binary filename alone.
 
 ## When full reconciliation is necessary
 
-Avoid a full project scan unless at least one condition applies:
+Avoid a full project scan unless:
 
-- No trustworthy initial checkpoint exists.
-- The checkpoint object and a replacement baseline are unavailable.
+- No marker history or trustworthy explicit base exists.
 - Existing documentation is demonstrably unreliable or structurally incomplete.
-- A large project reorganization defeats path-to-component mapping.
-- The user explicitly requests a complete reconciliation.
+- A large reorganization defeats path-to-component mapping.
+- The user explicitly requests complete reconciliation.
 
-A missing documentation update in one component is not by itself evidence that the entire project
-must be reindexed.
+A missing update in one component does not by itself require full reindexing.
