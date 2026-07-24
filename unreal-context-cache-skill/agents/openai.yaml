@@ -1,0 +1,4 @@
+interface:
+  display_name: "Unreal Context Cache"
+  short_description: "Incrementally maintain indexed Unreal knowledge"
+  default_prompt: "Use $unreal-context-cache to discover Unreal projects and reconcile their indexed documentation from project and Git changes."
