@@ -9,6 +9,9 @@
 #include "BlueprintEventNodeSpawner.h"
 #include "BlueprintVariableNodeSpawner.h"
 #include "EdGraphSchema_K2.h"
+#include "Editor.h"
+#include "Engine/Level.h"
+#include "Engine/World.h"
 #include "FileHelpers.h"
 #include "HttpServerModule.h"
 #include "IHttpRouter.h"
@@ -35,6 +38,7 @@
 #include "Factories/DataTableFactory.h"
 #include "Kismet2/StructureEditorUtils.h"
 #include "StructUtils/UserDefinedStruct.h"
+#include "UObject/Package.h"
 
 namespace UnrealMCP::ApiProbe
 {
@@ -66,6 +70,11 @@ void RequirePublicTypes()
     static_assert(TIsDerivedFrom<AGameState, AGameStateBase>::Value);
     (void)&FHttpServerModule::IsAvailable;
     (void)&FAssetRegistryModule::GetRegistry;
+    using FEnumerateWorldAssets = bool (IAssetRegistry::*)(
+        const FARFilter&,
+        TFunctionRef<bool(const FAssetData&)>,
+        UE::AssetRegistry::EEnumerateAssetsFlags) const;
+    (void)static_cast<FEnumerateWorldAssets>(&IAssetRegistry::EnumerateAssets);
     (void)&FBlueprintActionDatabase::Get;
     (void)&UEdGraphSchema_K2::CanCreateConnection;
     (void)&UEdGraphSchema_K2::TryCreateConnection;
@@ -84,6 +93,17 @@ void RequirePublicTypes()
         const FEditorFileUtils::FShouldIgnorePackageFunctionRef&,
         bool);
     (void)static_cast<FSaveDirtyPackages>(&FEditorFileUtils::SaveDirtyPackages);
+    using FLoadMap = bool (*)(const FString&, bool, const bool);
+    (void)static_cast<FLoadMap>(&FEditorFileUtils::LoadMap);
+    (void)&UWorld::GetWorldPartition;
+    (void)&ULevel::IsUsingExternalActors;
+    (void)&ULevel::GetLoadedExternalObjectPackages;
+    (void)&UPackage::IsDirty;
+    (void)&UPackage::GetPersistentGuid;
+    (void)&FEditorDelegates::MapChange;
+    (void)&FEditorDelegates::OnMapOpened;
+    (void)&FEditorDelegates::PostUndoRedo;
+    (void)&UPackage::PackageDirtyStateChangedEvent;
     (void)&UGameMapsSettings::SetGlobalDefaultGameMode;
     (void)&FStructureEditorUtils::CreateUserDefinedStruct;
     (void)&FStructureEditorUtils::MoveVariable;

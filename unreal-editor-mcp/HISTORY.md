@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.18.0 — 2026-07-27
+
+- Added bounded `level_inspect` discovery plus exact current-map identity, revision, snapshot, dirtiness, World Partition, and external-actor state.
+- Added ledger-backed `level_open` for exact mounted World assets with dirty/editor-busy refusal, no implicit save or discard, and exact post-open verification.
+- Added public Unreal API probes, a 31st native automation case, and cross-process lost-response, restart-stability, and exact-map verification on Windows.
+
 ## 0.17.1 — 2026-07-27
 
 - Added a Windows tkinter deployment helper that selects an existing Unreal project, discovers or validates its Engine installation, builds an installed Win64 plugin with the local Visual Studio toolchain, strips implementation source and external debug artifacts while retaining module rules and precompiled metadata, and installs it with replace-safe staging.

@@ -41,7 +41,7 @@ Feature identifiers are stable names, not execution indexes. Unfinished features
 - [ ] [`editor-build` — Optional editor-target builds](docs/todo/editor-build.md) — Add optional editor-target builds.
   - Depends on:
     - `project-files`
-- [ ] [`level-open` — Level discovery, safe opening, and snapshot foundations](docs/todo/level-open.md) — Add bounded map discovery, explicit safe map opening, and restart-stable level snapshots.
+- [x] [`level-open` — Level discovery, safe opening, and snapshot foundations](docs/todo/level-open.md) — Add bounded map discovery, explicit safe map opening, and restart-stable level snapshots.
   - Depends on:
     - [`issue-1` resolution](docs/issues/issue-1.md) — resolved in 0.17.1
 - [ ] [`level-inspect` — World Partition actor and instance inspection](docs/todo/level-inspect.md) — Inspect bounded descriptor, actor, component, and reflected instance state without loading the entire world.
@@ -75,6 +75,7 @@ Feature checkboxes record implementation completion. This section separately lis
   - `editor-launch`
   - `editor-shutdown`
   - `editor-restart`
+  - `level-open`
 - Windows:
   - None
 - Linux:

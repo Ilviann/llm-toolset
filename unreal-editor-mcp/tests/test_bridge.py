@@ -11,7 +11,7 @@ from unreal_editor_mcp.errors import BridgeError, ErrorCode
 from unreal_editor_mcp.project import ProjectLayout
 
 
-RECORD = DiscoveryRecord("a" * 40, 123, 15485, "0.17.1", "5.8.0", 1)
+RECORD = DiscoveryRecord("a" * 40, 123, 15485, "0.18.0", "5.8.0", 1)
 
 
 class FakeResponse:
@@ -80,6 +80,8 @@ class BridgeTests(unittest.TestCase):
         operation_id = "c" * 32
         snapshot = "d" * 40
         calls = (
+            ("level_inspect", {"mode": "current"}),
+            ("level_open", {"operation_id": operation_id, "map_path": "/Game/Maps/Test.Test"}),
             ("blueprint_create", {"operation_id": operation_id, "parent_class": "/Script/Engine.Actor", "package_path": "/Game/BP_New"}),
             ("blueprint_compile", {"operation_id": operation_id, "asset_path": "/Game/BP_New.BP_New", "expected_snapshot": snapshot}),
             ("blueprint_save", {"operation_id": operation_id, "asset_path": "/Game/BP_New.BP_New", "expected_snapshot": snapshot}),
@@ -165,6 +167,13 @@ class BridgeTests(unittest.TestCase):
             })
         self.assertEqual(caught.exception.code, ErrorCode.OUTCOME_UNKNOWN)
         self.assertEqual(caught.exception.details["operation_id"], "c" * 32)
+        with self.assertRaises(BridgeError) as caught:
+            self._bridge(TimeoutConnection).call("level_open", {
+                "operation_id": "9" * 32,
+                "map_path": "/Game/Maps/Test.Test",
+            })
+        self.assertEqual(caught.exception.code, ErrorCode.OUTCOME_UNKNOWN)
+        self.assertEqual(caught.exception.details["operation_id"], "9" * 32)
         with self.assertRaises(BridgeError) as caught:
             self._bridge(TimeoutConnection).call("game_data_edit", {
                 "operation_id": "f" * 32, "target": "data_table", "operation": "remove_row",

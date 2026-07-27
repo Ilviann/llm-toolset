@@ -19,12 +19,13 @@ class ReleaseContractTests(unittest.TestCase):
         native = re.search(r'Version\[\].*TEXT\("([^"]+)"\)', header)
         self.assertIsNotNone(native)
         versions = {project["project"]["version"], plugin["VersionName"], native.group(1), unreal_editor_mcp.__version__}
-        self.assertEqual(versions, {"0.17.1"})
+        self.assertEqual(versions, {"0.18.0"})
 
-    def test_only_released_phase_seventeen_commands_are_registered(self):
+    def test_only_released_level_open_commands_are_registered(self):
         names = [tool["name"] for tool in TOOLS]
         self.assertEqual(names, [
-            "capabilities", "editor_state", "operation_status", "blueprint_inspect", "blueprint_action_catalog", "blueprint_graph_edit",
+            "capabilities", "editor_state", "operation_status", "level_inspect", "level_open",
+            "blueprint_inspect", "blueprint_action_catalog", "blueprint_graph_edit",
             "blueprint_create", "blueprint_compile", "blueprint_save",
             "blueprint_component_edit", "blueprint_default_edit",
             "blueprint_member_edit", "gameplay_framework_edit", "game_data_inspect", "game_data_edit",
@@ -32,6 +33,18 @@ class ReleaseContractTests(unittest.TestCase):
         bridge_source = (ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private/UnrealMCPBridge.cpp").read_text(encoding="utf-8")
         for command in names:
             self.assertIn(f'TEXT("{command}")', bridge_source)
+
+    def test_level_open_is_published_and_covered(self):
+        bridge = (ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private/UnrealMCPBridge.cpp").read_text(encoding="utf-8")
+        service = (ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private/UnrealMCPLevelService.cpp").read_text(encoding="utf-8")
+        native_test = (ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private/Tests/UnrealMCPAutomationTestsLevelOpen.cpp").read_text(encoding="utf-8")
+        for feature in ["level_discovery", "level_open", "level_snapshots"]:
+            self.assertIn(f'TEXT("{feature}"), true', bridge)
+        for safety in ["IsPlayingSessionInEditor()", "IsSimulatingInEditor()", "IsSavingPackage()",
+                       "IsGarbageCollecting()", "IsTransactionActive()", "IsAsyncLoading()"]:
+            self.assertIn(safety, service)
+        self.assertIn("FEditorFileUtils::LoadMap", service)
+        self.assertIn("UnrealMCP.LevelOpen.DiscoverySnapshotsAndSafety", native_test)
 
     def test_phase_sixteen_multiplayer_policy_is_published_and_covered(self):
         policy = (ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private/UnrealMCPBlueprintFamilyPolicy.cpp").read_text(encoding="utf-8")

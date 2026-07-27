@@ -11,4 +11,5 @@ References in this directory are grouped by the component that owns the contract
 - [`blueprint-mutator/`](blueprint-mutator/index.md) — published-family Blueprint creation, compile/save, components/defaults, member variables, functions, locals, macros, custom events, diagnostics, mutation scope, and cleanup contracts.
 - [`gameplay-framework-editor/`](gameplay-framework-editor/index.md) — exact default GameMode/GameInstance assignment, persistence, results, and exclusions.
 - [`game-data-service/`](game-data-service/index.md) — user-defined struct schemas, Data Table rows, recursive reflected values, batching, dependencies, snapshots, and limits.
+- [`level-service/`](level-service/index.md) — mounted map discovery, current-map identities, revisions, snapshots, cursors, and safe opening.
 - [`windows-deployment-helper/`](windows-deployment-helper/index.md) — Windows project and Engine selection, binary-package filtering, replace-safe installation, and LM Studio JSON.

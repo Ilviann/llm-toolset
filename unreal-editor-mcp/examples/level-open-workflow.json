@@ -1,0 +1,25 @@
+{
+  "discover_maps": {
+    "mode": "discover",
+    "package_path": "/Game/Maps",
+    "page_size": 10
+  },
+  "continue_discovery": {
+    "cursor": "0123456789abcdef0123456789abcdef",
+    "page_size": 10
+  },
+  "inspect_current_map": {
+    "mode": "current"
+  },
+  "open_exact_clean_map": {
+    "operation_id": "11111111111111111111111111111111",
+    "map_path": "/Game/Maps/Authoring.Authoring"
+  },
+  "inspect_opened_map": {
+    "mode": "current"
+  },
+  "reconcile_lost_open_response": {
+    "operation_id": "11111111111111111111111111111111",
+    "bridge_instance_id": "22222222222222222222222222222222"
+  }
+}

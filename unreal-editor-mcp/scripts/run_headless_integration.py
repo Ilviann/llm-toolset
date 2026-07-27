@@ -721,6 +721,7 @@ def main() -> int:
             state = bridge.call("editor_state")
             if capabilities.get("commands") != [
                 "capabilities", "editor_state", "editor_shutdown", "operation_status",
+                "level_inspect", "level_open",
                 "blueprint_inspect", "blueprint_action_catalog", "blueprint_graph_edit",
                 "blueprint_create", "blueprint_compile", "blueprint_save",
                 "blueprint_component_edit", "blueprint_default_edit", "blueprint_member_edit", "gameplay_framework_edit",
@@ -762,6 +763,9 @@ def main() -> int:
             for feature in ("user_defined_struct_authoring", "typed_data_tables", "game_data_batch_editing"):
                 if capabilities.get("features", {}).get(feature) is not True:
                     raise AssertionError(f"Phase 17 game-data capability is unavailable: {feature}")
+            for feature in ("level_discovery", "level_open", "level_snapshots"):
+                if capabilities.get("features", {}).get(feature) is not True:
+                    raise AssertionError(f"level-open capability is unavailable: {feature}")
             family_matrix = capabilities.get("blueprint_families", [])
             if [record.get("family") for record in family_matrix] != [
                 "actor", "game_mode_base", "game_mode", "game_state_base", "game_state", "game_instance",
@@ -789,11 +793,55 @@ def main() -> int:
             }
             if any(capabilities.get("limits", {}).get(name) != value for name, value in expected_game_data_limits.items()):
                 raise AssertionError(f"Phase 17 game-data limits mismatch: {capabilities.get('limits')!r}")
+            if capabilities.get("limits", {}).get("level_discovery_scan") != 2048 \
+                    or capabilities.get("limits", {}).get("level_external_packages") != 2048:
+                raise AssertionError(f"level-open limits mismatch: {capabilities.get('limits')!r}")
             if capabilities.get("asset_access") != {
                 "read_scope": "all_mounted_content",
                 "mutation_scope": "project_content_and_local_project_plugins",
             }:
                 raise AssertionError("asset access policy contract mismatch")
+            current_discovery = bridge.call("level_inspect", {
+                "mode": "discover",
+                "package_path": "/Engine/Maps/Templates",
+                "asset_name": "OpenWorld",
+                "page_size": 1,
+            })
+            discovered_maps = current_discovery.get("records", [])
+            if len(discovered_maps) != 1:
+                raise AssertionError(f"mounted acceptance level was not discoverable: {current_discovery!r}")
+            current_map_path = discovered_maps[0].get("map_path")
+            if not isinstance(current_map_path, str):
+                raise AssertionError(f"mounted acceptance level path is invalid: {current_discovery!r}")
+            level_open_operation = uuid.uuid4().hex
+            level_open_arguments = {
+                "operation_id": level_open_operation,
+                "map_path": current_map_path,
+            }
+            send_without_reading(layout, "level_open", level_open_arguments)
+            level_open_status = reconcile_operation(
+                bridge, level_open_operation, capabilities["bridge_instance_id"],
+            )
+            level_open_result = level_open_status.get("result") \
+                if level_open_status.get("state") == "committed" else None
+            if not isinstance(level_open_result, dict) \
+                    or level_open_result.get("opened") is not True:
+                raise AssertionError(f"lost level-open response did not reconcile: {level_open_status!r}")
+            level_current_snapshot = level_open_result.get("snapshot_id")
+            if not isinstance(level_current_snapshot, str) or len(level_current_snapshot) != 40:
+                raise AssertionError(f"opened level snapshot is invalid: {level_open_result!r}")
+            level_current = bridge.call("level_inspect", {"mode": "current"})
+            current_records = level_current.get("records", [])
+            if len(current_records) != 1 or current_records[0].get("map_path") != current_map_path \
+                    or current_records[0].get("mounted") is not True \
+                    or current_records[0].get("dirty") is not False \
+                    or level_current.get("snapshot_id") != level_current_snapshot:
+                raise AssertionError(
+                    f"opened level read-back mismatch: open={level_open_result!r}, current={level_current!r}"
+                )
+            level_open_replay = bridge.call("level_open", level_open_arguments)
+            if level_open_replay.get("request_digest") != level_open_result.get("request_digest"):
+                raise AssertionError("same-ID level-open replay did not return the retained result")
             discovery = bridge.call("blueprint_inspect", {
                 "mode": "discover",
                 "package_path": "/Game/UnrealMCPPhase2",
@@ -1456,18 +1504,6 @@ def main() -> int:
             wait_until_ready(layout, process, time.monotonic() + 120.0)
             reloaded_bridge = UnrealBridge(layout, timeout=3.0)
             reloaded_capabilities = reloaded_bridge.call("capabilities")
-            phase_two_reloaded = collect_inspection(reloaded_bridge, {
-                "mode": "inspect",
-                "asset_path": "/Game/UnrealMCPPhase2/BP_InspectionFixture.BP_InspectionFixture",
-                "sections": ["summary", "parent_class", "compile_state", "components", "variables",
-                             "graphs", "nodes", "pins", "connections"],
-                "page_size": 100,
-            })
-            if phase_two_reloaded.get("snapshot_id") != phase_two_loaded_snapshot:
-                raise AssertionError(
-                    "Phase 2 persisted structural snapshot changed between editor reloads: "
-                    f"expected {phase_two_loaded_snapshot}, received {phase_two_reloaded.get('snapshot_id')}"
-                )
             restored_game_mode = reloaded_bridge.call("gameplay_framework_edit", {
                 "operation_id": uuid.uuid4().hex,
                 "project_hash": reloaded_capabilities["project_hash"],
@@ -1484,6 +1520,32 @@ def main() -> int:
             })
             if restored_game_mode.get("verified") is not True or restored_game_instance.get("verified") is not True:
                 raise AssertionError("Phase 16 framework settings did not survive restart and restore")
+            reopened_level = reloaded_bridge.call("level_open", {
+                "operation_id": uuid.uuid4().hex,
+                "map_path": current_map_path,
+            })
+            if reopened_level.get("snapshot_id") != level_current_snapshot:
+                raise AssertionError(
+                    f"reopened level snapshot changed across clean restart: {reopened_level!r}"
+                )
+            level_reloaded = reloaded_bridge.call("level_inspect", {"mode": "current"})
+            if level_reloaded.get("snapshot_id") != level_current_snapshot \
+                    or level_reloaded.get("records", [{}])[0].get("map_path") != current_map_path:
+                raise AssertionError(
+                    f"current level snapshot changed across clean restart: {level_reloaded!r}"
+                )
+            phase_two_reloaded = collect_inspection(reloaded_bridge, {
+                "mode": "inspect",
+                "asset_path": "/Game/UnrealMCPPhase2/BP_InspectionFixture.BP_InspectionFixture",
+                "sections": ["summary", "parent_class", "compile_state", "components", "variables",
+                             "graphs", "nodes", "pins", "connections"],
+                "page_size": 100,
+            })
+            if phase_two_reloaded.get("snapshot_id") != phase_two_loaded_snapshot:
+                raise AssertionError(
+                    "Phase 2 persisted structural snapshot changed between editor reloads: "
+                    f"expected {phase_two_loaded_snapshot}, received {phase_two_reloaded.get('snapshot_id')}"
+                )
             reloaded_struct = collect_game_data(reloaded_bridge, {
                 "target": "user_defined_struct", "asset_path": phase_seventeen_game_data["struct_path"],
             })
@@ -1792,7 +1854,7 @@ def main() -> int:
             pass
         else:
             raise AssertionError("a live discovery heartbeat remained after editor termination")
-    print("Integration passed: Phase 17 authoring, replay/restart, and graceful lifecycle shutdown")
+    print("Integration passed: level-open and Phase 17 authoring, replay/restart, and graceful lifecycle shutdown")
     return 0
 
 

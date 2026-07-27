@@ -15,8 +15,9 @@ class FakeBridge:
     def call(self, command, arguments=None):
         self.calls.append((command, arguments))
         if command == "capabilities":
-            return {"bridge_version": "0.17.1", "commands": [
-                "capabilities", "editor_state", "operation_status", "blueprint_inspect", "blueprint_action_catalog", "blueprint_graph_edit",
+            return {"bridge_version": "0.18.0", "commands": [
+                "capabilities", "editor_state", "operation_status", "level_inspect", "level_open",
+                "blueprint_inspect", "blueprint_action_catalog", "blueprint_graph_edit",
                 "blueprint_create", "blueprint_compile", "blueprint_save",
                 "blueprint_component_edit", "blueprint_default_edit",
                 "blueprint_member_edit", "gameplay_framework_edit", "game_data_inspect", "game_data_edit",
@@ -36,10 +37,11 @@ class ServerStdioTests(unittest.TestCase):
         bridge = FakeBridge()
         server = MCPServer(bridge)
         initialized = server.handle({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2025-06-18"}})
-        self.assertEqual(initialized["result"]["serverInfo"]["version"], "0.17.1")
+        self.assertEqual(initialized["result"]["serverInfo"]["version"], "0.18.0")
         listed = server.handle({"jsonrpc": "2.0", "id": 2, "method": "tools/list"})
         self.assertEqual([tool["name"] for tool in listed["result"]["tools"]], [
-            "capabilities", "editor_state", "operation_status", "blueprint_inspect", "blueprint_action_catalog", "blueprint_graph_edit",
+            "capabilities", "editor_state", "operation_status", "level_inspect", "level_open",
+            "blueprint_inspect", "blueprint_action_catalog", "blueprint_graph_edit",
             "blueprint_create", "blueprint_compile", "blueprint_save",
             "blueprint_component_edit", "blueprint_default_edit",
             "blueprint_member_edit", "gameplay_framework_edit", "game_data_inspect", "game_data_edit",
@@ -48,6 +50,42 @@ class ServerStdioTests(unittest.TestCase):
         payload = json.loads(called["result"]["content"][0]["text"])
         self.assertTrue(payload["version_match"])
         self.assertEqual(payload["mcp_protocol_version"], "2025-06-18")
+
+    def test_level_open_schemas_are_exact_and_bounded(self):
+        server = MCPServer(FakeBridge())
+        valid = (
+            ("level_inspect", {"mode": "discover"}),
+            ("level_inspect", {"mode": "discover", "package_path": "/Game/Maps",
+                               "asset_name": "Example", "page_size": 100}),
+            ("level_inspect", {"mode": "current"}),
+            ("level_inspect", {"cursor": "a" * 32, "page_size": 1}),
+            ("level_open", {"operation_id": "b" * 32,
+                            "map_path": "/Game/Maps/Example.Example"}),
+        )
+        for name, arguments in valid:
+            with self.subTest(name=name, arguments=arguments):
+                response = server.handle({
+                    "jsonrpc": "2.0", "id": 20, "method": "tools/call",
+                    "params": {"name": name, "arguments": arguments},
+                })
+                self.assertNotIn("error", response)
+        invalid = (
+            ("level_inspect", {}),
+            ("level_inspect", {"mode": "current", "page_size": 1}),
+            ("level_inspect", {"mode": "discover", "package_path": "/Game/../Engine"}),
+            ("level_inspect", {"cursor": "short"}),
+            ("level_open", {"operation_id": "b" * 32, "map_path": "Game/Maps/Example.Example"}),
+            ("level_open", {"operation_id": "short", "map_path": "/Game/Maps/Example.Example"}),
+            ("level_open", {"operation_id": "b" * 32, "map_path": "/Game/Maps/Example.Example",
+                            "save": True}),
+        )
+        for name, arguments in invalid:
+            with self.subTest(name=name, arguments=arguments):
+                response = server.handle({
+                    "jsonrpc": "2.0", "id": 21, "method": "tools/call",
+                    "params": {"name": name, "arguments": arguments},
+                })
+                self.assertEqual(response["error"]["code"], -32602)
 
     def test_rejects_schema_and_unknown_tool(self):
         server = MCPServer(FakeBridge())

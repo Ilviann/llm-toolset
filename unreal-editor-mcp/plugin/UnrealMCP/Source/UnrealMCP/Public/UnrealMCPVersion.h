@@ -4,7 +4,7 @@
 
 namespace UnrealMCP
 {
-inline constexpr TCHAR Version[] = TEXT("0.17.1");
+inline constexpr TCHAR Version[] = TEXT("0.18.0");
 inline constexpr uint32 DefaultPort = 15485;
 inline constexpr int32 MaxRequestBytes = 64 * 1024;
 inline constexpr int32 MaxResponseBytes = 256 * 1024;
@@ -46,5 +46,7 @@ inline constexpr int32 MaxGameDataBatchRows = 64;
 inline constexpr int32 MaxGameDataCollectionItems = 64;
 inline constexpr int32 MaxGameDataDepth = 4;
 inline constexpr int32 MaxGameDataDependencies = 256;
+inline constexpr int32 MaxLevelDiscoveryScan = 2048;
+inline constexpr int32 MaxLevelExternalPackages = 2048;
 inline constexpr int32 MaxDirtyPackageSummary = 16;
 }

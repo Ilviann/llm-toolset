@@ -1,10 +1,12 @@
 # Unreal Editor MCP
 
-Unreal Editor MCP 0.17.1 is an offline-first MCP bridge for Unreal Engine 5.8+. It pairs a dependency-free Python 3.10+ stdio server with an editor-only C++ plugin. Default mode exposes exactly fifteen tools:
+Unreal Editor MCP 0.18.0 is an offline-first MCP bridge for Unreal Engine 5.8+. It pairs a dependency-free Python 3.10+ stdio server with an editor-only C++ plugin. Default mode exposes exactly seventeen tools:
 
 - `capabilities` reports the exact Python/plugin/Unreal versions, commands, features, listener state, effective limits, and published Blueprint-family matrix.
 - `editor_state` reports project identity, bridge readiness, play/simulate/save/GC state, and concise queued-operation state.
 - `operation_status` reconciles or safely cancels one retained mutation by operation and bridge identity.
+- `level_inspect` discovers bounded pages of mounted World assets or reports the current map's exact identity, revision, snapshot, and dirtiness.
+- `level_open` safely opens one exact mounted World asset through the retained mutation ledger.
 - `blueprint_inspect` discovers every published Blueprint family across mounted content and returns bounded pages of one selected Blueprint's structure.
 - `blueprint_action_catalog` discovers bounded context-valid function, variable, event, flow-control, cast, literal, and operator actions for one exact Blueprint graph snapshot.
 - `blueprint_graph_edit` creates, moves, removes, configures, or connects graph nodes and pins, including wildcard specialization and explicitly requested bounded conversions.
@@ -18,7 +20,7 @@ Unreal Editor MCP 0.17.1 is an offline-first MCP bridge for Unreal Engine 5.8+. 
 - `game_data_inspect` reads one user-defined struct schema or bounded page of typed Data Table rows from an exact asset snapshot.
 - `game_data_edit` creates or atomically edits user-defined structs and typed Data Table rows with validation, saving, and read-back.
 
-Opt-in large mode adds a sixteenth tool, `editor_lifecycle`, for configured launch, safe graceful shutdown, durable restart, and cancellation. CSV/JSON filesystem import/export, Curve Tables, Data Assets, arbitrary UObject assets, supplied struct code, General Project Settings beyond the narrow framework operation, world overrides, runtime server/client control, builds, Blueprint reparenting, console access, unrestricted reflection, forced process termination, and code execution remain unavailable.
+Opt-in large mode adds an eighteenth tool, `editor_lifecycle`, for configured launch, safe graceful shutdown, durable restart, and cancellation. CSV/JSON filesystem import/export, Curve Tables, Data Assets, arbitrary UObject assets, supplied struct code, General Project Settings beyond the narrow framework operation, world overrides, runtime server/client control, builds, Blueprint reparenting, console access, unrestricted reflection, forced process termination, and code execution remain unavailable.
 
 ## Security model
 
@@ -50,7 +52,7 @@ Python 3.10 or newer with tkinter is required. Official Windows Python installer
 
 1. Copy [`plugin/UnrealMCP`](plugin/UnrealMCP) to `<YourProject>/Plugins/UnrealMCP` or add this repository's `plugin/` folder as an `AdditionalPluginDirectories` entry in a disposable development `.uproject`.
 2. Enable the `UnrealMCP` plugin and compile the project's Editor target with Unreal 5.8 or a newer version that passes the included public-API probes.
-3. Open the project. Look for `Unreal MCP 0.17.1 ready on 127.0.0.1:15485` in the editor log.
+3. Open the project. Look for `Unreal MCP 0.18.0 ready on 127.0.0.1:15485` in the editor log.
 4. Install the Python package offline from this folder:
 
    ```sh
@@ -124,6 +126,30 @@ The tool accepts only:
 Shutdown refuses while PIE/simulation, saving, garbage collection, an editor transaction, asset compilation, or any dirty package is present. Dirty refusal includes only a bounded package summary. It never saves, discards, prompts, force-kills, or retargets another process. Once shutdown is accepted, cancellation cannot interrupt it; restart can still cancel at the safe point after the old process exits and before the new launch.
 
 Lifecycle progress is stored separately from Blueprint mutations at `Saved/UnrealMCP/lifecycle.json`, with at most 16 records retained for 24 hours. A server restart marks interrupted records `outcome_unknown`; inspect the configured editor state before choosing a new operation ID. Cancelling a launch wait does not terminate the editor, which may still become ready.
+
+## Level discovery and opening
+
+Discover mounted World assets with an optional exact package-root and asset-name filter. Results are sorted, bounded by the published scan ceiling, and continued with short-lived, query-bound, single-use cursors:
+
+```json
+{"mode":"discover","package_path":"/Game/Maps","asset_name":"Authoring","page_size":10}
+```
+
+Inspect the current editor map without mutation:
+
+```json
+{"mode":"current"}
+```
+
+The response identifies the exact map, a project-qualified map ID, revision, snapshot, dirty state, World Partition and external-actor state, and bounded dirty/external-package counts. An unsaved template map remains inspectable but is reported as unmounted.
+
+Open only an exact mounted World asset path:
+
+```json
+{"operation_id":"11111111111111111111111111111111","map_path":"/Game/Maps/Authoring.Authoring"}
+```
+
+Map switching refuses PIE/simulation, save, garbage collection, transactions, asset compilation, async loading, dirty packages, or another queued mutation. It never accepts filesystem paths, saves, discards, or prompts. Reuse the operation ID with `operation_status` after a lost response. See [`examples/level-open-workflow.json`](examples/level-open-workflow.json) for the complete request sequence.
 
 ## Blueprint-family inspection
 

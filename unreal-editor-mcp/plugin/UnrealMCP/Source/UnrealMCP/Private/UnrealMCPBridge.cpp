@@ -22,6 +22,7 @@
 #include "UnrealMCPBlueprintMutator.h"
 #include "UnrealMCPGameplayFrameworkEditor.h"
 #include "UnrealMCPGameDataService.h"
+#include "UnrealMCPLevelService.h"
 #include "UnrealMCPProtocol.h"
 #include "UnrealMCPOperationLedger.h"
 #include "UnrealMCPVersion.h"
@@ -53,7 +54,8 @@ FString Header(const FHttpServerRequest& Request, const TCHAR* LowercaseName)
 
 bool IsMutationCommand(const FString& Command)
 {
-    return Command == TEXT("blueprint_create") || Command == TEXT("blueprint_compile") || Command == TEXT("blueprint_save")
+    return Command == TEXT("level_open")
+        || Command == TEXT("blueprint_create") || Command == TEXT("blueprint_compile") || Command == TEXT("blueprint_save")
         || Command == TEXT("blueprint_component_edit") || Command == TEXT("blueprint_default_edit")
         || Command == TEXT("blueprint_member_edit") || Command == TEXT("blueprint_graph_edit")
         || Command == TEXT("gameplay_framework_edit") || Command == TEXT("game_data_edit");
@@ -169,6 +171,7 @@ void FUnrealMCPBridge::Stop()
     BlueprintMutator.Reset();
     GameplayFrameworkEditor.Reset();
     GameDataService.Reset();
+    LevelService.Reset();
     BlueprintActionCatalog.Reset();
     BlueprintInspector.Reset();
     Token.Reset();
@@ -178,7 +181,17 @@ bool FUnrealMCPBridge::HandleRequest(const FHttpServerRequest& Request, const FH
 {
     if (bStopping || bShutdownAccepted || !bReady)
     {
-        Complete(UnrealMCP::Protocol::Error(EHttpServerResponseCodes::ServiceUnavail, TEXT("editor_unavailable"), TEXT("Bridge is shutting down"), true));
+        const TSharedRef<FJsonObject> Details = MakeShared<FJsonObject>();
+        Details->SetBoolField(TEXT("stopping"), bStopping);
+        Details->SetBoolField(TEXT("shutdown_accepted"), bShutdownAccepted);
+        Details->SetBoolField(TEXT("bridge_ready"), bReady);
+        Complete(UnrealMCP::Protocol::Error(
+            EHttpServerResponseCodes::ServiceUnavail,
+            FUnrealMCPError{
+                TEXT("editor_unavailable"),
+                bShutdownAccepted || bStopping ? TEXT("Bridge is shutting down") : TEXT("Bridge is not ready"),
+                Details,
+                true}));
         return true;
     }
     const FString Authorization = Header(Request, TEXT("authorization"));
@@ -203,6 +216,7 @@ bool FUnrealMCPBridge::HandleRequest(const FHttpServerRequest& Request, const FH
     }
     if (Command != TEXT("capabilities") && Command != TEXT("editor_state") && Command != TEXT("editor_shutdown")
         && Command != TEXT("operation_status")
+        && Command != TEXT("level_inspect") && Command != TEXT("level_open")
         && Command != TEXT("blueprint_inspect") && Command != TEXT("blueprint_create") && Command != TEXT("blueprint_compile")
         && Command != TEXT("blueprint_save") && Command != TEXT("blueprint_component_edit") && Command != TEXT("blueprint_default_edit")
         && Command != TEXT("blueprint_member_edit") && Command != TEXT("blueprint_action_catalog")
@@ -334,6 +348,30 @@ bool FUnrealMCPBridge::Execute(const FString& Command, const TSharedPtr<FJsonObj
     {
         return EditorShutdown(OutResult, OutError);
     }
+    if (Command == TEXT("level_inspect") || Command == TEXT("level_open"))
+    {
+        if (!LevelService)
+        {
+            LevelService = MakeUnique<FUnrealMCPLevelService>(ProjectHash);
+        }
+        if (Command == TEXT("level_open") && OperationLedger)
+        {
+            const TSharedPtr<FJsonObject> State = OperationLedger->CurrentState();
+            if (static_cast<int32>(State->GetNumberField(TEXT("queued"))) > 0
+                || static_cast<int32>(State->GetNumberField(TEXT("executing"))) > 1)
+            {
+                OutError = {
+                    TEXT("busy"),
+                    TEXT("Map opening refused while another mutation is queued or executing"),
+                    MakeShared<FJsonObject>(),
+                    true};
+                return false;
+            }
+        }
+        return Command == TEXT("level_inspect")
+            ? LevelService->Inspect(Arguments, OutResult, OutError)
+            : LevelService->Open(Arguments, OutResult, OutError);
+    }
     if (Command == TEXT("gameplay_framework_edit"))
     {
         if (!GameplayFrameworkEditor) GameplayFrameworkEditor = MakeUnique<FUnrealMCPGameplayFrameworkEditor>(ProjectHash);
@@ -392,6 +430,7 @@ TSharedPtr<FJsonObject> FUnrealMCPBridge::Capabilities() const
     Result->SetStringField(TEXT("mode"), TEXT("blueprint_family_authoring"));
     Result->SetBoolField(TEXT("bridge_ready"), bReady);
     Result->SetArrayField(TEXT("commands"), Strings({TEXT("capabilities"), TEXT("editor_state"), TEXT("editor_shutdown"), TEXT("operation_status"),
+        TEXT("level_inspect"), TEXT("level_open"),
         TEXT("blueprint_inspect"), TEXT("blueprint_action_catalog"), TEXT("blueprint_graph_edit"), TEXT("blueprint_create"), TEXT("blueprint_compile"),
         TEXT("blueprint_save"), TEXT("blueprint_component_edit"), TEXT("blueprint_default_edit"), TEXT("blueprint_member_edit"),
         TEXT("gameplay_framework_edit"), TEXT("game_data_inspect"), TEXT("game_data_edit")}));
@@ -429,6 +468,11 @@ TSharedPtr<FJsonObject> FUnrealMCPBridge::Capabilities() const
     Features->SetBoolField(TEXT("user_defined_struct_authoring"), true);
     Features->SetBoolField(TEXT("typed_data_tables"), true);
     Features->SetBoolField(TEXT("game_data_batch_editing"), true);
+    Features->SetBoolField(TEXT("level_discovery"), true);
+    Features->SetBoolField(TEXT("level_open"), true);
+    Features->SetBoolField(TEXT("level_snapshots"), true);
+    Features->SetBoolField(TEXT("level_actor_inspection"), false);
+    Features->SetBoolField(TEXT("level_actor_editing"), false);
     Features->SetBoolField(TEXT("editor_lifecycle"), true);
     Features->SetBoolField(TEXT("graceful_editor_shutdown"), true);
     Features->SetBoolField(TEXT("project_build"), false);
@@ -477,6 +521,8 @@ TSharedPtr<FJsonObject> FUnrealMCPBridge::Capabilities() const
     Limits->SetNumberField(TEXT("game_data_collection_items"), UnrealMCP::MaxGameDataCollectionItems);
     Limits->SetNumberField(TEXT("game_data_depth"), UnrealMCP::MaxGameDataDepth);
     Limits->SetNumberField(TEXT("game_data_dependencies"), UnrealMCP::MaxGameDataDependencies);
+    Limits->SetNumberField(TEXT("level_discovery_scan"), UnrealMCP::MaxLevelDiscoveryScan);
+    Limits->SetNumberField(TEXT("level_external_packages"), UnrealMCP::MaxLevelExternalPackages);
     Limits->SetNumberField(TEXT("dirty_package_summary"), UnrealMCP::MaxDirtyPackageSummary);
     Result->SetObjectField(TEXT("limits"), Limits);
 
