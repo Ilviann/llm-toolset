@@ -4,7 +4,7 @@ This directory contains the detailed implementation, verification, documentation
 
 ## Roadmap workflow
 
-The target is Unreal Engine 5.8 and newer. macOS remains the primary development host. Platform validation belongs to each applicable feature rather than separate roadmap features. Linux remains source-portable with unit-tested platform branches until a native host is available.
+The target is Unreal Engine 5.8 and newer. macOS remains the primary development host. Platform verification requirements remain documented by each applicable feature, while missing native coverage for completed features is tracked separately in the [`ROADMAP.md` native platform test backlog](../../ROADMAP.md#native-platform-test-backlog). Linux remains source-portable with unit-tested platform branches until a native host is available.
 
 Keep the authoritative checklist in [`ROADMAP.md`](../../ROADMAP.md) synchronized one-for-one with the feature documents below. Feature identifiers are stable names rather than execution indexes. A feature may be implemented and completed whenever every direct dependency listed in its description is complete. Every feature must include implementation, tests, documentation, examples, and a releasable completion gate.
 

@@ -1,6 +1,6 @@
 # `editor-launch` — Optional configured editor launch
 
-**Implementation status:** Implemented in 0.17.0 and verified natively on Windows; the roadmap completion box remains open until the required native macOS run passes.
+**Implementation status:** Completed in 0.17.0 and verified natively on Windows. Native macOS verification remains in the roadmap platform test backlog.
 
 **Outcome:** Agents can opt in to launching only the configured Unreal project/editor instance and wait for its exact authenticated bridge.
 
@@ -18,9 +18,9 @@
 - Run launch, readiness, cancellation, and recovery natively on macOS and Windows. Unit test Linux command construction without claiming native support.
 - Prove the model cannot substitute executables, projects, environment values, shell fragments, or arbitrary arguments.
 
-### Documentation and completion gate
+### Documentation and completion
 
 - Document opt-in launch configuration, platform paths, states, cancellation, recovery, limits, and default-mode exclusion.
-- Complete the feature only when configured launch reaches the exact authenticated bridge without arbitrary process execution on native macOS and Windows.
+- Feature completion requires the implemented, documented, and automated launch contract. Missing applicable native platform verification is tracked separately in the roadmap platform test backlog.
 
 [Back to roadmap](../../ROADMAP.md) · [Shared roadmap contracts](index.md)

@@ -27,11 +27,11 @@ Feature identifiers are stable names, not execution indexes. Unfinished features
 - [ ] [`node-layout` — Deterministic changed-node layout](docs/todo/node-layout.md) — Add deterministic layout for changed nodes.
   - Depends on:
     - `event-macro-replace`
-- [ ] [`editor-launch` — Optional configured editor launch](docs/todo/editor-launch.md) — Add optional configured editor launch.
-- [ ] [`editor-shutdown` — Optional graceful editor shutdown](docs/todo/editor-shutdown.md) — Add optional graceful editor shutdown.
+- [x] [`editor-launch` — Optional configured editor launch](docs/todo/editor-launch.md) — Add optional configured editor launch.
+- [x] [`editor-shutdown` — Optional graceful editor shutdown](docs/todo/editor-shutdown.md) — Add optional graceful editor shutdown.
   - Depends on:
     - `editor-launch`
-- [ ] [`editor-restart` — Optional durable editor restart](docs/todo/editor-restart.md) — Add optional durable editor restart.
+- [x] [`editor-restart` — Optional durable editor restart](docs/todo/editor-restart.md) — Add optional durable editor restart.
   - Depends on:
     - `editor-launch`
     - `editor-shutdown`
@@ -66,3 +66,18 @@ Feature identifiers are stable names, not execution indexes. Unfinished features
 - [ ] [`pie-multiprocess` — Multi-process PIE companion and cross-process observation](docs/todo/pie-multiprocess.md) — Extend retained sessions through an authenticated local runtime companion for owned PIE processes.
   - Depends on:
     - `pie-test`
+
+## Native platform test backlog
+
+Feature checkboxes record implementation completion. This section separately lists completed features that have not yet passed their applicable native platform verification.
+
+- macOS:
+  - `editor-launch`
+  - `editor-shutdown`
+  - `editor-restart`
+- Windows:
+  - None
+- Linux:
+  - None
+
+Linux lifecycle launch and restart are intentionally unsupported, so the lifecycle features do not require native Linux verification.

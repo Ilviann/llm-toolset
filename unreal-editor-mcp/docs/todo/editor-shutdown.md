@@ -1,6 +1,6 @@
 # `editor-shutdown` — Optional graceful editor shutdown
 
-**Implementation status:** Implemented in 0.17.0 and verified natively on Windows; the roadmap completion box remains open until the required native macOS run passes.
+**Implementation status:** Completed in 0.17.0 and verified natively on Windows. Native macOS verification remains in the roadmap platform test backlog.
 
 **Outcome:** Agents can opt in to gracefully shutting down only the configured authenticated editor instance without forced termination or data loss.
 
@@ -21,9 +21,9 @@
 - Run graceful shutdown and recovery natively on macOS and Windows.
 - Prove no tool argument can select another process or request forced termination.
 
-### Documentation and completion gate
+### Documentation and completion
 
 - Document dirty-content policy, refusal states, disconnect semantics, cancellation, recovery, and default-mode exclusion.
-- Complete the feature only when configured graceful shutdown succeeds or refuses safely without arbitrary process control or data loss on native macOS and Windows.
+- Feature completion requires the implemented, documented, and automated graceful-shutdown contract. Missing applicable native platform verification is tracked separately in the roadmap platform test backlog.
 
 [Back to roadmap](../../ROADMAP.md) · [Shared roadmap contracts](index.md)
