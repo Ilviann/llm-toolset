@@ -1,44 +1,38 @@
 # Repository Guidelines
 
-## Purpose and Priorities
+## Priorities
 
-This repository contains lightweight, offline-first MCP tools for local LLM workflows, primarily LM Studio. Support macOS, Linux, and Windows, while optimizing for small local models and a 16 GB development machine.
+Build lightweight, offline-first MCP tools, primarily for LM Studio, on macOS, Linux, and Windows.
 
-- Prefer the Python standard library and short-lived or stdio processes.
-- Require no cloud service, account, telemetry, or runtime download.
-- Minimize dependencies, startup time, memory use, tool count, and context use.
-- Isolate unavoidable platform-specific behavior and test every branch.
-- Pin unavoidable dependencies and document how to prepare them offline.
+- Prefer the standard library, stdio or short-lived processes, and small model-facing schemas.
+- Avoid cloud services, accounts, telemetry, runtime downloads, and unnecessary dependencies.
+- Bound memory, output, recursion, collection sizes, file sizes, state, and execution time.
+- Isolate platform-specific behavior, test each branch, and document offline preparation for pinned dependencies.
 
-## Scope and Architecture
+## Structure and workflow
 
-Each application lives in its own top-level folder with source, tests, README, configuration examples, implementation knowledge, and `ROADMAP.md`. Current applications are `rooted-files-mcp/` and `godot-editor-mcp/`. Keep shared documentation at the repository root; introduce shared libraries only when multiple applications need them.
+Applications are `rooted-files-mcp/`, `godot-editor-mcp/`, and `unreal-editor-mcp/`. Keep each app self-contained; add shared code only when multiple apps need it.
 
-Before inspecting or changing application source for a feature, follow that application's `AGENTS.md`, start with its `docs/index.md`, and follow the relevant component/type indexes. Use the dependency map to select the smallest relevant working set: affected modules, their dependencies, tests, metadata, examples, history, roadmap, and documentation. Expand the set only when source evidence reveals an undocumented dependency, and update the affected application's knowledge files and immediate indexes when it does.
+Before changing an app, follow its `AGENTS.md` and `docs/workflow.md`, beginning at `docs/index.md`. Use the architecture and type indexes to identify the smallest relevant set of source, dependencies, tests, metadata, examples, roadmap/history, and documentation.
 
-Prefer narrow responsibilities, explicit interfaces, and low coupling. Broader refactoring is appropriate when it materially improves structure, maintainability, performance, security, or testability. If useful refactoring falls outside the requested scope, recommend it with affected modules, benefits, scope, risks, and tradeoffs; do not implement it without authorization.
+Keep one file per component under `docs/architecture/`, component-owned references under `docs/types/`, and an immediate relative-link `index.md` in every docs directory. Do not create a `CODE.md` monolith.
 
-## MCP and Security Design
+Executable source, schemas, metadata, runtime contracts, and behavioral tests define behavior. Documentation explains them and must not be executable input or a test fixture.
 
-- Treat every model-supplied argument as untrusted. Validate types, lengths, paths, operations, and encoded sizes.
-- Confine filesystem access to configured roots; reject traversal and symlink escapes.
-- Bound recursion, collection sizes, file sizes, response sizes, active state, and execution time. Avoid loading large data entirely into memory.
-- Expose a small set of distinct tools with brief descriptions, simple schemas, few arguments, concise results, and stable errors.
-- Prefer configured-root-relative identifiers and paths over long absolute paths.
-- Write only protocol messages to MCP stdio stdout; send diagnostics to stderr.
-- Test MCP initialization, `tools/list`, and `tools/call` end to end with LM Studio-compatible framing.
+Keep responsibilities narrow and interfaces explicit. Do not include unrelated refactors without authorization.
+
+## Security and MCP contracts
+
+- Treat model input as untrusted; validate types, lengths, paths, operations, and encoded sizes.
+- Confine filesystem access to configured roots and reject traversal and symlink escapes.
+- Keep tools few, schemas compact, results bounded, and errors stable.
+- Write protocol messages only to stdout; send diagnostics to stderr.
 - Never commit secrets, tokens, or machine-specific paths.
+- Test MCP initialization, `tools/list`, and `tools/call` with LM Studio-compatible framing.
 
-## Development, Testing, and Releases
+## Changes and releases
 
-Use built-in test frameworks and fast offline suites. Test normal behavior, invalid input, resource limits, security boundaries, and platform branches. Run the complete affected application suite after behavior changes.
-
-Production code, tests, generated code, and release checks must not use prose documentation as executable input or a test fixture. Derive expected behavior and release consistency from code, package or plugin metadata, runtime contracts, and behavioral results.
-
-Keep every roadmap phase usable and releasable: implementation, tests, documentation, and examples belong in the same phase. A roadmap that introduces feature work must maintain a synchronized top-level checklist with a checkbox, phase number, and one-line description for each phase. When the user requests cleanup after all phases are complete, retain `ROADMAP.md` with a concise statement that no feature requests remain.
-
-After each roadmap phase, update the application's version when it is versioned: patch for fixes, minor for features, and major only on explicit request. Keep executable/package/plugin metadata, runtime-reported versions, tests, README, examples, and history consistent. Update all affected documentation before handoff.
-
-## Contributions
-
-Use focused commits with imperative subjects, such as `Add bounded search results`. Pull requests should describe behavior, memory/context impact, dependencies, security implications, and tests.
+- Test normal, invalid, limit, security, and platform behavior proportional to the change. Run the full affected app suite after behavior changes.
+- Update affected documentation and examples with the implementation.
+- Keep each roadmap phase usable and releasable. Maintain a checkbox phase checklist; for versioned apps, update the version after each completed phase (patch for fixes, minor for features, major only when requested) and synchronize all version sources and history.
+- Use focused commits with imperative subjects. PRs should cover behavior, resource impact, dependencies, security, and tests.
