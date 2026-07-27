@@ -6,6 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "rooted-files-mcp"
 version = "0.3.0"
 description = "Small, dependency-free MCP server for rooted text file access"
+authors = [{ name = "Ilviann Zed", email = "ilviann.zed@gmail.com" }]
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
@@ -14,6 +15,9 @@ classifiers = [
     "Operating System :: Microsoft :: Windows",
     "Operating System :: POSIX :: Linux",
 ]
+
+[project.urls]
+Homepage = "https://github.com/Ilviann/llm-toolset"
 
 [project.scripts]
 rooted-files-mcp = "rooted_files_mcp.server:main"

@@ -6,6 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "unreal-editor-mcp"
 version = "0.18.0"
 description = "Offline-first MCP bridge for the Unreal Editor"
+authors = [{ name = "Ilviann Zed", email = "ilviann.zed@gmail.com" }]
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
@@ -14,6 +15,9 @@ classifiers = [
     "Operating System :: Microsoft :: Windows",
     "Operating System :: POSIX :: Linux",
 ]
+
+[project.urls]
+Homepage = "https://github.com/Ilviann/llm-toolset"
 
 [project.scripts]
 unreal-editor-mcp = "unreal_editor_mcp.cli:main"
