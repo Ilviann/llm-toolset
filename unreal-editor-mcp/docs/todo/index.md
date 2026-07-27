@@ -24,6 +24,10 @@ Keep the authoritative checklist in [`ROADMAP.md`](../../ROADMAP.md) synchronize
 - [`phase-15` — GameInstance family](phase-15.md) — Add GameInstance family support.
 - [`phase-16` — Multiplayer Blueprint authoring and framework assignment](phase-16.md) — Add RPC custom events, replication settings, and narrow GameMode/GameInstance project assignment.
 - [`phase-17` — User-defined structs and Data Tables](phase-17.md) — Add bounded row-schema and typed game-design table authoring.
+- [`asset-references` — Find asset references](asset-references.md) — Find bounded serialized and live-memory referencers for one exact mounted asset.
+- [`asset-delete` — Delete asset](asset-delete.md) — Safely delete one exact unreferenced asset package through Unreal Editor.
+  - Depends on:
+    - `asset-references`
 - [`widget-tree` — Widget Blueprint family and widget trees](widget-tree.md) — Add Widget Blueprint creation, inspection, compilation, saving, and widget-tree editing.
 - [`umg-authoring` — UMG layout, styling, bindings, and UI logic](umg-authoring.md) — Complete practical HUD and menu authoring on the Widget Blueprint family.
   - Depends on:
@@ -52,6 +56,10 @@ Keep the authoritative checklist in [`ROADMAP.md`](../../ROADMAP.md) synchronize
 - [`level-open` — Level discovery, safe opening, and snapshot foundations](level-open.md) — Add bounded map discovery, explicit safe map opening, and restart-stable level snapshots.
   - Depends on:
     - [`issue-1` resolution](../issues/issue-1.md) — resolved in 0.17.1
+- [`level-management` — Level management](level-management.md) — Create, configure, save, and safely delete exact map assets.
+  - Depends on:
+    - `level-open`
+    - `asset-delete`
 - [`level-inspect` — World Partition actor and instance inspection](level-inspect.md) — Inspect bounded descriptor, actor, component, and reflected instance state without loading the entire world.
   - Depends on:
     - `level-open`
@@ -105,12 +113,15 @@ Keep the public surface compact. Add typed operations to these remaining tool fa
 | `gameplay_framework_edit` | `phase-16` | Assign only the configured project's default GameMode or GameInstance class |
 | `game_data_inspect` | `phase-17` | Inspect one bounded user-defined struct or Data Table schema/row page |
 | `game_data_edit` | `phase-17` | Create or mutate one bounded user-defined struct or Data Table transaction |
+| `asset_references` | `asset-references` | Find bounded serialized and live-memory referencers for one exact mounted asset |
+| `asset_delete` | `asset-delete` | Delete one exact unreferenced asset package through a retained, verified editor operation |
 | `widget_tree_edit` | `widget-tree` | Perform one typed Widget Blueprint tree, widget-default, slot, layout, style, or binding mutation |
 | `blueprint_block_replace` | `function-replace` | Replace one complete bounded logic unit as a prevalidated transaction |
 | `editor_lifecycle` | `editor-launch` | Run one opt-in configured launch, restart, or graceful-shutdown operation |
 | `project_build` | `project-files` | Run one opt-in configured project-generation or editor-target build operation |
 | `level_inspect` | `level-open` | Discover mounted maps and inspect bounded current-map, actor, component, property, and spline snapshot pages |
 | `level_open` | `level-open` | Safely open one exact mounted map without implicit save or discard |
+| `level_manage` | `level-management` | Create and configure one exact map; map deletion reuses the safe `asset_delete` operation |
 | `level_actor_edit` | `level-edit` | Apply one stale-safe bounded actor/component/spline mutation batch in the current map |
 | `level_save` | `level-edit` | Save and verify the current map and explicit affected external-actor packages |
 | `play_session_start` | `pie-lifecycle` | Start one retained bounded PIE topology with exact effective settings and instance identities |
@@ -146,6 +157,7 @@ Lifecycle and build tools remain absent from the default model context. Use an o
 ### Level authoring contracts
 
 - Keep `level_inspect` read-only and use the separate ledger-backed `level_open` operation for map switching. Never implicitly save, discard, or prompt for dirty work.
+- Address maps by mounted `UWorld` asset paths, never raw `.umap` filesystem paths. Creation and deletion must verify the complete map-owned package set, including World Partition external packages where applicable.
 - Qualify stable Actor GUID and component identities by exact map identity. Require the current map snapshot and exact identities for every existing-object mutation.
 - Use World Partition actor descriptors for bounded discovery and exact or region loading for live instance work. Missing or failed cells and data layers are errors, not evidence that an actor is absent.
 - Prevalidate each complete actor/spline batch, transact where Unreal supports it, maintain explicit restoration for unexpected in-memory failure, and verify postconditions before reporting commit.

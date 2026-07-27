@@ -16,6 +16,10 @@ Feature identifiers are stable names, not execution indexes. Unfinished features
 - [x] [`phase-15` — GameInstance family](docs/todo/phase-15.md) — Add GameInstance family support.
 - [x] [`phase-16` — Multiplayer Blueprint authoring and framework assignment](docs/todo/phase-16.md) — Add RPC custom events, replication settings, and narrow GameMode/GameInstance project assignment.
 - [x] [`phase-17` — User-defined structs and Data Tables](docs/todo/phase-17.md) — Add bounded row-schema and typed game-design table authoring.
+- [ ] [`asset-references` — Find asset references](docs/todo/asset-references.md) — Find bounded serialized and live-memory referencers for one exact mounted asset.
+- [ ] [`asset-delete` — Delete asset](docs/todo/asset-delete.md) — Safely delete one exact unreferenced asset package through Unreal Editor.
+  - Depends on:
+    - `asset-references`
 - [ ] [`widget-tree` — Widget Blueprint family and widget trees](docs/todo/widget-tree.md) — Add Widget Blueprint creation, inspection, compilation, saving, and widget-tree editing.
 - [ ] [`umg-authoring` — UMG layout, styling, bindings, and UI logic](docs/todo/umg-authoring.md) — Complete practical HUD and menu authoring on the Widget Blueprint family.
   - Depends on:
@@ -44,6 +48,10 @@ Feature identifiers are stable names, not execution indexes. Unfinished features
 - [x] [`level-open` — Level discovery, safe opening, and snapshot foundations](docs/todo/level-open.md) — Add bounded map discovery, explicit safe map opening, and restart-stable level snapshots.
   - Depends on:
     - [`issue-1` resolution](docs/issues/issue-1.md) — resolved in 0.17.1
+- [ ] [`level-management` — Level management](docs/todo/level-management.md) — Create, configure, save, and safely delete exact map assets.
+  - Depends on:
+    - `level-open`
+    - `asset-delete`
 - [ ] [`level-inspect` — World Partition actor and instance inspection](docs/todo/level-inspect.md) — Inspect bounded descriptor, actor, component, and reflected instance state without loading the entire world.
   - Depends on:
     - `level-open`
