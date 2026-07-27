@@ -1,4 +1,4 @@
-# Phase 6 — Function signatures and local variables
+# `phase-6` — Function signatures and local variables
 
 **Outcome:** Agents can inspect and define user-owned function shells, complete signatures, and typed local variables.
 

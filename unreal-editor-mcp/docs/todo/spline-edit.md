@@ -1,6 +1,10 @@
-# Phase 31 — Spline component inspection and editing
+# `spline-edit` — Spline component inspection and editing
 
 **Outcome:** Agents can inspect and transactionally edit bounded spline point sets on exact level actor components, then save and verify them across reload.
+
+**Depends on:**
+
+- [`level-edit`](level-edit.md)
 
 ### Implementation
 
@@ -21,6 +25,6 @@
 
 - Document spline identities, coordinate and tangent semantics, point operations, metadata policy, transactions, World Partition saving, verification, and limits.
 - Add a traversal-spline example with four mixed-type points, explicit tangents, save, reload, and exact read-back.
-- Complete the phase only when a mixed-point traversal spline survives save and reload with exact supported values and no duplicate points on operation replay.
+- Complete the feature only when a mixed-point traversal spline survives save and reload with exact supported values and no duplicate points on operation replay.
 
 [Back to roadmap](../../ROADMAP.md) · [Shared roadmap contracts](index.md)

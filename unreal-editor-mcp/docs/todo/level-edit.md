@@ -1,6 +1,10 @@
-# Phase 30 — Transactional level actor editing and verified saving
+# `level-edit` — Transactional level actor editing and verified saving
 
 **Outcome:** Agents can create or mutate a bounded actor batch against an exact map snapshot and explicitly save and verify the affected map and external-actor packages.
+
+**Depends on:**
+
+- [`level-inspect`](level-inspect.md)
 
 ### Implementation
 
@@ -23,6 +27,6 @@
 
 - Document the edit operation matrix, property/class policy, transaction and rollback semantics, World Partition loading, affected-package results, verified save/reload, partial failure, recovery, and limits.
 - Add an actor-placement example that edits a bounded mixed native/Blueprint batch, saves the returned package set, reloads, and verifies exact identities and values.
-- Complete the phase only when bounded actor batches are prevalidated, idempotent, stale-safe, rollback-verified in memory, and persisted with honest per-package results.
+- Complete the feature only when bounded actor batches are prevalidated, idempotent, stale-safe, rollback-verified in memory, and persisted with honest per-package results.
 
 [Back to roadmap](../../ROADMAP.md) · [Shared roadmap contracts](index.md)

@@ -1,12 +1,16 @@
-# Phase 27 — Optional editor-target builds
+# `editor-build` — Optional editor-target builds
 
 **Outcome:** Agents can opt in to narrowly configured editor-target builds only while the configured project editor is stopped.
+
+**Depends on:**
+
+- [`project-files`](project-files.md)
 
 ### Implementation
 
 - Extend `project_build` with a typed `build_editor_target` operation while keeping the tool in opt-in large mode.
 - Let the model select only targets and configurations from a bounded published allowlist. Never accept executable paths, project paths, shell fragments, environment variables, compiler/linker flags, working directories, or arbitrary arguments.
-- Reuse the Phase 26 fixed platform adapters, stopped-editor precondition, durable lifecycle reconciliation, process bounds, retention, cancellation escalation, and child-process cleanup.
+- Reuse the `project-files` fixed platform adapters, stopped-editor precondition, durable lifecycle reconciliation, process bounds, retention, cancellation escalation, and child-process cleanup.
 - Normalize compiler diagnostics and keep raw subprocess output off MCP stdout except inside valid bounded tool results.
 
 ### Verification
@@ -18,6 +22,6 @@
 ### Documentation and completion gate
 
 - Document configured allowlists, offline tool preparation, lifecycle interaction, bounded diagnostics, cancellation, platform behavior, and default-mode exclusion.
-- Complete the phase only when fixed native editor-target builds are reproducible from clean documented configuration on macOS and Windows.
+- Complete the feature only when fixed native editor-target builds are reproducible from clean documented configuration on macOS and Windows.
 
 [Back to roadmap](../../ROADMAP.md) · [Shared roadmap contracts](index.md)

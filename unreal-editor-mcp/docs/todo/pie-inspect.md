@@ -1,6 +1,10 @@
-# Phase 33 — Per-world runtime actor inspection and attributed diagnostics
+# `pie-inspect` — Per-world runtime actor inspection and attributed diagnostics
 
 **Outcome:** Agents can inspect bounded runtime actor state in one exact retained PIE instance without confusing server and client worlds.
+
+**Depends on:**
+
+- [`pie-lifecycle`](pie-lifecycle.md)
 
 ### Implementation
 
@@ -22,6 +26,6 @@
 
 - Document runtime identities, world requirements, actor handle lifetime, replication fields, correlation limits, property policy, filters, log attribution, pagination, and limits.
 - Add an example that inspects the same replicated gameplay class independently in the listen-server/host and remote-client worlds.
-- Complete the phase only when authoritative and client copies can be inspected independently with no implicit world selection or unbounded runtime traversal.
+- Complete the feature only when authoritative and client copies can be inspected independently with no implicit world selection or unbounded runtime traversal.
 
 [Back to roadmap](../../ROADMAP.md) · [Shared roadmap contracts](index.md)

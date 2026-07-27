@@ -1,4 +1,4 @@
-# Phase 15 — GameInstance family
+# `phase-15` — GameInstance family
 
 **Outcome:** The established workflow supports UObject-based GameInstance Blueprints without weakening Actor-family restrictions or assuming component support.
 
@@ -6,7 +6,7 @@
 
 ### Implementation
 
-- Add the `UGameInstance` family through the Phase 14 family-policy and capability-matrix contracts.
+- Add the `UGameInstance` family through the `phase-14` family-policy and capability-matrix contracts.
 - Evaluate live GameInstance capabilities for defaults, components, event graphs, local variables, overrides, graph types, and supported actions. Reject component operations and every other unsupported operation before mutation.
 - Reuse inspection, class defaults, members, action catalog, graph editing, compile, save, diagnostics, operation reconciliation, and security contracts without introducing a separate mutation path.
 - Add GameInstance-specific default properties, callbacks, override functions, and graph-action coverage. Keep every output family-aware.

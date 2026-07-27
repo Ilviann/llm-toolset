@@ -1,6 +1,10 @@
-# Phase 29 — World Partition actor and instance inspection
+# `level-inspect` — World Partition actor and instance inspection
 
 **Outcome:** Agents can inspect bounded actor pages and selected actor/component instance state in the current map without loading the entire World Partition world.
+
+**Depends on:**
+
+- [`level-open`](level-open.md)
 
 ### Implementation
 
@@ -22,6 +26,6 @@
 
 - Document actor/component identities, descriptor versus live-instance fields, targeted loading, filters, property policy, pagination, snapshots, and unavailable-state errors.
 - Add a World Partition example that filters a bounded region, continues one page, and inspects selected actor/component properties by exact identity.
-- Complete the phase only when bounded inspection can locate and read the actors needed for level authoring without unbounded world loading or editor mutation.
+- Complete the feature only when bounded inspection can locate and read the actors needed for level authoring without unbounded world loading or editor mutation.
 
 [Back to roadmap](../../ROADMAP.md) · [Shared roadmap contracts](index.md)

@@ -1,4 +1,4 @@
-# Phase 11 — Graph-node lifecycle
+# `phase-11` — Graph-node lifecycle
 
 **Outcome:** Agents can create, move, and remove supported graph nodes through individually prevalidated and reconcilable mutations.
 

@@ -1,4 +1,4 @@
-# Phase 14 — GameMode and GameState families
+# `phase-14` — GameMode and GameState families
 
 **Outcome:** The established Actor-derived workflow formally supports GameMode and GameState Blueprint families through an explicit published family policy.
 

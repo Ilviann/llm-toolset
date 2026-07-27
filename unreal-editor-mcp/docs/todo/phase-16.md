@@ -1,6 +1,6 @@
-# Phase 16 — Multiplayer Blueprint authoring and framework assignment
+# `phase-16` — Multiplayer Blueprint authoring and framework assignment
 
-**Outcome:** Agents can author the replication and RPC contracts used by a multiplayer shooter and can activate the project's default GameMode and GameInstance through a narrow, observable settings operation.
+**Outcome:** Agents can author reusable replication and RPC contracts for multiplayer gameplay and can activate the project's default GameMode and GameInstance through a narrow, observable settings operation.
 
 **Status:** Completed in 0.15.0.
 
@@ -23,7 +23,7 @@
 
 ### Documentation and completion gate
 
-- Document authority/ownership implications, RPC delivery limitations, replication settings, RepNotify coupling, framework assignment, restart behavior, manual world overrides, and focused multiplayer-shooter examples.
+- Document authority/ownership implications, RPC delivery limitations, replication settings, RepNotify coupling, framework assignment, restart behavior, manual world overrides, and project-neutral multiplayer examples.
 - Complete the phase only when the supported multiplayer contracts survive compile/save/restart, settings failures restore exactly, and automation verifies the represented networking semantics on both native platforms.
 
 [Back to roadmap](../../ROADMAP.md) · [Shared roadmap contracts](index.md)

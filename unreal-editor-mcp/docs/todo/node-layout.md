@@ -1,6 +1,10 @@
-# Phase 22 — Deterministic changed-node layout
+# `node-layout` — Deterministic changed-node layout
 
 **Outcome:** Block replacement can lay out changed nodes predictably without moving or otherwise altering untouched Blueprint content.
+
+**Depends on:**
+
+- [`event-macro-replace`](event-macro-replace.md)
 
 ### Implementation
 
@@ -18,6 +22,6 @@
 ### Documentation and completion gate
 
 - Document the layout policy, determinism, bounds, preservation guarantees, explicit-position alternative, and recovery behavior.
-- Complete the phase only when layout is deterministic and unrelated-content fingerprints remain stable across success, rejection, failure, timeout, and replay on both native platforms.
+- Complete the feature only when layout is deterministic and unrelated-content fingerprints remain stable across success, rejection, failure, timeout, and replay on both native platforms.
 
 [Back to roadmap](../../ROADMAP.md) · [Shared roadmap contracts](index.md)

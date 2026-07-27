@@ -14,4 +14,4 @@ This directory is the entry point for implementation knowledge. Start here befor
 - [`draft.md`](draft.md) — original product requirements and proposed later tool surface.
 - [`notice.md`](notice.md) — requirements-stage technical notes and later design considerations.
 
-The last two files are planning inputs, not executable behavior contracts. The concise phase checklist remains in [`../ROADMAP.md`](../ROADMAP.md), with shared roadmap contracts and detailed phase requirements under [`todo/`](todo/index.md). User installation and operation guidance and released changes live in [`../README.md`](../README.md) and [`../HISTORY.md`](../HISTORY.md).
+The last two files are planning inputs, not executable behavior contracts. The concise feature checklist remains in [`../ROADMAP.md`](../ROADMAP.md), with shared roadmap contracts and detailed feature requirements under [`todo/`](todo/index.md). User installation and operation guidance and released changes live in [`../README.md`](../README.md) and [`../HISTORY.md`](../HISTORY.md).

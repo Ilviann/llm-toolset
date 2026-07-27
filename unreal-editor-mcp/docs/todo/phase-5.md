@@ -1,4 +1,4 @@
-# Phase 5 — Blueprint member variables
+# `phase-5` — Blueprint member variables
 
 **Outcome:** Agents can inspect and safely define the typed member variables needed by Actor Blueprint code.
 
@@ -8,7 +8,7 @@
 - Add `blueprint_member_edit` operations for one add, rename, supported update, or safe removal of a member variable.
 - Reuse the canonical K2 type/value codec. Define explicit scalar, container, object/class reference, and default-value forms rather than accepting serialized engine structures.
 - Validate names, inherited and cross-kind collisions, type compatibility, defaults, replication, instance editability, visibility, and categories through live Blueprint capabilities.
-- Expose RepNotify relationships for inspection, but defer mutations that create or alter notification functions to Phase 6.
+- Expose RepNotify relationships for inspection, but defer mutations that create or alter notification functions to `phase-6`.
 - Use `reject_if_referenced` as the only removal or type-change policy. Do not cascade-delete nodes, silently orphan references, or attempt automatic graph repair.
 - Return the operation result, concise member identity, reference summary, reconstructed identities, and new Blueprint snapshot.
 

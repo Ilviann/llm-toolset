@@ -1,4 +1,4 @@
-# Phase 23 — Optional configured editor launch
+# `editor-launch` — Optional configured editor launch
 
 **Outcome:** Agents can opt in to launching only the configured Unreal project/editor instance and wait for its exact authenticated bridge.
 
@@ -19,6 +19,6 @@
 ### Documentation and completion gate
 
 - Document opt-in launch configuration, platform paths, states, cancellation, recovery, limits, and default-mode exclusion.
-- Complete the phase only when configured launch reaches the exact authenticated bridge without arbitrary process execution on native macOS and Windows.
+- Complete the feature only when configured launch reaches the exact authenticated bridge without arbitrary process execution on native macOS and Windows.
 
 [Back to roadmap](../../ROADMAP.md) · [Shared roadmap contracts](index.md)

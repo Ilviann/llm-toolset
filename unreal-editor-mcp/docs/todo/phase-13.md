@@ -1,4 +1,4 @@
-# Phase 13 — Wildcards, conversions, and complete atomic graph editing
+# `phase-13` — Wildcards, conversions, and complete atomic graph editing
 
 **Outcome:** Agents can complete Actor Blueprint logic through wildcard-aware graph editing and explicitly requested bounded conversion insertion.
 
@@ -7,7 +7,7 @@
 - Extend `blueprint_graph_edit` connection preflight and verification with live-schema wildcard specialization and node or pin reconstruction.
 - Add explicit opt-in automatic conversion while keeping it disabled by default.
 - Bound inserted conversion nodes, include all insertions in preflight and the transaction, and return every inserted or reconstructed node and pin identity.
-- Preserve the operation, snapshot, identity, protected-target, transaction, rollback, and limits contracts established in Phases 11 and 12.
+- Preserve the operation, snapshot, identity, protected-target, transaction, rollback, and limits contracts established in `phase-11` and `phase-12`.
 - Audit the complete graph-edit tool schema and change records for consistent operation discriminators, concise results, and bounded context use.
 
 ### Verification

@@ -1,6 +1,10 @@
-# Phase 26 — Optional editor-offline project-file generation
+# `project-files` — Optional editor-offline project-file generation
 
 **Outcome:** Agents can opt in to narrowly configured project-file generation only while the configured project editor is stopped.
+
+**Depends on:**
+
+- [`editor-restart`](editor-restart.md)
 
 ### Implementation
 
@@ -21,6 +25,6 @@
 ### Documentation and completion gate
 
 - Document offline engine/tool preparation, lifecycle interaction, bounded output, cancellation, platform behavior, default-mode exclusion, and use with the confined file MCP.
-- Complete the phase only when fixed native project generation is reproducible from clean documented configuration on macOS and Windows.
+- Complete the feature only when fixed native project generation is reproducible from clean documented configuration on macOS and Windows.
 
 [Back to roadmap](../../ROADMAP.md) · [Shared roadmap contracts](index.md)

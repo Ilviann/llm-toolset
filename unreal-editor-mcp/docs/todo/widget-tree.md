@@ -1,4 +1,4 @@
-# Phase 18 — Widget Blueprint family and widget trees
+# `widget-tree` — Widget Blueprint family and widget trees
 
 **Outcome:** Agents can create and safely modify the structural widget hierarchy of HUD and menu Widget Blueprints while retaining the established Blueprint compile, save, inspection, and graph contracts.
 
@@ -9,7 +9,7 @@
 - Add `widget_tree_edit` for one typed add, remove, rename, reparent, root, variable-exposure, or safe widget-default mutation. Resolve only live usable `UWidget` classes and preserve required roots, named slots, panel-child rules, ownership, and unrelated widget content.
 - Make hierarchy and slot identities explicit and require an authoritative Widget Blueprint snapshot for mutation. Bound tree depth, widget count, named-slot traversal, changed properties, references, diagnostics, and Game-thread work.
 - Support the common structural building blocks needed by HUDs and menus, including panels, text, images, buttons, progress bars, lists, and user-widget composition when their live classes and slot rules permit it. Exact class availability remains authoritative.
-- Keep detailed responsive layout, styles, delegate/property bindings, and Widget Blueprint-specific event wiring for Phase 19. Keep Widget animations and arbitrary Slate/C++ widget authoring outside scope.
+- Keep detailed responsive layout, styles, delegate/property bindings, and Widget Blueprint-specific event wiring for `umg-authoring`. Keep Widget animations and arbitrary Slate/C++ widget authoring outside scope.
 
 ### Verification
 
@@ -21,6 +21,6 @@
 ### Documentation and completion gate
 
 - Document Widget Blueprint capabilities, structural composition, supported tree operations, identity and reference rules, limits, and focused HUD/menu hierarchy examples.
-- Complete the phase only when representative widget trees can be created, modified, compiled, saved, restarted, and read back without altering unrelated Blueprint or Designer content on both native platforms.
+- Complete the feature only when representative widget trees can be created, modified, compiled, saved, restarted, and read back without altering unrelated Blueprint or Designer content on both native platforms.
 
 [Back to roadmap](../../ROADMAP.md) · [Shared roadmap contracts](index.md)

@@ -1,4 +1,4 @@
-# Phase 4 — Reliable mutations, Actor components, and defaults
+# `phase-4` — Reliable mutations, Actor components, and defaults
 
 **Outcome:** Agents can reliably reconcile mutation outcomes, build an Actor component hierarchy, and edit supported component and Blueprint class defaults without duplicate execution or ambiguous timeouts.
 

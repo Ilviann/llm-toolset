@@ -1,6 +1,10 @@
-# Phase 24 — Optional graceful editor shutdown
+# `editor-shutdown` — Optional graceful editor shutdown
 
 **Outcome:** Agents can opt in to gracefully shutting down only the configured authenticated editor instance without forced termination or data loss.
+
+**Depends on:**
+
+- [`editor-launch`](editor-launch.md)
 
 ### Implementation
 
@@ -18,6 +22,6 @@
 ### Documentation and completion gate
 
 - Document dirty-content policy, refusal states, disconnect semantics, cancellation, recovery, and default-mode exclusion.
-- Complete the phase only when configured graceful shutdown succeeds or refuses safely without arbitrary process control or data loss on native macOS and Windows.
+- Complete the feature only when configured graceful shutdown succeeds or refuses safely without arbitrary process control or data loss on native macOS and Windows.
 
 [Back to roadmap](../../ROADMAP.md) · [Shared roadmap contracts](index.md)

@@ -1,6 +1,10 @@
-# Phase 28 — Level discovery, safe opening, and snapshot foundations
+# `level-open` — Level discovery, safe opening, and snapshot foundations
 
 **Outcome:** Agents can discover mounted maps, safely open one exact map, and obtain a stable current-map snapshot suitable for bounded level inspection and stale-write protection.
+
+**Depends on:**
+
+- [`issue-1` resolution](../issues/issue-1.md)
 
 ### Implementation
 
@@ -22,6 +26,6 @@
 
 - Document `level_inspect` discovery/current-map modes, `level_open`, map identities, revisions, snapshots, cursors, refusal states, idempotency, and limits.
 - Add a bounded example that discovers maps, safely opens one clean target, and re-inspects the returned snapshot.
-- Complete the phase only when an agent can discover and safely open an exact map, obtain a restart-stable snapshot, and cannot cause implicit save or data loss.
+- Complete the feature only when an agent can discover and safely open an exact map, obtain a restart-stable snapshot, and cannot cause implicit save or data loss.
 
 [Back to roadmap](../../ROADMAP.md) · [Shared roadmap contracts](index.md)

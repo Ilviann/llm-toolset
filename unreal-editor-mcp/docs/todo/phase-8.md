@@ -1,4 +1,4 @@
-# Phase 8 — Action-catalog infrastructure and core actions
+# `phase-8` — Action-catalog infrastructure and core actions
 
 **Outcome:** Agents can discover a small bounded set of function-call and variable actions valid for one graph without guessing node classes or mutating the Blueprint.
 
@@ -9,7 +9,7 @@
 - Initially cover pure and impure function calls and variable get/set actions that pass the live graph, family, member, and optional pin-context filters.
 - Return opaque action IDs bound to the bridge instance, target Blueprint class, graph schema and identity, structural snapshot, normalized query, and rebuildable action signature.
 - Bound action-database scans, elapsed time, result count, encoded bytes, retained action records, cache lifetime, and concurrent catalog work. Publish the effective limits.
-- Keep this phase mutation-free. Node creation moves to Phase 11.
+- Keep this feature mutation-free. Node creation moves to `phase-11`.
 
 ### Verification
 

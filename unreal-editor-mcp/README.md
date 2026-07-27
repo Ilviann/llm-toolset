@@ -170,7 +170,7 @@ Create a Data Table from one exact live native `FTableRowBase` descendant or use
 
 `add_row`, `replace_row`, `rename_row`, and `remove_row` affect one named row. A mixed `batch` stages at most 64 combined upserts and removals before opening its transaction, so duplicate names, case conflicts, missing fields, overlaps, or one invalid value reject without partial changes. `preserve_unspecified: true` is explicit and valid only for an existing row; otherwise omitted fields take the row struct's live defaults.
 
-Every accepted game-data edit saves non-interactively and returns the new snapshot plus concise changed-name read-back. Unexpected save or read-back failure restores and re-saves the prior state. The focused shooter-balance sequence in [`examples/game-data-workflow.json`](examples/game-data-workflow.json) demonstrates schema creation, table creation, filtered inspection, a preserved partial replacement, an atomic batch, and safe schema-removal policy.
+Every accepted game-data edit saves non-interactively and returns the new snapshot plus concise changed-name read-back. Unexpected save or read-back failure restores and re-saves the prior state. The project-neutral data-table sequence in [`examples/game-data-workflow.json`](examples/game-data-workflow.json) demonstrates schema creation, table creation, filtered inspection, a preserved partial replacement, an atomic batch, and safe schema-removal policy.
 
 ## Blueprint action catalog
 

@@ -1,13 +1,13 @@
-# Phase 10 — Expanded action-catalog families
+# `phase-10` — Expanded action-catalog families
 
 **Outcome:** Agents can discover the remaining supported event, flow-control, cast, literal, and operator actions through the same bounded catalog contract.
 
 ### Implementation
 
 - Extend `blueprint_action_catalog` with event, flow-control, cast, literal, and common operator families that pass the live graph, Blueprint family, and optional pin-context filters.
-- Preserve the Phase 8 action-ID, rebuildable-signature, cache, expiry, snapshot, and scan-limit contracts without adding family-specific bypasses.
+- Preserve the `phase-8` action-ID, rebuildable-signature, cache, expiry, snapshot, and scan-limit contracts without adding family-specific bypasses.
 - Apply live schema filtering for unique events, latent calls, static and instance contexts, inherited members, local members, and incompatible graph types.
-- Keep the catalog mutation-free and keep node construction unavailable until Phase 11.
+- Keep the catalog mutation-free and keep node construction unavailable until `phase-11`.
 
 ### Verification
 

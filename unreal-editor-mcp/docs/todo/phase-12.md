@@ -1,4 +1,4 @@
-# Phase 12 — Pin defaults and direct connections
+# `phase-12` — Pin defaults and direct connections
 
 **Outcome:** Agents can set supported pin defaults and create or remove schema-valid direct connections without automatic conversion.
 

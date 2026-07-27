@@ -1,4 +1,4 @@
-# Phase 7 — Macros and custom events
+# `phase-7` — Macros and custom events
 
 **Outcome:** Agents can inspect and define macro shells and custom-event shells without confusing them with inherited, override, interface, or function-owned logic.
 

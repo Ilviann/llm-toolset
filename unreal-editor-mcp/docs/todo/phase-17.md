@@ -1,6 +1,6 @@
-# Phase 17 — User-defined structs and Data Tables
+# `phase-17` — User-defined structs and Data Tables
 
-**Outcome:** Agents can define bounded game-design row schemas and create, inspect, and update typed Data Tables for values such as weapon damage, ammunition, progression, and leveling curves.
+**Outcome:** Agents can define bounded game-design row schemas and create, inspect, and update typed Data Tables for values such as item attributes, configuration, progression, and leveling curves.
 
 **Status:** Completed in 0.16.0.
 
@@ -16,14 +16,14 @@
 
 ### Verification
 
-- Build representative weapon-stat, damage, ammunition, and level-progression schemas and tables; inspect, batch-edit, compile/save, restart, and read back exact typed values and references.
+- Build representative item-attribute, configuration, and level-progression schemas and tables; inspect, batch-edit, compile/save, restart, and read back exact typed values and references.
 - Test native and user-defined row structs, schema evolution, dependent tables/Blueprint references, duplicate names, unsupported types, missing fields, nested-depth and collection bounds, stale snapshots, partial-page cursors, and response truncation.
 - Test atomic batch failure, rollback/restoration, undo/redo where supported, save failure, timeout, replay, lost response, reload, and deletion/type-change rejection with unchanged dependent content.
 - Run the complete game-data suite through Python contract tests, native Automation, and the production bridge headless workflow.
 
 ### Documentation and completion gate
 
-- Document schema design, supported values, row operations, batching, dependency policy, limits, save/recovery behavior, and focused shooter-balance examples.
+- Document schema design, supported values, row operations, batching, dependency policy, limits, save/recovery behavior, and project-neutral data-table examples.
 - Complete the phase only when agents can create and maintain representative typed balance tables without filesystem import, unsafe serialization, or partial batch results.
 
 [Back to roadmap](../../ROADMAP.md) · [Shared roadmap contracts](index.md)

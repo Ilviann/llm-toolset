@@ -34,5 +34,7 @@ Keep responsibilities narrow and interfaces explicit. Do not include unrelated r
 
 - Test normal, invalid, limit, security, and platform behavior proportional to the change. Run the full affected app suite after behavior changes.
 - Update affected documentation and examples with the implementation.
-- Keep each roadmap phase usable and releasable. Maintain a checkbox phase checklist; for versioned apps, update the version after each completed phase (patch for fixes, minor for features, major only when requested) and synchronize all version sources and history.
+- Use short, meaningful alphanumeric roadmap feature IDs; `-` and `_` are allowed. Existing completed features may retain identifiers such as `phase-1` or `phase-12`.
+- Treat roadmap feature IDs as stable names. List every direct prerequisite under `Depends on:` in each dependent feature description, and allow features to complete out of order once those dependencies are complete.
+- Keep each roadmap feature usable and releasable. Maintain a checkbox feature checklist; for versioned apps, update the version after each completed feature (patch for fixes, minor for features, major only when requested) and synchronize all version sources and history.
 - Use focused commits with imperative subjects. PRs should cover behavior, resource impact, dependencies, security, and tests.

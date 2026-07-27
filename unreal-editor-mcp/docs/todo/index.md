@@ -1,58 +1,90 @@
-# Roadmap phase details
+# Roadmap feature details
 
-This directory contains the detailed implementation, verification, documentation, and completion requirements for every roadmap phase. [`ROADMAP.md`](../../ROADMAP.md) remains the concise phase checklist.
+This directory contains the detailed implementation, verification, documentation, and completion requirements for every roadmap feature. [`ROADMAP.md`](../../ROADMAP.md) remains the concise feature checklist.
 
 ## Roadmap workflow
 
-The target is Unreal Engine 5.8 and newer. macOS remains the primary development host. Platform validation belongs to each applicable feature phase rather than separate roadmap phases. Linux remains source-portable with unit-tested platform branches until a native host is available.
+The target is Unreal Engine 5.8 and newer. macOS remains the primary development host. Platform validation belongs to each applicable feature rather than separate roadmap features. Linux remains source-portable with unit-tested platform branches until a native host is available.
 
-Keep the authoritative checklist in [`ROADMAP.md`](../../ROADMAP.md) synchronized one-for-one with the phase documents below. Complete phases in order unless a phase explicitly permits parallel platform validation. Every phase must include implementation, tests, documentation, examples, and a releasable completion gate.
+Keep the authoritative checklist in [`ROADMAP.md`](../../ROADMAP.md) synchronized one-for-one with the feature documents below. Feature identifiers are stable names rather than execution indexes. A feature may be implemented and completed whenever every direct dependency listed in its description is complete. Every feature must include implementation, tests, documentation, examples, and a releasable completion gate.
 
-## Phase documents
+## Feature documents
 
-- [Phase 4 — Reliable mutations, Actor components, and defaults](phase-04.md) — Add reliable mutation delivery, Actor component editing, and Blueprint/component defaults.
-- [Phase 5 — Blueprint member variables](phase-05.md) — Add typed Blueprint member-variable inspection and editing.
-- [Phase 6 — Function signatures and local variables](phase-06.md) — Add function signatures, function shells, and local variables.
-- [Phase 7 — Macros and custom events](phase-07.md) — Add macro and custom-event shells with matching inspection.
-- [Phase 8 — Action-catalog infrastructure and core actions](phase-08.md) — Add the bounded action-catalog infrastructure and core actions.
-- [Phase 9 — C++ architecture and test decomposition](phase-09.md) — Split oversized native components and Automation Tests along cohesive internal boundaries without changing behavior.
-- [Phase 10 — Expanded action-catalog families](phase-10.md) — Expand the action catalog to the remaining supported action families.
-- [Phase 11 — Graph-node lifecycle](phase-11.md) — Add transactional graph-node creation, movement, and removal.
-- [Phase 12 — Pin defaults and direct connections](phase-12.md) — Add pin defaults and direct graph connections without automatic conversion.
-- [Phase 13 — Wildcards, conversions, and complete atomic graph editing](phase-13.md) — Add wildcard specialization, explicit conversion insertion, and complete atomic graph editing.
-- [Phase 14 — GameMode and GameState families](phase-14.md) — Formalize GameMode and GameState family support.
-- [Phase 15 — GameInstance family](phase-15.md) — Add GameInstance family support.
-- [Phase 16 — Multiplayer Blueprint authoring and framework assignment](phase-16.md) — Add RPC custom events, replication settings, and narrow GameMode/GameInstance project assignment.
-- [Phase 17 — User-defined structs and Data Tables](phase-17.md) — Add bounded row-schema and typed game-design table authoring.
-- [Phase 18 — Widget Blueprint family and widget trees](phase-18.md) — Add Widget Blueprint creation, inspection, compilation, saving, and widget-tree editing.
-- [Phase 19 — UMG layout, styling, bindings, and UI logic](phase-19.md) — Complete practical HUD and menu authoring on the Widget Blueprint family.
-- [Phase 20 — Complete function replacement](phase-20.md) — Add transactional replacement of one complete user-owned function.
-- [Phase 21 — Event, custom-event, and macro replacement](phase-21.md) — Extend bounded replacement to events, custom events, and macros.
-- [Phase 22 — Deterministic changed-node layout](phase-22.md) — Add deterministic layout for changed nodes.
-- [Phase 23 — Optional configured editor launch](phase-23.md) — Add optional configured editor launch.
-- [Phase 24 — Optional graceful editor shutdown](phase-24.md) — Add optional graceful editor shutdown.
-- [Phase 25 — Optional durable editor restart](phase-25.md) — Add optional durable editor restart.
-- [Phase 26 — Optional editor-offline project-file generation](phase-26.md) — Add optional editor-offline project-file generation.
-- [Phase 27 — Optional editor-target builds](phase-27.md) — Add optional editor-target builds.
-- [Phase 28 — Level discovery, safe opening, and snapshot foundations](phase-28.md) — Add bounded map discovery, explicit safe map opening, and restart-stable level snapshots.
-- [Phase 29 — World Partition actor and instance inspection](phase-29.md) — Inspect bounded descriptor, actor, component, and reflected instance state without loading the entire world.
-- [Phase 30 — Transactional level actor editing and verified saving](phase-30.md) — Add stale-safe actor batches and honest per-package World Partition save verification.
-- [Phase 31 — Spline component inspection and editing](phase-31.md) — Add bounded mixed-point spline inspection, mutation, persistence, and metadata safety.
-- [Phase 32 — Retained operations and single-process multiplayer PIE lifecycle](phase-32.md) — Start and stop observable single-process PIE sessions, including a listen server and remote client.
-- [Phase 33 — Per-world runtime actor inspection and attributed diagnostics](phase-33.md) — Inspect exact server/client worlds with session-scoped actor identities and proven log attribution.
-- [Phase 34 — Bounded PIE test commands, waits, and Canyon acceptance](phase-34.md) — Add allowlisted test actions and complete the single-process Canyon Infantry acceptance flow.
-- [Phase 35 — Multi-process PIE companion and cross-process observation](phase-35.md) — Extend retained sessions through an authenticated local runtime companion for owned PIE processes.
+- [`phase-4` — Reliable mutations, Actor components, and defaults](phase-4.md) — Add reliable mutation delivery, Actor component editing, and Blueprint/component defaults.
+- [`phase-5` — Blueprint member variables](phase-5.md) — Add typed Blueprint member-variable inspection and editing.
+- [`phase-6` — Function signatures and local variables](phase-6.md) — Add function signatures, function shells, and local variables.
+- [`phase-7` — Macros and custom events](phase-7.md) — Add macro and custom-event shells with matching inspection.
+- [`phase-8` — Action-catalog infrastructure and core actions](phase-8.md) — Add the bounded action-catalog infrastructure and core actions.
+- [`phase-9` — C++ architecture and test decomposition](phase-9.md) — Split oversized native components and Automation Tests along cohesive internal boundaries without changing behavior.
+- [`phase-10` — Expanded action-catalog families](phase-10.md) — Expand the action catalog to the remaining supported action families.
+- [`phase-11` — Graph-node lifecycle](phase-11.md) — Add transactional graph-node creation, movement, and removal.
+- [`phase-12` — Pin defaults and direct connections](phase-12.md) — Add pin defaults and direct graph connections without automatic conversion.
+- [`phase-13` — Wildcards, conversions, and complete atomic graph editing](phase-13.md) — Add wildcard specialization, explicit conversion insertion, and complete atomic graph editing.
+- [`phase-14` — GameMode and GameState families](phase-14.md) — Formalize GameMode and GameState family support.
+- [`phase-15` — GameInstance family](phase-15.md) — Add GameInstance family support.
+- [`phase-16` — Multiplayer Blueprint authoring and framework assignment](phase-16.md) — Add RPC custom events, replication settings, and narrow GameMode/GameInstance project assignment.
+- [`phase-17` — User-defined structs and Data Tables](phase-17.md) — Add bounded row-schema and typed game-design table authoring.
+- [`widget-tree` — Widget Blueprint family and widget trees](widget-tree.md) — Add Widget Blueprint creation, inspection, compilation, saving, and widget-tree editing.
+- [`umg-authoring` — UMG layout, styling, bindings, and UI logic](umg-authoring.md) — Complete practical HUD and menu authoring on the Widget Blueprint family.
+  - Depends on:
+    - `widget-tree`
+- [`function-replace` — Complete function replacement](function-replace.md) — Add transactional replacement of one complete user-owned function.
+- [`event-macro-replace` — Event, custom-event, and macro replacement](event-macro-replace.md) — Extend bounded replacement to events, custom events, and macros.
+  - Depends on:
+    - `function-replace`
+- [`node-layout` — Deterministic changed-node layout](node-layout.md) — Add deterministic layout for changed nodes.
+  - Depends on:
+    - `event-macro-replace`
+- [`editor-launch` — Optional configured editor launch](editor-launch.md) — Add optional configured editor launch.
+- [`editor-shutdown` — Optional graceful editor shutdown](editor-shutdown.md) — Add optional graceful editor shutdown.
+  - Depends on:
+    - `editor-launch`
+- [`editor-restart` — Optional durable editor restart](editor-restart.md) — Add optional durable editor restart.
+  - Depends on:
+    - `editor-launch`
+    - `editor-shutdown`
+- [`project-files` — Optional editor-offline project-file generation](project-files.md) — Add optional editor-offline project-file generation.
+  - Depends on:
+    - `editor-restart`
+- [`editor-build` — Optional editor-target builds](editor-build.md) — Add optional editor-target builds.
+  - Depends on:
+    - `project-files`
+- [`level-open` — Level discovery, safe opening, and snapshot foundations](level-open.md) — Add bounded map discovery, explicit safe map opening, and restart-stable level snapshots.
+  - Depends on:
+    - [`issue-1` resolution](../issues/issue-1.md)
+- [`level-inspect` — World Partition actor and instance inspection](level-inspect.md) — Inspect bounded descriptor, actor, component, and reflected instance state without loading the entire world.
+  - Depends on:
+    - `level-open`
+- [`level-edit` — Transactional level actor editing and verified saving](level-edit.md) — Add stale-safe actor batches and honest per-package World Partition save verification.
+  - Depends on:
+    - `level-inspect`
+- [`spline-edit` — Spline component inspection and editing](spline-edit.md) — Add bounded mixed-point spline inspection, mutation, persistence, and metadata safety.
+  - Depends on:
+    - `level-edit`
+- [`pie-lifecycle` — Retained operations and single-process multiplayer PIE lifecycle](pie-lifecycle.md) — Start and stop observable single-process PIE sessions, including a listen server and remote client.
+  - Depends on:
+    - `level-open`
+- [`pie-inspect` — Per-world runtime actor inspection and attributed diagnostics](pie-inspect.md) — Inspect exact server/client worlds with session-scoped actor identities and proven log attribution.
+  - Depends on:
+    - `pie-lifecycle`
+- [`pie-test` — Bounded PIE test commands, waits, and multiplayer acceptance](pie-test.md) — Add allowlisted test actions and complete a reusable single-process multiplayer acceptance flow.
+  - Depends on:
+    - `spline-edit`
+    - `pie-inspect`
+- [`pie-multiprocess` — Multi-process PIE companion and cross-process observation](pie-multiprocess.md) — Extend retained sessions through an authenticated local runtime companion for owned PIE processes.
+  - Depends on:
+    - `pie-test`
 
 ## Shared roadmap contracts
 
 ### Process boundary
 
-Through Phase 34, the application remains an exact-version pair:
+Through `pie-test`, the application remains an exact-version pair:
 
 1. A dependency-free Python 3.10+ MCP server using stdio JSON-RPC.
 2. An Unreal Editor C++ plugin using public editor APIs and a bounded authenticated localhost HTTP bridge.
 
-Phase 35 adds a minimal exact-version runtime companion module to the same plugin distribution for editor-owned multi-process PIE children. It connects outward to editor-owned authenticated IPC and does not expose a model-facing game listener.
+`pie-multiprocess` adds a minimal exact-version runtime companion module to the same plugin distribution for editor-owned multi-process PIE children. It connects outward to editor-owned authenticated IPC and does not expose a model-facing game listener.
 
 Python owns MCP framing, published schemas, exact argument validation, tool modes, project configuration, discovery, authenticated HTTP calls, timeouts, process orchestration, and stable error presentation. The C++ plugin owns credentials, listener lifecycle, authentication, Game-thread dispatch, Unreal object access, Blueprint operations, compiler diagnostics, transactions, package saving, mutation-result retention, and authoritative capabilities.
 
@@ -62,29 +94,29 @@ Deploy the Python package and C++ plugin as an exact-version pair. Report both v
 
 Keep the public surface compact. Add typed operations to these remaining tool families rather than publishing a separate tool for every native handler:
 
-| Tool | First phase | Responsibility |
-| --- | ---: | --- |
-| `operation_status` | 4 | Resolve the retained outcome of one mutation operation without executing it again |
-| `blueprint_component_edit` | 4 | Perform one typed component-hierarchy or component-default mutation |
-| `blueprint_default_edit` | 4 | Set one supported Blueprint class-default property |
-| `blueprint_member_edit` | 5 | Perform one typed variable, function, macro, or custom-event mutation |
-| `blueprint_action_catalog` | 8 | Discover a bounded set of context-valid graph actions without mutation |
-| `blueprint_graph_edit` | 11 | Perform one typed node, pin, connection, position, or removal mutation |
-| `gameplay_framework_edit` | 16 | Assign only the configured project's default GameMode or GameInstance class |
-| `game_data_inspect` | 17 | Inspect one bounded user-defined struct or Data Table schema/row page |
-| `game_data_edit` | 17 | Create or mutate one bounded user-defined struct or Data Table transaction |
-| `widget_tree_edit` | 18 | Perform one typed Widget Blueprint tree, widget-default, slot, layout, style, or binding mutation |
-| `blueprint_block_replace` | 20 | Replace one complete bounded logic unit as a prevalidated transaction |
-| `editor_lifecycle` | 23 | Run one opt-in configured launch, restart, or graceful-shutdown operation |
-| `project_build` | 26 | Run one opt-in configured project-generation or editor-target build operation |
-| `level_inspect` | 28 | Discover mounted maps and inspect bounded current-map, actor, component, property, and spline snapshot pages |
-| `level_open` | 28 | Safely open one exact mounted map without implicit save or discard |
-| `level_actor_edit` | 30 | Apply one stale-safe bounded actor/component/spline mutation batch in the current map |
-| `level_save` | 30 | Save and verify the current map and explicit affected external-actor packages |
-| `play_session_start` | 32 | Start one retained bounded PIE topology with exact effective settings and instance identities |
-| `play_session_stop` | 32 | Idempotently stop one retained PIE session and report cleanup |
-| `play_session_inspect` | 33 | Inspect one retained session or exact runtime world with bounded actor/property/log pages |
-| `play_session_command` | 34 | Run one allowlisted test action or bounded wait against an exact retained session instance |
+| Tool | First feature | Responsibility |
+| --- | --- | --- |
+| `operation_status` | `phase-4` | Resolve the retained outcome of one mutation operation without executing it again |
+| `blueprint_component_edit` | `phase-4` | Perform one typed component-hierarchy or component-default mutation |
+| `blueprint_default_edit` | `phase-4` | Set one supported Blueprint class-default property |
+| `blueprint_member_edit` | `phase-5` | Perform one typed variable, function, macro, or custom-event mutation |
+| `blueprint_action_catalog` | `phase-8` | Discover a bounded set of context-valid graph actions without mutation |
+| `blueprint_graph_edit` | `phase-11` | Perform one typed node, pin, connection, position, or removal mutation |
+| `gameplay_framework_edit` | `phase-16` | Assign only the configured project's default GameMode or GameInstance class |
+| `game_data_inspect` | `phase-17` | Inspect one bounded user-defined struct or Data Table schema/row page |
+| `game_data_edit` | `phase-17` | Create or mutate one bounded user-defined struct or Data Table transaction |
+| `widget_tree_edit` | `widget-tree` | Perform one typed Widget Blueprint tree, widget-default, slot, layout, style, or binding mutation |
+| `blueprint_block_replace` | `function-replace` | Replace one complete bounded logic unit as a prevalidated transaction |
+| `editor_lifecycle` | `editor-launch` | Run one opt-in configured launch, restart, or graceful-shutdown operation |
+| `project_build` | `project-files` | Run one opt-in configured project-generation or editor-target build operation |
+| `level_inspect` | `level-open` | Discover mounted maps and inspect bounded current-map, actor, component, property, and spline snapshot pages |
+| `level_open` | `level-open` | Safely open one exact mounted map without implicit save or discard |
+| `level_actor_edit` | `level-edit` | Apply one stale-safe bounded actor/component/spline mutation batch in the current map |
+| `level_save` | `level-edit` | Save and verify the current map and explicit affected external-actor packages |
+| `play_session_start` | `pie-lifecycle` | Start one retained bounded PIE topology with exact effective settings and instance identities |
+| `play_session_stop` | `pie-lifecycle` | Idempotently stop one retained PIE session and report cleanup |
+| `play_session_inspect` | `pie-inspect` | Inspect one retained session or exact runtime world with bounded actor/property/log pages |
+| `play_session_command` | `pie-test` | Run one allowlisted test action or bounded wait against an exact retained session instance |
 
 Lifecycle and build tools remain absent from the default model context. Use an opt-in large mode for them. Measure the Blueprint schemas and use nested operation discriminators if context cost becomes excessive; the default mode must still support the complete Blueprint-authoring workflow.
 
@@ -124,7 +156,7 @@ Lifecycle and build tools remain absent from the default model context. Use an o
 - Give sessions, operations, instances, world contexts, runtime actors, logs, and tests explicit bounded identities. Require both session and instance/world identity for every world-specific query or action.
 - A two-player listen server has a listen-server/host world and one remote-client world. Use a dedicated server plus two clients when three separate worlds are required.
 - Publish supported topology, player/client, process-mode, inspection, command, wait, and test policies through `capabilities`; reject unsupported modes rather than falling back to mutable editor preferences.
-- Single-process inspection remains editor-owned. Multi-process observation requires the Phase 35 exact-version companion and authenticated editor-owned IPC; never guess or scrape state from foreign child processes.
+- Single-process inspection remains editor-owned. Multi-process observation requires the `pie-multiprocess` exact-version companion and authenticated editor-owned IPC; never guess or scrape state from foreign child processes.
 - Allow only configured console commands, named tests, plugin-marked reflected test functions, and bounded predicates. Do not expose arbitrary input injection, `ProcessEvent`, runtime reflection mutation, or unrestricted console execution.
 - Return only diagnostics with a proven originating process/PIE instance. Exclude unattributable raw log entries instead of assigning them heuristically.
 
@@ -138,24 +170,24 @@ Lifecycle and build tools remain absent from the default model context. Use an o
 
 ### Release discipline
 
-Increment the minor version after each completed feature phase and the patch version for fixes or behavior-preserving refactoring phases. A major-version promotion requires a separate explicit decision. Keep Python metadata, `.uplugin` metadata, runtime capabilities, tests, README, examples, and `HISTORY.md` synchronized after every phase. Phase sections do not repeat version-update tasks.
+Increment the minor version after each completed feature and the patch version for fixes or behavior-preserving refactoring. A major-version promotion requires a separate explicit decision. Keep Python metadata, `.uplugin` metadata, runtime capabilities, tests, README, examples, and `HISTORY.md` synchronized after every feature. Feature documents do not repeat version-update tasks.
 
 ## Deferred and excluded scope
 
 The following are not part of the committed remaining roadmap unless separately authorized:
 
-- Arbitrary selected-region block replacement beyond the complete logic-unit boundaries supported in Phases 20 and 21.
+- Arbitrary selected-region block replacement beyond the complete logic-unit boundaries supported in `function-replace` and `event-macro-replace`.
 - General filesystem access or C++ source modification.
 - Arbitrary shell commands, compiler arguments, console commands, UObject calls, unrestricted reflection mutation, expressions, or supplied-code evaluation.
 - Unrestricted whole-Blueprint text import/export or wholesale Blueprint replacement.
-- Blueprint reparenting, project-settings mutation beyond the narrow Phase 16 gameplay-framework assignments, timelines, event-dispatcher authoring, interface authoring, and specialized asset families not named in this roadmap.
+- Blueprint reparenting, project-settings mutation beyond the narrow `phase-16` gameplay-framework assignments, timelines, event-dispatcher authoring, interface authoring, and specialized asset families not named in this roadmap.
 - Level Blueprint, Animation Blueprint, Control Rig, Niagara, Material, Behavior Tree, StateTree, or Widget-animation authoring.
 - General Play-in-Editor input injection, screenshots, runtime object mutation beyond exact configured test functions, arbitrary gameplay assertions, or unrestricted raw-log capture.
 - Cloud services, accounts, telemetry, dependency downloads, or a model-facing game-side network listener.
 
 ## Primary Unreal 5.8 API references
 
-These references establish feasibility only. Each owning phase must add compiled public-header probes and behavioral tests before freezing its model-facing contract:
+These references establish feasibility only. Each owning feature must add compiled public-header probes and behavioral tests before freezing its model-facing contract:
 
 - [FScopedTransaction](https://dev.epicgames.com/documentation/en-us/unreal-engine/API/Editor/UnrealEd/FScopedTransaction)
 - [FAssetRegistryModule](https://dev.epicgames.com/documentation/en-us/unreal-engine/API/Runtime/AssetRegistry/FAssetRegistryModule)

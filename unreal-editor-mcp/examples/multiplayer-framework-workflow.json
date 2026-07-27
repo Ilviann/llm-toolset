@@ -8,7 +8,7 @@
     "tool": "blueprint_default_edit",
     "arguments": {
       "operation_id": "11111111111111111111111111111111",
-      "asset_path": "/Game/Characters/BP_Soldier.BP_Soldier",
+      "asset_path": "/Game/Examples/BP_ReplicatedActor.BP_ReplicatedActor",
       "expected_snapshot": "0123456789abcdef0123456789abcdef01234567",
       "replication_setting": "replicates",
       "value": true
@@ -18,7 +18,7 @@
     "tool": "blueprint_default_edit",
     "arguments": {
       "operation_id": "22222222222222222222222222222222",
-      "asset_path": "/Game/Characters/BP_Soldier.BP_Soldier",
+      "asset_path": "/Game/Examples/BP_ReplicatedActor.BP_ReplicatedActor",
       "expected_snapshot": "1111111111111111111111111111111111111111",
       "replication_setting": "replicate_movement",
       "value": true
@@ -28,7 +28,7 @@
     "tool": "blueprint_component_edit",
     "arguments": {
       "operation_id": "33333333333333333333333333333333",
-      "asset_path": "/Game/Characters/BP_Soldier.BP_Soldier",
+      "asset_path": "/Game/Examples/BP_ReplicatedActor.BP_ReplicatedActor",
       "expected_snapshot": "2222222222222222222222222222222222222222",
       "operation": "set_replication",
       "component_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -39,15 +39,15 @@
     "tool": "blueprint_member_edit",
     "arguments": {
       "operation_id": "44444444444444444444444444444444",
-      "asset_path": "/Game/Characters/BP_Soldier.BP_Soldier",
+      "asset_path": "/Game/Examples/BP_ReplicatedActor.BP_ReplicatedActor",
       "expected_snapshot": "3333333333333333333333333333333333333333",
       "target": "custom_event",
       "operation": "add",
       "graph_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "name": "ServerFire",
+      "name": "ServerAction",
       "signature": {
         "parameters": [
-          {"name": "AimOrigin", "type": {"category": "struct", "container": "none", "type_object": "/Script/CoreUObject.Vector"}}
+          {"name": "ActionOrigin", "type": {"category": "struct", "container": "none", "type_object": "/Script/CoreUObject.Vector"}}
         ]
       },
       "metadata": {"category": "Networking", "rpc_mode": "server", "reliability": "reliable"}
@@ -59,7 +59,7 @@
       "operation_id": "55555555555555555555555555555555",
       "project_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "setting": "default_game_mode",
-      "class_path": "/Game/Framework/BP_ShooterGameMode.BP_ShooterGameMode_C",
+      "class_path": "/Game/Examples/BP_ExampleGameMode.BP_ExampleGameMode_C",
       "expected_class": "/Script/Engine.GameModeBase"
     }
   },
@@ -69,7 +69,7 @@
       "operation_id": "66666666666666666666666666666666",
       "project_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "setting": "default_game_instance",
-      "class_path": "/Game/Framework/BP_ShooterGameInstance.BP_ShooterGameInstance_C",
+      "class_path": "/Game/Examples/BP_ExampleGameInstance.BP_ExampleGameInstance_C",
       "expected_class": "/Script/Engine.GameInstance"
     }
   }
