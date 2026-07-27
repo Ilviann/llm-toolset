@@ -8,7 +8,7 @@
 
 ### Implementation
 
-- Resolve the open Windows exact-snapshot instability in [`../issues/issue-1.md`](../issues/issue-1.md) before reusing snapshot infrastructure for level persistence. Preserve meaningful structural differences rather than weakening equality checks.
+- Reuse the exact-snapshot infrastructure only with the resolved Windows canonicalization in [`../issues/issue-1.md`](../issues/issue-1.md). Preserve meaningful structural differences rather than weakening equality checks.
 - Add `level_inspect` discovery and current-map-summary modes. Discover mounted World assets through the Asset Registry with bounded scans, pages, cursors, and concise map records.
 - Add a separate ledger-backed `level_open` tool. Accept one mounted map asset path and caller-generated `operation_id`; never accept a filesystem path.
 - Reject map switching while the current map is dirty, PIE or simulation is active, saving or garbage collection is active, another conflicting operation is retained, or editor state cannot be proven safe. Do not implicitly save, discard, or prompt.

@@ -2,9 +2,13 @@
 
 ## Unreleased
 
+## 0.17.1 — 2026-07-27
+
 - Added a Windows tkinter deployment helper that selects an existing Unreal project, discovers or validates its Engine installation, builds an installed Win64 plugin with the local Visual Studio toolchain, strips implementation source and external debug artifacts while retaining module rules and precompiled metadata, and installs it with replace-safe staging.
 - The deployment GUI initializes its Engine selection from `UNREAL_MCP_ENGINE_ROOT` and preserves a valid configured value when the project is selected.
 - Added one-click LM Studio JSON generation for the selected checkout and `.uproject`, plus focused offline tests and deployment architecture/contracts.
+- Fixed first-reload Blueprint snapshot instability by excluding only UE 5.8's hidden, untyped, unlinked, default-free `ErrorTolerance` pin on promotable operators from model-facing pin identities and structural fingerprints; typed or otherwise meaningful tolerance pins remain structural.
+- Added native regression coverage for the regenerated tolerance-pin GUID and verified the exact production-created Blueprint snapshot across the Windows cross-process restart workflow.
 
 ## 0.17.0 — 2026-07-27
 

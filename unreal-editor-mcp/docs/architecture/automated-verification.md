@@ -6,7 +6,7 @@
 
 ## Native boundary
 
-`Private/Tests/UnrealMCPAutomationTestSupport.h` owns shared fixture construction, argument builders, inspection helpers, snapshot tracking, save support, and cleanup conventions. Phase 17 adds `GameDataAuthoring`, bringing the suite to 30 native cases. `UnrealMCPApiProbe.cpp` keeps public structure-editor and Data Table APIs in the normal compatibility build.
+`Private/Tests/UnrealMCPAutomationTestSupport.h` owns shared fixture construction, argument builders, inspection helpers, snapshot tracking, save support, and cleanup conventions. Phase 17 adds `GameDataAuthoring`, and the lifecycle protocol case brings the suite to 30 native cases. Phase 13 also covers canonical omission of UE 5.8's regenerated inert promotable-operator tolerance pin. `UnrealMCPApiProbe.cpp` keeps public structure-editor and Data Table APIs in the normal compatibility build.
 
 Normal/adaptive and forced-unity module builds are both required. Private implementation headers include their explicit Unreal dependencies, use named internal namespaces, and remain valid when Unreal Build Tool combines family translation units.
 
@@ -16,4 +16,4 @@ Normal/adaptive and forced-unity module builds are both required. Private implem
 
 The cross-process workflow also authors every gameplay-framework family, typed Actor replication, a reliable server RPC, assigned default GameMode/GameInstance classes, one weapon-stat user-defined struct, and one typed balance table. It restarts, restores the native framework defaults with exact stale checks, and verifies RPC/default/schema/row identities and values.
 
-The Windows workflow currently reaches the first clean restart but fails the exact snapshot comparison for the Blueprint created through the production bridge. This confirmed unfixed error is tracked as [`issue-1`](../issues/issue-1.md).
+The Windows workflow passes the strict first-restart comparison for the Blueprint created through the production bridge. The resolved instability and exact changing field are recorded in [`issue-1`](../issues/issue-1.md).

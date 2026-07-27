@@ -169,7 +169,7 @@ for (const TPair<UEdGraph*, FString>& Entry : Graphs)
             + FString::Printf(TEXT("|%d|%d"), Node->NodePosX, Node->NodePosY));
         for (UEdGraphPin* Pin : Node->Pins)
         {
-            if (Pin == nullptr) continue;
+            if (!IsStructuralGraphPin(Node, Pin)) continue;
             const FString PinId = GuidString(Pin->PinId);
             if (Sections.Contains(TEXT("pins")))
             {

@@ -51,7 +51,7 @@ Keep the authoritative checklist in [`ROADMAP.md`](../../ROADMAP.md) synchronize
     - `project-files`
 - [`level-open` — Level discovery, safe opening, and snapshot foundations](level-open.md) — Add bounded map discovery, explicit safe map opening, and restart-stable level snapshots.
   - Depends on:
-    - [`issue-1` resolution](../issues/issue-1.md)
+    - [`issue-1` resolution](../issues/issue-1.md) — resolved in 0.17.1
 - [`level-inspect` — World Partition actor and instance inspection](level-inspect.md) — Inspect bounded descriptor, actor, component, and reflected instance state without loading the entire world.
   - Depends on:
     - `level-open`

@@ -2,13 +2,13 @@
 
 ## Status
 
-Open and reproducible on Windows with Unreal Engine 5.8.
+Resolved in 0.17.1 and verified on Windows with Unreal Engine 5.8.
 
 ## Summary
 
-A Blueprint created, edited, compiled, and saved through the production Unreal MCP bridge returns one structural snapshot before shutdown and a different snapshot after the first clean editor restart. The cross-process acceptance workflow requires these snapshots to match exactly and fails when they differ.
+A Blueprint created, edited, compiled, and saved through the production Unreal MCP bridge previously returned one structural snapshot before shutdown and a different snapshot after the first clean editor restart.
 
-This is not an editor-launch or Windows SDK failure. The Win64 SDK is valid, the plugin builds, all 31 native Unreal Automation cases pass, both editor processes start successfully, and the restarted process can inspect the saved asset.
+This is not an editor-launch or Windows SDK failure. The Win64 SDK is valid, the plugin builds, all 30 native Unreal Automation cases pass, both editor processes start successfully, and the restarted process can inspect the saved asset.
 
 ## Reproduction
 
@@ -40,17 +40,20 @@ AssertionError: created Blueprint snapshot changed after editor restart
 - Persistence of the authored Blueprint cannot currently be certified against the released exact-snapshot contract on its first reload.
 - Python boundary tests, native Unreal Automation tests, and Windows compilation remain usable and passing.
 
-## Current workaround
+## Root cause
 
-There is no accepted workaround that preserves the exact post-save-to-first-reload contract. Do not replace the equality assertion with a weaker check. The fixed Phase 2 persistence fixture may use its first loaded snapshot as the baseline for a second restart, but that behavior does not satisfy the stricter production-created Blueprint contract.
+UE 5.8 regenerates the GUID of one hidden `ErrorTolerance` input pin on a specialized `K2Node_PromotableOperator` during the first asset reload. The pin is untyped (`PinCategory` is `None`), unlinked, and has no string, object, or text default. The graph, node, three real operator pins, defaults, and connections remain identical. The changing pin contributed one otherwise identical fingerprint line, so its regenerated GUID alone changed the SHA-1 snapshot.
 
-## Investigation notes
+## Resolution
 
-The failure is isolated to snapshot stability after persistence. Likely investigation areas include Unreal save-time versus load-time normalization, reconstructed graph or pin identities, serialized default values, and snapshot fields whose canonical representation changes on initial reload. The differing snapshot inputs must be identified before changing production behavior or the contract.
+Inspection and graph-edit result encoding now omit only this exact editor-derived pin state: a hidden, untyped, unlinked, default-free `ErrorTolerance` input owned by `K2Node_PromotableOperator`. Graph edits cannot resolve that omitted identity, and changed-node pin counts, bounds, created identities, and reconstruction tracking use the same canonical pin set. A typed, visible, linked, or default-bearing tolerance pin remains model-facing and structural.
 
-## Resolution criteria
+The exact snapshot assertion remains unchanged. Native coverage reproduces the derived pin, verifies it is omitted, and proves changing only its GUID cannot change the snapshot. The full Windows production bridge workflow now retains the exact post-save snapshot across the first clean restart.
 
-- Identify and document the exact snapshot fields that change.
-- Correct save, load, inspection, or canonicalization behavior without hiding a meaningful structural change.
-- Pass the full Windows cross-process workflow with an exact post-save-to-first-restart snapshot match.
-- Preserve all Python and native Unreal Automation results.
+## Verification
+
+- Normal adaptive Win64 editor build.
+- Forced-unity Win64 editor build.
+- Python boundary suite.
+- Native Unreal Automation, including the Phase 13 regression.
+- Full Windows cross-process workflow with exact post-save-to-first-restart equality.

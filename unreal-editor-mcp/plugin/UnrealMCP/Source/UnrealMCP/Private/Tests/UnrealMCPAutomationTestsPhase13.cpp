@@ -57,15 +57,26 @@ bool FUnrealMCPPhase13AtomicGraphEditingTest::RunTest(const FString& Parameters)
     FTypePromotion::ClearNodeSpawners();
     FBlueprintActionDatabase::Get().RefreshAll();
     UBlueprintFunctionNodeSpawner* OperatorSpawner = FTypePromotion::GetOperatorSpawner(TEXT("Add"));
+    UBlueprintFunctionNodeSpawner* ComparisonSpawner = FTypePromotion::GetOperatorSpawner(TEXT("EqualEqual"));
     UK2Node_PromotableOperator* AddOperator = nullptr;
+    UK2Node_PromotableOperator* ComparisonOperator = nullptr;
     if (OperatorSpawner != nullptr)
     {
         IBlueprintNodeBinder::FBindingSet Bindings;
         AddOperator = Cast<UK2Node_PromotableOperator>(OperatorSpawner->Invoke(Graph, Bindings, FVector2D(320.0, 240.0)));
     }
+    if (ComparisonSpawner != nullptr)
+    {
+        IBlueprintNodeBinder::FBindingSet Bindings;
+        ComparisonOperator = Cast<UK2Node_PromotableOperator>(
+            ComparisonSpawner->Invoke(Graph, Bindings, FVector2D(320.0, 420.0)));
+    }
     if (!TestNotNull(TEXT("wildcard add operator is available"), AddOperator)) return false;
+    if (!TestNotNull(TEXT("wildcard comparison operator is available"), ComparisonOperator)) return false;
     if (!AddOperator->NodeGuid.IsValid()) AddOperator->CreateNewGuid();
+    if (!ComparisonOperator->NodeGuid.IsValid()) ComparisonOperator->CreateNewGuid();
     for (UEdGraphPin* Pin : AddOperator->Pins) if (Pin != nullptr && !Pin->PinId.IsValid()) Pin->PinId = FGuid::NewGuid();
+    for (UEdGraphPin* Pin : ComparisonOperator->Pins) if (Pin != nullptr && !Pin->PinId.IsValid()) Pin->PinId = FGuid::NewGuid();
     FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(Blueprint);
 
     FUnrealMCPBlueprintInspector Inspector;
@@ -146,6 +157,37 @@ bool FUnrealMCPPhase13AtomicGraphEditingTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("specialization remains direct"), Connection->GetBoolField(TEXT("direct")));
     TestTrue(TEXT("specialization returns reconstructed identities"), Result->GetArrayField(TEXT("reconstructed_identities")).Num() > 1);
     TestTrue(TEXT("specialized operator input is integer"), AddOperator->FindPinChecked(TEXT("A"), EGPD_Input)->PinType.PinCategory == UEdGraphSchema_K2::PC_Int);
+
+    TestTrue(TEXT("integer comparison specializes without conversion opt-in"), Connect(Editor, LiteralLimit,
+        LiteralLimit->FindPinChecked(UEdGraphSchema_K2::PN_ReturnValue, EGPD_Output), ComparisonOperator,
+        ComparisonOperator->FindPinChecked(TEXT("A"), EGPD_Input), false));
+    UEdGraphPin* DerivedTolerance = ComparisonOperator->FindPin(TEXT("ErrorTolerance"), EGPD_Input);
+    if (!TestNotNull(TEXT("integer comparison retains Unreal's derived tolerance pin"), DerivedTolerance)) return false;
+    TestTrue(TEXT("derived tolerance pin is hidden"), DerivedTolerance->bHidden);
+    TestTrue(TEXT("derived tolerance pin is untyped"), DerivedTolerance->PinType.PinCategory.IsNone());
+    TestEqual(TEXT("derived tolerance pin is unlinked"), DerivedTolerance->LinkedTo.Num(), 0);
+    TSharedRef<FJsonObject> PinInspection = InspectArguments(AssetPath);
+    PinInspection->SetArrayField(TEXT("sections"), {MakeShared<FJsonValueString>(TEXT("pins"))});
+    PinInspection->SetStringField(TEXT("graph_id"), GraphId);
+    TestTrue(TEXT("specialized comparison pins inspect"), Inspector.Execute(PinInspection, Result, Error));
+    int32 DerivedToleranceRecords = 0;
+    for (const TSharedPtr<FJsonValue>& Item : Result->GetArrayField(TEXT("records")))
+    {
+        const TSharedPtr<FJsonObject>* PinRecord = nullptr;
+        FString NodeId;
+        FString PinName;
+        if (Item.IsValid() && Item->TryGetObject(PinRecord) && PinRecord != nullptr && PinRecord->IsValid()
+            && (*PinRecord)->TryGetStringField(TEXT("node_id"), NodeId) && NodeId == Id(ComparisonOperator->NodeGuid)
+            && (*PinRecord)->TryGetStringField(TEXT("name"), PinName) && PinName == TEXT("ErrorTolerance"))
+        {
+            ++DerivedToleranceRecords;
+        }
+    }
+    TestEqual(TEXT("regenerated hidden tolerance pin is omitted from inspection"), DerivedToleranceRecords, 0);
+    const FString BeforeDerivedToleranceGuid = InspectSnapshot(Inspector, AssetPath);
+    DerivedTolerance->PinId = FGuid::NewGuid();
+    TestEqual(TEXT("regenerated hidden tolerance identity does not change the structural snapshot"),
+        InspectSnapshot(Inspector, AssetPath), BeforeDerivedToleranceGuid);
 
     TestTrue(TEXT("first execution edge connects"), Connect(Editor, PrintOne,
         PrintOne->FindPinChecked(UEdGraphSchema_K2::PN_Then, EGPD_Output), PrintTwo,

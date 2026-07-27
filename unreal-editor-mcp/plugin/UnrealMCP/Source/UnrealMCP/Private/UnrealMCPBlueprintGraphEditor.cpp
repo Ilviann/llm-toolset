@@ -24,6 +24,8 @@
 namespace UnrealMCP::BlueprintGraphEditorPrivate
 {
 using namespace UnrealMCP::BlueprintMutationPrivate;
+using UnrealMCP::BlueprintInspectionPrivate::IsStructuralGraphPin;
+using UnrealMCP::BlueprintInspectionPrivate::StructuralGraphPinCount;
 
 struct FGraphEditRequest
 {
@@ -210,7 +212,8 @@ static UEdGraphPin* FindPin(UEdGraphNode* Node, const FString& PinId)
 {
     if (Node == nullptr) return nullptr;
     for (UEdGraphPin* Pin : Node->Pins)
-        if (Pin != nullptr && Pin->GetOwningNodeUnchecked() == Node && GuidString(Pin->PinId) == PinId) return Pin;
+        if (IsStructuralGraphPin(Node, Pin) && Pin->GetOwningNodeUnchecked() == Node
+            && GuidString(Pin->PinId) == PinId) return Pin;
     return nullptr;
 }
 
@@ -252,11 +255,9 @@ static TSharedRef<FJsonObject> EncodeNode(UEdGraph* Graph, UEdGraphNode* Node)
     TArray<TSharedPtr<FJsonValue>> Pins;
     if (Node != nullptr)
     {
-        const int32 Count = FMath::Min(Node->Pins.Num(), UnrealMCP::MaxGraphPinsPerNode);
-        for (int32 Index = 0; Index < Count; ++Index)
+        for (const UEdGraphPin* Pin : Node->Pins)
         {
-            const UEdGraphPin* Pin = Node->Pins[Index];
-            if (Pin == nullptr) continue;
+            if (!IsStructuralGraphPin(Node, Pin) || Pins.Num() >= UnrealMCP::MaxGraphPinsPerNode) continue;
             const TSharedRef<FJsonObject> PinRecord = MakeShared<FJsonObject>();
             PinRecord->SetStringField(TEXT("id"), GuidString(Pin->PinId));
             PinRecord->SetBoolField(TEXT("identity_stable"), Pin->PinId.IsValid());
@@ -271,7 +272,7 @@ static TSharedRef<FJsonObject> EncodeNode(UEdGraph* Graph, UEdGraphNode* Node)
         }
     }
     Record->SetArrayField(TEXT("pins"), Pins);
-    Record->SetNumberField(TEXT("pin_count"), Node != nullptr ? Node->Pins.Num() : 0);
+    Record->SetNumberField(TEXT("pin_count"), StructuralGraphPinCount(Node));
     return Record;
 }
 
@@ -311,7 +312,7 @@ static FNodeIdentityState CaptureNodeIdentity(UEdGraphNode* Node)
         State.Pins.Reserve(Node->Pins.Num());
         for (UEdGraphPin* Pin : Node->Pins)
         {
-            if (Pin == nullptr) continue;
+            if (!IsStructuralGraphPin(Node, Pin)) continue;
             State.Pins.Add({GuidString(Pin->PinId), Pin->PersistentGuid, Pin->PinName, Pin->Direction, Pin->PinType, Pin});
         }
     }
@@ -327,7 +328,7 @@ static UEdGraphPin* ResolveReconstructedPin(UEdGraphNode* Node, const FPinIdenti
         UEdGraphPin* Match = nullptr;
         for (UEdGraphPin* Pin : Node->Pins)
         {
-            if (Pin != nullptr && Pin->PersistentGuid == Before.PersistentGuid)
+            if (IsStructuralGraphPin(Node, Pin) && Pin->PersistentGuid == Before.PersistentGuid)
             {
                 if (Match != nullptr) return nullptr;
                 Match = Pin;
@@ -338,7 +339,7 @@ static UEdGraphPin* ResolveReconstructedPin(UEdGraphNode* Node, const FPinIdenti
     UEdGraphPin* Match = nullptr;
     for (UEdGraphPin* Pin : Node->Pins)
     {
-        if (Pin != nullptr && Pin->PinName == Before.Name && Pin->Direction == Before.Direction)
+        if (IsStructuralGraphPin(Node, Pin) && Pin->PinName == Before.Name && Pin->Direction == Before.Direction)
         {
             if (Match != nullptr) return nullptr;
             Match = Pin;
@@ -349,7 +350,8 @@ static UEdGraphPin* ResolveReconstructedPin(UEdGraphNode* Node, const FPinIdenti
 
 static bool WasNodeReconstructed(UEdGraphNode* LiveNode, const FNodeIdentityState& Before)
 {
-    if (LiveNode == nullptr || LiveNode != Before.Pointer || LiveNode->Pins.Num() != Before.Pins.Num()) return true;
+    if (LiveNode == nullptr || LiveNode != Before.Pointer
+        || StructuralGraphPinCount(LiveNode) != Before.Pins.Num()) return true;
     for (const FPinIdentityState& PinBefore : Before.Pins)
     {
         UEdGraphPin* LivePin = ResolveReconstructedPin(LiveNode, PinBefore);
@@ -436,7 +438,7 @@ static void AddNodeAndPinIdentities(UEdGraphNode* Node, TSet<FString>& OutIdenti
     if (Node == nullptr || !Node->NodeGuid.IsValid()) return;
     OutIdentities.Add(GuidString(Node->NodeGuid));
     for (const UEdGraphPin* Pin : Node->Pins)
-        if (Pin != nullptr && Pin->PinId.IsValid()) OutIdentities.Add(GuidString(Pin->PinId));
+        if (IsStructuralGraphPin(Node, Pin) && Pin->PinId.IsValid()) OutIdentities.Add(GuidString(Pin->PinId));
 }
 
 static TArray<TSharedPtr<FJsonValue>> EncodeIdentities(const TSet<FString>& Identities)
@@ -584,7 +586,8 @@ static bool ExecutePinEdit(
             OutError = {TEXT("invalid_connection"), TEXT("Direct connections require an output from_pin and input to_pin")};
             return false;
         }
-        if (FromNode->Pins.Num() > UnrealMCP::MaxGraphPinsPerNode || ToNode->Pins.Num() > UnrealMCP::MaxGraphPinsPerNode)
+        if (StructuralGraphPinCount(FromNode) > UnrealMCP::MaxGraphPinsPerNode
+            || StructuralGraphPinCount(ToNode) > UnrealMCP::MaxGraphPinsPerNode)
         {
             OutError = {TEXT("graph_limit_exceeded"), TEXT("One requested endpoint exceeds the changed-node pin limit")};
             return false;
@@ -730,10 +733,12 @@ static bool ExecutePinEdit(
     {
         InsertedNodeSet.Add(Node);
         bInsertedNodesStable &= Node->GetGraph() == Graph && Node->GetOuter() == Graph && Node->NodeGuid.IsValid()
-            && Node->Pins.Num() <= UnrealMCP::MaxGraphPinsPerNode;
+            && StructuralGraphPinCount(Node) <= UnrealMCP::MaxGraphPinsPerNode;
         for (const UEdGraphPin* Pin : Node->Pins)
-            bInsertedNodesStable &= Pin != nullptr && Pin->PinId.IsValid()
-                && Pin->LinkedTo.Num() <= UnrealMCP::MaxGraphLinksPerPin;
+            if (Pin == nullptr)
+                bInsertedNodesStable = false;
+            else if (IsStructuralGraphPin(Node, Pin))
+                bInsertedNodesStable &= Pin->PinId.IsValid() && Pin->LinkedTo.Num() <= UnrealMCP::MaxGraphLinksPerPin;
     }
     bool bVerified = bApplied && bExpectedInsertionCount && bInsertedNodesStable
         && Graph->Nodes.Num() <= UnrealMCP::MaxGraphNodes && LiveFromNode != nullptr && LiveFromPin != nullptr;
@@ -979,16 +984,21 @@ bool FUnrealMCPBlueprintGraphEditor::Execute(
                     CreatedIdentities.Add(GuidString(TargetNode->NodeGuid));
                     for (UEdGraphPin* Pin : TargetNode->Pins)
                     {
-                        if (Pin == nullptr) continue;
+                        if (!IsStructuralGraphPin(TargetNode, Pin)) continue;
                         if (!Pin->PinId.IsValid()) Pin->PinId = FGuid::NewGuid();
                         CreatedIdentities.Add(GuidString(Pin->PinId));
                     }
                 }
-                if (TargetNode->NodeGuid.IsValid() && TargetNode->Pins.Num() <= UnrealMCP::MaxGraphPinsPerNode
+                if (TargetNode->NodeGuid.IsValid()
+                    && StructuralGraphPinCount(TargetNode) <= UnrealMCP::MaxGraphPinsPerNode
                     && Graph->Nodes.Num() <= UnrealMCP::MaxGraphNodes)
                 {
                     bool bPinsStable = true;
-                    for (const UEdGraphPin* Pin : TargetNode->Pins) bPinsStable &= Pin != nullptr && Pin->PinId.IsValid();
+                    for (const UEdGraphPin* Pin : TargetNode->Pins)
+                        if (Pin == nullptr)
+                            bPinsStable = false;
+                        else if (IsStructuralGraphPin(TargetNode, Pin))
+                            bPinsStable &= Pin->PinId.IsValid();
                     if (bPinsStable)
                     {
                         if (bCreated) MarkForNode(Blueprint, TargetNode);

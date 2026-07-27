@@ -23,6 +23,7 @@
 #include "K2Node_FunctionEntry.h"
 #include "K2Node_FunctionResult.h"
 #include "K2Node_MacroInstance.h"
+#include "K2Node_PromotableOperator.h"
 #include "K2Node_Tunnel.h"
 #include "Kismet2/BlueprintEditorUtils.h"
 #include "Kismet2/KismetEditorUtilities.h"
@@ -72,6 +73,33 @@ const TSet<FString> SupportedPinCategories = {
 static FString GuidString(const FGuid& Guid)
 {
     return Guid.IsValid() ? Guid.ToString(EGuidFormats::Digits).ToLower() : FString();
+}
+
+static bool IsStructuralGraphPin(const UEdGraphNode* Node, const UEdGraphPin* Pin)
+{
+    if (Node == nullptr || Pin == nullptr) return false;
+    const bool bRegeneratedPromotableTolerance =
+        Node->IsA<UK2Node_PromotableOperator>()
+        && Pin->Direction == EGPD_Input
+        && Pin->PinName == TEXT("ErrorTolerance")
+        && Pin->bHidden
+        && Pin->PinType.PinCategory.IsNone()
+        && Pin->LinkedTo.IsEmpty()
+        && Pin->DefaultValue.IsEmpty()
+        && Pin->DefaultObject == nullptr
+        && Pin->DefaultTextValue.IsEmpty();
+    return !bRegeneratedPromotableTolerance;
+}
+
+static int32 StructuralGraphPinCount(const UEdGraphNode* Node)
+{
+    if (Node == nullptr) return 0;
+    int32 Count = 0;
+    for (const UEdGraphPin* Pin : Node->Pins)
+    {
+        if (IsStructuralGraphPin(Node, Pin)) ++Count;
+    }
+    return Count;
 }
 
 static FString HashLines(TArray<FString> Lines)

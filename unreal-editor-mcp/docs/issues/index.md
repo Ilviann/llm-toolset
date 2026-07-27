@@ -1,8 +1,11 @@
-# Known unfixed issues
+# Issue records
 
-This directory tracks confirmed errors that remain unfixed. Each error has one numbered `issue-#.md` document; new documents use the next integer and existing numbers are never reused.
+This directory tracks confirmed errors through investigation and resolution. Each error has one numbered `issue-#.md` document; new documents use the next integer and existing numbers are never reused.
 
 ## Open issues
 
-- [`issue-1.md`](issue-1.md) — a Blueprint created and edited through the production bridge reports a different structural snapshot after its first Windows editor restart.
+- None.
 
+## Resolved issues
+
+- [`issue-1.md`](issue-1.md) — UE 5.8 regenerated one inert hidden promotable-operator tolerance-pin GUID on first reload; 0.17.1 canonicalizes that non-structural pin out of model-facing identities and snapshots.
