@@ -1,4 +1,5 @@
 import unittest
+from pathlib import Path
 
 from unreal_editor_mcp.platforms import PlatformAdapter
 
@@ -15,3 +16,20 @@ class PlatformAdapterTests(unittest.TestCase):
             adapter = PlatformAdapter(system, process_probe=lambda _pid: True)
             self.assertEqual(adapter.path_identity("/Game/Demo.uproject"), "/Game/Demo.uproject")
             self.assertTrue(adapter.process_is_alive(1))
+
+    def test_macos_detached_launch_uses_fixed_argument_array_without_shell(self):
+        captured = {}
+
+        def factory(command, **options):
+            captured["command"] = command
+            captured["options"] = options
+            return object()
+
+        adapter = PlatformAdapter("macos", process_probe=lambda _pid: True)
+        executable = Path("/Applications/UE 5.8/UnrealEditor")
+        project = Path("/Users/test/My Game/MyGame.uproject")
+        adapter.launch_editor(executable, project, process_factory=factory)
+        self.assertEqual(captured["command"], (str(executable), str(project)))
+        self.assertTrue(captured["options"]["start_new_session"])
+        self.assertFalse(captured["options"]["shell"])
+        self.assertNotIn("creationflags", captured["options"])

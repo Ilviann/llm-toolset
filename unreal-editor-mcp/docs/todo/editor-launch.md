@@ -1,5 +1,7 @@
 # `editor-launch` — Optional configured editor launch
 
+**Implementation status:** Implemented in 0.17.0 and verified natively on Windows; the roadmap completion box remains open until the required native macOS run passes.
+
 **Outcome:** Agents can opt in to launching only the configured Unreal project/editor instance and wait for its exact authenticated bridge.
 
 ### Implementation

@@ -1,6 +1,6 @@
 # Unreal Editor MCP
 
-Unreal Editor MCP 0.16.0 is an offline-first MCP bridge for Unreal Engine 5.8+. It pairs a dependency-free Python 3.10+ stdio server with an editor-only C++ plugin. This release exposes exactly fifteen tools:
+Unreal Editor MCP 0.17.0 is an offline-first MCP bridge for Unreal Engine 5.8+. It pairs a dependency-free Python 3.10+ stdio server with an editor-only C++ plugin. Default mode exposes exactly fifteen tools:
 
 - `capabilities` reports the exact Python/plugin/Unreal versions, commands, features, listener state, effective limits, and published Blueprint-family matrix.
 - `editor_state` reports project identity, bridge readiness, play/simulate/save/GC state, and concise queued-operation state.
@@ -18,7 +18,7 @@ Unreal Editor MCP 0.16.0 is an offline-first MCP bridge for Unreal Engine 5.8+. 
 - `game_data_inspect` reads one user-defined struct schema or bounded page of typed Data Table rows from an exact asset snapshot.
 - `game_data_edit` creates or atomically edits user-defined structs and typed Data Table rows with validation, saving, and read-back.
 
-Phase 17 adds bounded user-defined struct authoring and typed Data Table creation, inspection, schema evolution, row editing, and batch updates. CSV/JSON filesystem import/export, Curve Tables, Data Assets, arbitrary UObject assets, supplied struct code, General Project Settings beyond the narrow framework operation, world overrides, runtime server/client control, editor lifecycle, builds, Blueprint reparenting, console access, unrestricted reflection, and code execution remain unavailable.
+Opt-in large mode adds a sixteenth tool, `editor_lifecycle`, for configured launch, safe graceful shutdown, durable restart, and cancellation. CSV/JSON filesystem import/export, Curve Tables, Data Assets, arbitrary UObject assets, supplied struct code, General Project Settings beyond the narrow framework operation, world overrides, runtime server/client control, builds, Blueprint reparenting, console access, unrestricted reflection, forced process termination, and code execution remain unavailable.
 
 ## Security model
 
@@ -50,7 +50,7 @@ Python 3.10 or newer with tkinter is required. Official Windows Python installer
 
 1. Copy [`plugin/UnrealMCP`](plugin/UnrealMCP) to `<YourProject>/Plugins/UnrealMCP` or add this repository's `plugin/` folder as an `AdditionalPluginDirectories` entry in a disposable development `.uproject`.
 2. Enable the `UnrealMCP` plugin and compile the project's Editor target with Unreal 5.8 or a newer version that passes the included public-API probes.
-3. Open the project. Look for `Unreal MCP 0.16.0 ready on 127.0.0.1:15485` in the editor log.
+3. Open the project. Look for `Unreal MCP 0.17.0 ready on 127.0.0.1:15485` in the editor log.
 4. Install the Python package offline from this folder:
 
    ```sh
@@ -101,6 +101,29 @@ Use an absolute `.uproject` path. The committed [`examples/lm-studio.json`](exam
 ```
 
 Start the Unreal project before calling a tool. `capabilities` remains available to diagnose an exact-version mismatch; other operations reject the mismatch. MCP stdout contains protocol messages only, while diagnostics go to stderr.
+
+## Optional editor lifecycle
+
+`editor_lifecycle` is absent from default mode. Enable it only for an MCP entry dedicated to one trusted project by adding `--tool-mode large` and an absolute `--editor` path. Windows requires `UnrealEditor.exe`; macOS requires the executable inside `UnrealEditor.app`. For example, the configured argument arrays end with:
+
+```text
+Windows: C:\absolute\Project.uproject --tool-mode large --editor C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe
+macOS:   /absolute/Project.uproject --tool-mode large --editor /Users/Shared/Epic Games/UE_5.8/Engine/Binaries/Mac/UnrealEditor.app/Contents/MacOS/UnrealEditor
+```
+
+Pass each shown value as a separate MCP `args` element; spaces are part of a path, not shell quoting. `--lifecycle-timeout` configures one 5–900 second bound and defaults to 120 seconds. Linux rejects launch/restart; its command construction remains unit-tested without a native-support claim. Large mode without `--editor` can report and gracefully shut down the configured running project, but launch and restart reject as unavailable.
+
+The tool accepts only:
+
+```json
+{"operation_id":"0123456789abcdef0123456789abcdef","operation":"launch"}
+```
+
+`operation` may be `launch`, `shutdown`, `restart`, or `cancel`. The model cannot supply an executable, project, process, port, environment value, shell fragment, or arbitrary editor argument. Launch is detached and reaches `ready` only after the launched process publishes this project's exact hash and version and passes authenticated capability verification. Repeated launch reports `already_running`.
+
+Shutdown refuses while PIE/simulation, saving, garbage collection, an editor transaction, asset compilation, or any dirty package is present. Dirty refusal includes only a bounded package summary. It never saves, discards, prompts, force-kills, or retargets another process. Once shutdown is accepted, cancellation cannot interrupt it; restart can still cancel at the safe point after the old process exits and before the new launch.
+
+Lifecycle progress is stored separately from Blueprint mutations at `Saved/UnrealMCP/lifecycle.json`, with at most 16 records retained for 24 hours. A server restart marks interrupted records `outcome_unknown`; inspect the configured editor state before choosing a new operation ID. Cancelling a launch wait does not terminate the editor, which may still become ready.
 
 ## Blueprint-family inspection
 
@@ -546,4 +569,4 @@ scripts\run_headless_integration.cmd --automation-only
 scripts\run_headless_integration.cmd
 ```
 
-The headless runner selects `UnrealEditor` on macOS and Linux and `UnrealEditor-Cmd.exe` on Windows. The 0.16.0 native baseline is Unreal 5.8.0 on Apple Silicon macOS 26.5.2 with Xcode 26.1.1. Platform selection and environment requirements are unit-tested without requiring every host.
+The headless runner selects `UnrealEditor` on macOS and Linux and `UnrealEditor-Cmd.exe` on Windows. The prior 0.16.0 native baseline was Unreal 5.8.0 on Apple Silicon macOS 26.5.2 with Xcode 26.1.1. Platform selection and environment requirements are unit-tested without requiring every host.

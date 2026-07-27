@@ -13,12 +13,13 @@ The module constructs the token store and bridge. The bridge calls the protocol 
 - Startup fails closed unless the token is valid, atomically persisted, permission-restricted where supported, and re-read exactly.
 - The per-port HTTPServer override binds `127.0.0.1`; startup verifies the listener became active.
 - Authentication uses a fixed-work comparison and precedes JSON parsing.
-- The route accepts POST at `/unreal-mcp/v1/command`; the command allowlist contains the fifteen commands released through Phase 17.
+- The route accepts POST at `/unreal-mcp/v1/command`; the command allowlist contains the fifteen Phase 17 commands plus internal `editor_shutdown`.
 - At most eight requests are queued, dispatch expires after five seconds, and responses are at most 256 KiB.
 - Mutation IDs are admitted before Game-thread dispatch, bound to the command, canonical arguments, project/authenticated context, and bridge instance. Terminal results are retained before responding.
 - The process-scoped ledger retains at most 128 operations for 15 minutes. Same-request replay is non-executing; conflicting ID reuse rejects; queued cancellation is safe; another bridge instance resolves as `outcome_unknown`.
 - The discovery record never contains a token or project path and is atomically refreshed every two seconds.
 - Shutdown stops heartbeats, removes discovery, unbinds the route, releases the router, clears the in-memory token, and causes retained requests to return cancellation.
+- Authenticated `editor_shutdown` accepts no arguments and refuses PIE/simulation, saves, garbage collection, active transactions, asset compilation, and dirty packages before scheduling a non-forced engine exit.
 
 Unreal's HTTPServer owns listener sockets process-wide. The plugin owns and unbinds only its route; the shared module closes listener sockets during engine shutdown. This avoids stopping unrelated HTTPServer users during a dynamic plugin unload.
 

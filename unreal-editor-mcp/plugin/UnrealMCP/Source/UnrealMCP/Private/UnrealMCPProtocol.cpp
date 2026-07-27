@@ -129,7 +129,8 @@ bool UnrealMCP::Protocol::ParseCommand(const TArray<uint8>& Body, FString& OutCo
         return false;
     }
     OutArguments = *ArgumentsPointer;
-    if ((OutCommand == TEXT("capabilities") || OutCommand == TEXT("editor_state")) && !OutArguments->Values.IsEmpty())
+    if ((OutCommand == TEXT("capabilities") || OutCommand == TEXT("editor_state") || OutCommand == TEXT("editor_shutdown"))
+        && !OutArguments->Values.IsEmpty())
     {
         OutError = {TEXT("invalid_argument"), TEXT("This command does not accept arguments")};
         return false;

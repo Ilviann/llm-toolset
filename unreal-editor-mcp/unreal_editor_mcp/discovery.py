@@ -77,6 +77,24 @@ def read_discovery(
     maximum_age_ms: int = MAX_DISCOVERY_AGE_MS,
     platform: PlatformAdapter = DEFAULT_PLATFORM,
 ) -> DiscoveryRecord:
+    record = read_discovery_record(layout, platform=platform)
+    age = now_ms() - record.updated_at_ms
+    if age < -2_000 or age > maximum_age_ms:
+        raise BridgeError(
+            "Unreal bridge discovery record is stale",
+            code=ErrorCode.EDITOR_UNAVAILABLE,
+            details={"age_ms": age},
+            retryable=True,
+        )
+    return record
+
+
+def read_discovery_record(
+    layout: ProjectLayout,
+    *,
+    platform: PlatformAdapter = DEFAULT_PLATFORM,
+) -> DiscoveryRecord:
+    """Read an exact live-process record without accepting it as a fresh heartbeat."""
     raw = _read_regular_file(layout.discovery_file, MAX_DISCOVERY_BYTES)
     try:
         value = json.loads(raw)
@@ -90,14 +108,6 @@ def read_discovery(
     }:
         raise BridgeError("Unreal bridge discovery record is invalid", code=ErrorCode.INVALID_CONFIGURATION)
     record = _validated_record(value)
-    age = now_ms() - record.updated_at_ms
-    if age < -2_000 or age > maximum_age_ms:
-        raise BridgeError(
-            "Unreal bridge discovery record is stale",
-            code=ErrorCode.EDITOR_UNAVAILABLE,
-            details={"age_ms": age},
-            retryable=True,
-        )
     if not platform.process_is_alive(record.process_id):
         raise BridgeError(
             "Unreal bridge process is not running",

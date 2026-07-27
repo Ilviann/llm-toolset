@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 
 import unreal_editor_mcp
-from unreal_editor_mcp.tool_catalog import TOOLS
+from unreal_editor_mcp.tool_catalog import LARGE_TOOLS, TOOLS
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -19,7 +19,7 @@ class ReleaseContractTests(unittest.TestCase):
         native = re.search(r'Version\[\].*TEXT\("([^"]+)"\)', header)
         self.assertIsNotNone(native)
         versions = {project["project"]["version"], plugin["VersionName"], native.group(1), unreal_editor_mcp.__version__}
-        self.assertEqual(versions, {"0.16.0"})
+        self.assertEqual(versions, {"0.17.0"})
 
     def test_only_released_phase_seventeen_commands_are_registered(self):
         names = [tool["name"] for tool in TOOLS]
@@ -65,6 +65,22 @@ class ReleaseContractTests(unittest.TestCase):
         for operation in ["add_member", "reorder_member", "add_row", "replace_row", "rename_row", "remove_row", "batch"]:
             self.assertIn(f'TEXT("{operation}")', service)
         self.assertIn('UnrealMCP.Phase17.GameDataAuthoring', test)
+
+    def test_editor_lifecycle_is_large_mode_only_and_natively_guarded(self):
+        self.assertNotIn("editor_lifecycle", [tool["name"] for tool in TOOLS])
+        self.assertEqual([tool["name"] for tool in LARGE_TOOLS][-1], "editor_lifecycle")
+        bridge = (ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private/UnrealMCPBridge.cpp").read_text(encoding="utf-8")
+        protocol = (ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private/UnrealMCPProtocol.cpp").read_text(encoding="utf-8")
+        native_test = (ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private/Tests/UnrealMCPAutomationTestsLifecycle.cpp").read_text(encoding="utf-8")
+        self.assertIn('TEXT("editor_shutdown")', bridge)
+        self.assertIn('TEXT("editor_shutdown")', protocol)
+        self.assertIn("IsTransactionActive()", bridge)
+        self.assertIn("GetNumRemainingAssets()", bridge)
+        self.assertIn("IsPlayingSessionInEditor()", bridge)
+        self.assertIn("IsSavingPackage()", bridge)
+        self.assertIn("RequestExit(false)", bridge)
+        self.assertNotIn("RequestExit(true)", bridge)
+        self.assertIn("rejects forced termination", native_test)
 
     def test_every_docs_directory_has_an_index(self):
         for directory in [path for path in (ROOT / "docs").rglob("*") if path.is_dir()]:

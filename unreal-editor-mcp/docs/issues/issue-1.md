@@ -8,7 +8,7 @@ Open and reproducible on Windows with Unreal Engine 5.8.
 
 A Blueprint created, edited, compiled, and saved through the production Unreal MCP bridge returns one structural snapshot before shutdown and a different snapshot after the first clean editor restart. The cross-process acceptance workflow requires these snapshots to match exactly and fails when they differ.
 
-This is not an editor-launch or Windows SDK failure. The Win64 SDK is valid, the plugin builds, all 30 native Unreal Automation cases pass, both editor processes start successfully, and the restarted process can inspect the saved asset.
+This is not an editor-launch or Windows SDK failure. The Win64 SDK is valid, the plugin builds, all 31 native Unreal Automation cases pass, both editor processes start successfully, and the restarted process can inspect the saved asset.
 
 ## Reproduction
 
@@ -54,4 +54,3 @@ The failure is isolated to snapshot stability after persistence. Likely investig
 - Correct save, load, inspection, or canonicalization behavior without hiding a meaningful structural change.
 - Pass the full Windows cross-process workflow with an exact post-save-to-first-restart snapshot match.
 - Preserve all Python and native Unreal Automation results.
-

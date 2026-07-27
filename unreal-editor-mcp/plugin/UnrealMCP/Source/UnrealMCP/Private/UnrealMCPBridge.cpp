@@ -1,8 +1,10 @@
 #include "UnrealMCPBridge.h"
 
 #include "Async/Async.h"
+#include "AssetCompilingManager.h"
 #include "Dom/JsonValue.h"
 #include "Editor.h"
+#include "HAL/PlatformMisc.h"
 #include "HAL/PlatformProperties.h"
 #include "HttpPath.h"
 #include "HttpServerModule.h"
@@ -24,6 +26,8 @@
 #include "UnrealMCPOperationLedger.h"
 #include "UnrealMCPVersion.h"
 #include "UObject/GarbageCollection.h"
+#include "UObject/Package.h"
+#include "UObject/UObjectIterator.h"
 #include "UObject/UObjectGlobals.h"
 
 namespace
@@ -172,7 +176,7 @@ void FUnrealMCPBridge::Stop()
 
 bool FUnrealMCPBridge::HandleRequest(const FHttpServerRequest& Request, const FHttpResultCallback& Complete)
 {
-    if (bStopping || !bReady)
+    if (bStopping || bShutdownAccepted || !bReady)
     {
         Complete(UnrealMCP::Protocol::Error(EHttpServerResponseCodes::ServiceUnavail, TEXT("editor_unavailable"), TEXT("Bridge is shutting down"), true));
         return true;
@@ -197,7 +201,8 @@ bool FUnrealMCPBridge::HandleRequest(const FHttpServerRequest& Request, const FH
         Complete(UnrealMCP::Protocol::Error(EHttpServerResponseCodes::BadRequest, ParseError));
         return true;
     }
-    if (Command != TEXT("capabilities") && Command != TEXT("editor_state") && Command != TEXT("operation_status")
+    if (Command != TEXT("capabilities") && Command != TEXT("editor_state") && Command != TEXT("editor_shutdown")
+        && Command != TEXT("operation_status")
         && Command != TEXT("blueprint_inspect") && Command != TEXT("blueprint_create") && Command != TEXT("blueprint_compile")
         && Command != TEXT("blueprint_save") && Command != TEXT("blueprint_component_edit") && Command != TEXT("blueprint_default_edit")
         && Command != TEXT("blueprint_member_edit") && Command != TEXT("blueprint_action_catalog")
@@ -268,9 +273,12 @@ void FUnrealMCPBridge::DispatchOnGameThread(
             return;
         }
         --Pinned->Pending;
-        if (Pinned->bStopping)
+        if (Pinned->bStopping || Pinned->bShutdownAccepted)
         {
-            Complete(UnrealMCP::Protocol::Error(EHttpServerResponseCodes::ServiceUnavail, TEXT("cancelled"), TEXT("Bridge is shutting down")));
+            Complete(UnrealMCP::Protocol::Error(
+                EHttpServerResponseCodes::ServiceUnavail,
+                TEXT("cancelled"),
+                TEXT("Bridge is shutting down")));
             return;
         }
         if (FPlatformTime::Seconds() - AcceptedAt > UnrealMCP::CommandDeadlineSeconds)
@@ -321,6 +329,10 @@ bool FUnrealMCPBridge::Execute(const FString& Command, const TSharedPtr<FJsonObj
     {
         OutResult = EditorState();
         return true;
+    }
+    if (Command == TEXT("editor_shutdown"))
+    {
+        return EditorShutdown(OutResult, OutError);
     }
     if (Command == TEXT("gameplay_framework_edit"))
     {
@@ -379,7 +391,7 @@ TSharedPtr<FJsonObject> FUnrealMCPBridge::Capabilities() const
     Result->SetStringField(TEXT("platform"), FPlatformProperties::PlatformName());
     Result->SetStringField(TEXT("mode"), TEXT("blueprint_family_authoring"));
     Result->SetBoolField(TEXT("bridge_ready"), bReady);
-    Result->SetArrayField(TEXT("commands"), Strings({TEXT("capabilities"), TEXT("editor_state"), TEXT("operation_status"),
+    Result->SetArrayField(TEXT("commands"), Strings({TEXT("capabilities"), TEXT("editor_state"), TEXT("editor_shutdown"), TEXT("operation_status"),
         TEXT("blueprint_inspect"), TEXT("blueprint_action_catalog"), TEXT("blueprint_graph_edit"), TEXT("blueprint_create"), TEXT("blueprint_compile"),
         TEXT("blueprint_save"), TEXT("blueprint_component_edit"), TEXT("blueprint_default_edit"), TEXT("blueprint_member_edit"),
         TEXT("gameplay_framework_edit"), TEXT("game_data_inspect"), TEXT("game_data_edit")}));
@@ -417,7 +429,8 @@ TSharedPtr<FJsonObject> FUnrealMCPBridge::Capabilities() const
     Features->SetBoolField(TEXT("user_defined_struct_authoring"), true);
     Features->SetBoolField(TEXT("typed_data_tables"), true);
     Features->SetBoolField(TEXT("game_data_batch_editing"), true);
-    Features->SetBoolField(TEXT("editor_lifecycle"), false);
+    Features->SetBoolField(TEXT("editor_lifecycle"), true);
+    Features->SetBoolField(TEXT("graceful_editor_shutdown"), true);
     Features->SetBoolField(TEXT("project_build"), false);
     Result->SetObjectField(TEXT("features"), Features);
     Result->SetArrayField(TEXT("blueprint_families"), UnrealMCP::BlueprintFamilyPolicy::BuildPublishedMatrix());
@@ -464,6 +477,7 @@ TSharedPtr<FJsonObject> FUnrealMCPBridge::Capabilities() const
     Limits->SetNumberField(TEXT("game_data_collection_items"), UnrealMCP::MaxGameDataCollectionItems);
     Limits->SetNumberField(TEXT("game_data_depth"), UnrealMCP::MaxGameDataDepth);
     Limits->SetNumberField(TEXT("game_data_dependencies"), UnrealMCP::MaxGameDataDependencies);
+    Limits->SetNumberField(TEXT("dirty_package_summary"), UnrealMCP::MaxDirtyPackageSummary);
     Result->SetObjectField(TEXT("limits"), Limits);
 
     const TSharedRef<FJsonObject> Listener = MakeShared<FJsonObject>();
@@ -489,6 +503,86 @@ TSharedPtr<FJsonObject> FUnrealMCPBridge::EditorState() const
     Result->SetStringField(TEXT("bridge_instance_id"), BridgeInstanceId);
     Result->SetObjectField(TEXT("operation"), OperationLedger ? OperationLedger->CurrentState() : MakeShared<FJsonObject>());
     return Result;
+}
+
+bool FUnrealMCPBridge::EditorShutdown(TSharedPtr<FJsonObject>& OutResult, FUnrealMCPError& OutError)
+{
+    check(IsInGameThread());
+    if (IsEngineExitRequested())
+    {
+        OutResult = MakeShared<FJsonObject>();
+        OutResult->SetBoolField(TEXT("accepted"), true);
+        OutResult->SetStringField(TEXT("state"), TEXT("already_shutting_down"));
+        OutResult->SetStringField(TEXT("project_hash"), ProjectHash);
+        OutResult->SetStringField(TEXT("bridge_instance_id"), BridgeInstanceId);
+        return true;
+    }
+
+    const bool bPlaying = GEditor != nullptr && GEditor->IsPlayingSessionInEditor();
+    const bool bSimulating = GEditor != nullptr && GEditor->IsSimulatingInEditor();
+    const bool bSaving = UE::IsSavingPackage();
+    const bool bCollecting = IsGarbageCollecting();
+    const bool bTransaction = GEditor != nullptr && GEditor->IsTransactionActive();
+    const int32 CompilingAssets = FAssetCompilingManager::Get().GetNumRemainingAssets();
+    const int32 OtherQueuedRequests = Pending.Load();
+    if (bPlaying || bSimulating || bSaving || bCollecting || bTransaction
+        || CompilingAssets > 0 || OtherQueuedRequests > 0)
+    {
+        const TSharedRef<FJsonObject> Details = MakeShared<FJsonObject>();
+        Details->SetBoolField(TEXT("is_playing"), bPlaying);
+        Details->SetBoolField(TEXT("is_simulating"), bSimulating);
+        Details->SetBoolField(TEXT("is_saving"), bSaving);
+        Details->SetBoolField(TEXT("is_garbage_collecting"), bCollecting);
+        Details->SetBoolField(TEXT("transaction_active"), bTransaction);
+        Details->SetNumberField(TEXT("compiling_assets"), CompilingAssets);
+        Details->SetNumberField(TEXT("queued_requests"), OtherQueuedRequests);
+        OutError = {TEXT("busy"), TEXT("Editor shutdown refused while unsafe editor work is active"), Details, true};
+        return false;
+    }
+
+    TArray<FString> DirtyPackages;
+    int32 DirtyPackageCount = 0;
+    for (TObjectIterator<UPackage> It; It; ++It)
+    {
+        UPackage* Package = *It;
+        if (Package == nullptr || Package == GetTransientPackage() || !Package->IsDirty()
+            || Package->HasAnyPackageFlags(PKG_CompiledIn))
+        {
+            continue;
+        }
+        ++DirtyPackageCount;
+        if (DirtyPackages.Num() < UnrealMCP::MaxDirtyPackageSummary)
+        {
+            DirtyPackages.Add(Package->GetName().Left(256));
+        }
+    }
+    DirtyPackages.Sort();
+    if (DirtyPackageCount > 0)
+    {
+        const TSharedRef<FJsonObject> Details = MakeShared<FJsonObject>();
+        Details->SetNumberField(TEXT("dirty_package_count"), DirtyPackageCount);
+        Details->SetBoolField(TEXT("dirty_package_summary_truncated"), DirtyPackageCount > DirtyPackages.Num());
+        Details->SetStringField(TEXT("dirty_packages"), FString::Join(DirtyPackages, TEXT(",")).Left(512));
+        OutError = {TEXT("busy"), TEXT("Editor shutdown refused because packages have unsaved changes"), Details};
+        return false;
+    }
+
+    bShutdownAccepted = true;
+    OutResult = MakeShared<FJsonObject>();
+    OutResult->SetBoolField(TEXT("accepted"), true);
+    OutResult->SetStringField(TEXT("state"), TEXT("shutting_down"));
+    OutResult->SetNumberField(TEXT("dirty_package_count"), 0);
+    OutResult->SetStringField(TEXT("project_hash"), ProjectHash);
+    OutResult->SetStringField(TEXT("bridge_instance_id"), BridgeInstanceId);
+    FTSTicker::GetCoreTicker().AddTicker(
+        TEXT("UnrealMCPGracefulShutdown"),
+        0.0f,
+        [](float)
+        {
+            FPlatformMisc::RequestExit(false);
+            return false;
+        });
+    return true;
 }
 
 bool FUnrealMCPBridge::Heartbeat(float DeltaTime)

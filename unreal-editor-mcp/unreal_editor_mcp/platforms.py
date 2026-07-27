@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import os
+import subprocess
 import sys
 from dataclasses import dataclass
-from pathlib import PurePosixPath, PureWindowsPath
-from typing import Callable
+from pathlib import Path, PurePosixPath, PureWindowsPath
+from typing import Any, Callable
+
+from .errors import ConfigurationError
 
 
 def current_system() -> str:
@@ -43,6 +46,34 @@ class PlatformAdapter:
         except PermissionError:
             return True
         return True
+
+    def editor_launch_command(self, executable: Path, project: Path) -> tuple[str, str]:
+        if self.system == "linux":
+            raise ConfigurationError("Configured editor launch is supported only on macOS and Windows")
+        return (str(executable), str(project))
+
+    def launch_editor(
+        self,
+        executable: Path,
+        project: Path,
+        *,
+        process_factory: Callable[..., Any] = subprocess.Popen,
+    ) -> Any:
+        command = self.editor_launch_command(executable, project)
+        options: dict[str, Any] = {
+            "cwd": str(project.parent),
+            "stdin": subprocess.DEVNULL,
+            "stdout": subprocess.DEVNULL,
+            "stderr": subprocess.DEVNULL,
+            "close_fds": True,
+            "shell": False,
+        }
+        if self.system == "windows":
+            # Stable Win32 DETACHED_PROCESS and CREATE_NEW_PROCESS_GROUP values.
+            options["creationflags"] = 0x00000008 | 0x00000200
+        else:
+            options["start_new_session"] = True
+        return process_factory(command, **options)
 
 
 def _windows_process_is_alive(process_id: int) -> bool:

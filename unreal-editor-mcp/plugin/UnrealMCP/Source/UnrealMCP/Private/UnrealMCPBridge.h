@@ -37,6 +37,7 @@ private:
     bool Execute(const FString& Command, const TSharedPtr<FJsonObject>& Arguments, TSharedPtr<FJsonObject>& OutResult, FUnrealMCPError& OutError);
     TSharedPtr<FJsonObject> Capabilities() const;
     TSharedPtr<FJsonObject> EditorState() const;
+    bool EditorShutdown(TSharedPtr<FJsonObject>& OutResult, FUnrealMCPError& OutError);
     bool Heartbeat(float DeltaTime);
 
     FString Token;
@@ -57,5 +58,6 @@ private:
     FTSTicker::FDelegateHandle HeartbeatHandle;
     TAtomic<int32> Pending{0};
     TAtomic<bool> bStopping{false};
+    TAtomic<bool> bShutdownAccepted{false};
     bool bReady = false;
 };

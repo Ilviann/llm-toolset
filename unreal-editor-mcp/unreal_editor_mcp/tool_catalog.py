@@ -1065,4 +1065,29 @@ TOOLS: Final = (
         },
     },
 )
+
+EDITOR_LIFECYCLE_TOOL: Final = {
+    "name": "editor_lifecycle",
+    "description": "Launch, gracefully shut down, restart, or cancel waiting for only the startup-configured Unreal Editor project.",
+    "inputSchema": {
+        "type": "object",
+        "properties": {
+            "operation_id": _OPERATION_ID,
+            "operation": {"type": "string", "enum": ["launch", "shutdown", "restart", "cancel"]},
+        },
+        "required": ["operation_id", "operation"],
+        "additionalProperties": False,
+    },
+}
+LARGE_TOOLS: Final = (*TOOLS, EDITOR_LIFECYCLE_TOOL)
+
+
+def tools_for_mode(mode: str) -> tuple[dict[str, object], ...]:
+    if mode == "default":
+        return TOOLS
+    if mode == "large":
+        return LARGE_TOOLS
+    raise ValueError("Unsupported tool mode")
+
+
 TOOL_BY_NAME: Final = {tool["name"]: tool for tool in TOOLS}

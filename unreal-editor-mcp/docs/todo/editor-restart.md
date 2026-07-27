@@ -1,5 +1,7 @@
 # `editor-restart` — Optional durable editor restart
 
+**Implementation status:** Implemented in 0.17.0 and verified natively on Windows; the roadmap completion box remains open until the required native macOS run passes.
+
 **Outcome:** Agents can opt in to durably restarting the configured project/editor instance and reconcile the full shutdown, disconnect, launch, and readiness sequence.
 
 **Depends on:**

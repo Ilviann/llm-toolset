@@ -20,6 +20,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
+from unreal_editor_mcp import __version__  # noqa: E402
 from unreal_editor_mcp.bridge import BRIDGE_PATH, UnrealBridge  # noqa: E402
 from unreal_editor_mcp.discovery import read_discovery, read_token  # noqa: E402
 from unreal_editor_mcp.errors import BridgeError, ErrorCode  # noqa: E402
@@ -66,7 +67,7 @@ def wait_until_ready(layout: ProjectLayout, process: subprocess.Popen[bytes], de
         try:
             record = read_discovery(layout)
             result = UnrealBridge(layout, timeout=2.0).call("capabilities")
-            if result.get("bridge_ready") is True and record.bridge_version == "0.16.0":
+            if result.get("bridge_ready") is True and record.bridge_version == __version__:
                 return
         except Exception as error:
             last_error = str(error)
@@ -121,7 +122,7 @@ def send_without_reading(layout: ProjectLayout, command: str, arguments: dict[st
         headers={
             "Authorization": "Bearer " + read_token(layout),
             "Content-Type": "application/json",
-            "X-Unreal-MCP-Version": "0.16.0",
+            "X-Unreal-MCP-Version": __version__,
         },
     )
     connection.close()
@@ -719,14 +720,17 @@ def main() -> int:
             capabilities = bridge.call("capabilities")
             state = bridge.call("editor_state")
             if capabilities.get("commands") != [
-                "capabilities", "editor_state", "operation_status", "blueprint_inspect", "blueprint_action_catalog", "blueprint_graph_edit",
+                "capabilities", "editor_state", "editor_shutdown", "operation_status",
+                "blueprint_inspect", "blueprint_action_catalog", "blueprint_graph_edit",
                 "blueprint_create", "blueprint_compile", "blueprint_save",
                 "blueprint_component_edit", "blueprint_default_edit", "blueprint_member_edit", "gameplay_framework_edit",
                 "game_data_inspect", "game_data_edit",
             ]:
                 raise AssertionError("released command catalog mismatch")
-            if capabilities.get("bridge_version") != "0.16.0" or state.get("bridge_ready") is not True:
+            if capabilities.get("bridge_version") != __version__ or state.get("bridge_ready") is not True:
                 raise AssertionError("capability/state contract mismatch")
+            if capabilities.get("features", {}).get("graceful_editor_shutdown") is not True:
+                raise AssertionError("graceful editor shutdown capability is unavailable")
             if capabilities.get("features", {}).get("blueprint_mutation") is not True:
                 raise AssertionError("Phase 6 mutation capability is unavailable")
             for feature in ("blueprint_functions", "blueprint_local_variables", "blueprint_rep_notify"):
@@ -1764,6 +1768,14 @@ def main() -> int:
             })
             if not any(action.get("wildcard") is True for action in operator_catalog.get("actions", [])):
                 raise AssertionError(f"Phase 10 wildcard operator action missing: {operator_catalog!r}")
+            shutdown = reloaded_bridge.call("editor_shutdown")
+            if shutdown.get("accepted") is not True:
+                raise AssertionError(f"graceful shutdown was not accepted: {shutdown!r}")
+            shutdown_deadline = time.monotonic() + 30.0
+            while process.poll() is None and time.monotonic() < shutdown_deadline:
+                time.sleep(0.1)
+            if process.poll() is None:
+                raise AssertionError("graceful shutdown did not terminate the configured editor")
         except Exception:
             log.seek(0)
             sys.stderr.buffer.write(log.read()[-32_000:])
@@ -1780,7 +1792,7 @@ def main() -> int:
             pass
         else:
             raise AssertionError("a live discovery heartbeat remained after editor termination")
-    print("Phase 17 integration passed: typed game-data authoring, dependency safety, replay, restart, and clean unload")
+    print("Integration passed: Phase 17 authoring, replay/restart, and graceful lifecycle shutdown")
     return 0
 
 

@@ -6,6 +6,13 @@
 - The deployment GUI initializes its Engine selection from `UNREAL_MCP_ENGINE_ROOT` and preserves a valid configured value when the project is selected.
 - Added one-click LM Studio JSON generation for the selected checkout and `.uproject`, plus focused offline tests and deployment architecture/contracts.
 
+## 0.17.0 — 2026-07-27
+
+- Added opt-in large-mode `editor_lifecycle` with configured macOS/Windows launch, exact authenticated readiness, idempotent already-running detection, cancellation, and bounded startup/abnormal-exit outcomes.
+- Added bridge-owned graceful shutdown that refuses PIE/simulation, saving, garbage collection, transactions, asset compilation, and dirty packages; no model argument can select a process or request forced termination.
+- Added restart composition across graceful shutdown, process exit, detached relaunch, rediscovery, reauthentication, exact-version matching, and old/new bridge-instance validation.
+- Added bounded atomic lifecycle records, stale/interrupted recovery, focused Python/native protocol coverage, lifecycle architecture/contracts, and user configuration/recovery guidance.
+
 ## 0.16.0 — 2026-07-23
 
 - Added `game_data_inspect` and reconciled `game_data_edit` for bounded user-defined struct schemas and typed Data Tables, bringing the released surface to fifteen exact tools.

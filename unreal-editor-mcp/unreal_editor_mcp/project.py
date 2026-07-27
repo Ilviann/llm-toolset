@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass
 from pathlib import Path
 
 from .errors import ConfigurationError
+from .platforms import DEFAULT_PLATFORM, PlatformAdapter
 
 
 @dataclass(frozen=True)
@@ -44,3 +46,7 @@ class ProjectLayout:
             token_file=state_dir / "bridge.token",
             discovery_file=state_dir / "discovery.json",
         )
+
+    def project_hash(self, platform: PlatformAdapter = DEFAULT_PLATFORM) -> str:
+        identity = platform.path_identity(str(self.descriptor))
+        return hashlib.sha1(identity.encode("utf-8")).hexdigest()

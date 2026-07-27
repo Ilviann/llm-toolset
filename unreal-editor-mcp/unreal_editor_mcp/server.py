@@ -5,10 +5,10 @@ from __future__ import annotations
 from typing import Any, Protocol
 
 from . import __version__
-from .errors import DomainError
+from .errors import DomainError, ErrorCode
 from .schema_validation import SchemaValidationError, validate_tool_arguments
 from .stdio import error, result, tool_result
-from .tool_catalog import LATEST_PROTOCOL, SUPPORTED_PROTOCOLS, TOOL_BY_NAME, TOOLS
+from .tool_catalog import LATEST_PROTOCOL, SUPPORTED_PROTOCOLS, tools_for_mode
 
 
 class BridgeClient(Protocol):
@@ -16,9 +16,25 @@ class BridgeClient(Protocol):
     def close(self) -> None: ...
 
 
+class LifecycleClient(Protocol):
+    def availability(self) -> dict[str, Any]: ...
+    def execute(self, arguments: dict[str, Any]) -> dict[str, Any]: ...
+    def close(self) -> None: ...
+
+
 class MCPServer:
-    def __init__(self, bridge: BridgeClient) -> None:
+    def __init__(
+        self,
+        bridge: BridgeClient,
+        *,
+        lifecycle: LifecycleClient | None = None,
+        tool_mode: str = "default",
+    ) -> None:
         self.bridge = bridge
+        self.lifecycle = lifecycle
+        self.tool_mode = tool_mode
+        self.tools = tools_for_mode(tool_mode)
+        self.tool_by_name = {tool["name"]: tool for tool in self.tools}
         self.negotiated_protocol_version: str | None = None
 
     def handle(self, message: dict[str, Any]) -> dict[str, Any] | None:
@@ -43,7 +59,7 @@ class MCPServer:
         if method == "ping":
             return result(request_id, {})
         if method == "tools/list":
-            return result(request_id, {"tools": list(TOOLS)})
+            return result(request_id, {"tools": list(self.tools)})
         if method == "tools/call":
             return self._call_tool(request_id, params)
         return error(request_id, -32601, "Method not found")
@@ -51,16 +67,24 @@ class MCPServer:
     def _call_tool(self, request_id: Any, params: dict[str, Any]) -> dict[str, Any]:
         name = params.get("name")
         arguments = params.get("arguments", {})
-        if not isinstance(name, str) or name not in TOOL_BY_NAME:
+        if not isinstance(name, str) or name not in self.tool_by_name:
             return error(request_id, -32602, "Unknown tool")
         if not isinstance(arguments, dict):
             return error(request_id, -32602, "Invalid tool arguments")
         try:
-            validate_tool_arguments(arguments, TOOL_BY_NAME[name]["inputSchema"])
+            validate_tool_arguments(arguments, self.tool_by_name[name]["inputSchema"])
         except SchemaValidationError as exc:
             return error(request_id, -32602, f"Invalid tool arguments: {exc}")
         try:
-            output = self.bridge.call(name, arguments)
+            if name == "editor_lifecycle":
+                if self.lifecycle is None:
+                    raise DomainError(
+                        "Editor lifecycle is unavailable in this server configuration",
+                        code=ErrorCode.INVALID_CONFIGURATION,
+                    )
+                output = self.lifecycle.execute(arguments)
+            else:
+                output = self.bridge.call(name, arguments)
             if name == "capabilities" and isinstance(output, dict):
                 bridge_version = output.get("bridge_version")
                 output = {
@@ -68,10 +92,18 @@ class MCPServer:
                     "python_version": __version__,
                     "version_match": bridge_version == __version__,
                     "mcp_protocol_version": self.negotiated_protocol_version,
+                    "tool_mode": self.tool_mode,
+                    "editor_lifecycle": (
+                        self.lifecycle.availability()
+                        if self.lifecycle is not None
+                        else {"enabled": False, "launch_configured": False}
+                    ),
                 }
             return result(request_id, tool_result(output))
         except DomainError as exc:
             return result(request_id, tool_result(exc.as_dict(), is_error=True))
 
     def close(self) -> None:
+        if self.lifecycle is not None:
+            self.lifecycle.close()
         self.bridge.close()

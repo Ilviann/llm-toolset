@@ -1,5 +1,7 @@
 # `editor-shutdown` — Optional graceful editor shutdown
 
+**Implementation status:** Implemented in 0.17.0 and verified natively on Windows; the roadmap completion box remains open until the required native macOS run passes.
+
 **Outcome:** Agents can opt in to gracefully shutting down only the configured authenticated editor instance without forced termination or data loss.
 
 **Depends on:**

@@ -52,6 +52,7 @@ class UnrealBridge:
         if command not in {
             "capabilities",
             "editor_state",
+            "editor_shutdown",
             "operation_status",
             "blueprint_inspect",
             "blueprint_action_catalog",
