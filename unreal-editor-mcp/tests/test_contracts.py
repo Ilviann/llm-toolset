@@ -6,12 +6,33 @@ from pathlib import Path
 
 import unreal_editor_mcp
 from unreal_editor_mcp.tool_catalog import LARGE_TOOLS, TOOLS
+from unreal_editor_mcp.tool_catalog_families.assets import ASSET_TOOLS
+from unreal_editor_mcp.tool_catalog_families.blueprints import BLUEPRINT_TOOLS
+from unreal_editor_mcp.tool_catalog_families.core import CORE_TOOLS
+from unreal_editor_mcp.tool_catalog_families.game_data import GAME_DATA_TOOLS
+from unreal_editor_mcp.tool_catalog_families.gameplay_framework import GAMEPLAY_TOOLS
+from unreal_editor_mcp.tool_catalog_families.levels import LEVEL_TOOLS
+from unreal_editor_mcp.tool_catalog_families.lifecycle import EDITOR_LIFECYCLE_TOOL
 
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 class ReleaseContractTests(unittest.TestCase):
+    def test_tool_catalog_has_one_ordered_family_assembler(self):
+        assembled = (
+            *CORE_TOOLS,
+            *ASSET_TOOLS,
+            *LEVEL_TOOLS,
+            *BLUEPRINT_TOOLS,
+            *GAMEPLAY_TOOLS,
+            *GAME_DATA_TOOLS,
+        )
+        self.assertEqual(TOOLS, assembled)
+        self.assertEqual(LARGE_TOOLS, (*assembled, EDITOR_LIFECYCLE_TOOL))
+        names = [tool["name"] for tool in assembled]
+        self.assertEqual(len(names), len(set(names)))
+
     def test_versions_match_executable_metadata(self):
         project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
         plugin = json.loads((ROOT / "plugin/UnrealMCP/UnrealMCP.uplugin").read_text(encoding="utf-8"))
