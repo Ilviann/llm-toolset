@@ -19,12 +19,12 @@ class ReleaseContractTests(unittest.TestCase):
         native = re.search(r'Version\[\].*TEXT\("([^"]+)"\)', header)
         self.assertIsNotNone(native)
         versions = {project["project"]["version"], plugin["VersionName"], native.group(1), unreal_editor_mcp.__version__}
-        self.assertEqual(versions, {"0.18.0"})
+        self.assertEqual(versions, {"0.19.0"})
 
-    def test_only_released_level_open_commands_are_registered(self):
+    def test_only_released_asset_reference_commands_are_registered(self):
         names = [tool["name"] for tool in TOOLS]
         self.assertEqual(names, [
-            "capabilities", "editor_state", "operation_status", "level_inspect", "level_open",
+            "capabilities", "editor_state", "operation_status", "asset_references", "level_inspect", "level_open",
             "blueprint_inspect", "blueprint_action_catalog", "blueprint_graph_edit",
             "blueprint_create", "blueprint_compile", "blueprint_save",
             "blueprint_component_edit", "blueprint_default_edit",
@@ -33,6 +33,21 @@ class ReleaseContractTests(unittest.TestCase):
         bridge_source = (ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private/UnrealMCPBridge.cpp").read_text(encoding="utf-8")
         for command in names:
             self.assertIn(f'TEXT("{command}")', bridge_source)
+
+    def test_asset_references_is_published_bounded_and_covered(self):
+        bridge = (ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private/UnrealMCPBridge.cpp").read_text(encoding="utf-8")
+        service = (ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private/UnrealMCPAssetReferenceService.cpp").read_text(encoding="utf-8")
+        native_test = (ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private/Tests/UnrealMCPAutomationTestsAssetReferences.cpp").read_text(encoding="utf-8")
+        for feature in ["asset_reference_discovery", "asset_reference_live_memory"]:
+            self.assertIn(f'TEXT("{feature}"), true', bridge)
+        for bound in [
+            "MaxAssetReferenceRegistryCandidates", "MaxAssetReferenceLiveObjects",
+            "MaxAssetReferenceRecords", "MaxAssetReferenceRetainedCursors",
+        ]:
+            self.assertIn(bound, service)
+        for evidence in ["serialized", "management", "searchable_name", "live_memory"]:
+            self.assertIn(f'TEXT("{evidence}")', service)
+        self.assertIn("UnrealMCP.AssetReferences.RegistryLiveMemoryAndCursors", native_test)
 
     def test_level_open_is_published_and_covered(self):
         bridge = (ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private/UnrealMCPBridge.cpp").read_text(encoding="utf-8")

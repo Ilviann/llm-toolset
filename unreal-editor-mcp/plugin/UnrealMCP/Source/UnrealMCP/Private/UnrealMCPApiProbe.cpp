@@ -2,6 +2,7 @@
 // needed by the roadmap before bridge contracts are frozen. Keeping it in the
 // normal module build makes every supported engine compile the probe.
 #include "AssetRegistry/AssetRegistryModule.h"
+#include "AssetRegistry/IAssetRegistry.h"
 #include "BlueprintNodeSpawner.h"
 #include "BlueprintActionDatabase.h"
 #include "BlueprintActionFilter.h"
@@ -12,6 +13,7 @@
 #include "Editor.h"
 #include "Engine/Level.h"
 #include "Engine/World.h"
+#include "Engine/AssetManager.h"
 #include "FileHelpers.h"
 #include "HttpServerModule.h"
 #include "IHttpRouter.h"
@@ -33,12 +35,15 @@
 #include "K2Node_PromotableOperator.h"
 #include "K2Node_Tunnel.h"
 #include "ScopedTransaction.h"
+#include "Subsystems/AssetEditorSubsystem.h"
 #include "SubobjectDataSubsystem.h"
 #include "DataTableEditorUtils.h"
 #include "Factories/DataTableFactory.h"
 #include "Kismet2/StructureEditorUtils.h"
 #include "StructUtils/UserDefinedStruct.h"
 #include "UObject/Package.h"
+#include "UObject/UObjectGlobals.h"
+#include "UObject/UObjectIterator.h"
 
 namespace UnrealMCP::ApiProbe
 {
@@ -75,6 +80,26 @@ void RequirePublicTypes()
         TFunctionRef<bool(const FAssetData&)>,
         UE::AssetRegistry::EEnumerateAssetsFlags) const;
     (void)static_cast<FEnumerateWorldAssets>(&IAssetRegistry::EnumerateAssets);
+    using FGetAssetReferencers = bool (IAssetRegistry::*)(
+        const FAssetIdentifier&,
+        TArray<FAssetDependency>&,
+        UE::AssetRegistry::EDependencyCategory,
+        const UE::AssetRegistry::FDependencyQuery&) const;
+    (void)static_cast<FGetAssetReferencers>(&IAssetRegistry::GetReferencers);
+    using FGetPackageAssets = bool (IAssetRegistry::*)(
+        FName, TArray<FAssetData>&, bool, bool) const;
+    (void)static_cast<FGetPackageAssets>(&IAssetRegistry::GetAssetsByPackageName);
+    (void)&IAssetRegistry::IsGathering;
+    (void)&IAssetRegistry::OnAssetAdded;
+    (void)&IAssetRegistry::OnAssetRemoved;
+    (void)&IAssetRegistry::OnAssetRenamed;
+    (void)&IAssetRegistry::OnAssetUpdated;
+    (void)&IAssetRegistry::OnFilesLoaded;
+    (void)&UAssetEditorSubsystem::FindEditorsForAsset;
+    (void)&UAssetEditorSubsystem::GetAllEditedAssets;
+    (void)&FReferenceFinder::FindReferences;
+    (void)&UAssetManager::GetPrimaryAssetPath;
+    static_assert(sizeof(FThreadSafeObjectIterator) > 0);
     (void)&FBlueprintActionDatabase::Get;
     (void)&UEdGraphSchema_K2::CanCreateConnection;
     (void)&UEdGraphSchema_K2::TryCreateConnection;

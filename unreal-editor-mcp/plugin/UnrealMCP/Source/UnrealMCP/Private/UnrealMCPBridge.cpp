@@ -23,6 +23,7 @@
 #include "UnrealMCPGameplayFrameworkEditor.h"
 #include "UnrealMCPGameDataService.h"
 #include "UnrealMCPLevelService.h"
+#include "UnrealMCPAssetReferenceService.h"
 #include "UnrealMCPProtocol.h"
 #include "UnrealMCPOperationLedger.h"
 #include "UnrealMCPVersion.h"
@@ -215,7 +216,7 @@ bool FUnrealMCPBridge::HandleRequest(const FHttpServerRequest& Request, const FH
         return true;
     }
     if (Command != TEXT("capabilities") && Command != TEXT("editor_state") && Command != TEXT("editor_shutdown")
-        && Command != TEXT("operation_status")
+        && Command != TEXT("operation_status") && Command != TEXT("asset_references")
         && Command != TEXT("level_inspect") && Command != TEXT("level_open")
         && Command != TEXT("blueprint_inspect") && Command != TEXT("blueprint_create") && Command != TEXT("blueprint_compile")
         && Command != TEXT("blueprint_save") && Command != TEXT("blueprint_component_edit") && Command != TEXT("blueprint_default_edit")
@@ -348,6 +349,14 @@ bool FUnrealMCPBridge::Execute(const FString& Command, const TSharedPtr<FJsonObj
     {
         return EditorShutdown(OutResult, OutError);
     }
+    if (Command == TEXT("asset_references"))
+    {
+        if (!AssetReferenceService)
+        {
+            AssetReferenceService = MakeUnique<FUnrealMCPAssetReferenceService>();
+        }
+        return AssetReferenceService->Inspect(Arguments, OutResult, OutError);
+    }
     if (Command == TEXT("level_inspect") || Command == TEXT("level_open"))
     {
         if (!LevelService)
@@ -429,7 +438,7 @@ TSharedPtr<FJsonObject> FUnrealMCPBridge::Capabilities() const
     Result->SetStringField(TEXT("platform"), FPlatformProperties::PlatformName());
     Result->SetStringField(TEXT("mode"), TEXT("blueprint_family_authoring"));
     Result->SetBoolField(TEXT("bridge_ready"), bReady);
-    Result->SetArrayField(TEXT("commands"), Strings({TEXT("capabilities"), TEXT("editor_state"), TEXT("editor_shutdown"), TEXT("operation_status"),
+    Result->SetArrayField(TEXT("commands"), Strings({TEXT("capabilities"), TEXT("editor_state"), TEXT("editor_shutdown"), TEXT("operation_status"), TEXT("asset_references"),
         TEXT("level_inspect"), TEXT("level_open"),
         TEXT("blueprint_inspect"), TEXT("blueprint_action_catalog"), TEXT("blueprint_graph_edit"), TEXT("blueprint_create"), TEXT("blueprint_compile"),
         TEXT("blueprint_save"), TEXT("blueprint_component_edit"), TEXT("blueprint_default_edit"), TEXT("blueprint_member_edit"),
@@ -468,6 +477,8 @@ TSharedPtr<FJsonObject> FUnrealMCPBridge::Capabilities() const
     Features->SetBoolField(TEXT("user_defined_struct_authoring"), true);
     Features->SetBoolField(TEXT("typed_data_tables"), true);
     Features->SetBoolField(TEXT("game_data_batch_editing"), true);
+    Features->SetBoolField(TEXT("asset_reference_discovery"), true);
+    Features->SetBoolField(TEXT("asset_reference_live_memory"), true);
     Features->SetBoolField(TEXT("level_discovery"), true);
     Features->SetBoolField(TEXT("level_open"), true);
     Features->SetBoolField(TEXT("level_snapshots"), true);
@@ -521,6 +532,13 @@ TSharedPtr<FJsonObject> FUnrealMCPBridge::Capabilities() const
     Limits->SetNumberField(TEXT("game_data_collection_items"), UnrealMCP::MaxGameDataCollectionItems);
     Limits->SetNumberField(TEXT("game_data_depth"), UnrealMCP::MaxGameDataDepth);
     Limits->SetNumberField(TEXT("game_data_dependencies"), UnrealMCP::MaxGameDataDependencies);
+    Limits->SetNumberField(TEXT("asset_reference_registry_candidates"), UnrealMCP::MaxAssetReferenceRegistryCandidates);
+    Limits->SetNumberField(TEXT("asset_reference_live_objects"), UnrealMCP::MaxAssetReferenceLiveObjects);
+    Limits->SetNumberField(TEXT("asset_reference_records"), UnrealMCP::MaxAssetReferenceRecords);
+    Limits->SetNumberField(TEXT("asset_reference_assets_per_package"), UnrealMCP::MaxAssetReferenceAssetsPerPackage);
+    Limits->SetNumberField(TEXT("asset_reference_properties"), UnrealMCP::MaxAssetReferenceProperties);
+    Limits->SetNumberField(TEXT("asset_reference_retained_cursors"), UnrealMCP::MaxAssetReferenceRetainedCursors);
+    Limits->SetNumberField(TEXT("asset_reference_traversal_depth"), 1);
     Limits->SetNumberField(TEXT("level_discovery_scan"), UnrealMCP::MaxLevelDiscoveryScan);
     Limits->SetNumberField(TEXT("level_external_packages"), UnrealMCP::MaxLevelExternalPackages);
     Limits->SetNumberField(TEXT("dirty_package_summary"), UnrealMCP::MaxDirtyPackageSummary);

@@ -14,6 +14,12 @@ _PATH = {
     "maxLength": 512,
     "pattern": r"^(?!.*\.\.)/[^\\]+$",
 }
+_ASSET_OBJECT_PATH = {
+    "type": "string",
+    "minLength": 3,
+    "maxLength": 512,
+    "pattern": r"^(?!.*\.\.)/(?:[^\\/:]+/)*[^\\/:.]+\.[^\\/:.]+$",
+}
 _OPERATION_ID = {
     "type": "string",
     "minLength": 32,
@@ -427,6 +433,32 @@ TOOLS: Final = (
             },
             "required": ["operation_id", "bridge_instance_id"],
             "additionalProperties": False,
+        },
+    },
+    {
+        "name": "asset_references",
+        "description": "Find bounded serialized, management, searchable-name, and live-memory referencers for one exact mounted asset.",
+        "inputSchema": {
+            "oneOf": [
+                {
+                    "type": "object",
+                    "properties": {
+                        "asset_path": _ASSET_OBJECT_PATH,
+                        "page_size": {"type": "integer", "minimum": 1, "maximum": 100},
+                    },
+                    "required": ["asset_path"],
+                    "additionalProperties": False,
+                },
+                {
+                    "type": "object",
+                    "properties": {
+                        "cursor": _OPERATION_ID,
+                        "page_size": {"type": "integer", "minimum": 1, "maximum": 100},
+                    },
+                    "required": ["cursor"],
+                    "additionalProperties": False,
+                },
+            ]
         },
     },
     {

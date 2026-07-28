@@ -1,10 +1,11 @@
 # Unreal Editor MCP
 
-Unreal Editor MCP 0.18.0 is an offline-first MCP bridge for Unreal Engine 5.8+. It pairs a dependency-free Python 3.10+ stdio server with an editor-only C++ plugin. Default mode exposes exactly seventeen tools:
+Unreal Editor MCP 0.19.0 is an offline-first MCP bridge for Unreal Engine 5.8+. It pairs a dependency-free Python 3.10+ stdio server with an editor-only C++ plugin. Default mode exposes exactly eighteen tools:
 
 - `capabilities` reports the exact Python/plugin/Unreal versions, commands, features, listener state, effective limits, and published Blueprint-family matrix.
 - `editor_state` reports project identity, bridge readiness, play/simulate/save/GC state, and concise queued-operation state.
 - `operation_status` reconciles or safely cancels one retained mutation by operation and bridge identity.
+- `asset_references` finds bounded Asset Registry and live-memory referencers for one exact mounted asset without loading candidate packages.
 - `level_inspect` discovers bounded pages of mounted World assets or reports the current map's exact identity, revision, snapshot, and dirtiness.
 - `level_open` safely opens one exact mounted World asset through the retained mutation ledger.
 - `blueprint_inspect` discovers every published Blueprint family across mounted content and returns bounded pages of one selected Blueprint's structure.
@@ -20,7 +21,7 @@ Unreal Editor MCP 0.18.0 is an offline-first MCP bridge for Unreal Engine 5.8+. 
 - `game_data_inspect` reads one user-defined struct schema or bounded page of typed Data Table rows from an exact asset snapshot.
 - `game_data_edit` creates or atomically edits user-defined structs and typed Data Table rows with validation, saving, and read-back.
 
-Opt-in large mode adds an eighteenth tool, `editor_lifecycle`, for configured launch, safe graceful shutdown, durable restart, and cancellation. CSV/JSON filesystem import/export, Curve Tables, Data Assets, arbitrary UObject assets, supplied struct code, General Project Settings beyond the narrow framework operation, world overrides, runtime server/client control, builds, Blueprint reparenting, console access, unrestricted reflection, forced process termination, and code execution remain unavailable.
+Opt-in large mode adds a nineteenth tool, `editor_lifecycle`, for configured launch, safe graceful shutdown, durable restart, and cancellation. CSV/JSON filesystem import/export, Curve Tables, Data Assets, arbitrary UObject assets, supplied struct code, General Project Settings beyond the narrow framework operation, world overrides, runtime server/client control, builds, Blueprint reparenting, console access, unrestricted reflection, forced process termination, and code execution remain unavailable.
 
 ## Security model
 
@@ -52,7 +53,7 @@ Python 3.10 or newer with tkinter is required. Official Windows Python installer
 
 1. Copy [`plugin/UnrealMCP`](plugin/UnrealMCP) to `<YourProject>/Plugins/UnrealMCP` or add this repository's `plugin/` folder as an `AdditionalPluginDirectories` entry in a disposable development `.uproject`.
 2. Enable the `UnrealMCP` plugin and compile the project's Editor target with Unreal 5.8 or a newer version that passes the included public-API probes.
-3. Open the project. Look for `Unreal MCP 0.18.0 ready on 127.0.0.1:15485` in the editor log.
+3. Open the project. Look for `Unreal MCP 0.19.0 ready on 127.0.0.1:15485` in the editor log.
 4. Install the Python package offline from this folder:
 
    ```sh
@@ -150,6 +151,18 @@ Open only an exact mounted World asset path:
 ```
 
 Map switching refuses PIE/simulation, save, garbage collection, transactions, asset compilation, async loading, dirty packages, or another queued mutation. It never accepts filesystem paths, saves, discards, or prompts. Reuse the operation ID with `operation_status` after a lost response. See [`examples/level-open-workflow.json`](examples/level-open-workflow.json) for the complete request sequence.
+
+## Asset references
+
+Find inbound evidence for one exact mounted asset object path:
+
+```json
+{"asset_path":"/Game/Data/ST_WeaponStats.ST_WeaponStats","page_size":25}
+```
+
+The response separates serialized package dependencies, management dependencies, searchable-name dependencies, and loaded live-memory references. Each scan reports `complete`, `truncated`, `unsupported`, or `stale`, with candidate, scanned, and record counts. Results include referencer package/mount, dependency properties, an Asset Registry object/class when known, and direct loaded-object or open-editor evidence.
+
+Large results use a 40-hex exact snapshot plus a short-lived, query-bound, single-use cursor. Registry changes make an outstanding cursor stale. The scan never loads referencer packages or compiles, saves, fixes redirectors, runs garbage collection, changes editors, or mutates content. Serialized evidence is package-granular, and complete empty results still cannot rule out runtime-built string paths, external code, or weak references. See [`examples/asset-references-workflow.json`](examples/asset-references-workflow.json).
 
 ## Blueprint-family inspection
 
@@ -545,7 +558,7 @@ If saving fails, confirm that the package directory is writable and that source-
 
 ## Limits
 
-The plugin publishes these authoritative defaults through `capabilities`: 64 KiB requests, 256 KiB responses, eight queued requests, JSON depth 16, strings up to 4096 characters, and a five-second Game-thread dispatch deadline. Inspection uses 25 records by default and allows 100 per page, scans at most 2,048 registry candidates, accepts at most 4,096 structural records, retains 32 cursors for 30 seconds, allows 32 targeted properties, returns at most 16 changed defaults per component, and lists at most 64 member or callable references. Action cataloging returns at most 50 results, scans at most 20,000 spawners for one second, retains 32 catalogs and 256 actions for 60 seconds, and permits one Game-thread catalog at a time. Graph editing permits 2,048 nodes per graph, 256 pins per changed-node result, integer coordinates within ±1,000,000, 64 links per pin, and 512 canonical pin-default characters. Function, macro, and custom-event signatures accept at most 32 parameters. K2 container defaults hold at most 64 items or map entries. Game-data schemas and nested structs contain at most 64 fields, containers hold at most 64 items, reflected values nest to depth four, one edit touches at most 64 rows, inspection refuses tables above 2,048 rows, and destructive schema scans examine at most 256 dependencies. The operation ledger retains 128 operations for 15 minutes. Compilation returns at most 64 diagnostic messages of 512 characters each. Discovery heartbeats are valid for ten seconds. Python HTTP calls default to three seconds and can be configured from `0.05` to `30` seconds.
+The plugin publishes these authoritative defaults through `capabilities`: 64 KiB requests, 256 KiB responses, eight queued requests, JSON depth 16, strings up to 4096 characters, and a five-second Game-thread dispatch deadline. Inspection uses 25 records by default and allows 100 per page, scans at most 2,048 registry candidates, accepts at most 4,096 structural records, retains 32 cursors for 30 seconds, allows 32 targeted properties, returns at most 16 changed defaults per component, and lists at most 64 member or callable references. Asset-reference discovery examines at most 4,096 registry candidates and 8,192 loaded objects, retains at most 2,048 records and eight cursors, expands at most 64 assets per referencer package, reports at most 16 live property names, and traverses only direct references. Action cataloging returns at most 50 results, scans at most 20,000 spawners for one second, retains 32 catalogs and 256 actions for 60 seconds, and permits one Game-thread catalog at a time. Graph editing permits 2,048 nodes per graph, 256 pins per changed-node result, integer coordinates within ±1,000,000, 64 links per pin, and 512 canonical pin-default characters. Function, macro, and custom-event signatures accept at most 32 parameters. K2 container defaults hold at most 64 items or map entries. Game-data schemas and nested structs contain at most 64 fields, containers hold at most 64 items, reflected values nest to depth four, one edit touches at most 64 rows, inspection refuses tables above 2,048 rows, and destructive schema scans examine at most 256 dependencies. The operation ledger retains 128 operations for 15 minutes. Compilation returns at most 64 diagnostic messages of 512 characters each. Discovery heartbeats are valid for ten seconds. Python HTTP calls default to three seconds and can be configured from `0.05` to `30` seconds.
 
 ## Offline development and tests
 

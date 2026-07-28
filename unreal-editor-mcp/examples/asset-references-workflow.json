@@ -1,0 +1,15 @@
+{
+  "find_references": {
+    "asset_path": "/Game/Data/ST_WeaponStats.ST_WeaponStats",
+    "page_size": 1
+  },
+  "continue_exact_snapshot": {
+    "cursor": "0123456789abcdef0123456789abcdef",
+    "page_size": 25
+  },
+  "interpretation": {
+    "complete_empty_result": "Bounded evidence only; runtime-built string paths, external code, and weak references are not included.",
+    "serialized_granularity": "package",
+    "cursor_policy": "query-bound, single-use, 30 seconds, stale after an observed Asset Registry change"
+  }
+}

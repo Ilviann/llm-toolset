@@ -597,6 +597,8 @@ def run_automation(executable: Path, project: Path, environment: dict[str, str],
         "MultiplayerAuthoring",
         "FrameworkAssignment",
         "GameDataAuthoring",
+        "DiscoverySnapshotsAndSafety",
+        "RegistryLiveMemoryAndCursors",
     )
     if test_filter == "UnrealMCP":
         expected = all_expected
@@ -628,6 +630,8 @@ def run_automation(executable: Path, project: Path, environment: dict[str, str],
         expected = tuple(name for name in all_expected if name in {"MultiplayerAuthoring", "FrameworkAssignment"})
     elif test_filter == "UnrealMCP.Phase17":
         expected = tuple(name for name in all_expected if name == "GameDataAuthoring")
+    elif test_filter == "UnrealMCP.AssetReferences":
+        expected = tuple(name for name in all_expected if name == "RegistryLiveMemoryAndCursors")
     else:
         leaf = test_filter.rsplit(".", 1)[-1]
         expected = (leaf,) if leaf in all_expected else ()
@@ -721,6 +725,7 @@ def main() -> int:
             state = bridge.call("editor_state")
             if capabilities.get("commands") != [
                 "capabilities", "editor_state", "editor_shutdown", "operation_status",
+                "asset_references",
                 "level_inspect", "level_open",
                 "blueprint_inspect", "blueprint_action_catalog", "blueprint_graph_edit",
                 "blueprint_create", "blueprint_compile", "blueprint_save",
@@ -766,6 +771,9 @@ def main() -> int:
             for feature in ("level_discovery", "level_open", "level_snapshots"):
                 if capabilities.get("features", {}).get(feature) is not True:
                     raise AssertionError(f"level-open capability is unavailable: {feature}")
+            for feature in ("asset_reference_discovery", "asset_reference_live_memory"):
+                if capabilities.get("features", {}).get(feature) is not True:
+                    raise AssertionError(f"asset-references capability is unavailable: {feature}")
             family_matrix = capabilities.get("blueprint_families", [])
             if [record.get("family") for record in family_matrix] != [
                 "actor", "game_mode_base", "game_mode", "game_state_base", "game_state", "game_instance",
@@ -796,6 +804,20 @@ def main() -> int:
             if capabilities.get("limits", {}).get("level_discovery_scan") != 2048 \
                     or capabilities.get("limits", {}).get("level_external_packages") != 2048:
                 raise AssertionError(f"level-open limits mismatch: {capabilities.get('limits')!r}")
+            expected_asset_reference_limits = {
+                "asset_reference_registry_candidates": 4096,
+                "asset_reference_live_objects": 8192,
+                "asset_reference_records": 2048,
+                "asset_reference_assets_per_package": 64,
+                "asset_reference_properties": 16,
+                "asset_reference_retained_cursors": 8,
+                "asset_reference_traversal_depth": 1,
+            }
+            if any(capabilities.get("limits", {}).get(name) != value
+                   for name, value in expected_asset_reference_limits.items()):
+                raise AssertionError(
+                    f"asset-references limits mismatch: {capabilities.get('limits')!r}"
+                )
             if capabilities.get("asset_access") != {
                 "read_scope": "all_mounted_content",
                 "mutation_scope": "project_content_and_local_project_plugins",
@@ -875,6 +897,31 @@ def main() -> int:
             phase_seventeen_game_data = author_phase_seventeen_game_data(
                 bridge, layout, capabilities["bridge_instance_id"],
             )
+            reference_asset_path = phase_seventeen_game_data["struct_path"]
+            reference_page = bridge.call("asset_references", {
+                "asset_path": reference_asset_path,
+                "page_size": 1,
+            })
+            reference_records = list(reference_page.get("records", []))
+            reference_snapshot = reference_page.get("snapshot_id")
+            if reference_page.get("target", {}).get("asset_path") != reference_asset_path \
+                    or not isinstance(reference_snapshot, str) or len(reference_snapshot) != 40:
+                raise AssertionError(f"asset-references target/snapshot mismatch: {reference_page!r}")
+            cursor = reference_page.get("next_cursor")
+            while cursor:
+                continued = bridge.call("asset_references", {"cursor": cursor, "page_size": 100})
+                if continued.get("snapshot_id") != reference_snapshot:
+                    raise AssertionError("asset-references cursor changed the exact snapshot")
+                reference_records.extend(continued.get("records", []))
+                cursor = continued.get("next_cursor")
+            if reference_page.get("scans", {}).get("serialized", {}).get("status") != "complete" \
+                    or not any(record.get("evidence") == "serialized"
+                               and record.get("referencer_asset_path") == phase_seventeen_game_data["table_path"]
+                               for record in reference_records):
+                raise AssertionError(
+                    f"asset-references did not find the serialized Data Table dependency: "
+                    f"{reference_page!r} {reference_records!r}"
+                )
             asset_path = "/Game/UnrealMCPPhase4/BP_ComponentFixture.BP_ComponentFixture"
             created = bridge.call("blueprint_default_edit", {
                 "operation_id": uuid.uuid4().hex,
@@ -1560,6 +1607,17 @@ def main() -> int:
                     or reloaded_rows[0].get("values", {}).get("Damage") != 45 \
                     or reloaded_rows[0].get("values", {}).get("AmmoType") != "Rifle":
                 raise AssertionError(f"Phase 17 typed rows changed after restart: {reloaded_table!r}")
+            reloaded_references = reloaded_bridge.call("asset_references", {
+                "asset_path": phase_seventeen_game_data["struct_path"],
+                "page_size": 100,
+            })
+            if reloaded_references.get("scans", {}).get("serialized", {}).get("status") != "complete" \
+                    or not any(record.get("evidence") == "serialized"
+                               and record.get("referencer_asset_path") == phase_seventeen_game_data["table_path"]
+                               for record in reloaded_references.get("records", [])):
+                raise AssertionError(
+                    f"serialized asset references changed after restart: {reloaded_references!r}"
+                )
             reloaded = collect_inspection(reloaded_bridge, {
                 "mode": "inspect",
                 "asset_path": "/Game/UnrealMCPPhase4/BP_ComponentFixture.BP_ComponentFixture",
@@ -1854,7 +1912,7 @@ def main() -> int:
             pass
         else:
             raise AssertionError("a live discovery heartbeat remained after editor termination")
-    print("Integration passed: level-open and Phase 17 authoring, replay/restart, and graceful lifecycle shutdown")
+    print("Integration passed: asset references, level-open, Phase 17 authoring, replay/restart, and graceful lifecycle shutdown")
     return 0
 
 

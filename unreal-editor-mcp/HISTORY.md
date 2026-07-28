@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.19.0 — 2026-07-28
+
+- Added read-only `asset_references` for exact mounted assets, with separate serialized, management, searchable-name, open-editor, and direct loaded-object evidence.
+- Added deterministic exact snapshots, bounded pages, single-use cursors, Asset Registry stale-cursor rejection, explicit completeness/limitation fields, and published reference-scan limits.
+- Added Unreal 5.8 public-API probes, a 32nd native automation case, Python schema/contract coverage, and cross-process serialized-reference verification.
+
 ## 0.18.0 — 2026-07-27
 
 - Added bounded `level_inspect` discovery plus exact current-map identity, revision, snapshot, dirtiness, World Partition, and external-actor state.

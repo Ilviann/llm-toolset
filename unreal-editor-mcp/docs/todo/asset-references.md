@@ -1,5 +1,7 @@
 # `asset-references` — Find asset references
 
+**Implementation status:** Completed in 0.19.0 and verified natively on Windows. Native macOS verification remains in the roadmap platform test backlog.
+
 **Outcome:** Agents can determine which mounted packages and live editor objects refer to one exact asset, within explicit completeness and response bounds, before proposing a destructive operation.
 
 ### Implementation

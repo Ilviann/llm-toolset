@@ -55,6 +55,7 @@ class UnrealBridge:
             "editor_state",
             "editor_shutdown",
             "operation_status",
+            "asset_references",
             "level_inspect",
             "level_open",
             "blueprint_inspect",

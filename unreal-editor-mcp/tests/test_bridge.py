@@ -11,7 +11,7 @@ from unreal_editor_mcp.errors import BridgeError, ErrorCode
 from unreal_editor_mcp.project import ProjectLayout
 
 
-RECORD = DiscoveryRecord("a" * 40, 123, 15485, "0.18.0", "5.8.0", 1)
+RECORD = DiscoveryRecord("a" * 40, 123, 15485, "0.19.0", "5.8.0", 1)
 
 
 class FakeResponse:
@@ -80,6 +80,7 @@ class BridgeTests(unittest.TestCase):
         operation_id = "c" * 32
         snapshot = "d" * 40
         calls = (
+            ("asset_references", {"asset_path": "/Game/DT_Weapons.DT_Weapons", "page_size": 10}),
             ("level_inspect", {"mode": "current"}),
             ("level_open", {"operation_id": operation_id, "map_path": "/Game/Maps/Test.Test"}),
             ("blueprint_create", {"operation_id": operation_id, "parent_class": "/Script/Engine.Actor", "package_path": "/Game/BP_New"}),

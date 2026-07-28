@@ -16,7 +16,7 @@ Feature identifiers are stable names, not execution indexes. Unfinished features
 - [x] [`phase-15` — GameInstance family](docs/todo/phase-15.md) — Add GameInstance family support.
 - [x] [`phase-16` — Multiplayer Blueprint authoring and framework assignment](docs/todo/phase-16.md) — Add RPC custom events, replication settings, and narrow GameMode/GameInstance project assignment.
 - [x] [`phase-17` — User-defined structs and Data Tables](docs/todo/phase-17.md) — Add bounded row-schema and typed game-design table authoring.
-- [ ] [`asset-references` — Find asset references](docs/todo/asset-references.md) — Find bounded serialized and live-memory referencers for one exact mounted asset.
+- [x] [`asset-references` — Find asset references](docs/todo/asset-references.md) — Find bounded serialized and live-memory referencers for one exact mounted asset.
 - [ ] [`asset-delete` — Delete asset](docs/todo/asset-delete.md) — Safely delete one exact unreferenced asset package through Unreal Editor.
   - Depends on:
     - `asset-references`
@@ -84,6 +84,7 @@ Feature checkboxes record implementation completion. This section separately lis
   - `editor-shutdown`
   - `editor-restart`
   - `level-open`
+  - `asset-references`
 - Windows:
   - None
 - Linux:

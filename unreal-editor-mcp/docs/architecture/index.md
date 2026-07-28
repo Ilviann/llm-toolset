@@ -13,5 +13,6 @@ Each file in this directory documents one implemented cohesive component: what i
 - [`gameplay-framework-editor.md`](gameplay-framework-editor.md) — narrow verified default GameMode/GameInstance project assignment and config restoration.
 - [`game-data-service.md`](game-data-service.md) — bounded user-defined struct schemas, typed Data Table rows, dependencies, transactions, saving, and cursors.
 - [`level-service.md`](level-service.md) — bounded mounted-map discovery, current-map identities and snapshots, delegate invalidation, and safe ledger-backed opening.
+- [`asset-reference-service.md`](asset-reference-service.md) — exact mounted targets, inbound registry evidence, live-memory evidence, snapshots, and stale-safe pagination.
 - [`windows-deployment-helper.md`](windows-deployment-helper.md) — tkinter project/Engine selection, installed Win64 packaging, symbol-free project deployment, and LM Studio configuration.
 - [`automated-verification.md`](automated-verification.md) — Python, native, public-API-probe, and cross-process verification boundaries.

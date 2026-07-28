@@ -12,4 +12,5 @@ References in this directory are grouped by the component that owns the contract
 - [`gameplay-framework-editor/`](gameplay-framework-editor/index.md) — exact default GameMode/GameInstance assignment, persistence, results, and exclusions.
 - [`game-data-service/`](game-data-service/index.md) — user-defined struct schemas, Data Table rows, recursive reflected values, batching, dependencies, snapshots, and limits.
 - [`level-service/`](level-service/index.md) — mounted map discovery, current-map identities, revisions, snapshots, cursors, and safe opening.
+- [`asset-reference-service/`](asset-reference-service/index.md) — exact reference targets, evidence categories, scan completeness, snapshots, cursors, limits, and exclusions.
 - [`windows-deployment-helper/`](windows-deployment-helper/index.md) — Windows project and Engine selection, binary-package filtering, replace-safe installation, and LM Studio JSON.
