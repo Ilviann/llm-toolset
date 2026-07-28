@@ -10,6 +10,7 @@ References in this directory are grouped by the component that owns the contract
 - [`blueprint-graph-editor/`](blueprint-graph-editor/index.md) — action-backed graph-node lifecycle, typed pin defaults, wildcard-aware connections, bounded conversions, persistent identities, and results.
 - [`blueprint-mutator/`](blueprint-mutator/index.md) — published-family Blueprint creation, compile/save, components/defaults, member variables, functions, locals, macros, custom events, diagnostics, mutation scope, and cleanup contracts.
 - [`widget-tree/`](widget-tree/index.md) — Widget Blueprint tree/default records, stable widget and slot identities, structural edit requests, results, limits, and exclusions.
+- [`umg-authoring/`](umg-authoring/index.md) — typed layout/style edits, property and Designer-event bindings, records, costs, limits, and exclusions.
 - [`gameplay-framework-editor/`](gameplay-framework-editor/index.md) — exact default GameMode/GameInstance assignment, persistence, results, and exclusions.
 - [`game-data-service/`](game-data-service/index.md) — user-defined struct schemas, Data Table rows, recursive reflected values, batching, dependencies, snapshots, and limits.
 - [`level-service/`](level-service/index.md) — mounted map discovery, current-map identities, revisions, snapshots, cursors, and safe opening.

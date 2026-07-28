@@ -11,6 +11,10 @@ Each file in this directory documents one implemented cohesive component: what i
 - [`blueprint-graph-editor.md`](blueprint-graph-editor.md) — request decoding, focused node/pin operation handlers, transactional graph editing, identity completion, and result read-back.
 - [`blueprint-mutator.md`](blueprint-mutator.md) — safe published-family Blueprint creation, compilation, package saving, diagnostics, cleanup, and read-back.
 - [`widget-tree-service.md`](widget-tree-service.md) — bounded Widget Blueprint hierarchy/default inspection and stale-safe structural editing.
+- [`umg-layout-service.md`](umg-layout-service.md) — typed common panel-slot layout editing and inspection.
+- [`umg-style-service.md`](umg-style-service.md) — bounded reflected widget presentation editing.
+- [`umg-binding-service.md`](umg-binding-service.md) — exact property bindings and Designer-event graph nodes.
+- [`umg-authoring-support.md`](umg-authoring-support.md) — shared request validation, identity resolution, value decoding, and mutation results.
 - [`gameplay-framework-editor.md`](gameplay-framework-editor.md) — narrow verified default GameMode/GameInstance project assignment and config restoration.
 - [`game-data-service.md`](game-data-service.md) — request validation, struct/table operation handlers, bounded inspection/result building, transactions, saving, and cursors.
 - [`level-service.md`](level-service.md) — bounded mounted-map discovery, current-map identities and snapshots, delegate invalidation, and safe ledger-backed opening.

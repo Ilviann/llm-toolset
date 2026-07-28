@@ -2,22 +2,22 @@
 
 ## Responsibility
 
-`FUnrealMCPWidgetTreeService` owns authenticated `widget_tree_edit` execution for one exact `UWidgetBlueprint`. `UnrealMCPWidgetTreeInspector.h` extends the existing inspector builder with widget, panel-slot, named-slot, and targeted default records. `UnrealMCPWidgetTreeSupport.h` owns deterministic traversal and stable identity helpers.
+`FUnrealMCPWidgetTreeService` is the `widget_tree_edit` facade for one exact `UWidgetBlueprint`. It owns structural operations and delegates UMG layout, styling, property bindings, and Designer events to focused services. `UnrealMCPWidgetTreeInspector.h` emits widget, slot, default, layout, and binding records. `UnrealMCPWidgetTreeSupport.h` owns deterministic traversal and stable tree identities.
 
 ## Dependencies
 
-The service depends on the shared Blueprint family policy, inspector snapshots, mutation path/precondition helpers, property codec, reference scanner, public `WidgetTree`/`UPanelWidget`/`INamedSlotInterface` APIs, and `FWidgetBlueprintOperationUtils`. The HTTP bridge owns the service facade; the Python widget schema module owns model-facing request validation. No widget component writes protocol output or saves implicitly.
+The facade depends on Blueprint family policy, inspector snapshots, mutation preconditions, the reference scanner, public `WidgetTree`/panel/named-slot APIs, and `FWidgetBlueprintOperationUtils`. Layout, style, binding, and reflected-value responsibilities point inward through their own components. The HTTP bridge owns the facade; the Python widget catalog owns model-facing validation. No widget component writes protocol output or saves implicitly.
 
 ## Invariants
 
 - Only the published `widget` family is accepted. Actor component operations remain unavailable.
-- Widget identities use the Widget Blueprint's persistent name-to-GUID map. Panel-slot and named-slot identities are deterministic hashes of stable owners, children, and slot names.
-- Every edit requires a fresh operation ID and authoritative 40-character Blueprint snapshot. Operations are retained by the shared mutation ledger.
-- `set_root`, `add`, `remove`, `rename`, `reparent`, `set_variable`, and `set_property` each accept one exact shape and change only the selected local tree/default state.
-- Root removal/reparenting, cycles, occupied named slots, invalid classes, duplicate names, incompatible panel children, referenced destruction, and unsupported reflected properties fail before unsafe mutation.
-- Inspection refuses trees over 512 widgets, depth 32, or 256 named slots. It exposes at most 16 changed defaults per widget and refuses more than 1,024 total changed defaults.
+- Widget identities use the Widget Blueprint's persistent name-to-GUID map. Slot identities are deterministic hashes of stable owners, children, and slot names.
+- Every edit requires a fresh operation ID and authoritative snapshot and is retained by the shared mutation ledger.
+- Each operation accepts one exact shape and changes only selected local tree, layout, presentation, binding, or graph state.
+- Root/cycle/container/reference protections run before structural mutations; delegated services apply their narrower allowlists and signature checks.
+- Inspection refuses trees over 512 widgets, depth 32, 256 named slots, or 256 bindings.
 - Compilation and saving remain explicit Blueprint commands.
 
 ## Verification
 
-`UnrealMCP.WidgetTree.FamilyInspectionMutationAndPersistence` covers family policy, specialized creation, tree/default inspection, stable identities, transactions and undo/redo, stale state, reference refusal, component rejection, compilation, deletion, saving, and read-back. Python tests cover exact schemas, registration, version/capability contracts, and cross-process scenario wiring. The headless workflow authors and saves a tree, restarts the editor, and verifies its stable hierarchy and changed default.
+`UnrealMCP.WidgetTree.FamilyInspectionMutationAndPersistence` covers the structural contract. `UnrealMCP.UMGAuthoring.LayoutStyleBindingsAndEvents` covers typed Canvas layout, Text/ProgressBar presentation, member-property binding, Designer-event creation, inspection, compilation, and saving. Python tests cover exact schemas, registration, versions, capability limits, and focused component size.

@@ -1,6 +1,6 @@
 # Families and capabilities
 
-`capabilities.blueprint_families` contains seven ordered family records. Each adds `multiplayer` with exact Actor/component/variable replication Booleans and supported RPC modes. Parent change is always false; project assignment is true only for the two GameMode families and GameInstance. GameInstance and Widget report components false; Widget alone reports `widget_tree: true`.
+`capabilities.blueprint_families` contains seven ordered family records. Each adds `multiplayer` with exact Actor/component/variable replication Booleans and supported RPC modes. Parent change is always false; project assignment is true only for the two GameMode families and GameInstance. GameInstance and Widget report components false; Widget alone reports `widget_tree: true` and live `umg_authoring: true`.
 
 Classification uses the live native or generated class. Descendants of `AGameMode` remain `game_mode`; other descendants of `AGameModeBase` are `game_mode_base`. The equivalent nearest-family rule applies to `AGameState` and `AGameStateBase`. Other `AActor` descendants are `actor`. `UGameInstance` descendants are `game_instance`, `UUserWidget` descendants are `widget`, and unrelated UObject classes remain unsupported.
 

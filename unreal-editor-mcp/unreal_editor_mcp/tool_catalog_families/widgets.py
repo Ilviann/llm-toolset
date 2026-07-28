@@ -14,6 +14,55 @@ from .schemas import (
 
 
 _NAME: Final = {"type": "string", "minLength": 1, "maxLength": 128}
+
+
+def _widget_value(depth: int = 4) -> dict[str, object]:
+    scalar: list[dict[str, object]] = [
+        {"type": "boolean"},
+        {"type": "number"},
+        {"type": "string", "maxLength": 4096},
+        {
+            "type": "object",
+            "properties": {
+                "kind": {"const": "reference"},
+                "path": {
+                    "type": "string",
+                    "maxLength": 512,
+                    "pattern": r"^(|/(?!.*\\.\\.)[^\\\\]+)$",
+                },
+            },
+            "required": ["kind", "path"],
+            "additionalProperties": False,
+        },
+    ]
+    if depth <= 0:
+        return {"oneOf": scalar}
+    child = _widget_value(depth - 1)
+    return {
+        "oneOf": [
+            *scalar,
+            {"type": "array", "maxItems": 64, "items": child},
+            {
+                "type": "object",
+                "properties": {
+                    "kind": {"const": "struct"},
+                    "fields": {
+                        "type": "object",
+                        "maxProperties": 64,
+                        "propertyNames": {
+                            "type": "string", "minLength": 1, "maxLength": 128,
+                        },
+                        "additionalProperties": child,
+                    },
+                },
+                "required": ["kind", "fields"],
+                "additionalProperties": False,
+            },
+        ]
+    }
+
+
+_WIDGET_VALUE: Final = _widget_value()
 _TARGET: Final = {
     "oneOf": [
         {
@@ -60,8 +109,8 @@ WIDGET_TOOLS: Final = (
     {
         "name": "widget_tree_edit",
         "description": (
-            "Perform one stale-safe structural Widget Blueprint tree or safe widget-default "
-            "mutation using stable widget and slot identities."
+            "Perform one stale-safe Widget Blueprint hierarchy, layout, presentation, "
+            "property-binding, or designer-event mutation using stable identities."
         ),
         "inputSchema": {
             "oneOf": [
@@ -108,6 +157,47 @@ WIDGET_TOOLS: Final = (
                     widget_id=_COMPONENT_ID,
                     property_name=_NAME,
                     value=_PROPERTY_VALUE,
+                ),
+                _shape(
+                    "set_slot",
+                    ["slot_id", "property_name", "value"],
+                    slot_id=_COMPONENT_ID,
+                    property_name=_NAME,
+                    value=_WIDGET_VALUE,
+                ),
+                _shape(
+                    "set_style",
+                    ["widget_id", "property_name", "value"],
+                    widget_id=_COMPONENT_ID,
+                    property_name=_NAME,
+                    value=_WIDGET_VALUE,
+                ),
+                _shape(
+                    "bind_property",
+                    ["widget_id", "target_property", "source_kind", "source_name"],
+                    widget_id=_COMPONENT_ID,
+                    target_property=_NAME,
+                    source_kind={"type": "string", "enum": ["function", "property"]},
+                    source_name=_NAME,
+                ),
+                _shape(
+                    "unbind_property",
+                    ["widget_id", "target_property"],
+                    widget_id=_COMPONENT_ID,
+                    target_property=_NAME,
+                ),
+                _shape(
+                    "bind_event",
+                    ["widget_id", "delegate_name"],
+                    widget_id=_COMPONENT_ID,
+                    delegate_name=_NAME,
+                ),
+                _shape(
+                    "unbind_event",
+                    ["widget_id", "delegate_name", "policy"],
+                    widget_id=_COMPONENT_ID,
+                    delegate_name=_NAME,
+                    policy={"const": "reject_if_connected"},
                 ),
             ]
         },

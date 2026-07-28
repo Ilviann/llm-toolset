@@ -522,6 +522,10 @@ TSharedPtr<FJsonObject> FUnrealMCPBridge::Capabilities() const
     Features->SetBoolField(TEXT("game_instance_family"), true);
     Features->SetBoolField(TEXT("widget_blueprint_family"), true);
     Features->SetBoolField(TEXT("widget_tree_authoring"), true);
+    Features->SetBoolField(TEXT("umg_layout_authoring"), true);
+    Features->SetBoolField(TEXT("umg_style_authoring"), true);
+    Features->SetBoolField(TEXT("umg_property_bindings"), true);
+    Features->SetBoolField(TEXT("umg_designer_events"), true);
     Features->SetBoolField(TEXT("multiplayer_blueprint_authoring"), true);
     Features->SetBoolField(TEXT("custom_event_rpcs"), true);
     Features->SetBoolField(TEXT("typed_replication_settings"), true);
@@ -602,6 +606,7 @@ TSharedPtr<FJsonObject> FUnrealMCPBridge::Capabilities() const
     Limits->SetNumberField(TEXT("widget_named_slots"), UnrealMCP::MaxWidgetNamedSlots);
     Limits->SetNumberField(TEXT("widget_defaults_per_widget"), UnrealMCP::MaxWidgetDefaultsPerWidget);
     Limits->SetNumberField(TEXT("widget_changed_defaults"), UnrealMCP::MaxWidgetChangedDefaults);
+    Limits->SetNumberField(TEXT("widget_bindings"), UnrealMCP::MaxWidgetBindings);
     Result->SetObjectField(TEXT("limits"), Limits);
 
     const TSharedRef<FJsonObject> Listener = MakeShared<FJsonObject>();

@@ -15,7 +15,7 @@ class FakeBridge:
     def call(self, command, arguments=None):
         self.calls.append((command, arguments))
         if command == "capabilities":
-            return {"bridge_version": "0.21.1", "commands": [
+            return {"bridge_version": "0.22.0", "commands": [
                 "capabilities", "editor_state", "operation_status", "asset_references", "asset_delete",
                 "level_inspect", "level_open",
                 "blueprint_inspect", "blueprint_action_catalog", "blueprint_graph_edit",
@@ -39,7 +39,7 @@ class ServerStdioTests(unittest.TestCase):
         bridge = FakeBridge()
         server = MCPServer(bridge)
         initialized = server.handle({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2025-06-18"}})
-        self.assertEqual(initialized["result"]["serverInfo"]["version"], "0.21.1")
+        self.assertEqual(initialized["result"]["serverInfo"]["version"], "0.22.0")
         listed = server.handle({"jsonrpc": "2.0", "id": 2, "method": "tools/list"})
         self.assertEqual([tool["name"] for tool in listed["result"]["tools"]], [
             "capabilities", "editor_state", "operation_status", "asset_references", "asset_delete",
@@ -342,6 +342,34 @@ class ServerStdioTests(unittest.TestCase):
              "is_variable": True},
             {**base, "operation": "set_property", "widget_id": "e" * 32,
              "property_name": "RenderOpacity", "value": 0.5},
+            {**base, "operation": "set_slot", "slot_id": "f" * 32,
+             "property_name": "LayoutData", "value": {
+                 "kind": "struct", "fields": {
+                     "Offsets": {"kind": "struct", "fields": {
+                         "Left": 0, "Top": 0, "Right": 320, "Bottom": 64,
+                     }},
+                 },
+             }},
+            {**base, "operation": "set_style", "widget_id": "e" * 32,
+             "property_name": "ColorAndOpacity", "value": {
+                 "kind": "struct", "fields": {
+                     "SpecifiedColor": {"kind": "struct", "fields": {
+                         "R": 1.0, "G": 0.5, "B": 0.0, "A": 1.0,
+                     }},
+                     "ColorUseRule": "UseColor_Specified",
+                 },
+             }},
+            {**base, "operation": "set_style", "widget_id": "e" * 32,
+             "property_name": "DefaultOptions", "value": ["Low", "Medium", "High"]},
+            {**base, "operation": "bind_property", "widget_id": "e" * 32,
+             "target_property": "Text", "source_kind": "property",
+             "source_name": "Title"},
+            {**base, "operation": "unbind_property", "widget_id": "e" * 32,
+             "target_property": "Text"},
+            {**base, "operation": "bind_event", "widget_id": "e" * 32,
+             "delegate_name": "OnClicked"},
+            {**base, "operation": "unbind_event", "widget_id": "e" * 32,
+             "delegate_name": "OnClicked", "policy": "reject_if_connected"},
         )
         for arguments in valid:
             with self.subTest(arguments=arguments):
@@ -361,6 +389,10 @@ class ServerStdioTests(unittest.TestCase):
              "policy": "cascade"},
             {**base, "operation": "set_property", "widget_id": "e" * 32,
              "property_name": "Unsafe", "value": {"nested": True}},
+            {**base, "operation": "set_style", "widget_id": "e" * 32,
+             "property_name": "Brush", "value": {"nested": True}},
+            {**base, "operation": "unbind_event", "widget_id": "e" * 32,
+             "delegate_name": "OnClicked", "policy": "cascade"},
             {**base, "operation": "rename", "widget_id": "e" * 32,
              "new_name": "Heading", "extra": True},
         )

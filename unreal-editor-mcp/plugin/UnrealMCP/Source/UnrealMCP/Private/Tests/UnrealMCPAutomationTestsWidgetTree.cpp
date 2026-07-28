@@ -413,6 +413,7 @@ bool FUnrealMCPWidgetTreeTest::RunTest(const FString& Parameters)
     FDelegateEditorBinding WidgetBinding;
     WidgetBinding.ObjectName = TEXT("HUDStatus");
     Blueprint->Bindings.Add(WidgetBinding);
+    Snapshot = InspectSnapshot(Inspector, AssetPath);
 
     TSharedRef<FJsonObject> RemoveReferenced =
         WidgetEdit(AssetPath, Snapshot, TEXT("remove"));

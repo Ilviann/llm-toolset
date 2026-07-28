@@ -1,6 +1,9 @@
 #pragma once
 
 #include "UnrealMCPBlueprintInspectionSupport.h"
+#include "UnrealMCPWidgetBindingService.h"
+#include "UnrealMCPWidgetLayoutService.h"
+#include "UnrealMCPWidgetStyleService.h"
 #include "UnrealMCPWidgetTreeSupport.h"
 
 namespace UnrealMCP::BlueprintInspectionPrivate
@@ -62,7 +65,9 @@ inline bool CollectWidgetTree(
     UWidgetBlueprint* WidgetBlueprint = Cast<UWidgetBlueprint>(Blueprint);
     if (WidgetBlueprint == nullptr)
     {
-        if (!WidgetFilter.IsEmpty() || Sections.Contains(TEXT("widget_defaults")))
+        if (!WidgetFilter.IsEmpty()
+            || Sections.Contains(TEXT("widget_defaults"))
+            || Sections.Contains(TEXT("widget_bindings")))
         {
             OutError = {TEXT("wrong_type"), TEXT("Widget inspection requires a Widget Blueprint")};
             return false;
@@ -154,6 +159,14 @@ inline bool CollectWidgetTree(
             Value->SetBoolField(
                 TEXT("defaults_truncated"),
                 WidgetChangedDefaultCount > UnrealMCP::MaxWidgetDefaultsPerWidget);
+            TArray<TSharedPtr<FJsonValue>> StyleProperties;
+            for (const FString& Name :
+                FUnrealMCPWidgetStyleService::SupportedProperties(Widget))
+            {
+                StyleProperties.Add(MakeShared<FJsonValueString>(Name));
+            }
+            Value->SetArrayField(
+                TEXT("supported_style_properties"), StyleProperties);
             AddRecord(Sink.Records, Value);
         }
         if (Sections.Contains(TEXT("widget_defaults")) && bSelected)
@@ -213,10 +226,25 @@ inline bool CollectWidgetTree(
                     TEXT("slot_class"),
                     Child != nullptr && Child->Slot != nullptr
                         ? Child->Slot->GetClass()->GetPathName() : FString());
+                TArray<TSharedPtr<FJsonValue>> LayoutProperties;
+                for (const FString& Name :
+                    FUnrealMCPWidgetLayoutService::SupportedProperties(
+                        Child != nullptr ? Child->Slot : nullptr))
+                {
+                    LayoutProperties.Add(MakeShared<FJsonValueString>(Name));
+                }
+                Slot->SetArrayField(
+                    TEXT("supported_layout_properties"), LayoutProperties);
+                Slot->SetObjectField(
+                    TEXT("layout"),
+                    FUnrealMCPWidgetLayoutService::Encode(
+                        Child != nullptr ? Child->Slot : nullptr));
                 AddRecord(Sink.Records, Slot);
             }
             Sink.Fingerprint.Add(TEXT("widget_slot|panel|") + Id + TEXT("|")
-                + ParentId + TEXT("|") + ChildId + TEXT("|") + LexToString(Index));
+                + ParentId + TEXT("|") + ChildId + TEXT("|") + LexToString(Index)
+                + TEXT("|") + FUnrealMCPWidgetLayoutService::Fingerprint(
+                    Child != nullptr ? Child->Slot : nullptr));
         }
     }
     for (const UnrealMCP::WidgetTreePrivate::FNamedSlotRef& Ref : NamedSlots)
@@ -237,6 +265,24 @@ inline bool CollectWidgetTree(
         }
         Sink.Fingerprint.Add(TEXT("widget_slot|named|") + Ref.Id + TEXT("|")
             + Ref.HostId + TEXT("|") + Ref.Name.ToString() + TEXT("|") + ChildId);
+    }
+    TArray<FUnrealMCPWidgetBindingRecord> Bindings;
+    if (!FUnrealMCPWidgetBindingService::Collect(
+            WidgetBlueprint, Bindings, OutError))
+    {
+        return false;
+    }
+    for (const FUnrealMCPWidgetBindingRecord& Binding : Bindings)
+    {
+        Sink.Fingerprint.Add(TEXT("widget_binding|") + Binding.Fingerprint);
+        if (Sections.Contains(TEXT("widget_bindings"))
+            && (WidgetFilter.IsEmpty() || Binding.WidgetId == WidgetFilter)
+            && Binding.Record.IsValid())
+        {
+            AddRecord(
+                Sink.Records,
+                Binding.Record.ToSharedRef());
+        }
     }
     Sink.Fingerprint.Add(TEXT("widget_tree_depth|") + LexToString(TreeDepth));
     return true;

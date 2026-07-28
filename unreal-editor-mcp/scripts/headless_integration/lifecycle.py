@@ -417,6 +417,12 @@ def main() -> int:
             if capabilities.get("features", {}).get("widget_blueprint_family") is not True \
                     or capabilities.get("features", {}).get("widget_tree_authoring") is not True:
                 raise AssertionError("Widget Blueprint capability is unavailable")
+            for feature in (
+                "umg_layout_authoring", "umg_style_authoring",
+                "umg_property_bindings", "umg_designer_events",
+            ):
+                if capabilities.get("features", {}).get(feature) is not True:
+                    raise AssertionError(f"UMG authoring capability is unavailable: {feature}")
             for feature in ("multiplayer_blueprint_authoring", "custom_event_rpcs",
                             "typed_replication_settings", "gameplay_framework_assignment"):
                 if capabilities.get("features", {}).get(feature) is not True:
@@ -470,6 +476,7 @@ def main() -> int:
                 "widget_named_slots": 256,
                 "widget_defaults_per_widget": 16,
                 "widget_changed_defaults": 1024,
+                "widget_bindings": 256,
             }
             if any(capabilities.get("limits", {}).get(name) != value
                    for name, value in expected_widget_limits.items()):

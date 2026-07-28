@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.22.0 — 2026-07-28
+
+- Added stale-safe common panel-slot layout and bounded widget presentation edits through recursively typed reflected values, with live allowlists and inspection read-back.
+- Added exact widget-property bindings with explicit polling cost, Designer-event graph binding/unbinding, stable graph/node identities, reference safety, and binding-aware snapshots.
+- Split UMG authoring into focused layout, style, binding, and shared-support native components; added Python schemas, native Windows Automation coverage, documentation, and a complete workflow example.
+
 ## 0.21.1 — 2026-07-28
 
 - Split native Game Data and Blueprint Graph Editor code into focused request validation, operation-handler, and result/inspection-builder translation units without changing MCP schemas or behavior.

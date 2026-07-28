@@ -21,7 +21,7 @@ The CLI constructs a `ProjectLayout`, `UnrealBridge`, and `MCPServer`; the trans
 - Every mutation requires a caller-generated 32-lowercase-hex `operation_id`. Existing-asset mutations also require the current 40-lowercase-hex `expected_snapshot`.
 - Component operations use one exact discriminated shape; class/component property edits accept only the bounded shared value forms.
 - Member operations use exact add/rename/update/remove shapes with canonical K2 type/default records, stable identities, and reject-only signature/type/removal policies. Scoped discriminators cover functions, locals, macros, and custom events without adding another model-facing tool; custom-event add requires one stable event-graph identity.
-- `widget_tree_edit` uses seven exact operation shapes and stable widget/slot identities; the separate widget catalog module prevents further growth of the Blueprint schema module.
+- `widget_tree_edit` uses thirteen exact operation shapes for tree, layout, style, property-binding, and Designer-event edits with stable widget/slot/graph/node identities; the separate widget catalog module prevents further growth of the Blueprint schema module.
 - Custom-event metadata has exact RPC mode/reliability fields. Actor/component replication uses bounded setting discriminators, and framework assignment requires project hash plus expected current class.
 - Game-data inspection has exact struct/table/cursor shapes. Game-data edits discriminate schema and row operations, bound nested value depth/collections/fields/batches, and require snapshots for existing assets.
 - HTTP always targets the literal IPv4 loopback address and authenticates with the generated token.

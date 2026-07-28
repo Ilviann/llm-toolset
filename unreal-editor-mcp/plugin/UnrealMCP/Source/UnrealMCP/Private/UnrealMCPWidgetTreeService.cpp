@@ -8,6 +8,9 @@
 #include "ScopedTransaction.h"
 #include "UnrealMCPBlueprintMutationCommon.h"
 #include "UnrealMCPBlueprintReferenceScanner.h"
+#include "UnrealMCPWidgetBindingService.h"
+#include "UnrealMCPWidgetLayoutService.h"
+#include "UnrealMCPWidgetStyleService.h"
 #include "UnrealMCPWidgetTreeSupport.h"
 #include "WidgetBlueprintOperationUtils.h"
 
@@ -437,6 +440,24 @@ bool FUnrealMCPWidgetTreeService::Execute(
     {
         OutError = {TEXT("invalid_argument"), TEXT("operation is required")};
         return false;
+    }
+    if (Operation == TEXT("set_slot"))
+    {
+        return FUnrealMCPWidgetLayoutService(Inspector).Execute(
+            Arguments, OutResult, OutError);
+    }
+    if (Operation == TEXT("set_style"))
+    {
+        return FUnrealMCPWidgetStyleService(Inspector).Execute(
+            Arguments, OutResult, OutError);
+    }
+    if (Operation == TEXT("bind_property")
+        || Operation == TEXT("unbind_property")
+        || Operation == TEXT("bind_event")
+        || Operation == TEXT("unbind_event"))
+    {
+        return FUnrealMCPWidgetBindingService(Inspector).Execute(
+            Arguments, OutResult, OutError);
     }
 
     UWidgetBlueprint* Blueprint = nullptr;

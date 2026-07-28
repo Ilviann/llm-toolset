@@ -63,7 +63,7 @@ const TSet<FString> InspectSections = {
     TEXT("class_defaults"), TEXT("variables"), TEXT("functions"), TEXT("macros"), TEXT("custom_events"),
     TEXT("parameters"), TEXT("local_variables"),
     TEXT("graphs"), TEXT("nodes"), TEXT("pins"), TEXT("connections"),
-    TEXT("widget_tree"), TEXT("widget_defaults")};
+    TEXT("widget_tree"), TEXT("widget_defaults"), TEXT("widget_bindings")};
 
 const TSet<FString> SupportedPinCategories = {
     TEXT("exec"), TEXT("boolean"), TEXT("byte"), TEXT("int"), TEXT("int64"), TEXT("real"),

@@ -42,7 +42,7 @@ static bool DecodeInspectionQuery(const FJsonObject& Arguments, FInspectionQuery
     if (Arguments.HasField(TEXT("sections")))
     {
         const TArray<TSharedPtr<FJsonValue>>* Values = nullptr;
-        if (!Arguments.TryGetArrayField(TEXT("sections"), Values) || Values == nullptr || Values->IsEmpty() || Values->Num() > 17)
+        if (!Arguments.TryGetArrayField(TEXT("sections"), Values) || Values == nullptr || Values->IsEmpty() || Values->Num() > 18)
         {
             OutError = {TEXT("invalid_argument"), TEXT("sections must be a non-empty bounded array")};
             return false;

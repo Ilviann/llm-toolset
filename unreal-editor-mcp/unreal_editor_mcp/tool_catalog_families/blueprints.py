@@ -65,7 +65,7 @@ BLUEPRINT_TOOLS: Final = (
                         "sections": {
                             "type": "array",
                             "minItems": 1,
-                            "maxItems": 17,
+                            "maxItems": 18,
                             "items": {
                                 "type": "string",
                                 "enum": [
@@ -73,7 +73,7 @@ BLUEPRINT_TOOLS: Final = (
                                     "class_defaults", "variables", "functions", "macros", "custom_events",
                                     "parameters", "local_variables",
                                     "graphs", "nodes", "pins", "connections",
-                                    "widget_tree", "widget_defaults",
+                                    "widget_tree", "widget_defaults", "widget_bindings",
                                 ],
                             },
                         },

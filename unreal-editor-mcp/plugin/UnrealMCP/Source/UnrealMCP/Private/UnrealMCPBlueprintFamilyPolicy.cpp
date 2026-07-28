@@ -204,6 +204,8 @@ TSharedRef<FJsonObject> BuildLiveCapabilities(const UBlueprint* Blueprint)
     Result->SetBoolField(TEXT("components"), Supports(ParentClass, EOperation::Components) && bComponents);
     Result->SetBoolField(TEXT("widget_tree"), Supports(ParentClass, EOperation::WidgetTree)
         && Cast<UWidgetBlueprint>(Blueprint) != nullptr);
+    Result->SetBoolField(TEXT("umg_authoring"), Supports(ParentClass, EOperation::WidgetTree)
+        && Cast<UWidgetBlueprint>(Blueprint) != nullptr);
     Result->SetBoolField(TEXT("event_graphs"), Family.bSupported && bEventGraph);
     Result->SetBoolField(TEXT("local_variables"), Family.bSupported && bNormalBlueprint);
     Result->SetBoolField(TEXT("overrides"), Family.bSupported && bOverrides);

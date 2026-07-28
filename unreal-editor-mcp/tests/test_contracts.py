@@ -42,7 +42,7 @@ class ReleaseContractTests(unittest.TestCase):
         native = re.search(r'Version\[\].*TEXT\("([^"]+)"\)', header)
         self.assertIsNotNone(native)
         versions = {project["project"]["version"], plugin["VersionName"], native.group(1), unreal_editor_mcp.__version__}
-        self.assertEqual(versions, {"0.21.1"})
+        self.assertEqual(versions, {"0.22.0"})
 
     def test_only_released_asset_delete_commands_are_registered(self):
         names = [tool["name"] for tool in TOOLS]
@@ -172,20 +172,50 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertIn('TEXT("widget")', policy)
         self.assertIn("UUserWidget::StaticClass()", policy)
         self.assertIn('Command == TEXT("widget_tree_edit")', bridge)
-        for feature in ["widget_blueprint_family", "widget_tree_authoring"]:
+        for feature in [
+            "widget_blueprint_family", "widget_tree_authoring",
+            "umg_layout_authoring", "umg_style_authoring",
+            "umg_property_bindings", "umg_designer_events",
+        ]:
             self.assertIn(f'TEXT("{feature}"), true', bridge)
         for limit in [
             "MaxWidgetTreeWidgets", "MaxWidgetTreeDepth", "MaxWidgetNamedSlots",
             "MaxWidgetDefaultsPerWidget", "MaxWidgetChangedDefaults",
+            "MaxWidgetBindings",
         ]:
             self.assertIn(limit, bridge + inspector)
         for operation in [
             "set_root", "add", "remove", "rename", "reparent",
             "set_variable", "set_property",
+            "set_slot", "set_style", "bind_property", "unbind_property",
+            "bind_event", "unbind_event",
         ]:
             self.assertIn(f'TEXT("{operation}")', service)
         self.assertIn(
             "UnrealMCP.WidgetTree.FamilyInspectionMutationAndPersistence",
+            native_test,
+        )
+
+    def test_umg_authoring_has_focused_native_components(self):
+        root = ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private"
+        expected = {
+            "UnrealMCPWidgetAuthoringSupport.cpp": "ApplyProperty",
+            "UnrealMCPWidgetLayoutService.cpp": "FUnrealMCPWidgetLayoutService::Execute",
+            "UnrealMCPWidgetStyleService.cpp": "FUnrealMCPWidgetStyleService::Execute",
+            "UnrealMCPWidgetBindingService.cpp": "FUnrealMCPWidgetBindingService::Execute",
+        }
+        for filename, owner in expected.items():
+            source = (root / filename).read_text(encoding="utf-8")
+            self.assertIn(owner, source)
+            self.assertLessEqual(len(source.splitlines()), 600)
+        inspector = (root / "UnrealMCPWidgetTreeInspector.h").read_text(encoding="utf-8")
+        self.assertIn('TEXT("widget_bindings")', inspector)
+        self.assertIn("FUnrealMCPWidgetLayoutService::Fingerprint", inspector)
+        native_test = (
+            root / "Tests/UnrealMCPAutomationTestsUMGAuthoring.cpp"
+        ).read_text(encoding="utf-8")
+        self.assertIn(
+            "UnrealMCP.UMGAuthoring.LayoutStyleBindingsAndEvents",
             native_test,
         )
 
