@@ -9,7 +9,7 @@
 
 namespace
 {
-TSharedRef<FJsonObject> DataCreateArguments(
+TSharedRef<FJsonObject> AssetReferenceDataCreateArguments(
     const FString& Target,
     const FString& AssetPath)
 {
@@ -57,7 +57,9 @@ bool FUnrealMCPAssetReferencesTest::RunTest(const FString& Parameters)
     TSharedPtr<FJsonObject> Result;
     FUnrealMCPError Error;
     TSharedRef<FJsonObject> CreateStruct =
-        DataCreateArguments(TEXT("user_defined_struct"), StructPackage);
+        AssetReferenceDataCreateArguments(
+            TEXT("user_defined_struct"),
+            StructPackage);
     const TSharedRef<FJsonObject> Member = MakeShared<FJsonObject>();
     Member->SetStringField(TEXT("name"), TEXT("Value"));
     Member->SetObjectField(TEXT("type"), K2Type(TEXT("int")));
@@ -79,7 +81,9 @@ bool FUnrealMCPAssetReferencesTest::RunTest(const FString& Parameters)
     for (const FString& TablePackage : {TablePackageA, TablePackageB})
     {
         TSharedRef<FJsonObject> CreateTable =
-            DataCreateArguments(TEXT("data_table"), TablePackage);
+            AssetReferenceDataCreateArguments(
+                TEXT("data_table"),
+                TablePackage);
         CreateTable->SetStringField(TEXT("row_struct"), StructPath);
         if (!TestTrue(
             TEXT("serialized referencer Data Table creates"),

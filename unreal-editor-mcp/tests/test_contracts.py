@@ -58,17 +58,26 @@ class ReleaseContractTests(unittest.TestCase):
 
     def test_asset_references_is_published_bounded_and_covered(self):
         bridge = (ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private/UnrealMCPBridge.cpp").read_text(encoding="utf-8")
-        service = (ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private/UnrealMCPAssetReferenceService.cpp").read_text(encoding="utf-8")
+        source_dir = ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private"
+        components = {
+            name: (source_dir / f"UnrealMCPAssetReference{name}.cpp").read_text(encoding="utf-8")
+            for name in [
+                "Service", "TargetResolver", "RegistryScanner", "LiveScanner",
+                "SnapshotBuilder", "CursorStore",
+            ]
+        }
         native_test = (ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private/Tests/UnrealMCPAutomationTestsAssetReferences.cpp").read_text(encoding="utf-8")
         for feature in ["asset_reference_discovery", "asset_reference_live_memory"]:
             self.assertIn(f'TEXT("{feature}"), true', bridge)
-        for bound in [
-            "MaxAssetReferenceRegistryCandidates", "MaxAssetReferenceLiveObjects",
-            "MaxAssetReferenceRecords", "MaxAssetReferenceRetainedCursors",
-        ]:
-            self.assertIn(bound, service)
-        for evidence in ["serialized", "management", "searchable_name", "live_memory"]:
-            self.assertIn(f'TEXT("{evidence}")', service)
+        self.assertIn("MaxAssetReferenceRegistryCandidates", components["RegistryScanner"])
+        self.assertIn("MaxAssetReferenceLiveObjects", components["LiveScanner"])
+        self.assertIn("MaxAssetReferenceRecords", components["RegistryScanner"] + components["LiveScanner"])
+        self.assertIn("MaxAssetReferenceRetainedCursors", components["CursorStore"])
+        for evidence in ["serialized", "management", "searchable_name"]:
+            self.assertIn(f'TEXT("{evidence}")', components["RegistryScanner"] + components["SnapshotBuilder"])
+        self.assertIn('TEXT("live_memory")', components["LiveScanner"] + components["SnapshotBuilder"])
+        for collaborator in ["TargetResolver", "RegistryScanner", "LiveScanner", "SnapshotBuilder", "CursorStore"]:
+            self.assertIn(f"FUnrealMCPAssetReference{collaborator}", "".join(components.values()))
         self.assertIn("UnrealMCP.AssetReferences.RegistryLiveMemoryAndCursors", native_test)
 
     def test_asset_delete_is_ledger_backed_conservative_and_covered(self):

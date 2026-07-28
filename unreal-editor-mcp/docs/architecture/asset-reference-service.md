@@ -2,11 +2,11 @@
 
 ## Ownership
 
-`FUnrealMCPAssetReferenceService` owns exact mounted-asset resolution, inbound Asset Registry evidence, bounded live-memory evidence, deterministic reference snapshots, and reference-page cursors. `UnrealMCPBridge` owns HTTP admission and constructs the service lazily; `asset_references` is read-only and never enters the operation ledger. The asset-deletion service may request the same complete in-memory snapshot without creating a model-facing cursor.
+`FUnrealMCPAssetReferenceService` is the narrow `asset_references` facade. It validates the initial-versus-continuation request shape, delegates exact targets to the target resolver, delegates snapshot capture to the snapshot builder, and delegates page retention to the cursor store. `UnrealMCPBridge` owns HTTP admission and constructs the facade lazily; `asset_references` is read-only and never enters the operation ledger. The asset-deletion service depends only on the facade's complete in-memory snapshot contract and never creates a model-facing cursor.
 
 ## Dependency direction
 
-The service reads public Asset Registry dependency data without loading candidate packages. It optionally reads the already-loaded target through `FindObject`, open editor state through `UAssetEditorSubsystem`, and direct strong UObject references through a bounded object iterator and `FReferenceFinder`. The latter uses reflected reference collection and `AddReferencedObjects`, not arbitrary UObject `Serialize` overrides. The service does not depend on Blueprint or level mutation components.
+The facade composes [`asset-reference-target-resolver.md`](asset-reference-target-resolver.md), [`asset-reference-registry-scanner.md`](asset-reference-registry-scanner.md), [`asset-reference-live-scanner.md`](asset-reference-live-scanner.md), [`asset-reference-snapshot-builder.md`](asset-reference-snapshot-builder.md), and [`asset-reference-cursor-store.md`](asset-reference-cursor-store.md). Dependencies flow from the facade through snapshot/page orchestration to the stateless resolvers and scanners; no lower component depends on the facade, deletion service, Blueprint components, or level mutation components.
 
 ## Invariants
 

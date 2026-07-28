@@ -286,8 +286,6 @@ TSharedRef<FJsonObject> BuildResult(
 }
 }
 
-using namespace UnrealMCPAssetDeletionPrivate;
-
 FUnrealMCPAssetDeletionService::FUnrealMCPAssetDeletionService(
     FUnrealMCPAssetReferenceService& InReferences)
     : References(InReferences)
@@ -301,7 +299,7 @@ bool FUnrealMCPAssetDeletionService::Delete(
 {
     check(IsInGameThread());
     if (!Arguments.IsValid()
-        || !HasOnlyFields(*Arguments, {
+        || !UnrealMCPAssetDeletionPrivate::HasOnlyFields(*Arguments, {
             TEXT("operation_id"), TEXT("asset_path"), TEXT("expected_snapshot")}))
     {
         OutError = {
@@ -313,17 +311,17 @@ bool FUnrealMCPAssetDeletionService::Delete(
     FString AssetPath;
     FString ExpectedSnapshot;
     if (!Arguments->TryGetStringField(TEXT("operation_id"), OperationId)
-        || !IsLowerHex(OperationId, 32)
+        || !UnrealMCPAssetDeletionPrivate::IsLowerHex(OperationId, 32)
         || !Arguments->TryGetStringField(TEXT("asset_path"), AssetPath)
         || !Arguments->TryGetStringField(TEXT("expected_snapshot"), ExpectedSnapshot)
-        || !IsLowerHex(ExpectedSnapshot, 40))
+        || !UnrealMCPAssetDeletionPrivate::IsLowerHex(ExpectedSnapshot, 40))
     {
         OutError = {
             TEXT("invalid_argument"),
             TEXT("asset_delete requires valid operation_id, exact asset_path, and reference snapshot")};
         return false;
     }
-    if (HasUnsafeEditorWork(OutError))
+    if (UnrealMCPAssetDeletionPrivate::HasUnsafeEditorWork(OutError))
     {
         return false;
     }
@@ -353,7 +351,9 @@ bool FUnrealMCPAssetDeletionService::Delete(
         return false;
     }
     const FString PackageName = Asset.PackageName.ToString();
-    if (!ValidateMutationScope(PackageName, OutError))
+    if (!UnrealMCPAssetDeletionPrivate::ValidateMutationScope(
+        PackageName,
+        OutError))
     {
         return false;
     }
@@ -363,7 +363,7 @@ bool FUnrealMCPAssetDeletionService::Delete(
         return false;
     }
     if (Asset.AssetClassPath == UWorld::StaticClass()->GetClassPathName()
-        || IsCurrentMapPackage(PackageName))
+        || UnrealMCPAssetDeletionPrivate::IsCurrentMapPackage(PackageName))
     {
         OutError = {TEXT("unsupported_asset"), TEXT("Map and current-world packages are outside asset_delete scope")};
         return false;
@@ -444,7 +444,10 @@ bool FUnrealMCPAssetDeletionService::Delete(
     FUnrealMCPAssetReferenceSnapshot Final;
     bool bLiveScanComplete = false;
     if (!References.Capture(AssetPath, Final, OutError)
-        || !ReferenceScansSufficient(Final, bLiveScanComplete, OutError))
+        || !UnrealMCPAssetDeletionPrivate::ReferenceScansSufficient(
+            Final,
+            bLiveScanComplete,
+            OutError))
     {
         return false;
     }
@@ -474,7 +477,8 @@ bool FUnrealMCPAssetDeletionService::Delete(
             Details};
         return false;
     }
-    if (HasUnsafeEditorWork(OutError) || Package->IsDirty())
+    if (UnrealMCPAssetDeletionPrivate::HasUnsafeEditorWork(OutError)
+        || Package->IsDirty())
     {
         if (Package->IsDirty())
         {
@@ -506,7 +510,7 @@ bool FUnrealMCPAssetDeletionService::Delete(
     const bool bStorageAbsent =
         !FPackageName::DoesPackageExist(PackageName, &RemainingFilename)
         && !IFileManager::Get().FileExists(*PackageFilename);
-    OutResult = BuildResult(
+    OutResult = UnrealMCPAssetDeletionPrivate::BuildResult(
         AssetPath,
         PackageName,
         ExpectedSnapshot,

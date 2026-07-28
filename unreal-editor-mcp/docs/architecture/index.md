@@ -13,7 +13,12 @@ Each file in this directory documents one implemented cohesive component: what i
 - [`gameplay-framework-editor.md`](gameplay-framework-editor.md) — narrow verified default GameMode/GameInstance project assignment and config restoration.
 - [`game-data-service.md`](game-data-service.md) — bounded user-defined struct schemas, typed Data Table rows, dependencies, transactions, saving, and cursors.
 - [`level-service.md`](level-service.md) — bounded mounted-map discovery, current-map identities and snapshots, delegate invalidation, and safe ledger-backed opening.
-- [`asset-reference-service.md`](asset-reference-service.md) — exact mounted targets, inbound registry evidence, live-memory evidence, snapshots, and stale-safe pagination.
+- [`asset-reference-service.md`](asset-reference-service.md) — request validation and facade composition for reference capture and pagination.
+- [`asset-reference-target-resolver.md`](asset-reference-target-resolver.md) — exact mounted-target validation, non-loading resolution, and metadata.
+- [`asset-reference-registry-scanner.md`](asset-reference-registry-scanner.md) — bounded serialized, management, and searchable-name inbound evidence.
+- [`asset-reference-live-scanner.md`](asset-reference-live-scanner.md) — bounded open-editor and direct loaded-object evidence.
+- [`asset-reference-snapshot-builder.md`](asset-reference-snapshot-builder.md) — scan aggregation, stable ordering, and deterministic snapshot identity.
+- [`asset-reference-cursor-store.md`](asset-reference-cursor-store.md) — registry serials, bounded snapshot retention, and stale-safe single-use pagination.
 - [`asset-deletion-service.md`](asset-deletion-service.md) — exact single-package deletion, conservative preflight, retained outcomes, and persistence verification.
 - [`windows-deployment-helper.md`](windows-deployment-helper.md) — tkinter project/Engine selection, installed Win64 packaging, symbol-free project deployment, and LM Studio configuration.
 - [`automated-verification.md`](automated-verification.md) — Python, native, public-API-probe, and cross-process verification boundaries.

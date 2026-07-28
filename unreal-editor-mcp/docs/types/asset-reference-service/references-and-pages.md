@@ -16,3 +16,5 @@ Live records use `section:"live_memory"` and identify an `asset_editor`, `loaded
 Every `serialized`, `management`, `searchable_name`, and `live_memory` scan reports `status`, Boolean `complete`/`truncated`/`unsupported`/`stale`, and candidate/scanned/record counts. Limits are 4,096 registry candidates, 8,192 loaded objects, 2,048 total records, 64 Asset Registry assets expanded per package, 16 live property names, traversal depth one, eight retained reference cursors, 100 records per page, 30 seconds per cursor, and the global 256 KiB response ceiling.
 
 The `limitations` object explicitly excludes runtime-constructed string paths, external code references, and weak live references. Therefore a complete empty result is useful bounded evidence, not an absolute guarantee that runtime code can never reach the asset.
+
+Internally, the facade preserves this wire contract while delegating exact resolution, the three registry categories, live-memory evidence, snapshot construction, and cursor retention to separate components. The deletion service consumes the same snapshot record through the facade and does not depend on any scanner or cursor implementation.
