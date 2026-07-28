@@ -1,0 +1,4 @@
+interface:
+  display_name: "Maintain Project Documentation"
+  short_description: "Keep implementation docs aligned with source"
+  default_prompt: "Use $maintain-project-documentation to keep project implementation documentation current."
