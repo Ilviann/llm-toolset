@@ -4,7 +4,7 @@ This directory tracks confirmed errors through investigation and resolution. Eac
 
 ## Open issues
 
-- None.
+- [`issue-2.md`](issue-2.md) — Unreal Editor can intermittently crash during an `editor_lifecycle` restart; investigation is awaiting crash logs and reproduction details.
 
 ## Resolved issues
 
