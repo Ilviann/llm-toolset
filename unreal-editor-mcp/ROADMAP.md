@@ -24,6 +24,15 @@ Feature identifiers are stable names, not execution indexes. Unfinished features
 - [x] [`umg-authoring` — UMG layout, styling, bindings, and UI logic](docs/todo/umg-authoring.md) — Complete practical HUD and menu authoring on the Widget Blueprint family.
   - Depends on:
     - `widget-tree`
+- [ ] [`umg-mvvm` — UMG ViewModels and View Bindings](docs/todo/umg-mvvm.md) — Add typed MVVM ViewModel and Widget View Binding authoring through an optional lockstep-versioned companion plugin.
+  - Depends on:
+    - `umg-authoring`
+- [ ] [`gas-ability-blueprints` — Gameplay Ability Blueprint creation and editing](docs/todo/gas-ability-blueprints.md) — Add typed Gameplay Ability Blueprint authoring through an optional lockstep-versioned companion plugin.
+  - Depends on:
+    - `phase-13`
+- [ ] [`gas-gameplay-effects` — Gameplay Effect creation and editing](docs/todo/gas-gameplay-effects.md) — Add typed creation and data-only editing of Gameplay Effect Blueprint assets through the GAS companion.
+  - Depends on:
+    - `gas-ability-blueprints`
 - [ ] [`function-replace` — Complete function replacement](docs/todo/function-replace.md) — Add transactional replacement of one complete user-owned function.
 - [ ] [`event-macro-replace` — Event, custom-event, and macro replacement](docs/todo/event-macro-replace.md) — Extend bounded replacement to events, custom events, and macros.
   - Depends on:

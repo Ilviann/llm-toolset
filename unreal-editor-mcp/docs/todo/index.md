@@ -32,6 +32,15 @@ Keep the authoritative checklist in [`ROADMAP.md`](../../ROADMAP.md) synchronize
 - [`umg-authoring` — UMG layout, styling, bindings, and UI logic](umg-authoring.md) — Complete practical HUD and menu authoring on the Widget Blueprint family.
   - Depends on:
     - `widget-tree`
+- [`umg-mvvm` — UMG ViewModels and View Bindings](umg-mvvm.md) — Add typed MVVM ViewModel and Widget View Binding authoring through an optional lockstep-versioned companion plugin.
+  - Depends on:
+    - `umg-authoring`
+- [`gas-ability-blueprints` — Gameplay Ability Blueprint creation and editing](gas-ability-blueprints.md) — Add typed Gameplay Ability Blueprint authoring through an optional lockstep-versioned companion plugin.
+  - Depends on:
+    - `phase-13`
+- [`gas-gameplay-effects` — Gameplay Effect creation and editing](gas-gameplay-effects.md) — Add typed creation and data-only editing of Gameplay Effect Blueprint assets through the GAS companion.
+  - Depends on:
+    - `gas-ability-blueprints`
 - [`function-replace` — Complete function replacement](function-replace.md) — Add transactional replacement of one complete user-owned function.
 - [`event-macro-replace` — Event, custom-event, and macro replacement](event-macro-replace.md) — Extend bounded replacement to events, custom events, and macros.
   - Depends on:
@@ -87,16 +96,20 @@ Keep the authoritative checklist in [`ROADMAP.md`](../../ROADMAP.md) synchronize
 
 ### Process boundary
 
-Through `pie-test`, the application remains an exact-version pair:
+The default installation remains an exact-version pair:
 
 1. A dependency-free Python 3.10+ MCP server using stdio JSON-RPC.
 2. An Unreal Editor C++ plugin using public editor APIs and a bounded authenticated localhost HTTP bridge.
+
+`gas-ability-blueprints` adds an optional editor-only `UnrealMCPGAS` companion plugin. It owns every direct Gameplay Ability System module dependency, reuses the base plugin's listener, credential, dispatch, ledger, and capability contracts, and ships in the same release bundle as the exact matching `UnrealMCP` version. The base plugin must continue to build, package, load, and expose its complete non-GAS contract when the companion or Gameplay Ability System plugin is absent.
+
+`umg-mvvm` adds an independent optional editor-only `UnrealMCPMVVM` companion plugin. It owns every direct `ModelViewViewModel` plugin and module dependency, reuses the same base extension and bridge contracts, and ships in the same release bundle as the exact matching `UnrealMCP` version. The base plugin must retain its complete Widget Blueprint, legacy property-binding, and Designer-event contract when the companion or Engine UMG Viewmodel plugin is absent.
 
 `pie-multiprocess` adds a minimal exact-version runtime companion module to the same plugin distribution for editor-owned multi-process PIE children. It connects outward to editor-owned authenticated IPC and does not expose a model-facing game listener.
 
 Python owns MCP framing, published schemas, exact argument validation, tool modes, project configuration, discovery, authenticated HTTP calls, timeouts, process orchestration, and stable error presentation. The C++ plugin owns credentials, listener lifecycle, authentication, Game-thread dispatch, Unreal object access, Blueprint operations, compiler diagnostics, transactions, package saving, mutation-result retention, and authoritative capabilities.
 
-Deploy the Python package and C++ plugin as an exact-version pair. Report both versions and the installed Unreal version through `capabilities`; reject a mismatched pair before mutation. Support for later Unreal releases must be proven through compilation and behavioral tests, not inferred from version numbers.
+Deploy the Python package and base C++ plugin as an exact-version pair. Report both versions and the installed Unreal version through `capabilities`; reject a mismatched pair before mutation. For every optional editor companion, require its descriptor `Version` and `VersionName` to match the base plugin exactly, set its `UnrealMCP` plugin reference `RequestedVersion` to the base numeric `Version`, report its version and readiness through `capabilities`, and reject its operations unless the complete enabled set matches. Engine-plugin dependencies such as Gameplay Ability System and UMG Viewmodel remain tied to the exact supported Unreal build rather than receiving an `UnrealMCP` version pin. Support for later Unreal releases must be proven through compilation and behavioral tests, not inferred from version numbers.
 
 ### Remaining model-facing tool surface
 
@@ -130,6 +143,10 @@ Keep the public surface compact. Add typed operations to these remaining tool fa
 | `play_session_command` | `pie-test` | Run one allowlisted test action or bounded wait against an exact retained session instance |
 
 Lifecycle and build tools remain absent from the default model context. Use an opt-in large mode for them. Measure the Blueprint schemas and use nested operation discriminators if context cost becomes excessive; the default mode must still support the complete Blueprint-authoring workflow.
+
+The GAS features extend the existing Blueprint tools when the companion capability is live and do not add a separate model-facing GAS tool. `gas-ability-blueprints` adds its graph-capable family to creation, inspection, default/member editing, action cataloging, graph editing, compilation, and saving. `gas-gameplay-effects` adds its data-only family to creation, typed inspection/default editing, compilation, and saving while explicitly rejecting graph and member authoring.
+
+`umg-mvvm` extends the existing Blueprint tools for ViewModel Blueprint authoring and adds typed MVVM operations to `widget_tree_edit` for Widget Blueprint ViewModel contexts and View Bindings. It does not add a separate model-facing MVVM tool, and its records remain explicitly distinct from legacy property bindings and Designer events.
 
 ### Mutation delivery and concurrency contracts
 

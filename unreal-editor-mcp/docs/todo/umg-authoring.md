@@ -13,6 +13,7 @@
 - Add exact inspection and mutation of supported widget delegate and property bindings. Prefer event-driven updates, validate source/target signatures and widget identities live, report binding cost/capability, and preserve unrelated bindings.
 - Extend action discovery and graph editing for Widget Blueprint-specific events, widget references, construction/destruction/focus/input flow, and supported designer-created delegate handlers. Keep every action context-valid and opaque; do not synthesize arbitrary calls or graphs.
 - Preserve Designer hierarchy, layout, styles, graph logic, bindings, animations, and unrelated Blueprint members outside the changed boundary. Continue using exact snapshots, operation reconciliation, bounded diagnostics, compile/save, and explicit restoration.
+- Treat the released property bindings as legacy `UWidgetBlueprint::Bindings` records and Designer events as graph-node bindings. Defer `UMVVMViewModelBase`, FieldNotify, ViewModel contexts, and UMG View Bindings to [`umg-mvvm`](umg-mvvm.md).
 - Do not add Widget animations, screenshot-driven design, arbitrary Slate code, runtime viewport control, input injection, or gameplay object mutation.
 
 ### Verification
