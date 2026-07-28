@@ -2,7 +2,7 @@
 
 This detailed operational reference covers every released tool family. For installation, first connection, and the concise contract overview, start with the [project README](../../README.md).
 
-Unreal Editor MCP 0.21.0 is an offline-first MCP bridge for Unreal Engine 5.8+. It pairs a dependency-free Python 3.10+ stdio server with an editor-only C++ plugin. Default mode exposes exactly twenty tools:
+Unreal Editor MCP 0.21.1 is an offline-first MCP bridge for Unreal Engine 5.8+. It pairs a dependency-free Python 3.10+ stdio server with an editor-only C++ plugin. Default mode exposes exactly twenty tools:
 
 - `capabilities` reports the exact Python/plugin/Unreal versions, commands, features, listener state, effective limits, and published Blueprint-family matrix.
 - `editor_state` reports project identity, bridge readiness, play/simulate/save/GC state, and concise queued-operation state.
@@ -56,7 +56,7 @@ Python 3.10 or newer with tkinter is required. Official Windows Python installer
 
 1. Copy [`plugin/UnrealMCP`](../../plugin/UnrealMCP) to `<YourProject>/Plugins/UnrealMCP` or add this repository's `plugin/` folder as an `AdditionalPluginDirectories` entry in a disposable development `.uproject`.
 2. Enable the `UnrealMCP` plugin and compile the project's Editor target with Unreal 5.8 or a newer version that passes the included public-API probes.
-3. Open the project. Look for `Unreal MCP 0.21.0 ready on 127.0.0.1:15485` in the editor log.
+3. Open the project. Look for `Unreal MCP 0.21.1 ready on 127.0.0.1:15485` in the editor log.
 4. Install the Python package offline from this folder:
 
    ```sh

@@ -2,11 +2,11 @@
 
 ## Ownership
 
-`FUnrealMCPGameDataService` owns `game_data_inspect` and `game_data_edit`, opaque inspection cursors, user-defined struct creation/evolution, Data Table creation and row mutation, dependency preflight, transactions, package saving, and structural read-back. `UnrealMCPGameDataValueCodec` owns bounded reflected row values independently of Blueprint class/component defaults.
+`FUnrealMCPGameDataService` is the `game_data_inspect` and `game_data_edit` facade and owns opaque inspection cursors. `UnrealMCPGameDataRequestValidation` owns exact target/operation shapes plus bounded names, paths, identities, and page sizes. `UnrealMCPGameDataOperationHandlers` owns user-defined struct creation/evolution, Data Table creation and row mutation, dependency preflight, transactions, package saving, and verified edit orchestration. `UnrealMCPGameDataInspectionBuilder` owns structural inspection, dependency metadata, row/schema records, query-independent snapshots, and common saved-edit result envelopes. `UnrealMCPGameDataValueCodec` owns bounded reflected row values independently of Blueprint class/component defaults.
 
 ## Dependency direction
 
-The HTTP bridge owns one lazily created service and admits `game_data_edit` through the shared operation ledger. The service depends on public Asset Registry, `FStructureEditorUtils`, `FDataTableEditorUtils`, package-saving, transaction, reflected-property, and user-defined-struct APIs. It reuses the canonical K2 type/default codec for struct-member declarations. The row-value codec depends only on reflected properties, live reference resolution, and K2 property-to-pin type conversion; Blueprint inspectors and mutators do not depend on game data.
+The HTTP bridge owns one lazily created service and admits `game_data_edit` through the shared operation ledger. The facade depends on request validation and the inspection builder; operation handlers depend on both and on public Asset Registry, `FStructureEditorUtils`, `FDataTableEditorUtils`, package-saving, transaction, and user-defined-struct APIs. The inspection builder depends on the Asset Registry, request normalization, the row-value codec, and canonical K2 type/default encoding. The row-value codec depends only on reflected properties, live reference resolution, and K2 property-to-pin type conversion; Blueprint inspectors and mutators do not depend on game data.
 
 ## Invariants
 

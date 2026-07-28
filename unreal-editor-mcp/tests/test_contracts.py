@@ -42,7 +42,7 @@ class ReleaseContractTests(unittest.TestCase):
         native = re.search(r'Version\[\].*TEXT\("([^"]+)"\)', header)
         self.assertIsNotNone(native)
         versions = {project["project"]["version"], plugin["VersionName"], native.group(1), unreal_editor_mcp.__version__}
-        self.assertEqual(versions, {"0.21.0"})
+        self.assertEqual(versions, {"0.21.1"})
 
     def test_only_released_asset_delete_commands_are_registered(self):
         names = [tool["name"] for tool in TOOLS]
@@ -134,7 +134,7 @@ class ReleaseContractTests(unittest.TestCase):
 
     def test_phase_seventeen_game_data_is_published_and_covered(self):
         bridge = (ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private/UnrealMCPBridge.cpp").read_text(encoding="utf-8")
-        service = (ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private/UnrealMCPGameDataService.cpp").read_text(encoding="utf-8")
+        service = (ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private/UnrealMCPGameDataOperationHandlers.cpp").read_text(encoding="utf-8")
         test = (ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private/Tests/UnrealMCPAutomationTestsPhase17.cpp").read_text(encoding="utf-8")
         for command in ["game_data_inspect", "game_data_edit"]:
             self.assertIn(f'TEXT("{command}")', bridge)
@@ -143,6 +143,22 @@ class ReleaseContractTests(unittest.TestCase):
         for operation in ["add_member", "reorder_member", "add_row", "replace_row", "rename_row", "remove_row", "batch"]:
             self.assertIn(f'TEXT("{operation}")', service)
         self.assertIn('UnrealMCP.Phase17.GameDataAuthoring', test)
+
+    def test_game_data_and_graph_editor_have_focused_native_boundaries(self):
+        root = ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private"
+        expected_units = {
+            "UnrealMCPGameDataRequestValidation.cpp": "ValidateEditShape",
+            "UnrealMCPGameDataOperationHandlers.cpp": "FUnrealMCPGameDataService::Edit",
+            "UnrealMCPGameDataInspectionBuilder.cpp": "GameDataInspectionBuilder",
+            "UnrealMCPBlueprintGraphRequestValidation.cpp": "BlueprintGraphRequestValidation",
+            "UnrealMCPBlueprintGraphOperationHandlers.cpp": "FUnrealMCPBlueprintGraphEditor::Execute",
+            "UnrealMCPBlueprintGraphPinOperationHandler.cpp": "BlueprintGraphPinOperationHandler",
+            "UnrealMCPBlueprintGraphResultBuilder.cpp": "BlueprintGraphResultBuilder",
+        }
+        for filename, owner in expected_units.items():
+            source = (root / filename).read_text(encoding="utf-8")
+            self.assertIn(owner, source)
+            self.assertLessEqual(len(source.splitlines()), 600)
 
     def test_widget_tree_is_family_scoped_bounded_and_covered(self):
         root = ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private"

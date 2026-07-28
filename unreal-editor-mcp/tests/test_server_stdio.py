@@ -15,7 +15,7 @@ class FakeBridge:
     def call(self, command, arguments=None):
         self.calls.append((command, arguments))
         if command == "capabilities":
-            return {"bridge_version": "0.21.0", "commands": [
+            return {"bridge_version": "0.21.1", "commands": [
                 "capabilities", "editor_state", "operation_status", "asset_references", "asset_delete",
                 "level_inspect", "level_open",
                 "blueprint_inspect", "blueprint_action_catalog", "blueprint_graph_edit",
@@ -39,7 +39,7 @@ class ServerStdioTests(unittest.TestCase):
         bridge = FakeBridge()
         server = MCPServer(bridge)
         initialized = server.handle({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2025-06-18"}})
-        self.assertEqual(initialized["result"]["serverInfo"]["version"], "0.21.0")
+        self.assertEqual(initialized["result"]["serverInfo"]["version"], "0.21.1")
         listed = server.handle({"jsonrpc": "2.0", "id": 2, "method": "tools/list"})
         self.assertEqual([tool["name"] for tool in listed["result"]["tools"]], [
             "capabilities", "editor_state", "operation_status", "asset_references", "asset_delete",

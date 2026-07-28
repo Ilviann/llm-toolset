@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.21.1 — 2026-07-28
+
+- Split native Game Data and Blueprint Graph Editor code into focused request validation, operation-handler, and result/inspection-builder translation units without changing MCP schemas or behavior.
+
 ## 0.21.0 — 2026-07-28
 
 - Added the `widget` Blueprint family, specialized Widget Blueprint creation, bounded tree/default inspection, stable widget and slot identities, and explicit rejection of Actor component operations.
