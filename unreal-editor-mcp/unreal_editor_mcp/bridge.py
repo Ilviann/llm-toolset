@@ -18,6 +18,7 @@ BRIDGE_PATH = "/unreal-mcp/v1/command"
 MAX_REQUEST_BYTES = 64 * 1024
 MAX_RESPONSE_BYTES = 256 * 1024
 MUTATING_COMMANDS = {
+    "asset_delete",
     "level_open",
     "blueprint_create", "blueprint_compile", "blueprint_save",
     "blueprint_component_edit", "blueprint_default_edit", "blueprint_member_edit",
@@ -56,6 +57,7 @@ class UnrealBridge:
             "editor_shutdown",
             "operation_status",
             "asset_references",
+            "asset_delete",
             "level_inspect",
             "level_open",
             "blueprint_inspect",

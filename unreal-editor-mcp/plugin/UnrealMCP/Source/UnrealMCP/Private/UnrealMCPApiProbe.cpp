@@ -25,6 +25,7 @@
 #include "Kismet2/BlueprintEditorUtils.h"
 #include "Kismet2/CompilerResultsLog.h"
 #include "Kismet2/KismetEditorUtilities.h"
+#include "ObjectTools.h"
 #include "K2Node_FunctionEntry.h"
 #include "K2Node_FunctionResult.h"
 #include "K2Node_CustomEvent.h"
@@ -99,6 +100,11 @@ void RequirePublicTypes()
     (void)&UAssetEditorSubsystem::GetAllEditedAssets;
     (void)&FReferenceFinder::FindReferences;
     (void)&UAssetManager::GetPrimaryAssetPath;
+    (void)&ObjectTools::GatherObjectReferencersForDeletion;
+    using FDeleteSingleObject = bool (*)(UObject*, bool);
+    (void)static_cast<FDeleteSingleObject>(&ObjectTools::DeleteSingleObject);
+    using FCleanupAfterDelete = void (*)(const TArray<UPackage*>&, bool);
+    (void)static_cast<FCleanupAfterDelete>(&ObjectTools::CleanupAfterSuccessfulDelete);
     static_assert(sizeof(FThreadSafeObjectIterator) > 0);
     (void)&FBlueprintActionDatabase::Get;
     (void)&UEdGraphSchema_K2::CanCreateConnection;

@@ -703,6 +703,9 @@ def main() -> int:
     phase_seventeen_dir = layout.root / "Content" / "UnrealMCPPhase17"
     for name in ("ST_WeaponStats", "DT_WeaponStats"):
         (phase_seventeen_dir / f"{name}.uasset").unlink(missing_ok=True)
+    (layout.root / "Content" / "UnrealMCPAssetDelete" / "DT_Disposable.uasset").unlink(
+        missing_ok=True
+    )
     if sys.argv[1:] == ["--automation-only"]:
         return run_automation(executable, layout.descriptor, environment)
     if len(sys.argv) == 3 and sys.argv[1] == "--automation-filter":
@@ -725,7 +728,7 @@ def main() -> int:
             state = bridge.call("editor_state")
             if capabilities.get("commands") != [
                 "capabilities", "editor_state", "editor_shutdown", "operation_status",
-                "asset_references",
+                "asset_references", "asset_delete",
                 "level_inspect", "level_open",
                 "blueprint_inspect", "blueprint_action_catalog", "blueprint_graph_edit",
                 "blueprint_create", "blueprint_compile", "blueprint_save",
@@ -774,6 +777,10 @@ def main() -> int:
             for feature in ("asset_reference_discovery", "asset_reference_live_memory"):
                 if capabilities.get("features", {}).get(feature) is not True:
                     raise AssertionError(f"asset-references capability is unavailable: {feature}")
+            if capabilities.get("features", {}).get("asset_delete") is not True \
+                    or capabilities.get("features", {}).get("asset_delete_force") is not False \
+                    or capabilities.get("features", {}).get("asset_delete_undo") is not False:
+                raise AssertionError("asset-delete capability contract mismatch")
             family_matrix = capabilities.get("blueprint_families", [])
             if [record.get("family") for record in family_matrix] != [
                 "actor", "game_mode_base", "game_mode", "game_state_base", "game_state", "game_instance",
@@ -922,6 +929,58 @@ def main() -> int:
                     f"asset-references did not find the serialized Data Table dependency: "
                     f"{reference_page!r} {reference_records!r}"
                 )
+            disposable = bridge.call("game_data_edit", {
+                "operation_id": uuid.uuid4().hex,
+                "target": "data_table",
+                "operation": "create",
+                "asset_path": "/Game/UnrealMCPAssetDelete/DT_Disposable",
+                "row_struct": phase_seventeen_game_data["struct_path"],
+            })
+            disposable_path = disposable["asset_path"]
+            disposable_references = bridge.call("asset_references", {
+                "asset_path": disposable_path,
+                "page_size": 100,
+            })
+            disposable_scans = disposable_references.get("scans", {})
+            registry_scans = (
+                disposable_scans.get(name, {})
+                for name in ("serialized", "management", "searchable_name")
+            )
+            live_scan = disposable_scans.get("live_memory", {})
+            if disposable_references.get("record_count") != 0 \
+                    or any(scan.get("status") != "complete" for scan in registry_scans) \
+                    or live_scan.get("status") not in {"complete", "truncated"} \
+                    or live_scan.get("unsupported") is True \
+                    or live_scan.get("stale") is True:
+                raise AssertionError(
+                    f"disposable deletion target is not clean: {disposable_references!r}"
+                )
+            delete_operation = uuid.uuid4().hex
+            send_without_reading(layout, "asset_delete", {
+                "operation_id": delete_operation,
+                "asset_path": disposable_path,
+                "expected_snapshot": disposable_references["snapshot_id"],
+            })
+            delete_status = reconcile_operation(
+                bridge, delete_operation, capabilities["bridge_instance_id"],
+            )
+            delete_result = delete_status.get("result") \
+                if delete_status.get("state") == "committed" else None
+            if not isinstance(delete_result, dict) or delete_result.get("deleted") is not True \
+                    or delete_result.get("undo_supported") is not False:
+                raise AssertionError(
+                    f"lost asset-delete response did not reconcile: {delete_status!r}"
+                )
+            try:
+                bridge.call("asset_references", {
+                    "asset_path": disposable_path,
+                    "page_size": 100,
+                })
+            except BridgeError as error:
+                if error.code is not ErrorCode.NOT_FOUND:
+                    raise
+            else:
+                raise AssertionError("deleted asset still resolved before restart")
             asset_path = "/Game/UnrealMCPPhase4/BP_ComponentFixture.BP_ComponentFixture"
             created = bridge.call("blueprint_default_edit", {
                 "operation_id": uuid.uuid4().hex,
@@ -1618,6 +1677,16 @@ def main() -> int:
                 raise AssertionError(
                     f"serialized asset references changed after restart: {reloaded_references!r}"
                 )
+            try:
+                reloaded_bridge.call("asset_references", {
+                    "asset_path": disposable_path,
+                    "page_size": 100,
+                })
+            except BridgeError as error:
+                if error.code is not ErrorCode.NOT_FOUND:
+                    raise
+            else:
+                raise AssertionError("deleted asset returned after editor restart")
             reloaded = collect_inspection(reloaded_bridge, {
                 "mode": "inspect",
                 "asset_path": "/Game/UnrealMCPPhase4/BP_ComponentFixture.BP_ComponentFixture",
@@ -1912,7 +1981,7 @@ def main() -> int:
             pass
         else:
             raise AssertionError("a live discovery heartbeat remained after editor termination")
-    print("Integration passed: asset references, level-open, Phase 17 authoring, replay/restart, and graceful lifecycle shutdown")
+    print("Integration passed: asset references/deletion, level-open, Phase 17 authoring, replay/restart, and graceful lifecycle shutdown")
     return 0
 
 

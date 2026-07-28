@@ -25,6 +25,38 @@ bool FUnrealMCPPhase4OperationLedgerTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("same request replays"), Admission.Kind, EUnrealMCPOperationAdmission::ReplaySuccess);
     TestTrue(TEXT("replay returns retained result"), Admission.Result == Committed);
 
+    const FString PartialId = TEXT("dddddddddddddddddddddddddddddddd");
+    const TSharedRef<FJsonObject> PartialArguments = MakeShared<FJsonObject>();
+    PartialArguments->SetStringField(TEXT("operation_id"), PartialId);
+    TestEqual(
+        TEXT("partial operation is admitted"),
+        Ledger.Admit(TEXT("asset_delete"), PartialArguments).Kind,
+        EUnrealMCPOperationAdmission::Accepted);
+    TestTrue(TEXT("partial operation starts executing"), Ledger.MarkExecuting(PartialId, Error));
+    const TSharedRef<FJsonObject> Partial = MakeShared<FJsonObject>();
+    Partial->SetStringField(TEXT("operation_state"), TEXT("partial"));
+    Ledger.Complete(PartialId, TEXT("partial"), Partial);
+    FUnrealMCPOperationAdmission PartialReplay =
+        Ledger.Admit(TEXT("asset_delete"), PartialArguments);
+    TestEqual(
+        TEXT("partial outcome replays without executing"),
+        PartialReplay.Kind,
+        EUnrealMCPOperationAdmission::ReplaySuccess);
+    const TSharedRef<FJsonObject> PartialStatusArguments = MakeShared<FJsonObject>();
+    PartialStatusArguments->SetStringField(TEXT("operation_id"), PartialId);
+    PartialStatusArguments->SetStringField(TEXT("bridge_instance_id"), BridgeId);
+    TSharedPtr<FJsonObject> PartialStatus;
+    TestTrue(
+        TEXT("partial outcome remains reconcilable"),
+        Ledger.Status(PartialStatusArguments, PartialStatus, Error));
+    TestEqual(
+        TEXT("partial outcome retains terminal state"),
+        PartialStatus->GetStringField(TEXT("state")),
+        FString(TEXT("partial")));
+    TestFalse(
+        TEXT("partial outcome is never retry-safe"),
+        PartialStatus->GetBoolField(TEXT("retry_safe")));
+
     Arguments->SetStringField(TEXT("asset_path"), TEXT("/Game/BP_Other.BP_Other"));
     Admission = Ledger.Admit(TEXT("blueprint_save"), Arguments);
     TestEqual(TEXT("conflicting ID reuse rejects"), Admission.Kind, EUnrealMCPOperationAdmission::Conflict);

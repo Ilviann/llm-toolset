@@ -323,15 +323,11 @@ void AppendRegistryCategory(
 {
     OutCounts.bStale = bRegistryStale;
     TArray<TPair<FString, FAssetDependency>> Dependencies;
-    bool bAnySupportedTarget = false;
     TSet<FString> Seen;
     for (const FAssetIdentifier& Target : Targets)
     {
         TArray<FAssetDependency> Found;
-        if (Registry.GetReferencers(Target, Found, Category))
-        {
-            bAnySupportedTarget = true;
-        }
+        Registry.GetReferencers(Target, Found, Category);
         OutCounts.Candidates += Found.Num();
         for (const FAssetDependency& Dependency : Found)
         {
@@ -350,7 +346,6 @@ void AppendRegistryCategory(
             Dependencies.Emplace(Target.ToString(), Dependency);
         }
     }
-    OutCounts.bSupported = bAnySupportedTarget;
     Dependencies.Sort([](const TPair<FString, FAssetDependency>& Left, const TPair<FString, FAssetDependency>& Right)
     {
         const FString LeftKey = Left.Key + TEXT("|") + Left.Value.AssetId.ToString()
@@ -622,6 +617,30 @@ bool FUnrealMCPAssetReferenceService::Inspect(
         : InspectInitial(*Arguments, PageSize, OutResult, OutError);
 }
 
+bool FUnrealMCPAssetReferenceService::Capture(
+    const FString& AssetPath,
+    FUnrealMCPAssetReferenceSnapshot& OutSnapshot,
+    FUnrealMCPError& OutError)
+{
+    check(IsInGameThread());
+    if (!IsExactMountedAssetPath(AssetPath))
+    {
+        OutError = {TEXT("invalid_argument"), TEXT("asset_path must be one exact mounted asset object path")};
+        return false;
+    }
+    OutSnapshot = FUnrealMCPAssetReferenceSnapshot();
+    OutSnapshot.AssetPath = AssetPath;
+    OutSnapshot.RegistrySerial = RegistrySerial.Load();
+    return BuildSnapshot(
+        AssetPath,
+        OutSnapshot.RegistrySerial,
+        OutSnapshot.Target,
+        OutSnapshot.Scans,
+        OutSnapshot.Records,
+        OutSnapshot.SnapshotId,
+        OutError);
+}
+
 bool FUnrealMCPAssetReferenceService::InspectInitial(
     const FJsonObject& Arguments,
     int32 PageSize,
@@ -639,18 +658,20 @@ bool FUnrealMCPAssetReferenceService::InspectInitial(
         OutError = {TEXT("invalid_argument"), TEXT("asset_path must be one exact mounted asset object path")};
         return false;
     }
-    const uint64 SnapshotRegistrySerial = RegistrySerial.Load();
-    TSharedPtr<FJsonObject> Target;
-    TSharedPtr<FJsonObject> Scans;
-    TArray<TSharedPtr<FJsonValue>> Records;
-    FString Snapshot;
-    if (!BuildSnapshot(
-        AssetPath, SnapshotRegistrySerial, Target, Scans, Records, Snapshot, OutError))
+    FUnrealMCPAssetReferenceSnapshot Snapshot;
+    if (!Capture(AssetPath, Snapshot, OutError))
     {
         return false;
     }
     OutResult = BuildPage(
-        AssetPath, Snapshot, Target, Scans, Records, 0, PageSize, SnapshotRegistrySerial);
+        AssetPath,
+        Snapshot.SnapshotId,
+        Snapshot.Target,
+        Snapshot.Scans,
+        Snapshot.Records,
+        0,
+        PageSize,
+        Snapshot.RegistrySerial);
     return true;
 }
 

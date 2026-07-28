@@ -1,5 +1,7 @@
 # `asset-delete` — Delete asset
 
+**Implementation status:** Completed in 0.20.0 and verified natively on Windows. Native macOS verification remains in the roadmap platform test backlog.
+
 **Outcome:** Agents can delete one exact, unreferenced asset package through Unreal Editor only after conservative reference and editor-state preflight, with a retained and verified result.
 
 **Depends on:**
@@ -11,8 +13,8 @@
 - Add a ledger-backed `asset_delete` tool accepting a caller-generated `operation_id`, one exact asset object path, and the current asset/reference snapshot. Never accept a filesystem path or a force-delete option.
 - Confine deletion to `/Game` and symlink-free content mounts owned by plugins physically inside the current project's `Plugins/` directory. Reject engine, external, marketplace, transient, generated, redirector, and otherwise read-only targets.
 - Require a single-asset package and refuse current maps, dirty packages, active PIE/simulation, saving, compilation, async loading, garbage collection, undo/redo, conflicting retained work, or any state whose safety cannot be proven.
-- Re-run the complete bounded serialized and live-memory reference preflight immediately before mutation. Reject any referencer, unsupported/truncated scan, stale snapshot, or newly observed reference.
-- Close only editors for the exact clean target when Unreal permits it. Release benign tool-owned references and use package unloading only when the selected public deletion path requires it; unloading must not be treated as proof that serialized references are absent.
+- Re-run bounded serialized and live-memory reference preflight immediately before mutation. Require complete registry categories; reject any referencer, unsupported or stale scan, truncated registry scan, stale snapshot, or newly observed reference. A truncated live diagnostic requires Unreal's full deletion-specific memory/Undo reference check to prove no retained reference.
+- Reject an open editor for the exact target without closing it. Release benign tool-owned references and use package unloading only when the selected public deletion path requires it; unloading must not be treated as proof that serialized references are absent.
 - Delete through a compiled, supported Unreal Editor asset/package API on the Game thread. Do not call the force-delete editor subsystem path, delete `.uasset` files directly, fix redirectors implicitly, rewrite referencers, clear unrelated transactions, or claim Undo support that Unreal cannot provide.
 - Reconcile lost responses through `operation_status`. Verify the object and package are absent from the Asset Registry and storage view before reporting `committed`; return explicit partial or unknown outcomes if the editor API and persistence state disagree.
 - Publish deletion, reference, memory, package, editor-state, operation-retention, timeout, and verification capabilities and stable refusal errors.

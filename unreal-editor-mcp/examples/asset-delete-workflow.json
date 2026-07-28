@@ -1,0 +1,19 @@
+{
+  "inspect_references": {
+    "asset_path": "/Game/Data/DA_Disposable.DA_Disposable",
+    "page_size": 100
+  },
+  "delete": {
+    "operation_id": "0123456789abcdef0123456789abcdef",
+    "asset_path": "/Game/Data/DA_Disposable.DA_Disposable",
+    "expected_snapshot": "0123456789abcdef0123456789abcdef01234567"
+  },
+  "reconcile": {
+    "operation_id": "0123456789abcdef0123456789abcdef",
+    "bridge_instance_id": "fedcba9876543210fedcba9876543210"
+  },
+  "verify_absence": {
+    "asset_path": "/Game/Data/DA_Disposable.DA_Disposable",
+    "page_size": 100
+  }
+}

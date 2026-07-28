@@ -19,12 +19,13 @@ class ReleaseContractTests(unittest.TestCase):
         native = re.search(r'Version\[\].*TEXT\("([^"]+)"\)', header)
         self.assertIsNotNone(native)
         versions = {project["project"]["version"], plugin["VersionName"], native.group(1), unreal_editor_mcp.__version__}
-        self.assertEqual(versions, {"0.19.0"})
+        self.assertEqual(versions, {"0.20.0"})
 
-    def test_only_released_asset_reference_commands_are_registered(self):
+    def test_only_released_asset_delete_commands_are_registered(self):
         names = [tool["name"] for tool in TOOLS]
         self.assertEqual(names, [
-            "capabilities", "editor_state", "operation_status", "asset_references", "level_inspect", "level_open",
+            "capabilities", "editor_state", "operation_status", "asset_references", "asset_delete",
+            "level_inspect", "level_open",
             "blueprint_inspect", "blueprint_action_catalog", "blueprint_graph_edit",
             "blueprint_create", "blueprint_compile", "blueprint_save",
             "blueprint_component_edit", "blueprint_default_edit",
@@ -48,6 +49,22 @@ class ReleaseContractTests(unittest.TestCase):
         for evidence in ["serialized", "management", "searchable_name", "live_memory"]:
             self.assertIn(f'TEXT("{evidence}")', service)
         self.assertIn("UnrealMCP.AssetReferences.RegistryLiveMemoryAndCursors", native_test)
+
+    def test_asset_delete_is_ledger_backed_conservative_and_covered(self):
+        bridge = (ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private/UnrealMCPBridge.cpp").read_text(encoding="utf-8")
+        service = (ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private/UnrealMCPAssetDeletionService.cpp").read_text(encoding="utf-8")
+        native_test = (ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private/Tests/UnrealMCPAutomationTestsAssetDelete.cpp").read_text(encoding="utf-8")
+        self.assertIn('Command == TEXT("asset_delete")', bridge)
+        self.assertIn('TEXT("asset_delete"), true', bridge)
+        for safety in [
+            "IsPlayingSessionInEditor()", "IsSimulatingInEditor()", "IsSavingPackage()",
+            "IsGarbageCollecting()", "IsTransactionActive()", "IsAsyncLoading()",
+            "GatherObjectReferencersForDeletion", "DeleteSingleObject", "CleanupAfterSuccessfulDelete",
+        ]:
+            self.assertIn(safety, service)
+        self.assertNotIn("DeleteObjectsUnchecked", service)
+        self.assertNotIn("ForceDeleteObjects", service)
+        self.assertIn("UnrealMCP.AssetDelete.PreflightPersistenceAndReferences", native_test)
 
     def test_level_open_is_published_and_covered(self):
         bridge = (ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private/UnrealMCPBridge.cpp").read_text(encoding="utf-8")

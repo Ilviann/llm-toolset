@@ -149,7 +149,9 @@ FUnrealMCPOperationAdmission FUnrealMCPOperationLedger::Admit(const FString& Com
             Admission.OwnedError = MakeShared<FUnrealMCPError>(FUnrealMCPError{TEXT("operation_conflict"), TEXT("operation_id is already bound to different normalized arguments")});
             Admission.Error = Admission.OwnedError.Get();
         }
-        else if (Existing->State == TEXT("committed"))
+        else if (Existing->State == TEXT("committed")
+            || Existing->State == TEXT("partial")
+            || Existing->State == TEXT("outcome_unknown"))
         {
             Admission.Kind = EUnrealMCPOperationAdmission::ReplaySuccess;
             Admission.Result = Existing->Result;
@@ -206,10 +208,21 @@ bool FUnrealMCPOperationLedger::MarkExecuting(const FString& OperationId, FUnrea
 
 void FUnrealMCPOperationLedger::Commit(const FString& OperationId, const TSharedPtr<FJsonObject>& Result)
 {
+    Complete(OperationId, TEXT("committed"), Result);
+}
+
+void FUnrealMCPOperationLedger::Complete(
+    const FString& OperationId,
+    const FString& State,
+    const TSharedPtr<FJsonObject>& Result)
+{
     FScopeLock Lock(&Mutex);
     if (FEntry* Entry = Entries.Find(OperationId))
     {
-        Entry->State = TEXT("committed");
+        Entry->State =
+            State == TEXT("partial") || State == TEXT("outcome_unknown")
+            ? State
+            : TEXT("committed");
         Entry->Result = Result;
         Entry->Error.Reset();
         Entry->ExpiresAt = Now() + UnrealMCP::OperationLifetimeSeconds;
@@ -237,7 +250,13 @@ TSharedRef<FJsonObject> FUnrealMCPOperationLedger::EntryStatusLocked(const FStri
     Value->SetStringField(TEXT("request_digest"), Entry.Digest);
     Value->SetStringField(TEXT("state"), Entry.State);
     Value->SetBoolField(TEXT("retained"), true);
-    if (Entry.State == TEXT("committed") && Entry.Result.IsValid()) Value->SetObjectField(TEXT("result"), Entry.Result);
+    if ((Entry.State == TEXT("committed") || Entry.State == TEXT("partial")
+            || Entry.State == TEXT("outcome_unknown"))
+        && Entry.Result.IsValid())
+    {
+        Value->SetObjectField(TEXT("result"), Entry.Result);
+        Value->SetBoolField(TEXT("retry_safe"), false);
+    }
     if ((Entry.State == TEXT("rejected") || Entry.State == TEXT("cancelled")) && Entry.Error.IsValid())
     {
         Value->SetObjectField(TEXT("error"), ErrorValue(*Entry.Error));

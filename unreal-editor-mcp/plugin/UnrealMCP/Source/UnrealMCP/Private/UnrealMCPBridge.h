@@ -18,6 +18,7 @@ class FUnrealMCPGameplayFrameworkEditor;
 class FUnrealMCPGameDataService;
 class FUnrealMCPLevelService;
 class FUnrealMCPAssetReferenceService;
+class FUnrealMCPAssetDeletionService;
 class FUnrealMCPOperationLedger;
 class IHttpRouter;
 
@@ -57,6 +58,7 @@ private:
     TUniquePtr<FUnrealMCPGameDataService> GameDataService;
     TUniquePtr<FUnrealMCPLevelService> LevelService;
     TUniquePtr<FUnrealMCPAssetReferenceService> AssetReferenceService;
+    TUniquePtr<FUnrealMCPAssetDeletionService> AssetDeletionService;
     TUniquePtr<FUnrealMCPOperationLedger> OperationLedger;
     FString BridgeInstanceId;
     FTSTicker::FDelegateHandle HeartbeatHandle;

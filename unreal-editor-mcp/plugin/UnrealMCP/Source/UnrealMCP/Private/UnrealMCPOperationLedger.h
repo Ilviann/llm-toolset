@@ -33,6 +33,10 @@ public:
     FUnrealMCPOperationAdmission Admit(const FString& Command, const TSharedPtr<FJsonObject>& Arguments);
     bool MarkExecuting(const FString& OperationId, FUnrealMCPError& OutError);
     void Commit(const FString& OperationId, const TSharedPtr<FJsonObject>& Result);
+    void Complete(
+        const FString& OperationId,
+        const FString& State,
+        const TSharedPtr<FJsonObject>& Result);
     void Reject(const FString& OperationId, const FUnrealMCPError& Error);
     bool Status(const TSharedPtr<FJsonObject>& Arguments, TSharedPtr<FJsonObject>& OutResult, FUnrealMCPError& OutError);
     void CancelQueued();

@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.20.0 — 2026-07-28
+
+- Added ledger-backed `asset_delete` for one exact persisted project or local-project-plugin asset package after stale-safe reference, editor-state, mount, package, storage, and Unreal deletion-reference preflight.
+- Added public non-force `ObjectTools` deletion/cleanup with registry and storage verification, explicit non-Undo semantics, and retained `partial` outcomes when persistence evidence disagrees.
+- Added Python schema/contract coverage, public API probes, focused native Automation coverage, cross-process deletion/restart verification, documentation, and a bounded workflow example.
+
 ## 0.19.0 — 2026-07-28
 
 - Added read-only `asset_references` for exact mounted assets, with separate serialized, management, searchable-name, open-editor, and direct loaded-object evidence.

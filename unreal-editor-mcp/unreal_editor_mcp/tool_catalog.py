@@ -462,6 +462,20 @@ TOOLS: Final = (
         },
     },
     {
+        "name": "asset_delete",
+        "description": "Delete one exact unreferenced project asset after stale-safe reference and editor-state preflight.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "operation_id": _OPERATION_ID,
+                "asset_path": _ASSET_OBJECT_PATH,
+                "expected_snapshot": _SNAPSHOT_ID,
+            },
+            "required": ["operation_id", "asset_path", "expected_snapshot"],
+            "additionalProperties": False,
+        },
+    },
+    {
         "name": "level_inspect",
         "description": "Discover mounted World assets or report the exact current-map identity, revision, dirty state, and snapshot.",
         "inputSchema": {

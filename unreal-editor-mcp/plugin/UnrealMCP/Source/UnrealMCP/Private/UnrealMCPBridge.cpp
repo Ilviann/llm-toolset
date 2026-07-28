@@ -24,6 +24,7 @@
 #include "UnrealMCPGameDataService.h"
 #include "UnrealMCPLevelService.h"
 #include "UnrealMCPAssetReferenceService.h"
+#include "UnrealMCPAssetDeletionService.h"
 #include "UnrealMCPProtocol.h"
 #include "UnrealMCPOperationLedger.h"
 #include "UnrealMCPVersion.h"
@@ -55,7 +56,7 @@ FString Header(const FHttpServerRequest& Request, const TCHAR* LowercaseName)
 
 bool IsMutationCommand(const FString& Command)
 {
-    return Command == TEXT("level_open")
+    return Command == TEXT("asset_delete") || Command == TEXT("level_open")
         || Command == TEXT("blueprint_create") || Command == TEXT("blueprint_compile") || Command == TEXT("blueprint_save")
         || Command == TEXT("blueprint_component_edit") || Command == TEXT("blueprint_default_edit")
         || Command == TEXT("blueprint_member_edit") || Command == TEXT("blueprint_graph_edit")
@@ -173,6 +174,8 @@ void FUnrealMCPBridge::Stop()
     GameplayFrameworkEditor.Reset();
     GameDataService.Reset();
     LevelService.Reset();
+    AssetDeletionService.Reset();
+    AssetReferenceService.Reset();
     BlueprintActionCatalog.Reset();
     BlueprintInspector.Reset();
     Token.Reset();
@@ -217,6 +220,7 @@ bool FUnrealMCPBridge::HandleRequest(const FHttpServerRequest& Request, const FH
     }
     if (Command != TEXT("capabilities") && Command != TEXT("editor_state") && Command != TEXT("editor_shutdown")
         && Command != TEXT("operation_status") && Command != TEXT("asset_references")
+        && Command != TEXT("asset_delete")
         && Command != TEXT("level_inspect") && Command != TEXT("level_open")
         && Command != TEXT("blueprint_inspect") && Command != TEXT("blueprint_create") && Command != TEXT("blueprint_compile")
         && Command != TEXT("blueprint_save") && Command != TEXT("blueprint_component_edit") && Command != TEXT("blueprint_default_edit")
@@ -322,11 +326,17 @@ void FUnrealMCPBridge::DispatchOnGameThread(
         }
         if (!OperationId.IsEmpty())
         {
+            FString OperationState = TEXT("committed");
+            Result->TryGetStringField(TEXT("operation_state"), OperationState);
+            if (OperationState != TEXT("partial") && OperationState != TEXT("outcome_unknown"))
+            {
+                OperationState = TEXT("committed");
+            }
             Result->SetStringField(TEXT("operation_id"), OperationId);
-            Result->SetStringField(TEXT("operation_state"), TEXT("committed"));
+            Result->SetStringField(TEXT("operation_state"), OperationState);
             Result->SetStringField(TEXT("bridge_instance_id"), Pinned->BridgeInstanceId);
             Result->SetStringField(TEXT("request_digest"), RequestDigest);
-            Pinned->OperationLedger->Commit(OperationId, Result);
+            Pinned->OperationLedger->Complete(OperationId, OperationState, Result);
         }
         Complete(UnrealMCP::Protocol::Success(Result));
     });
@@ -356,6 +366,33 @@ bool FUnrealMCPBridge::Execute(const FString& Command, const TSharedPtr<FJsonObj
             AssetReferenceService = MakeUnique<FUnrealMCPAssetReferenceService>();
         }
         return AssetReferenceService->Inspect(Arguments, OutResult, OutError);
+    }
+    if (Command == TEXT("asset_delete"))
+    {
+        if (!AssetReferenceService)
+        {
+            AssetReferenceService = MakeUnique<FUnrealMCPAssetReferenceService>();
+        }
+        if (!AssetDeletionService)
+        {
+            AssetDeletionService =
+                MakeUnique<FUnrealMCPAssetDeletionService>(*AssetReferenceService);
+        }
+        if (OperationLedger)
+        {
+            const TSharedPtr<FJsonObject> State = OperationLedger->CurrentState();
+            if (static_cast<int32>(State->GetNumberField(TEXT("queued"))) > 0
+                || static_cast<int32>(State->GetNumberField(TEXT("executing"))) > 1)
+            {
+                OutError = {
+                    TEXT("busy"),
+                    TEXT("Asset deletion refused while another mutation is queued or executing"),
+                    MakeShared<FJsonObject>(),
+                    true};
+                return false;
+            }
+        }
+        return AssetDeletionService->Delete(Arguments, OutResult, OutError);
     }
     if (Command == TEXT("level_inspect") || Command == TEXT("level_open"))
     {
@@ -438,7 +475,7 @@ TSharedPtr<FJsonObject> FUnrealMCPBridge::Capabilities() const
     Result->SetStringField(TEXT("platform"), FPlatformProperties::PlatformName());
     Result->SetStringField(TEXT("mode"), TEXT("blueprint_family_authoring"));
     Result->SetBoolField(TEXT("bridge_ready"), bReady);
-    Result->SetArrayField(TEXT("commands"), Strings({TEXT("capabilities"), TEXT("editor_state"), TEXT("editor_shutdown"), TEXT("operation_status"), TEXT("asset_references"),
+    Result->SetArrayField(TEXT("commands"), Strings({TEXT("capabilities"), TEXT("editor_state"), TEXT("editor_shutdown"), TEXT("operation_status"), TEXT("asset_references"), TEXT("asset_delete"),
         TEXT("level_inspect"), TEXT("level_open"),
         TEXT("blueprint_inspect"), TEXT("blueprint_action_catalog"), TEXT("blueprint_graph_edit"), TEXT("blueprint_create"), TEXT("blueprint_compile"),
         TEXT("blueprint_save"), TEXT("blueprint_component_edit"), TEXT("blueprint_default_edit"), TEXT("blueprint_member_edit"),
@@ -479,6 +516,9 @@ TSharedPtr<FJsonObject> FUnrealMCPBridge::Capabilities() const
     Features->SetBoolField(TEXT("game_data_batch_editing"), true);
     Features->SetBoolField(TEXT("asset_reference_discovery"), true);
     Features->SetBoolField(TEXT("asset_reference_live_memory"), true);
+    Features->SetBoolField(TEXT("asset_delete"), true);
+    Features->SetBoolField(TEXT("asset_delete_force"), false);
+    Features->SetBoolField(TEXT("asset_delete_undo"), false);
     Features->SetBoolField(TEXT("level_discovery"), true);
     Features->SetBoolField(TEXT("level_open"), true);
     Features->SetBoolField(TEXT("level_snapshots"), true);

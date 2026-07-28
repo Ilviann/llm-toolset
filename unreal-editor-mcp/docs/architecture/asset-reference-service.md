@@ -2,7 +2,7 @@
 
 ## Ownership
 
-`FUnrealMCPAssetReferenceService` owns exact mounted-asset resolution, inbound Asset Registry evidence, bounded live-memory evidence, deterministic reference snapshots, and reference-page cursors. `UnrealMCPBridge` owns HTTP admission and constructs the service lazily; `asset_references` is read-only and never enters the operation ledger.
+`FUnrealMCPAssetReferenceService` owns exact mounted-asset resolution, inbound Asset Registry evidence, bounded live-memory evidence, deterministic reference snapshots, and reference-page cursors. `UnrealMCPBridge` owns HTTP admission and constructs the service lazily; `asset_references` is read-only and never enters the operation ledger. The asset-deletion service may request the same complete in-memory snapshot without creating a model-facing cursor.
 
 ## Dependency direction
 

@@ -7,6 +7,16 @@
 
 struct FAssetData;
 
+struct FUnrealMCPAssetReferenceSnapshot
+{
+    FString AssetPath;
+    FString SnapshotId;
+    TSharedPtr<FJsonObject> Target;
+    TSharedPtr<FJsonObject> Scans;
+    TArray<TSharedPtr<FJsonValue>> Records;
+    uint64 RegistrySerial = 0;
+};
+
 class FUnrealMCPAssetReferenceService
 {
 public:
@@ -17,6 +27,10 @@ public:
     bool Inspect(
         const TSharedPtr<FJsonObject>& Arguments,
         TSharedPtr<FJsonObject>& OutResult,
+        FUnrealMCPError& OutError);
+    bool Capture(
+        const FString& AssetPath,
+        FUnrealMCPAssetReferenceSnapshot& OutSnapshot,
         FUnrealMCPError& OutError);
 
 private:
