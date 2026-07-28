@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.21.0 — 2026-07-28
+
+- Added the `widget` Blueprint family, specialized Widget Blueprint creation, bounded tree/default inspection, stable widget and slot identities, and explicit rejection of Actor component operations.
+- Added stale-safe `widget_tree_edit` operations for roots, panel/named-slot children, removal, rename, reparenting, variable exposure, and supported widget defaults, with transactions, reference checks, cycle/root protection, replay, and published limits.
+- Added Python schemas, public UE 5.8 API probes, focused native Automation coverage, Windows build/test verification, cross-process restart read-back, documentation, and a workflow example.
+
 ## 0.20.0 — 2026-07-28
 
 - Added ledger-backed `asset_delete` for one exact persisted project or local-project-plugin asset package after stale-safe reference, editor-state, mount, package, storage, and Unreal deletion-reference preflight.

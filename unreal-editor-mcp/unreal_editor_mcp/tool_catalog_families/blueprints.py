@@ -65,7 +65,7 @@ BLUEPRINT_TOOLS: Final = (
                         "sections": {
                             "type": "array",
                             "minItems": 1,
-                            "maxItems": 15,
+                            "maxItems": 17,
                             "items": {
                                 "type": "string",
                                 "enum": [
@@ -73,6 +73,7 @@ BLUEPRINT_TOOLS: Final = (
                                     "class_defaults", "variables", "functions", "macros", "custom_events",
                                     "parameters", "local_variables",
                                     "graphs", "nodes", "pins", "connections",
+                                    "widget_tree", "widget_defaults",
                                 ],
                             },
                         },
@@ -83,6 +84,7 @@ BLUEPRINT_TOOLS: Final = (
                         "local_id": _LOCAL_ID,
                         "macro_id": _MACRO_ID,
                         "custom_event_id": _CUSTOM_EVENT_ID,
+                        "widget_id": _COMPONENT_ID,
                         "property_names": {
                             "type": "array",
                             "minItems": 1,

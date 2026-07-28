@@ -12,7 +12,7 @@ bool FUnrealMCPPhase14GameplayFrameworkFamiliesTest::RunTest(const FString& Para
     using namespace UnrealMCP::BlueprintFamilyPolicy;
 
     const TArray<TSharedPtr<FJsonValue>> Matrix = BuildPublishedMatrix();
-    TestEqual(TEXT("family matrix retains generic Actor plus all released gameplay families"), Matrix.Num(), 6);
+    TestEqual(TEXT("family matrix retains released Blueprint families"), Matrix.Num(), 7);
     for (const TSharedPtr<FJsonValue>& Value : Matrix)
     {
         const TSharedPtr<FJsonObject> Record = Value->AsObject();

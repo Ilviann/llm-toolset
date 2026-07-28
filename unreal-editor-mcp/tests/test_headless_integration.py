@@ -16,7 +16,7 @@ SPEC.loader.exec_module(run_headless_integration)
 
 class HeadlessIntegrationScriptTests(unittest.TestCase):
     def test_runner_is_a_thin_compatibility_orchestrator(self):
-        from headless_integration import assets, blueprints, game_data_levels, lifecycle
+        from headless_integration import assets, blueprints, game_data_levels, lifecycle, widgets
 
         self.assertIs(run_headless_integration.main, lifecycle.main)
         self.assertIs(
@@ -26,6 +26,7 @@ class HeadlessIntegrationScriptTests(unittest.TestCase):
         self.assertTrue(callable(assets.run_asset_scenario))
         self.assertTrue(callable(blueprints.author_blueprint_scenario))
         self.assertTrue(callable(game_data_levels.open_acceptance_level))
+        self.assertTrue(callable(widgets.author_widget_scenario))
 
     def test_editor_executable_is_selected_for_each_supported_host(self):
         expected_paths = {

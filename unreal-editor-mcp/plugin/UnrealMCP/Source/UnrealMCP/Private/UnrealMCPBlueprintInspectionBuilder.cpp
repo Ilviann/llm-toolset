@@ -3,6 +3,7 @@
 #include "UnrealMCPBlueprintInspectionCollectors.h"
 #include "UnrealMCPBlueprintInspectionFamilyCollectors.h"
 #include "UnrealMCPBlueprintInspectionQuery.h"
+#include "UnrealMCPWidgetTreeInspector.h"
 
 namespace UnrealMCP::BlueprintInspectionPrivate
 {
@@ -29,6 +30,7 @@ bool BuildInspection(
     const FString& LocalFilter = Query.LocalFilter;
     const FString& MacroFilter = Query.MacroFilter;
     const FString& CustomEventFilter = Query.CustomEventFilter;
+    const FString& WidgetFilter = Query.WidgetFilter;
     const TSet<FString>& PropertyNames = Query.PropertyNames;
 
     IAssetRegistry& Registry = FAssetRegistryModule::GetRegistry();
@@ -72,6 +74,7 @@ bool BuildInspection(
         CustomEventFilter, Sink, OutError)) return false;
 
     if (!CollectGraphs(Blueprint, Owners, Sections, GraphFilter, Sink, OutError)) return false;
+    if (!CollectWidgetTree(Blueprint, WidgetFilter, PropertyNames, Sections, Sink, OutError)) return false;
     if (Sink.ExceedsStructuralLimit())
     {
         OutError = {TEXT("response_too_large"), TEXT("Inspection exceeds the configured structural record limit")};

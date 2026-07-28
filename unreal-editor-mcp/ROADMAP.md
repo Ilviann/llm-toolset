@@ -20,7 +20,7 @@ Feature identifiers are stable names, not execution indexes. Unfinished features
 - [x] [`asset-delete` — Delete asset](docs/todo/asset-delete.md) — Safely delete one exact unreferenced asset package through Unreal Editor.
   - Depends on:
     - `asset-references`
-- [ ] [`widget-tree` — Widget Blueprint family and widget trees](docs/todo/widget-tree.md) — Add Widget Blueprint creation, inspection, compilation, saving, and widget-tree editing.
+- [x] [`widget-tree` — Widget Blueprint family and widget trees](docs/todo/widget-tree.md) — Add Widget Blueprint creation, inspection, compilation, saving, and widget-tree editing.
 - [ ] [`umg-authoring` — UMG layout, styling, bindings, and UI logic](docs/todo/umg-authoring.md) — Complete practical HUD and menu authoring on the Widget Blueprint family.
   - Depends on:
     - `widget-tree`
@@ -86,6 +86,7 @@ Feature checkboxes record implementation completion. This section separately lis
   - `level-open`
   - `asset-references`
   - `asset-delete`
+  - `widget-tree`
 - Windows:
   - None
 - Linux:

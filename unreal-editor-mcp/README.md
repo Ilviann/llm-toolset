@@ -1,6 +1,6 @@
 # Unreal Editor MCP
 
-Unreal Editor MCP 0.20.0 is an offline-first MCP bridge for Unreal Engine 5.8+. It pairs a dependency-free Python 3.10+ stdio server with an editor-only C++ plugin.
+Unreal Editor MCP 0.21.0 is an offline-first MCP bridge for Unreal Engine 5.8+. It pairs a dependency-free Python 3.10+ stdio server with an editor-only C++ plugin.
 
 ## Installation
 
@@ -20,7 +20,7 @@ Python 3.10 or newer with tkinter is required. The build and installation are of
 
 1. Copy [`plugin/UnrealMCP`](plugin/UnrealMCP) to `<YourProject>/Plugins/UnrealMCP`, or add this repository's `plugin/` directory to `AdditionalPluginDirectories` in a disposable development `.uproject`.
 2. Enable `UnrealMCP` and compile the project's Editor target with Unreal Engine 5.8 or newer.
-3. Open the project and wait for `Unreal MCP 0.20.0 ready on 127.0.0.1:15485` in the editor log.
+3. Open the project and wait for `Unreal MCP 0.21.0 ready on 127.0.0.1:15485` in the editor log.
 4. Create a virtual environment and install the Python package offline:
 
    ```sh
@@ -61,11 +61,12 @@ Start Unreal before calling normal tools. `capabilities` remains available for d
 
 ## Contract overview
 
-Default mode exposes nineteen tools:
+Default mode exposes twenty tools:
 
 - Core and lifecycle state: `capabilities`, `editor_state`, and `operation_status`.
 - Levels and assets: `level_inspect`, `level_open`, `asset_references`, and `asset_delete`.
 - Blueprint discovery and authoring: `blueprint_inspect`, `blueprint_action_catalog`, `blueprint_graph_edit`, `blueprint_create`, `blueprint_compile`, `blueprint_save`, `blueprint_component_edit`, `blueprint_default_edit`, and `blueprint_member_edit`.
+- Widget Blueprint hierarchy authoring: `widget_tree_edit`.
 - Project and game data: `gameplay_framework_edit`, `game_data_inspect`, and `game_data_edit`.
 
 Opt-in large mode adds `editor_lifecycle` for a single configured trusted project. It supports bounded launch, graceful shutdown, restart, and cancellation; it never accepts model-supplied executables, projects, process IDs, environment values, shell fragments, or arbitrary editor arguments.

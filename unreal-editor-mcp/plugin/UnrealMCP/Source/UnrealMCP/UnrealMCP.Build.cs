@@ -19,6 +19,8 @@ public class UnrealMCP : ModuleRules
             "KismetCompiler",
             "Projects",
             "SubobjectDataInterface",
+            "UMG",
+            "UMGEditor",
             "UnrealEd"
         });
     }

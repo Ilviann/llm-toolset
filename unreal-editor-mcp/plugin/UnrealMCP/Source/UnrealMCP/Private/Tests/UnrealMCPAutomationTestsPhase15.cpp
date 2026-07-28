@@ -12,7 +12,7 @@ bool FUnrealMCPPhase15GameInstanceFamilyTest::RunTest(const FString& Parameters)
     using namespace UnrealMCP::BlueprintFamilyPolicy;
 
     const TArray<TSharedPtr<FJsonValue>> Matrix = BuildPublishedMatrix();
-    TestEqual(TEXT("family matrix adds GameInstance"), Matrix.Num(), 6);
+    TestEqual(TEXT("family matrix retains GameInstance with later families"), Matrix.Num(), 7);
     TSharedPtr<FJsonObject> GameInstanceRecord;
     for (const TSharedPtr<FJsonValue>& Value : Matrix)
     {

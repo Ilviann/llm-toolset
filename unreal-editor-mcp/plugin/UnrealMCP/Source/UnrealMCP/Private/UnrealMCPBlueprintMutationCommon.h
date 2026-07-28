@@ -15,6 +15,7 @@
 #include "EdGraphSchema_K2.h"
 #include "Components/ActorComponent.h"
 #include "Components/SceneComponent.h"
+#include "Blueprint/UserWidget.h"
 #include "Editor.h"
 #include "GameFramework/Actor.h"
 #include "HAL/FileManager.h"
@@ -254,7 +255,9 @@ static bool ResolveParent(const FString& Path, UClass*& OutClass, FUnrealMCPErro
         return false;
     }
     const bool bGenerated = Cast<UBlueprintGeneratedClass>(OutClass) != nullptr;
-    const bool bUnusableFlags = OutClass->HasAnyClassFlags(CLASS_Abstract | CLASS_Deprecated | CLASS_NewerVersionExists);
+    const bool bPublishedAbstractBase = OutClass == UUserWidget::StaticClass();
+    const bool bUnusableFlags = OutClass->HasAnyClassFlags(CLASS_Deprecated | CLASS_NewerVersionExists)
+        || (OutClass->HasAnyClassFlags(CLASS_Abstract) && !bPublishedAbstractBase);
     const bool bTransientName = OutClass->GetName().StartsWith(TEXT("SKEL_")) || OutClass->GetName().StartsWith(TEXT("REINST_"));
     if (!UnrealMCP::BlueprintFamilyPolicy::Supports(OutClass, UnrealMCP::BlueprintFamilyPolicy::EOperation::Create)
         || bUnusableFlags || bTransientName

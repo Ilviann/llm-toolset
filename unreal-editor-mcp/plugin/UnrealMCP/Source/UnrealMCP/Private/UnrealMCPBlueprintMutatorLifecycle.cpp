@@ -1,4 +1,6 @@
 #include "UnrealMCPBlueprintCallableMutationSupport.h"
+#include "Blueprint/UserWidget.h"
+#include "WidgetBlueprintOperationUtils.h"
 
 
 FUnrealMCPBlueprintMutator::FUnrealMCPBlueprintMutator(
@@ -89,8 +91,12 @@ bool FUnrealMCPBlueprintMutator::Create(
 
     const FString AssetName = FPackageName::GetLongPackageAssetName(PackageName);
     UPackage* Package = CreatePackage(*PackageName);
-    UBlueprint* Blueprint = FKismetEditorUtilities::CreateBlueprint(
-        ParentClass, Package, FName(*AssetName), BPTYPE_Normal, FName(TEXT("UnrealMCP")));
+    UBlueprint* Blueprint = ParentClass->IsChildOf(UUserWidget::StaticClass())
+        ? FWidgetBlueprintOperationUtils::CreateWidgetBlueprint(
+            Package, FName(*AssetName), BPTYPE_Normal, ParentClass, nullptr,
+            FName(TEXT("UnrealMCP")), false)
+        : FKismetEditorUtilities::CreateBlueprint(
+            ParentClass, Package, FName(*AssetName), BPTYPE_Normal, FName(TEXT("UnrealMCP")));
     if (Blueprint == nullptr)
     {
         CleanupFailedCreation(Package, nullptr, Filename, false);

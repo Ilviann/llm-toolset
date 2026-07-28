@@ -2,7 +2,7 @@
 
 ## Ownership
 
-`unreal_editor_mcp/` owns the Python 3.10+ process. `stdio.py` bounds newline-delimited JSON-RPC and keeps stdout protocol-only. `server.py` negotiates MCP, publishes the nineteen default tools plus optional large-mode lifecycle tool, validates arguments, and converts domain failures to MCP tool errors. `tool_catalog.py` is the one ordered catalog assembler over the core, asset, level, Blueprint, gameplay-framework, game-data, and lifecycle definitions in `tool_catalog_families/`. `project.py`, `platforms.py`, and `discovery.py` resolve one project and validate generated state. `bridge.py` is the only HTTP client. `lifecycle.py` owns configured editor process orchestration and durable lifecycle records. `cli.py` composes these responsibilities.
+`unreal_editor_mcp/` owns the Python 3.10+ process. `stdio.py` bounds newline-delimited JSON-RPC and keeps stdout protocol-only. `server.py` negotiates MCP, publishes the twenty default tools plus optional large-mode lifecycle tool, validates arguments, and converts domain failures to MCP tool errors. `tool_catalog.py` is the one ordered catalog assembler over the core, asset, level, Blueprint, widget, gameplay-framework, game-data, and lifecycle definitions in `tool_catalog_families/`. `project.py`, `platforms.py`, and `discovery.py` resolve one project and validate generated state. `bridge.py` is the only HTTP client. `lifecycle.py` owns configured editor process orchestration and durable lifecycle records. `cli.py` composes these responsibilities.
 
 ## Dependency direction
 
@@ -10,7 +10,7 @@ The CLI constructs a `ProjectLayout`, `UnrealBridge`, and `MCPServer`; the trans
 
 ## Invariants
 
-- Default mode contains the nineteen tools released through `asset-delete`. Only large mode adds `editor_lifecycle`.
+- Default mode contains the twenty tools released through `widget-tree`. Only large mode adds `editor_lifecycle`.
 - The public catalog order is assembled once from disjoint family tuples; every tool name is unique.
 - `asset_references` has exact mounted-object-path and cursor-continuation shapes with bounded page size.
 - `level_inspect` has exact mounted discovery, current-map, and cursor-continuation shapes. `level_open` requires one 32-hex operation ID and one exact mounted World object path.
@@ -21,6 +21,7 @@ The CLI constructs a `ProjectLayout`, `UnrealBridge`, and `MCPServer`; the trans
 - Every mutation requires a caller-generated 32-lowercase-hex `operation_id`. Existing-asset mutations also require the current 40-lowercase-hex `expected_snapshot`.
 - Component operations use one exact discriminated shape; class/component property edits accept only the bounded shared value forms.
 - Member operations use exact add/rename/update/remove shapes with canonical K2 type/default records, stable identities, and reject-only signature/type/removal policies. Scoped discriminators cover functions, locals, macros, and custom events without adding another model-facing tool; custom-event add requires one stable event-graph identity.
+- `widget_tree_edit` uses seven exact operation shapes and stable widget/slot identities; the separate widget catalog module prevents further growth of the Blueprint schema module.
 - Custom-event metadata has exact RPC mode/reliability fields. Actor/component replication uses bounded setting discriminators, and framework assignment requires project hash plus expected current class.
 - Game-data inspection has exact struct/table/cursor shapes. Game-data edits discriminate schema and row operations, bound nested value depth/collections/fields/batches, and require snapshots for existing assets.
 - HTTP always targets the literal IPv4 loopback address and authenticates with the generated token.

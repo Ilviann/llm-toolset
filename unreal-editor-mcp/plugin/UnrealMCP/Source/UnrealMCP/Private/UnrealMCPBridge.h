@@ -14,6 +14,7 @@ class FUnrealMCPBlueprintInspector;
 class FUnrealMCPBlueprintActionCatalog;
 class FUnrealMCPBlueprintGraphEditor;
 class FUnrealMCPBlueprintMutator;
+class FUnrealMCPWidgetTreeService;
 class FUnrealMCPGameplayFrameworkEditor;
 class FUnrealMCPGameDataService;
 class FUnrealMCPLevelService;
@@ -54,6 +55,7 @@ private:
     TUniquePtr<FUnrealMCPBlueprintActionCatalog> BlueprintActionCatalog;
     TUniquePtr<FUnrealMCPBlueprintGraphEditor> BlueprintGraphEditor;
     TUniquePtr<FUnrealMCPBlueprintMutator> BlueprintMutator;
+    TUniquePtr<FUnrealMCPWidgetTreeService> WidgetTreeService;
     TUniquePtr<FUnrealMCPGameplayFrameworkEditor> GameplayFrameworkEditor;
     TUniquePtr<FUnrealMCPGameDataService> GameDataService;
     TUniquePtr<FUnrealMCPLevelService> LevelService;

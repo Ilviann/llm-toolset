@@ -20,6 +20,7 @@
 #include "UnrealMCPBlueprintGraphEditor.h"
 #include "UnrealMCPBlueprintFamilyPolicy.h"
 #include "UnrealMCPBlueprintMutator.h"
+#include "UnrealMCPWidgetTreeService.h"
 #include "UnrealMCPGameplayFrameworkEditor.h"
 #include "UnrealMCPGameDataService.h"
 #include "UnrealMCPLevelService.h"
@@ -60,6 +61,7 @@ bool IsMutationCommand(const FString& Command)
         || Command == TEXT("blueprint_create") || Command == TEXT("blueprint_compile") || Command == TEXT("blueprint_save")
         || Command == TEXT("blueprint_component_edit") || Command == TEXT("blueprint_default_edit")
         || Command == TEXT("blueprint_member_edit") || Command == TEXT("blueprint_graph_edit")
+        || Command == TEXT("widget_tree_edit")
         || Command == TEXT("gameplay_framework_edit") || Command == TEXT("game_data_edit");
 }
 
@@ -171,6 +173,7 @@ void FUnrealMCPBridge::Stop()
     Router.Reset();
     BlueprintGraphEditor.Reset();
     BlueprintMutator.Reset();
+    WidgetTreeService.Reset();
     GameplayFrameworkEditor.Reset();
     GameDataService.Reset();
     LevelService.Reset();
@@ -226,6 +229,7 @@ bool FUnrealMCPBridge::HandleRequest(const FHttpServerRequest& Request, const FH
         && Command != TEXT("blueprint_save") && Command != TEXT("blueprint_component_edit") && Command != TEXT("blueprint_default_edit")
         && Command != TEXT("blueprint_member_edit") && Command != TEXT("blueprint_action_catalog")
         && Command != TEXT("blueprint_graph_edit") && Command != TEXT("gameplay_framework_edit")
+        && Command != TEXT("widget_tree_edit")
         && Command != TEXT("game_data_inspect") && Command != TEXT("game_data_edit"))
     {
         Complete(UnrealMCP::Protocol::Error(EHttpServerResponseCodes::BadRequest, TEXT("invalid_argument"), TEXT("Unknown or unavailable command")));
@@ -458,6 +462,14 @@ bool FUnrealMCPBridge::Execute(const FString& Command, const TSharedPtr<FJsonObj
         }
         return BlueprintGraphEditor->Execute(Arguments, OutResult, OutError);
     }
+    if (Command == TEXT("widget_tree_edit"))
+    {
+        if (!WidgetTreeService)
+        {
+            WidgetTreeService = MakeUnique<FUnrealMCPWidgetTreeService>(*BlueprintInspector);
+        }
+        return WidgetTreeService->Execute(Arguments, OutResult, OutError);
+    }
     if (!BlueprintMutator)
     {
         BlueprintMutator = MakeUnique<FUnrealMCPBlueprintMutator>(*BlueprintInspector);
@@ -479,6 +491,7 @@ TSharedPtr<FJsonObject> FUnrealMCPBridge::Capabilities() const
         TEXT("level_inspect"), TEXT("level_open"),
         TEXT("blueprint_inspect"), TEXT("blueprint_action_catalog"), TEXT("blueprint_graph_edit"), TEXT("blueprint_create"), TEXT("blueprint_compile"),
         TEXT("blueprint_save"), TEXT("blueprint_component_edit"), TEXT("blueprint_default_edit"), TEXT("blueprint_member_edit"),
+        TEXT("widget_tree_edit"),
         TEXT("gameplay_framework_edit"), TEXT("game_data_inspect"), TEXT("game_data_edit")}));
 
     const TSharedRef<FJsonObject> Features = MakeShared<FJsonObject>();
@@ -507,6 +520,8 @@ TSharedPtr<FJsonObject> FUnrealMCPBridge::Capabilities() const
     Features->SetBoolField(TEXT("game_mode_families"), true);
     Features->SetBoolField(TEXT("game_state_families"), true);
     Features->SetBoolField(TEXT("game_instance_family"), true);
+    Features->SetBoolField(TEXT("widget_blueprint_family"), true);
+    Features->SetBoolField(TEXT("widget_tree_authoring"), true);
     Features->SetBoolField(TEXT("multiplayer_blueprint_authoring"), true);
     Features->SetBoolField(TEXT("custom_event_rpcs"), true);
     Features->SetBoolField(TEXT("typed_replication_settings"), true);
@@ -582,6 +597,11 @@ TSharedPtr<FJsonObject> FUnrealMCPBridge::Capabilities() const
     Limits->SetNumberField(TEXT("level_discovery_scan"), UnrealMCP::MaxLevelDiscoveryScan);
     Limits->SetNumberField(TEXT("level_external_packages"), UnrealMCP::MaxLevelExternalPackages);
     Limits->SetNumberField(TEXT("dirty_package_summary"), UnrealMCP::MaxDirtyPackageSummary);
+    Limits->SetNumberField(TEXT("widget_tree_widgets"), UnrealMCP::MaxWidgetTreeWidgets);
+    Limits->SetNumberField(TEXT("widget_tree_depth"), UnrealMCP::MaxWidgetTreeDepth);
+    Limits->SetNumberField(TEXT("widget_named_slots"), UnrealMCP::MaxWidgetNamedSlots);
+    Limits->SetNumberField(TEXT("widget_defaults_per_widget"), UnrealMCP::MaxWidgetDefaultsPerWidget);
+    Limits->SetNumberField(TEXT("widget_changed_defaults"), UnrealMCP::MaxWidgetChangedDefaults);
     Result->SetObjectField(TEXT("limits"), Limits);
 
     const TSharedRef<FJsonObject> Listener = MakeShared<FJsonObject>();

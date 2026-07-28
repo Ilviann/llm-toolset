@@ -1,0 +1,64 @@
+[
+  {
+    "tool": "blueprint_create",
+    "arguments": {
+      "operation_id": "11111111111111111111111111111111",
+      "parent_class": "/Script/UMG.UserWidget",
+      "package_path": "/Game/UI/WBP_Status"
+    }
+  },
+  {
+    "tool": "widget_tree_edit",
+    "arguments": {
+      "operation_id": "22222222222222222222222222222222",
+      "asset_path": "/Game/UI/WBP_Status.WBP_Status",
+      "expected_snapshot": "<snapshot returned by create>",
+      "operation": "set_root",
+      "widget_class": "/Script/UMG.CanvasPanel",
+      "name": "RootCanvas"
+    }
+  },
+  {
+    "tool": "widget_tree_edit",
+    "arguments": {
+      "operation_id": "33333333333333333333333333333333",
+      "asset_path": "/Game/UI/WBP_Status.WBP_Status",
+      "expected_snapshot": "<latest snapshot>",
+      "operation": "add",
+      "widget_class": "/Script/UMG.TextBlock",
+      "name": "StatusText",
+      "target": {
+        "kind": "panel",
+        "parent_id": "<root widget_id>",
+        "index": 0
+      }
+    }
+  },
+  {
+    "tool": "widget_tree_edit",
+    "arguments": {
+      "operation_id": "44444444444444444444444444444444",
+      "asset_path": "/Game/UI/WBP_Status.WBP_Status",
+      "expected_snapshot": "<latest snapshot>",
+      "operation": "set_variable",
+      "widget_id": "<StatusText widget_id>",
+      "is_variable": true
+    }
+  },
+  {
+    "tool": "blueprint_compile",
+    "arguments": {
+      "operation_id": "55555555555555555555555555555555",
+      "asset_path": "/Game/UI/WBP_Status.WBP_Status",
+      "expected_snapshot": "<latest snapshot>"
+    }
+  },
+  {
+    "tool": "blueprint_save",
+    "arguments": {
+      "operation_id": "66666666666666666666666666666666",
+      "asset_path": "/Game/UI/WBP_Status.WBP_Status",
+      "expected_snapshot": "<snapshot returned by compile>"
+    }
+  }
+]

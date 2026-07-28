@@ -2,7 +2,7 @@
 
 ## Ownership
 
-`FUnrealMCPBlueprintInspector` remains the read-only `blueprint_inspect` facade and owns only paging/cursor retention plus orchestration into the private builder. `FInspectionQuery` normalizes and validates initial requests. Discovery, overview/component/default, member, function/local, macro, custom-event, and graph collectors feed one bounded record/fingerprint sink so every requested section is emitted from one structural snapshot.
+`FUnrealMCPBlueprintInspector` remains the read-only `blueprint_inspect` facade and owns only paging/cursor retention plus orchestration into the private builder. `FInspectionQuery` normalizes and validates initial requests. Discovery, overview/component/default, member, function/local, macro, custom-event, graph, and widget-tree collectors feed one bounded record/fingerprint sink so every requested section is emitted from one structural snapshot.
 
 ## Dependency direction
 
@@ -11,13 +11,13 @@ The HTTP bridge owns one inspector and supplies already-authenticated JSON argum
 ## Invariants
 
 - Omitting `package_path` discovers across every content mount visible to the project. Supplying it restricts discovery recursively below that normalized mount/package path. Exact optional asset-name matching, a 2,048-candidate ceiling, and no asset loading apply in either form.
-- Deep inspection resolves one exact object or package path in any visible mount, rejects missing, non-Blueprint, and unpublished-family assets, and loads only that target. Summary output reports `actor_blueprint: false` for GameInstance.
+- Deep inspection resolves one exact object or package path in any visible mount, rejects missing, non-Blueprint, and unpublished-family assets, and loads only that target. Summary output reports `actor_blueprint: false` for GameInstance and Widget Blueprints.
 - Discovery records identify the resolved published family without loading candidates. Exact inspection pages and summary records report the family plus live defaults/components/event-graph/local/override/graph-type capabilities.
 - Read scope includes `/Game`, `/Engine`, enabled project plugins, enabled engine/marketplace plugins, and other mounted content. This does not grant mutation authority: mutation scope is `/Game` plus symlink-free content mounts owned by plugins physically located under the current project's local `Plugins/` directory.
-- Default inspection is shallow: summary, parent, compile state, components, typed variables, functions, macros, custom events, locals, and graphs. Nodes, pins, connections, and separate parameter records require explicit sections. Stable member/function/local/macro/custom-event filters select one exact declaration and its scoped records.
+- Default inspection is shallow: summary, parent, compile state, components, typed variables, functions, macros, custom events, locals, graphs, and Widget Blueprint trees. Nodes, pins, connections, widget defaults, and separate parameter records require explicit sections. Stable member/function/local/macro/custom-event/widget filters select one exact declaration and its scoped records.
 - `class_defaults`, `component_id`, and `property_names` provide bounded targeted default inspection. Component records distinguish local, inherited, and native ownership and publish editability, scene/root state, and stable identity availability.
 - Every result is a page from one structural snapshot. A continuation cursor is opaque, single-use, retained for 30 seconds, and bound to its normalized query and snapshot. Changed structure returns `stale_precondition`.
-- At most 4,096 structural records, 100 records per page, 32 cursors, and 16 changed component defaults per component are retained or encoded. The shared 256 KiB response bound still applies.
+- At most 4,096 structural records, 100 records per page, 32 cursors, and 16 changed component or widget defaults per object are retained or encoded. Widget traversal adds its separately published tree/depth/slot/default limits. The shared 256 KiB response bound still applies.
 - Inspection never opens a transaction, compiles, saves, changes selection, or intentionally marks a package dirty. The inspector checks package dirty state and compile status before returning.
 - Variable records expose canonical K2 types/tagged defaults, metadata, ownership/editability, replication and validated mutable RepNotify relationships, plus at most 64 exact loaded graph/node references and an unresolved-reference signal.
 - Variables, functions, locals, macros, and custom events obtain reference summaries from the same typed bounded scanner used by mutation preflight; collectors encode that result only when producing records.
@@ -27,4 +27,4 @@ The HTTP bridge owns one inspector and supplies already-authenticated JSON argum
 
 ## Verification
 
-`UnrealMCP.Phase2` covers discovery, structure, paging, identity, and non-mutation. `UnrealMCP.Phase4` adds component/default read-back. `UnrealMCP.Phase5` adds exact variable inspection. `UnrealMCP.Phase6` adds function/local/RepNotify inspection. `UnrealMCP.Phase7` adds exact macro/custom-event signature, ownership, graph, required-node, and reference inspection. `UnrealMCP.Phase13` covers regenerated promotable-operator tolerance-pin canonicalization. `UnrealMCP.Phase14` covers the four GameMode/GameState families; `UnrealMCP.Phase15` covers GameInstance capability, empty component, default/member/callable/graph, and restart read-back contracts.
+`UnrealMCP.Phase2` covers discovery, structure, paging, identity, and non-mutation. `UnrealMCP.Phase4` adds component/default read-back. `UnrealMCP.Phase5` adds exact variable inspection. `UnrealMCP.Phase6` adds function/local/RepNotify inspection. `UnrealMCP.Phase7` adds exact macro/custom-event signature, ownership, graph, required-node, and reference inspection. `UnrealMCP.Phase13` covers regenerated promotable-operator tolerance-pin canonicalization. `UnrealMCP.Phase14` covers the four GameMode/GameState families; `UnrealMCP.Phase15` covers GameInstance. `UnrealMCP.WidgetTree` covers widget/slot identities, hierarchy fingerprints, and targeted defaults.

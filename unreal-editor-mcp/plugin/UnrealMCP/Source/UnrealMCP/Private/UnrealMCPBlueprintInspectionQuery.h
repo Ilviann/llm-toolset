@@ -16,13 +16,14 @@ struct FInspectionQuery
     FString LocalFilter;
     FString MacroFilter;
     FString CustomEventFilter;
+    FString WidgetFilter;
     TSet<FString> PropertyNames;
 };
 
 static bool DecodeInspectionQuery(const FJsonObject& Arguments, FInspectionQuery& Out, FUnrealMCPError& OutError)
 {
     if (!HasOnlyFields(Arguments, {TEXT("mode"), TEXT("asset_path"), TEXT("sections"), TEXT("graph_id"), TEXT("component_id"), TEXT("member_id"),
-        TEXT("function_id"), TEXT("local_id"), TEXT("macro_id"), TEXT("custom_event_id"),
+        TEXT("function_id"), TEXT("local_id"), TEXT("macro_id"), TEXT("custom_event_id"), TEXT("widget_id"),
         TEXT("property_names"), TEXT("include_inherited"), TEXT("page_size")}))
     {
         OutError = {TEXT("invalid_argument"), TEXT("Inspection arguments contain an unknown field")};
@@ -36,11 +37,12 @@ static bool DecodeInspectionQuery(const FJsonObject& Arguments, FInspectionQuery
     }
     if (!ReadOptionalBool(Arguments, TEXT("include_inherited"), false, Out.bIncludeInherited, OutError)) return false;
     Out.Sections = {TEXT("summary"), TEXT("parent_class"), TEXT("compile_state"), TEXT("components"),
-        TEXT("variables"), TEXT("functions"), TEXT("macros"), TEXT("custom_events"), TEXT("local_variables"), TEXT("graphs")};
+        TEXT("variables"), TEXT("functions"), TEXT("macros"), TEXT("custom_events"), TEXT("local_variables"),
+        TEXT("graphs"), TEXT("widget_tree")};
     if (Arguments.HasField(TEXT("sections")))
     {
         const TArray<TSharedPtr<FJsonValue>>* Values = nullptr;
-        if (!Arguments.TryGetArrayField(TEXT("sections"), Values) || Values == nullptr || Values->IsEmpty() || Values->Num() > 15)
+        if (!Arguments.TryGetArrayField(TEXT("sections"), Values) || Values == nullptr || Values->IsEmpty() || Values->Num() > 17)
         {
             OutError = {TEXT("invalid_argument"), TEXT("sections must be a non-empty bounded array")};
             return false;
@@ -65,7 +67,8 @@ static bool DecodeInspectionQuery(const FJsonObject& Arguments, FInspectionQuery
         {TEXT("function_id"), &Out.FunctionFilter, TEXT("function_id must be a 32-character stable function identity")},
         {TEXT("local_id"), &Out.LocalFilter, TEXT("local_id must be a 32-character stable local-variable identity")},
         {TEXT("macro_id"), &Out.MacroFilter, TEXT("macro_id must be a 32-character stable macro identity")},
-        {TEXT("custom_event_id"), &Out.CustomEventFilter, TEXT("custom_event_id must be a 32-character stable custom-event identity")}};
+        {TEXT("custom_event_id"), &Out.CustomEventFilter, TEXT("custom_event_id must be a 32-character stable custom-event identity")},
+        {TEXT("widget_id"), &Out.WidgetFilter, TEXT("widget_id must be a 32-character stable widget identity")}};
     for (const FIdentityField& Identity : IdentityFields)
     {
         if (Arguments.HasField(Identity.Field)
@@ -79,6 +82,12 @@ static bool DecodeInspectionQuery(const FJsonObject& Arguments, FInspectionQuery
     if (Out.Sections.Contains(TEXT("class_defaults")) && Out.PropertyNames.IsEmpty())
     {
         OutError = {TEXT("invalid_argument"), TEXT("class_defaults inspection requires one or more targeted property_names")};
+        return false;
+    }
+    if (Out.Sections.Contains(TEXT("widget_defaults"))
+        && (Out.PropertyNames.IsEmpty() || Out.WidgetFilter.IsEmpty()))
+    {
+        OutError = {TEXT("invalid_argument"), TEXT("widget_defaults inspection requires widget_id and property_names")};
         return false;
     }
     return true;

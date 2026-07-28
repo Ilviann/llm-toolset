@@ -2,6 +2,7 @@
 
 #include "EdGraph/EdGraph.h"
 #include "EdGraphSchema_K2.h"
+#include "Blueprint/UserWidget.h"
 #include "Engine/Blueprint.h"
 #include "Engine/GameInstance.h"
 #include "Engine/SimpleConstructionScript.h"
@@ -13,6 +14,7 @@
 #include "Kismet2/BlueprintEditorUtils.h"
 #include "UnrealMCPPropertyCodec.h"
 #include "UObject/UnrealType.h"
+#include "WidgetBlueprint.h"
 
 namespace UnrealMCP::BlueprintFamilyPolicy
 {
@@ -39,7 +41,11 @@ TSharedRef<FJsonObject> PublishedOperations(const FFamilyInfo& Family)
     {
         Operations->SetBoolField(Name, true);
     }
-    Operations->SetBoolField(TEXT("components"), Family.Name != TEXT("game_instance"));
+    const bool bActorFamily = Family.Name == TEXT("actor")
+        || Family.Name == TEXT("game_mode_base") || Family.Name == TEXT("game_mode")
+        || Family.Name == TEXT("game_state_base") || Family.Name == TEXT("game_state");
+    Operations->SetBoolField(TEXT("components"), bActorFamily);
+    Operations->SetBoolField(TEXT("widget_tree"), Family.Name == TEXT("widget"));
     Operations->SetBoolField(TEXT("parent_change"), false);
     Operations->SetBoolField(TEXT("project_settings_assignment"), Family.Name == TEXT("game_mode_base")
         || Family.Name == TEXT("game_mode") || Family.Name == TEXT("game_instance"));
@@ -75,6 +81,10 @@ FFamilyInfo Classify(const UClass* Class)
     if (Class->IsChildOf(UGameInstance::StaticClass()))
     {
         return MakeFamily(TEXT("game_instance"), UGameInstance::StaticClass());
+    }
+    if (Class->IsChildOf(UUserWidget::StaticClass()))
+    {
+        return MakeFamily(TEXT("widget"), UUserWidget::StaticClass());
     }
     if (!Class->IsChildOf(AActor::StaticClass()))
     {
@@ -119,7 +129,11 @@ bool Supports(const UClass* Class, EOperation Operation)
     case EOperation::GraphEdit:
         return true;
     case EOperation::Components:
-        return Family.Name != TEXT("game_instance");
+        return Family.Name == TEXT("actor") || Family.Name == TEXT("game_mode_base")
+            || Family.Name == TEXT("game_mode") || Family.Name == TEXT("game_state_base")
+            || Family.Name == TEXT("game_state");
+    case EOperation::WidgetTree:
+        return Family.Name == TEXT("widget");
     default:
         return false;
     }
@@ -188,6 +202,8 @@ TSharedRef<FJsonObject> BuildLiveCapabilities(const UBlueprint* Blueprint)
 
     Result->SetBoolField(TEXT("class_defaults"), Family.bSupported && bDefaults);
     Result->SetBoolField(TEXT("components"), Supports(ParentClass, EOperation::Components) && bComponents);
+    Result->SetBoolField(TEXT("widget_tree"), Supports(ParentClass, EOperation::WidgetTree)
+        && Cast<UWidgetBlueprint>(Blueprint) != nullptr);
     Result->SetBoolField(TEXT("event_graphs"), Family.bSupported && bEventGraph);
     Result->SetBoolField(TEXT("local_variables"), Family.bSupported && bNormalBlueprint);
     Result->SetBoolField(TEXT("overrides"), Family.bSupported && bOverrides);
@@ -227,7 +243,8 @@ TArray<TSharedPtr<FJsonValue>> BuildPublishedMatrix()
         MakeFamily(TEXT("game_mode"), AGameMode::StaticClass()),
         MakeFamily(TEXT("game_state_base"), AGameStateBase::StaticClass()),
         MakeFamily(TEXT("game_state"), AGameState::StaticClass()),
-        MakeFamily(TEXT("game_instance"), UGameInstance::StaticClass())};
+        MakeFamily(TEXT("game_instance"), UGameInstance::StaticClass()),
+        MakeFamily(TEXT("widget"), UUserWidget::StaticClass())};
     TArray<TSharedPtr<FJsonValue>> Result;
     for (const FFamilyInfo& Family : Families)
     {
@@ -235,7 +252,8 @@ TArray<TSharedPtr<FJsonValue>> BuildPublishedMatrix()
         Record->SetStringField(TEXT("family"), Family.Name);
         Record->SetStringField(TEXT("native_base_class"), Family.NativeBaseClass);
         Record->SetStringField(TEXT("inheritance_category"),
-            Family.Name == TEXT("game_instance") ? TEXT("uobject_derived") : TEXT("actor_derived"));
+            Family.Name == TEXT("widget") ? TEXT("widget_derived")
+            : Family.Name == TEXT("game_instance") ? TEXT("uobject_derived") : TEXT("actor_derived"));
         Record->SetObjectField(TEXT("operations"), PublishedOperations(Family));
         Record->SetObjectField(TEXT("multiplayer"), PublishedMultiplayer(Family));
         Result.Add(MakeShared<FJsonValueObject>(Record));

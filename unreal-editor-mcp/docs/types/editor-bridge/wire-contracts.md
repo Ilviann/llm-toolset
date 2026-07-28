@@ -1,6 +1,6 @@
 # Native wire contracts
 
-The HTTP request has exactly two fields: `command` is one of the nineteen model-facing commands released through `asset-delete` or internal `editor_shutdown`, and `arguments` follows its exact owning shape. `editor_shutdown` accepts no arguments and is not a model-facing tool. `asset_delete`, `level_open`, and `game_data_edit` are ledger-backed; `asset_references`, `level_inspect`, and `game_data_inspect` are read-only and cursor-capable. Authentication remains one exact bearer header.
+The HTTP request has exactly two fields: `command` is one of the twenty model-facing commands released through `widget-tree` or internal `editor_shutdown`, and `arguments` follows its exact owning shape. `editor_shutdown` accepts no arguments and is not a model-facing tool. `asset_delete`, `level_open`, `widget_tree_edit`, and `game_data_edit` are ledger-backed; `asset_references`, `level_inspect`, and `game_data_inspect` are read-only and cursor-capable. Authentication remains one exact bearer header.
 
 A success is `{ok:true,result:<object>}`. A failure is `{ok:false,error:{code,message,details,retryable}}`. Native errors use the same stable codes accepted by Python and never contain exceptions, addresses, tokens, absolute project paths, or unbounded logs.
 

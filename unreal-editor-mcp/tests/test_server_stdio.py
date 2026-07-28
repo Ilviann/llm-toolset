@@ -15,17 +15,18 @@ class FakeBridge:
     def call(self, command, arguments=None):
         self.calls.append((command, arguments))
         if command == "capabilities":
-            return {"bridge_version": "0.20.0", "commands": [
+            return {"bridge_version": "0.21.0", "commands": [
                 "capabilities", "editor_state", "operation_status", "asset_references", "asset_delete",
                 "level_inspect", "level_open",
                 "blueprint_inspect", "blueprint_action_catalog", "blueprint_graph_edit",
                 "blueprint_create", "blueprint_compile", "blueprint_save",
                 "blueprint_component_edit", "blueprint_default_edit",
-                "blueprint_member_edit", "gameplay_framework_edit", "game_data_inspect", "game_data_edit",
+                "blueprint_member_edit", "widget_tree_edit",
+                "gameplay_framework_edit", "game_data_inspect", "game_data_edit",
             ]}
         if command == "blueprint_inspect":
             return {"mode": "discover", "snapshot_id": "a" * 40, "records": []}
-        if command.startswith("blueprint_"):
+        if command.startswith("blueprint_") or command == "widget_tree_edit":
             return {"asset_path": "/Game/Actors/BP_Light.BP_Light", "snapshot_id": "a" * 40}
         return {"bridge_ready": True}
 
@@ -38,7 +39,7 @@ class ServerStdioTests(unittest.TestCase):
         bridge = FakeBridge()
         server = MCPServer(bridge)
         initialized = server.handle({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2025-06-18"}})
-        self.assertEqual(initialized["result"]["serverInfo"]["version"], "0.20.0")
+        self.assertEqual(initialized["result"]["serverInfo"]["version"], "0.21.0")
         listed = server.handle({"jsonrpc": "2.0", "id": 2, "method": "tools/list"})
         self.assertEqual([tool["name"] for tool in listed["result"]["tools"]], [
             "capabilities", "editor_state", "operation_status", "asset_references", "asset_delete",
@@ -46,7 +47,8 @@ class ServerStdioTests(unittest.TestCase):
             "blueprint_inspect", "blueprint_action_catalog", "blueprint_graph_edit",
             "blueprint_create", "blueprint_compile", "blueprint_save",
             "blueprint_component_edit", "blueprint_default_edit",
-            "blueprint_member_edit", "gameplay_framework_edit", "game_data_inspect", "game_data_edit",
+            "blueprint_member_edit", "widget_tree_edit",
+            "gameplay_framework_edit", "game_data_inspect", "game_data_edit",
         ])
         called = server.handle({"jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": {"name": "capabilities", "arguments": {}}})
         payload = json.loads(called["result"]["content"][0]["text"])
@@ -164,6 +166,9 @@ class ServerStdioTests(unittest.TestCase):
             {"mode": "inspect", "asset_path": "/Game/Actors/BP_Light.BP_Light", "sections": ["macros", "parameters"], "macro_id": "c" * 32},
             {"mode": "inspect", "asset_path": "/Game/Actors/BP_Light.BP_Light", "sections": ["custom_events", "parameters"], "custom_event_id": "9" * 32},
             {"mode": "inspect", "asset_path": "/ProjectPlugin/BP_Light.BP_Light"},
+            {"mode": "inspect", "asset_path": "/Game/UI/WBP_HUD.WBP_HUD",
+             "sections": ["widget_tree", "widget_defaults"], "widget_id": "7" * 32,
+             "property_names": ["RenderOpacity"]},
             {"cursor": "a" * 32, "page_size": 25},
         )
         for arguments in valid:
@@ -310,6 +315,61 @@ class ServerStdioTests(unittest.TestCase):
         for name, arguments in invalid:
             with self.subTest(name=name, arguments=arguments):
                 response = server.handle({"jsonrpc": "2.0", "id": 7, "method": "tools/call", "params": {"name": name, "arguments": arguments}})
+                self.assertEqual(response["error"]["code"], -32602)
+
+    def test_widget_tree_schema_is_exact_and_stale_safe(self):
+        server = MCPServer(FakeBridge())
+        base = {
+            "operation_id": "a" * 32,
+            "asset_path": "/Game/UI/WBP_HUD.WBP_HUD",
+            "expected_snapshot": "b" * 40,
+        }
+        target = {"kind": "panel", "parent_id": "c" * 32, "index": 0}
+        valid = (
+            {**base, "operation": "set_root", "widget_class": "/Script/UMG.CanvasPanel",
+             "name": "Root"},
+            {**base, "operation": "add", "widget_class": "/Script/UMG.TextBlock",
+             "name": "Title", "target": target},
+            {**base, "operation": "add", "widget_class": "/Game/UI/WBP_Row.WBP_Row_C",
+             "name": "Row", "target": {"kind": "named_slot", "slot_id": "d" * 32}},
+            {**base, "operation": "remove", "widget_id": "e" * 32,
+             "policy": "reject_if_referenced"},
+            {**base, "operation": "rename", "widget_id": "e" * 32,
+             "new_name": "Heading"},
+            {**base, "operation": "reparent", "widget_id": "e" * 32,
+             "target": target},
+            {**base, "operation": "set_variable", "widget_id": "e" * 32,
+             "is_variable": True},
+            {**base, "operation": "set_property", "widget_id": "e" * 32,
+             "property_name": "RenderOpacity", "value": 0.5},
+        )
+        for arguments in valid:
+            with self.subTest(arguments=arguments):
+                response = server.handle({
+                    "jsonrpc": "2.0", "id": 30, "method": "tools/call",
+                    "params": {"name": "widget_tree_edit", "arguments": arguments},
+                })
+                self.assertNotIn("error", response)
+        invalid = (
+            {},
+            {**base, "operation": "set_root", "widget_class": "CanvasPanel", "name": "Root"},
+            {**base, "operation": "add", "widget_class": "/Script/UMG.TextBlock",
+             "name": "Title", "target": {"kind": "root"}},
+            {**base, "operation": "remove", "widget_id": "short",
+             "policy": "reject_if_referenced"},
+            {**base, "operation": "remove", "widget_id": "e" * 32,
+             "policy": "cascade"},
+            {**base, "operation": "set_property", "widget_id": "e" * 32,
+             "property_name": "Unsafe", "value": {"nested": True}},
+            {**base, "operation": "rename", "widget_id": "e" * 32,
+             "new_name": "Heading", "extra": True},
+        )
+        for arguments in invalid:
+            with self.subTest(arguments=arguments):
+                response = server.handle({
+                    "jsonrpc": "2.0", "id": 31, "method": "tools/call",
+                    "params": {"name": "widget_tree_edit", "arguments": arguments},
+                })
                 self.assertEqual(response["error"]["code"], -32602)
 
     def test_action_catalog_schema_is_exact_and_bounded(self):

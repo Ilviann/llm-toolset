@@ -23,6 +23,7 @@ MUTATING_COMMANDS = {
     "blueprint_create", "blueprint_compile", "blueprint_save",
     "blueprint_component_edit", "blueprint_default_edit", "blueprint_member_edit",
     "blueprint_graph_edit",
+    "widget_tree_edit",
     "gameplay_framework_edit",
     "game_data_edit",
 }
@@ -69,6 +70,7 @@ class UnrealBridge:
             "blueprint_component_edit",
             "blueprint_default_edit",
             "blueprint_member_edit",
+            "widget_tree_edit",
             "gameplay_framework_edit",
             "game_data_inspect",
             "game_data_edit",

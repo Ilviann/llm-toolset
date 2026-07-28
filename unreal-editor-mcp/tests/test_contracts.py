@@ -13,6 +13,7 @@ from unreal_editor_mcp.tool_catalog_families.game_data import GAME_DATA_TOOLS
 from unreal_editor_mcp.tool_catalog_families.gameplay_framework import GAMEPLAY_TOOLS
 from unreal_editor_mcp.tool_catalog_families.levels import LEVEL_TOOLS
 from unreal_editor_mcp.tool_catalog_families.lifecycle import EDITOR_LIFECYCLE_TOOL
+from unreal_editor_mcp.tool_catalog_families.widgets import WIDGET_TOOLS
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -25,6 +26,7 @@ class ReleaseContractTests(unittest.TestCase):
             *ASSET_TOOLS,
             *LEVEL_TOOLS,
             *BLUEPRINT_TOOLS,
+            *WIDGET_TOOLS,
             *GAMEPLAY_TOOLS,
             *GAME_DATA_TOOLS,
         )
@@ -40,7 +42,7 @@ class ReleaseContractTests(unittest.TestCase):
         native = re.search(r'Version\[\].*TEXT\("([^"]+)"\)', header)
         self.assertIsNotNone(native)
         versions = {project["project"]["version"], plugin["VersionName"], native.group(1), unreal_editor_mcp.__version__}
-        self.assertEqual(versions, {"0.20.0"})
+        self.assertEqual(versions, {"0.21.0"})
 
     def test_only_released_asset_delete_commands_are_registered(self):
         names = [tool["name"] for tool in TOOLS]
@@ -50,7 +52,8 @@ class ReleaseContractTests(unittest.TestCase):
             "blueprint_inspect", "blueprint_action_catalog", "blueprint_graph_edit",
             "blueprint_create", "blueprint_compile", "blueprint_save",
             "blueprint_component_edit", "blueprint_default_edit",
-            "blueprint_member_edit", "gameplay_framework_edit", "game_data_inspect", "game_data_edit",
+            "blueprint_member_edit", "widget_tree_edit",
+            "gameplay_framework_edit", "game_data_inspect", "game_data_edit",
         ])
         bridge_source = (ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private/UnrealMCPBridge.cpp").read_text(encoding="utf-8")
         for command in names:
@@ -140,6 +143,35 @@ class ReleaseContractTests(unittest.TestCase):
         for operation in ["add_member", "reorder_member", "add_row", "replace_row", "rename_row", "remove_row", "batch"]:
             self.assertIn(f'TEXT("{operation}")', service)
         self.assertIn('UnrealMCP.Phase17.GameDataAuthoring', test)
+
+    def test_widget_tree_is_family_scoped_bounded_and_covered(self):
+        root = ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private"
+        policy = (root / "UnrealMCPBlueprintFamilyPolicy.cpp").read_text(encoding="utf-8")
+        service = (root / "UnrealMCPWidgetTreeService.cpp").read_text(encoding="utf-8")
+        inspector = (root / "UnrealMCPWidgetTreeInspector.h").read_text(encoding="utf-8")
+        bridge = (root / "UnrealMCPBridge.cpp").read_text(encoding="utf-8")
+        native_test = (
+            root / "Tests/UnrealMCPAutomationTestsWidgetTree.cpp"
+        ).read_text(encoding="utf-8")
+        self.assertIn('TEXT("widget")', policy)
+        self.assertIn("UUserWidget::StaticClass()", policy)
+        self.assertIn('Command == TEXT("widget_tree_edit")', bridge)
+        for feature in ["widget_blueprint_family", "widget_tree_authoring"]:
+            self.assertIn(f'TEXT("{feature}"), true', bridge)
+        for limit in [
+            "MaxWidgetTreeWidgets", "MaxWidgetTreeDepth", "MaxWidgetNamedSlots",
+            "MaxWidgetDefaultsPerWidget", "MaxWidgetChangedDefaults",
+        ]:
+            self.assertIn(limit, bridge + inspector)
+        for operation in [
+            "set_root", "add", "remove", "rename", "reparent",
+            "set_variable", "set_property",
+        ]:
+            self.assertIn(f'TEXT("{operation}")', service)
+        self.assertIn(
+            "UnrealMCP.WidgetTree.FamilyInspectionMutationAndPersistence",
+            native_test,
+        )
 
     def test_editor_lifecycle_is_large_mode_only_and_natively_guarded(self):
         self.assertNotIn("editor_lifecycle", [tool["name"] for tool in TOOLS])

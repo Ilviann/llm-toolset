@@ -36,6 +36,7 @@ from .game_data_levels import (
     open_acceptance_level,
     verify_restarted_game_data_and_level,
 )
+from .widgets import author_widget_scenario, verify_restarted_widgets
 
 
 def required_path(name: str) -> Path:
@@ -164,6 +165,46 @@ def stop_editor(process: subprocess.Popen[bytes], timeout: float = 30.0) -> None
         raise RuntimeError("Unreal Editor did not unload cleanly")
 
 
+def run_widget_restart_integration(
+    executable: Path,
+    layout: ProjectLayout,
+    environment: dict[str, str],
+) -> int:
+    """Run the focused Widget Blueprint author/save/restart inspection gate."""
+    command = [
+        str(executable), str(layout.descriptor), "-unattended", "-nop4", "-nosplash",
+        "-nullrhi", "-nosound", "-NoAssetRegistryCache",
+    ]
+    with tempfile.TemporaryFile() as log:
+        process = subprocess.Popen(command, cwd=ROOT, env=environment, stdout=log, stderr=subprocess.STDOUT)
+        try:
+            wait_until_ready(layout, process, time.monotonic() + 120.0)
+            scenario = author_widget_scenario(UnrealBridge(layout, timeout=3.0))
+        except Exception:
+            log.seek(0)
+            sys.stderr.buffer.write(log.read()[-32_000:])
+            raise
+        finally:
+            stop_editor(process)
+
+        process = subprocess.Popen(command, cwd=ROOT, env=environment, stdout=log, stderr=subprocess.STDOUT)
+        try:
+            wait_until_ready(layout, process, time.monotonic() + 120.0)
+            bridge = UnrealBridge(layout, timeout=3.0)
+            verify_restarted_widgets(bridge, scenario)
+            shutdown = bridge.call("editor_shutdown")
+            if shutdown.get("accepted") is not True:
+                raise AssertionError(f"graceful shutdown was not accepted: {shutdown!r}")
+        except Exception:
+            log.seek(0)
+            sys.stderr.buffer.write(log.read()[-32_000:])
+            raise
+        finally:
+            stop_editor(process)
+    print("Integration passed: Widget Blueprint authoring, save, restart, and inspection")
+    return 0
+
+
 def run_automation(executable: Path, project: Path, environment: dict[str, str], test_filter: str = "UnrealMCP") -> int:
     all_expected = (
         "CompatibilityBranch",
@@ -197,7 +238,9 @@ def run_automation(executable: Path, project: Path, environment: dict[str, str],
         "FrameworkAssignment",
         "GameDataAuthoring",
         "DiscoverySnapshotsAndSafety",
+        "PreflightPersistenceAndReferences",
         "RegistryLiveMemoryAndCursors",
+        "FamilyInspectionMutationAndPersistence",
     )
     if test_filter == "UnrealMCP":
         expected = all_expected
@@ -305,12 +348,20 @@ def main() -> int:
     (layout.root / "Content" / "UnrealMCPAssetDelete" / "DT_Disposable.uasset").unlink(
         missing_ok=True
     )
+    (layout.root / "Content" / "UnrealMCPWidgetTree" / "WBP_WidgetTree.uasset").unlink(
+        missing_ok=True
+    )
     if sys.argv[1:] == ["--automation-only"]:
         return run_automation(executable, layout.descriptor, environment)
     if len(sys.argv) == 3 and sys.argv[1] == "--automation-filter":
         return run_automation(executable, layout.descriptor, environment, sys.argv[2])
+    if sys.argv[1:] == ["--widget-only"]:
+        return run_widget_restart_integration(executable, layout, environment)
     if sys.argv[1:]:
-        raise SystemExit("usage: run_headless_integration.py [--automation-only | --automation-filter PREFIX]")
+        raise SystemExit(
+            "usage: run_headless_integration.py "
+            "[--automation-only | --automation-filter PREFIX | --widget-only]"
+        )
     saved_fixture_snapshot = prepare_phase_two_fixture(executable, layout.descriptor, environment)
     if len(saved_fixture_snapshot) != 40:
         raise AssertionError("Phase 2 saved fixture did not report a structural snapshot")
@@ -331,8 +382,8 @@ def main() -> int:
                 "level_inspect", "level_open",
                 "blueprint_inspect", "blueprint_action_catalog", "blueprint_graph_edit",
                 "blueprint_create", "blueprint_compile", "blueprint_save",
-                "blueprint_component_edit", "blueprint_default_edit", "blueprint_member_edit", "gameplay_framework_edit",
-                "game_data_inspect", "game_data_edit",
+                "blueprint_component_edit", "blueprint_default_edit", "blueprint_member_edit",
+                "widget_tree_edit", "gameplay_framework_edit", "game_data_inspect", "game_data_edit",
             ]:
                 raise AssertionError("released command catalog mismatch")
             if capabilities.get("bridge_version") != __version__ or state.get("bridge_ready") is not True:
@@ -363,6 +414,9 @@ def main() -> int:
                     raise AssertionError(f"Phase 14 family capability is unavailable: {feature}")
             if capabilities.get("features", {}).get("game_instance_family") is not True:
                 raise AssertionError("Phase 15 GameInstance capability is unavailable")
+            if capabilities.get("features", {}).get("widget_blueprint_family") is not True \
+                    or capabilities.get("features", {}).get("widget_tree_authoring") is not True:
+                raise AssertionError("Widget Blueprint capability is unavailable")
             for feature in ("multiplayer_blueprint_authoring", "custom_event_rpcs",
                             "typed_replication_settings", "gameplay_framework_assignment"):
                 if capabilities.get("features", {}).get(feature) is not True:
@@ -383,6 +437,7 @@ def main() -> int:
             family_matrix = capabilities.get("blueprint_families", [])
             if [record.get("family") for record in family_matrix] != [
                 "actor", "game_mode_base", "game_mode", "game_state_base", "game_state", "game_instance",
+                "widget",
             ]:
                 raise AssertionError(f"Phase 15 family matrix mismatch: {family_matrix!r}")
             for record in family_matrix:
@@ -393,8 +448,10 @@ def main() -> int:
                     raise AssertionError(f"Phase 16 operation matrix mismatch: {record!r}")
                 if not isinstance(record.get("multiplayer", {}).get("rpc_modes"), list):
                     raise AssertionError(f"Phase 16 multiplayer matrix mismatch: {record!r}")
-                if operations.get("components") != (record.get("family") != "game_instance"):
-                    raise AssertionError(f"Phase 15 component matrix mismatch: {record!r}")
+                family = record.get("family")
+                if operations.get("components") != (family not in {"game_instance", "widget"}) \
+                        or operations.get("widget_tree") != (family == "widget"):
+                    raise AssertionError(f"Blueprint family operation matrix mismatch: {record!r}")
             expected_graph_limits = {
                 "graph_nodes": 2048, "graph_pins_per_node": 256, "graph_coordinate": 1000000,
                 "graph_links_per_pin": 64, "graph_automatic_conversion_nodes": 1, "pin_default_chars": 512,
@@ -407,6 +464,16 @@ def main() -> int:
             }
             if any(capabilities.get("limits", {}).get(name) != value for name, value in expected_game_data_limits.items()):
                 raise AssertionError(f"Phase 17 game-data limits mismatch: {capabilities.get('limits')!r}")
+            expected_widget_limits = {
+                "widget_tree_widgets": 512,
+                "widget_tree_depth": 32,
+                "widget_named_slots": 256,
+                "widget_defaults_per_widget": 16,
+                "widget_changed_defaults": 1024,
+            }
+            if any(capabilities.get("limits", {}).get(name) != value
+                   for name, value in expected_widget_limits.items()):
+                raise AssertionError(f"Widget-tree limits mismatch: {capabilities.get('limits')!r}")
             if capabilities.get("limits", {}).get("level_discovery_scan") != 2048 \
                     or capabilities.get("limits", {}).get("level_external_packages") != 2048:
                 raise AssertionError(f"level-open limits mismatch: {capabilities.get('limits')!r}")
@@ -457,6 +524,7 @@ def main() -> int:
                 phase_fourteen_families,
                 phase_fifteen_game_instance,
             )
+            widget_scenario = author_widget_scenario(bridge)
             assigned_game_instance_class = blueprint_scenario["assigned_game_instance_class"]
             assigned_game_mode_class = blueprint_scenario["assigned_game_mode_class"]
             reject_bad_token(layout)
@@ -488,6 +556,7 @@ def main() -> int:
             })
             if restored_game_mode.get("verified") is not True or restored_game_instance.get("verified") is not True:
                 raise AssertionError("Phase 16 framework settings did not survive restart and restore")
+            verify_restarted_widgets(reloaded_bridge, widget_scenario)
             verify_restarted_game_data_and_level(
                 reloaded_bridge,
                 phase_seventeen_game_data,
@@ -530,7 +599,7 @@ def main() -> int:
             pass
         else:
             raise AssertionError("a live discovery heartbeat remained after editor termination")
-    print("Integration passed: asset references/deletion, level-open, Phase 17 authoring, replay/restart, and graceful lifecycle shutdown")
+    print("Integration passed: Widget Blueprint authoring, asset references/deletion, level-open, Phase 17 authoring, replay/restart, and graceful lifecycle shutdown")
     return 0
 
 

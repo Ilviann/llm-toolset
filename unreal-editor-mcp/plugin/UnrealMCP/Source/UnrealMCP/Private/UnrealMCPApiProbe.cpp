@@ -9,6 +9,9 @@
 #include "BlueprintFunctionNodeSpawner.h"
 #include "BlueprintEventNodeSpawner.h"
 #include "BlueprintVariableNodeSpawner.h"
+#include "Blueprint/UserWidget.h"
+#include "Blueprint/WidgetTree.h"
+#include "Components/PanelWidget.h"
 #include "EdGraphSchema_K2.h"
 #include "Editor.h"
 #include "Engine/Level.h"
@@ -45,6 +48,8 @@
 #include "UObject/Package.h"
 #include "UObject/UObjectGlobals.h"
 #include "UObject/UObjectIterator.h"
+#include "WidgetBlueprint.h"
+#include "WidgetBlueprintOperationUtils.h"
 
 namespace UnrealMCP::ApiProbe
 {
@@ -74,6 +79,16 @@ void RequirePublicTypes()
     static_assert(TIsDerivedFrom<UDataTableFactory, UFactory>::Value);
     static_assert(TIsDerivedFrom<AGameStateBase, AActor>::Value);
     static_assert(TIsDerivedFrom<AGameState, AGameStateBase>::Value);
+    static_assert(TIsDerivedFrom<UUserWidget, UWidget>::Value);
+    static_assert(TIsDerivedFrom<UWidgetBlueprint, UBlueprint>::Value);
+    (void)&UWidgetTree::FindWidget;
+    (void)&UWidgetTree::RemoveWidget;
+    (void)&FWidgetBlueprintOperationUtils::CreateWidgetBlueprint;
+    (void)&FWidgetBlueprintOperationUtils::AddWidget;
+    (void)&FWidgetBlueprintOperationUtils::MoveWidget;
+    (void)&FWidgetBlueprintOperationUtils::RemoveWidget;
+    (void)&FWidgetBlueprintOperationUtils::RenameWidget;
+    (void)&FWidgetBlueprintOperationUtils::ToggleWidgetAsVariable;
     (void)&FHttpServerModule::IsAvailable;
     (void)&FAssetRegistryModule::GetRegistry;
     using FEnumerateWorldAssets = bool (IAssetRegistry::*)(

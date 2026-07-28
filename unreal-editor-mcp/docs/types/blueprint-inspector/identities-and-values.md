@@ -3,6 +3,7 @@
 The inspector uses Unreal-provided persistent GUIDs where available:
 
 - SCS component `VariableGuid`
+- Widget Blueprint `WidgetVariableNameToGuidMap` entry
 - member variable `VarGuid`
 - graph `GraphGuid`
 - user function `GraphGuid`
@@ -12,7 +13,7 @@ The inspector uses Unreal-provided persistent GUIDs where available:
 - custom-event node `NodeGuid`
 - pin `PinId`
 
-Each identity-bearing record contains `id` and `identity_stable`. If Unreal provides no valid GUID, `id` is empty and `identity_stable` is false; the inspector does not invent a mutable-object identity. Connection records reference graph, node, and pin IDs. Component records publish `ownership` (`local`, `inherited`, or `native`), owning class/Blueprint, `editable`, `scene_component`, and `root`; native and inherited components remain read-only.
+Each identity-bearing record contains `id` and `identity_stable`. If Unreal provides no valid GUID, `id` is empty and `identity_stable` is false; the inspector does not invent a mutable-object identity. Connection records reference graph, node, and pin IDs. Component records publish `ownership` (`local`, `inherited`, or `native`), owning class/Blueprint, `editable`, `scene_component`, and `root`; native and inherited components remain read-only. Widget records publish local hierarchy and variable/default state; widget slots use deterministic IDs derived from stable owners, children, and named-slot names.
 
 Snapshots hash sorted structural identity, ownership, names, graph/node position, K2 types and all string/object/text default storage, component hierarchy and changed defaults, and pin links. The representative behavioral fixture retains its snapshot through undo, compile/node reconstruction, save, editor restart, and reload. Callers must still discard prior cursors and re-inspect after any compile, undo/redo, reload, or reconstruction because Unreal may replace nodes or pins in other Blueprints; a changed snapshot is an explicit conflict, not a retargeting signal.
 

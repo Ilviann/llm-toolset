@@ -2,7 +2,7 @@
 
 ## Ownership
 
-`FUnrealMCPBlueprintMutator` remains the bridge-facing facade for the six Blueprint mutation commands. Phase 16 extends component/default units with typed replication and custom events with exact RPC metadata; project settings remain in the separate gameplay-framework editor.
+`FUnrealMCPBlueprintMutator` remains the bridge-facing facade for the six shared Blueprint mutation commands. Widget hierarchy edits live in the separate widget-tree service; project settings remain in the separate gameplay-framework editor.
 
 ## Dependency direction
 
@@ -10,11 +10,11 @@ The HTTP bridge owns one inspector and constructs the mutator facade with a refe
 
 ## Invariants
 
-- `blueprint_create` accepts one native or Blueprint-generated parent from the explicit published family policy and one destination long package name. It rejects unsuitable, abstract, deprecated, skeleton, reinstanced, editor-only, missing, unpublished-family, or compile-error parents before package creation.
+- `blueprint_create` accepts one native or Blueprint-generated parent from the explicit published family policy and one destination long package name. It rejects unsuitable, abstract, deprecated, skeleton, reinstanced, editor-only, missing, unpublished-family, or compile-error parents before package creation; the published abstract `UUserWidget` base is the narrow exception required by Unreal's Widget Blueprint factory.
 - Creation and every existing-asset mutation resolve family eligibility before changing state and return the exact `blueprint_family` plus live family capabilities.
 - Mutation is confined to `/Game` and mounted content beneath a symlink-free local project-plugin directory containing a `.uplugin` descriptor. Engine, external-plugin, unavailable, and symlink-escaping mounts reject.
 - Existing loaded objects, packages, registry assets, or package files reject as `already_exists`, including case-only collisions on case-insensitive hosts. Creation never chooses a new name and never overwrites.
-- Initial compilation and package saving finish before registry publication. Compile, save, or read-back failure deletes only the newly created file, removes any publication, moves the failed package out of the requested namespace, and marks its objects for collection so the same destination can be retried.
+- Actor/UObject families use Unreal's general Blueprint factory; the widget family uses the public Widget Blueprint operation utility so the result owns a real Designer tree. Initial compilation and package saving finish before registry publication. Compile, save, or read-back failure deletes only the newly created file, removes any publication, moves the failed package out of the requested namespace, and marks its objects for collection so the same destination can be retried.
 - Explicit compilation reports Blueprint compiler errors as `compile_succeeded: false` with at most 64 diagnostics rather than converting a completed compiler run into a transport error. Mandatory initial compilation failure returns `compile_failed` and cleans up.
 - Package saving is non-interactive. A pre-existing read-only file or unwritable existing directory returns `write_conflict`; an attempted save that fails returns `save_failed`.
 - Component edits add/remove/rename/reparent/set-root/set-property one local editable component by stable ID for families that publish component support. Native and inherited components remain inspectable but immutable. GameInstance rejects the command before component resolution. Class defaults edit one supported property on the generated CDO.

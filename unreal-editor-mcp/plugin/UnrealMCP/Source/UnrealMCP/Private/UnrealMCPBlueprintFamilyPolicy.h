@@ -17,6 +17,7 @@ enum class EOperation : uint8
     Save,
     ClassDefaults,
     Components,
+    WidgetTree,
     Members,
     ActionCatalog,
     GraphEdit
