@@ -16,7 +16,17 @@ SPEC.loader.exec_module(run_headless_integration)
 
 class HeadlessIntegrationScriptTests(unittest.TestCase):
     def test_runner_is_a_thin_compatibility_orchestrator(self):
-        from headless_integration import assets, blueprints, game_data_levels, lifecycle, widgets
+        from headless_integration import (
+            assets,
+            blueprint_declarations,
+            blueprint_fixture_preparation,
+            blueprint_graph_editing,
+            blueprint_restart_verification,
+            blueprints,
+            game_data_levels,
+            lifecycle,
+            widgets,
+        )
 
         self.assertIs(run_headless_integration.main, lifecycle.main)
         self.assertIs(
@@ -24,7 +34,19 @@ class HeadlessIntegrationScriptTests(unittest.TestCase):
             lifecycle.resolve_editor_executable,
         )
         self.assertTrue(callable(assets.run_asset_scenario))
-        self.assertTrue(callable(blueprints.author_blueprint_scenario))
+        self.assertTrue(callable(blueprint_declarations.author_blueprint_declarations))
+        self.assertIs(
+            blueprints.prepare_blueprint_scenario,
+            blueprint_fixture_preparation.prepare_blueprint_scenario,
+        )
+        self.assertIs(
+            blueprints.author_blueprint_scenario,
+            blueprint_graph_editing.author_blueprint_scenario,
+        )
+        self.assertIs(
+            blueprints.verify_restarted_blueprints,
+            blueprint_restart_verification.verify_restarted_blueprints,
+        )
         self.assertTrue(callable(game_data_levels.open_acceptance_level))
         self.assertTrue(callable(widgets.author_widget_scenario))
 
