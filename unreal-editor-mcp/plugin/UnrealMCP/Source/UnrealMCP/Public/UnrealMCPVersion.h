@@ -4,7 +4,7 @@
 
 namespace UnrealMCP
 {
-inline constexpr TCHAR Version[] = TEXT("0.22.1");
+inline constexpr TCHAR Version[] = TEXT("0.23.0");
 inline constexpr uint32 DefaultPort = 15485;
 inline constexpr int32 MaxRequestBytes = 64 * 1024;
 inline constexpr int32 MaxResponseBytes = 256 * 1024;
@@ -40,6 +40,11 @@ inline constexpr int32 MaxGraphCoordinate = 1000000;
 inline constexpr int32 MaxGraphLinksPerPin = 64;
 inline constexpr int32 MaxAutomaticConversionNodes = 1;
 inline constexpr int32 MaxPinDefaultChars = 512;
+inline constexpr int32 MaxFunctionReplacementNodes = 64;
+inline constexpr int32 MaxFunctionReplacementOwnedNodes = 256;
+inline constexpr int32 MaxFunctionReplacementLocals = 64;
+inline constexpr int32 MaxFunctionReplacementDefaults = 128;
+inline constexpr int32 MaxFunctionReplacementConnections = 256;
 inline constexpr int32 MaxGameDataFields = 64;
 inline constexpr int32 MaxGameDataRows = 2048;
 inline constexpr int32 MaxGameDataBatchRows = 64;

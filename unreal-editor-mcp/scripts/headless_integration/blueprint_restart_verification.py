@@ -23,6 +23,7 @@ def verify_restarted_blueprints(
     custom_event_exec_pin_id = scenario["custom_event_exec_pin_id"]
     custom_event_id = scenario["custom_event_id"]
     function_id = scenario["function_id"]
+    function_node_id = scenario["function_node_id"]
     graph_node_id = scenario["graph_node_id"]
     graph_pin_ids = scenario["graph_pin_ids"]
     literal_node_id = scenario["literal_node_id"]
@@ -184,6 +185,11 @@ def verify_restarted_blueprints(
     }
     if functions.get("ComputeHealth", {}).get("id") != function_id:
         raise AssertionError(f"function identity changed after restart: {functions!r}")
+    function_boundary = functions.get("ComputeHealth", {}).get("replacement_boundary", {})
+    if function_boundary.get("replaceable") is not True \
+            or function_node_id not in function_boundary.get("owned_node_ids", []) \
+            or not function_boundary.get("function_fingerprint"):
+        raise AssertionError(f"function replacement boundary changed after restart: {function_boundary!r}")
     if functions.get("OnRep_Health", {}).get("id") != notify_id:
         raise AssertionError(f"RepNotify function identity changed after restart: {functions!r}")
     parameters = [
@@ -224,6 +230,8 @@ def verify_restarted_blueprints(
     }
     if graph_node_id not in nodes or nodes[graph_node_id].get("x") != 480 or nodes[graph_node_id].get("y") != -160:
         raise AssertionError(f"created/moved graph node changed after restart: {nodes.get(graph_node_id)!r}")
+    if function_node_id not in nodes:
+        raise AssertionError("replaced function body node changed after restart")
     if temporary_node_id in nodes:
         raise AssertionError("removed graph node returned after restart")
     reloaded_pin_ids = {

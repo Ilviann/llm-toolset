@@ -8,6 +8,7 @@ References in this directory are grouped by the component that owns the contract
 - [`blueprint-inspector/`](blueprint-inspector/index.md) — published-family Blueprint queries, pages, snapshots, identities, and bounded value encodings.
 - [`blueprint-action-catalog/`](blueprint-action-catalog/index.md) — graph-action queries, records, opaque identities, limits, caching, and invalidation.
 - [`blueprint-graph-editor/`](blueprint-graph-editor/index.md) — action-backed graph-node lifecycle, typed pin defaults, wildcard-aware connections, bounded conversions, persistent identities, and results.
+- [`blueprint-block-replacement/`](blueprint-block-replacement/index.md) — complete function-boundary fingerprints, semantic replacement plans, limits, results, and recovery.
 - [`blueprint-mutator/`](blueprint-mutator/index.md) — published-family Blueprint creation, compile/save, components/defaults, member variables, functions, locals, macros, custom events, diagnostics, mutation scope, and cleanup contracts.
 - [`widget-tree/`](widget-tree/index.md) — Widget Blueprint tree/default records, stable widget and slot identities, structural edit requests, results, limits, and exclusions.
 - [`umg-authoring/`](umg-authoring/index.md) — typed layout/style edits, property and Designer-event bindings, records, costs, limits, and exclusions.

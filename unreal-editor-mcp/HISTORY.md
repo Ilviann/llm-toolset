@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.23.0 — 2026-07-29
+
+- Added `blueprint_block_replace` for one complete user-owned function with exact inspected entry/result/body/local fingerprints, bounded action-backed semantic plans, explicit positions, typed defaults, and direct or explicitly positioned conversion connections.
+- Added isolated non-transient scratch application and compilation before one live transaction, semantic scratch/live parity checks, exact rollback verification, retained replay/reconciliation, and function-boundary inspection records.
+- Added Python contract tests, Windows native Automation coverage for success, Undo/Redo, stale and compile failures, live rollback, compile/save, plus production cross-process lost-response, replay, save, and restart verification.
+
 ## 0.22.1 — 2026-07-29
 
 - Added an opt-in Windows deployment checkbox that installs matching `Binaries/Win64` PDB crash symbols beside plugin DLLs while continuing to exclude unrelated and intermediate debug artifacts.

@@ -6,6 +6,7 @@ import os
 import uuid
 
 from unreal_editor_mcp.bridge import UnrealBridge
+from unreal_editor_mcp.errors import BridgeError, ErrorCode
 from unreal_editor_mcp.project import ProjectLayout
 
 from .blueprint_declarations import author_blueprint_declarations
@@ -39,10 +40,105 @@ def author_blueprint_scenario(
     member_id = declarations["member_id"]
     notify_id = declarations["notify_id"]
 
+    function_inspection: dict[str, object] = {}
+    boundary: dict[str, object] = {}
+    replacement_catalog: dict[str, object] = {}
+    for attempt in range(3):
+        function_inspection = collect_inspection(bridge, {
+            "mode": "inspect",
+            "asset_path": asset_path,
+            "sections": ["functions"],
+            "page_size": 100,
+        })
+        function_records = [
+            record for record in function_inspection.get("records", [])
+            if record.get("section") == "function" and record.get("id") == function_id
+        ]
+        if len(function_records) != 1:
+            raise AssertionError(
+                f"function replacement boundary is unavailable: {function_inspection!r}")
+        boundary = function_records[0].get("replacement_boundary", {})
+        if boundary.get("replaceable") is not True:
+            raise AssertionError(f"function replacement boundary is not editable: {boundary!r}")
+        try:
+            replacement_catalog = bridge.call("blueprint_action_catalog", {
+                "asset_path": asset_path,
+                "graph_id": function_id,
+                "expected_snapshot": function_inspection["snapshot_id"],
+                "text": "Branch",
+                "node_family": "flow_control",
+                "limit": 50,
+            })
+            break
+        except BridgeError as error:
+            if error.code != ErrorCode.STALE_PRECONDITION or attempt == 2:
+                raise
+    branch_actions = [
+        action for action in replacement_catalog.get("actions", [])
+        if str(action.get("title", "")).casefold() == "branch"
+    ]
+    if not branch_actions:
+        raise AssertionError(f"function replacement Branch action is unavailable: {replacement_catalog!r}")
+    function_replace_operation = uuid.uuid4().hex
+    function_replace_arguments = {
+        "operation_id": function_replace_operation,
+        "asset_path": asset_path,
+        "expected_snapshot": function_inspection["snapshot_id"],
+        "function_id": function_id,
+        "expected_function_fingerprint": boundary["function_fingerprint"],
+        "entry_node_id": boundary["entry_node_id"],
+        "result_node_id": boundary["result_node_id"],
+        "owned_node_ids": boundary["owned_node_ids"],
+        "local_variable_ids": boundary["local_variable_ids"],
+        "entry_position": {"x": -320, "y": 0},
+        "result_position": {"x": 640, "y": 0},
+        "nodes": [{
+            "key": "branch",
+            "action_id": branch_actions[0]["action_id"],
+            "position": {"x": 0, "y": 0},
+        }],
+        "pin_defaults": [{
+            "endpoint": {"node_key": "$result", "pin_name": "Result"},
+            "value": {"kind": "literal", "value": 7},
+        }],
+        "connections": [
+            {
+                "from": {"node_key": "$entry", "pin_name": "then"},
+                "to": {"node_key": "branch", "pin_name": "execute"},
+            },
+            {
+                "from": {"node_key": "branch", "pin_name": "then"},
+                "to": {"node_key": "$result", "pin_name": "execute"},
+            },
+        ],
+    }
+    send_without_reading(layout, "blueprint_block_replace", function_replace_arguments)
+    function_replace_status = reconcile_operation(
+        bridge, function_replace_operation, capabilities["bridge_instance_id"])
+    function_replace = (
+        function_replace_status.get("result")
+        if function_replace_status.get("state") == "committed" else None
+    )
+    function_replace_nodes = (
+        function_replace.get("changed", {}).get("nodes", [])
+        if isinstance(function_replace, dict) else []
+    )
+    if len(function_replace_nodes) != 1 or function_replace.get("changed", {}).get(
+            "scratch_preflight") is not True:
+        raise AssertionError(
+            f"lost function-replacement response did not reconcile: {function_replace_status!r}")
+    function_replace_replay = bridge.call(
+        "blueprint_block_replace", function_replace_arguments)
+    if function_replace_replay != function_replace:
+        raise AssertionError("function replacement replay changed its retained terminal result")
+    function_node_id = function_replace_nodes[0].get("id")
+    if not isinstance(function_node_id, str) or len(function_node_id) != 32:
+        raise AssertionError(f"function replacement omitted its node identity: {function_replace!r}")
+
     graph_catalog = bridge.call("blueprint_action_catalog", {
         "asset_path": asset_path,
         "graph_id": event_graph_id,
-        "expected_snapshot": custom_event["snapshot_id"],
+        "expected_snapshot": function_replace["snapshot_id"],
         "member": "Health",
         "node_family": "variable_get",
         "limit": 5,
@@ -53,7 +149,7 @@ def author_blueprint_scenario(
     graph_add_arguments = {
         "operation_id": graph_add_operation,
         "asset_path": asset_path,
-        "expected_snapshot": custom_event["snapshot_id"],
+        "expected_snapshot": function_replace["snapshot_id"],
         "operation": "add_node",
         "graph_id": event_graph_id,
         "action_id": graph_catalog["actions"][0]["action_id"],
@@ -463,6 +559,7 @@ def author_blueprint_scenario(
         "custom_event_exec_pin_id": custom_event_exec_pin_id,
         "custom_event_id": custom_event_id,
         "function_id": function_id,
+        "function_node_id": function_node_id,
         "graph_node_id": graph_node_id,
         "graph_pin_ids": graph_pin_ids,
         "literal_node_id": literal_node_id,

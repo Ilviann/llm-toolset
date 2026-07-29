@@ -39,6 +39,16 @@ public:
         FResolvedAction& OutAction,
         FUnrealMCPError& OutError);
 
+    bool ResolveManyForReplacement(
+        const TArray<FString>& ActionIds,
+        UBlueprint* Blueprint,
+        UEdGraph* Graph,
+        const FString& AssetPath,
+        const FString& GraphId,
+        const FString& SnapshotId,
+        TMap<FString, FResolvedAction>& OutActions,
+        FUnrealMCPError& OutError);
+
 private:
     struct FRetainedAction
     {

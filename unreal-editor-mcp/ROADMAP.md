@@ -33,7 +33,7 @@ Feature identifiers are stable names, not execution indexes. Unfinished features
 - [ ] [`gas-gameplay-effects` — Gameplay Effect creation and editing](docs/todo/gas-gameplay-effects.md) — Add typed creation and data-only editing of Gameplay Effect Blueprint assets through the GAS companion.
   - Depends on:
     - `gas-ability-blueprints`
-- [ ] [`function-replace` — Complete function replacement](docs/todo/function-replace.md) — Add transactional replacement of one complete user-owned function.
+- [x] [`function-replace` — Complete function replacement](docs/todo/function-replace.md) — Add transactional replacement of one complete user-owned function.
 - [ ] [`event-macro-replace` — Event, custom-event, and macro replacement](docs/todo/event-macro-replace.md) — Extend bounded replacement to events, custom events, and macros.
   - Depends on:
     - `function-replace`
@@ -97,6 +97,7 @@ Feature checkboxes record implementation completion. This section separately lis
   - `asset-delete`
   - `widget-tree`
   - `umg-authoring`
+  - `function-replace`
 - Windows:
   - None
 - Linux:

@@ -15,10 +15,11 @@ class FakeBridge:
     def call(self, command, arguments=None):
         self.calls.append((command, arguments))
         if command == "capabilities":
-            return {"bridge_version": "0.22.1", "commands": [
+            return {"bridge_version": "0.23.0", "commands": [
                 "capabilities", "editor_state", "operation_status", "asset_references", "asset_delete",
                 "level_inspect", "level_open",
                 "blueprint_inspect", "blueprint_action_catalog", "blueprint_graph_edit",
+                "blueprint_block_replace",
                 "blueprint_create", "blueprint_compile", "blueprint_save",
                 "blueprint_component_edit", "blueprint_default_edit",
                 "blueprint_member_edit", "widget_tree_edit",
@@ -39,12 +40,13 @@ class ServerStdioTests(unittest.TestCase):
         bridge = FakeBridge()
         server = MCPServer(bridge)
         initialized = server.handle({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2025-06-18"}})
-        self.assertEqual(initialized["result"]["serverInfo"]["version"], "0.22.1")
+        self.assertEqual(initialized["result"]["serverInfo"]["version"], "0.23.0")
         listed = server.handle({"jsonrpc": "2.0", "id": 2, "method": "tools/list"})
         self.assertEqual([tool["name"] for tool in listed["result"]["tools"]], [
             "capabilities", "editor_state", "operation_status", "asset_references", "asset_delete",
             "level_inspect", "level_open",
             "blueprint_inspect", "blueprint_action_catalog", "blueprint_graph_edit",
+            "blueprint_block_replace",
             "blueprint_create", "blueprint_compile", "blueprint_save",
             "blueprint_component_edit", "blueprint_default_edit",
             "blueprint_member_edit", "widget_tree_edit",
@@ -498,6 +500,79 @@ class ServerStdioTests(unittest.TestCase):
             with self.subTest(arguments=arguments):
                 response = server.handle({"jsonrpc": "2.0", "id": 11, "method": "tools/call",
                     "params": {"name": "blueprint_graph_edit", "arguments": arguments}})
+                self.assertEqual(response["error"]["code"], -32602)
+
+    def test_function_replace_schema_is_exact_and_bounded(self):
+        server = MCPServer(FakeBridge())
+        base = {
+            "operation_id": "a" * 32,
+            "asset_path": "/Game/Actors/BP_Light.BP_Light",
+            "expected_snapshot": "b" * 40,
+            "function_id": "c" * 32,
+            "expected_function_fingerprint": "d" * 40,
+            "entry_node_id": "e" * 32,
+            "result_node_id": "f" * 32,
+            "owned_node_ids": ["1" * 32],
+            "local_variable_ids": ["2" * 32],
+            "entry_position": {"x": -320, "y": 0},
+            "result_position": {"x": 640, "y": 0},
+            "nodes": [],
+            "pin_defaults": [],
+            "connections": [],
+        }
+        valid = (
+            base,
+            {
+                **base,
+                "nodes": [{
+                    "key": "branch",
+                    "action_id": "3" * 32,
+                    "position": {"x": 0, "y": 0},
+                }],
+                "pin_defaults": [{
+                    "endpoint": {"node_key": "branch", "pin_name": "Condition"},
+                    "value": {"kind": "literal", "value": True},
+                }],
+                "connections": [
+                    {
+                        "from": {"node_key": "$entry", "pin_name": "then"},
+                        "to": {"node_key": "branch", "pin_name": "execute"},
+                    },
+                    {
+                        "from": {"node_key": "branch", "pin_name": "else"},
+                        "to": {"node_key": "$result", "pin_name": "execute"},
+                        "automatic_conversion": True,
+                        "conversion_position": {"x": 320, "y": 160},
+                    },
+                ],
+            },
+        )
+        for arguments in valid:
+            with self.subTest(arguments=arguments):
+                response = server.handle({
+                    "jsonrpc": "2.0", "id": 12, "method": "tools/call",
+                    "params": {"name": "blueprint_block_replace", "arguments": arguments},
+                })
+                self.assertNotIn("error", response)
+        invalid = (
+            {},
+            {**base, "expected_function_fingerprint": "short"},
+            {**base, "entry_position": {"x": 1000001, "y": 0}},
+            {**base, "nodes": [{"key": "$unsafe", "action_id": "3" * 32,
+                               "position": {"x": 0, "y": 0}}]},
+            {**base, "connections": [{
+                "from": {"node_key": "$entry", "pin_name": "then"},
+                "to": {"node_key": "$result", "pin_name": "execute"},
+                "automatic_conversion": True,
+            }]},
+            {**base, "force": True},
+        )
+        for arguments in invalid:
+            with self.subTest(arguments=arguments):
+                response = server.handle({
+                    "jsonrpc": "2.0", "id": 13, "method": "tools/call",
+                    "params": {"name": "blueprint_block_replace", "arguments": arguments},
+                })
                 self.assertEqual(response["error"]["code"], -32602)
 
     def test_domain_error_is_tool_error(self):

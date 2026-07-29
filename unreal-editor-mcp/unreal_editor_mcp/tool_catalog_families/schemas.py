@@ -41,6 +41,7 @@ _CUSTOM_EVENT_ID = _COMPONENT_ID
 _NODE_ID = _COMPONENT_ID
 _PIN_ID = _COMPONENT_ID
 _ACTION_ID = _COMPONENT_ID
+_FUNCTION_FINGERPRINT = _SNAPSHOT_ID
 _STRUCT_MEMBER_ID = _COMPONENT_ID
 _GRAPH_POSITION = {
     "type": "object",
@@ -151,6 +152,68 @@ _K2_DEFAULT = {
             "additionalProperties": False,
         },
     ]
+}
+_BLOCK_NODE_KEY = {
+    "type": "string",
+    "minLength": 1,
+    "maxLength": 64,
+    "pattern": r"^[A-Za-z][A-Za-z0-9_]*$",
+}
+_BLOCK_PIN_ENDPOINT = {
+    "type": "object",
+    "properties": {
+        "node_key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": r"^(?:\$entry|\$result|[A-Za-z][A-Za-z0-9_]*)$",
+        },
+        "pin_name": {"type": "string", "minLength": 1, "maxLength": 128},
+    },
+    "required": ["node_key", "pin_name"],
+    "additionalProperties": False,
+}
+_BLOCK_NODE = {
+    "type": "object",
+    "properties": {
+        "key": _BLOCK_NODE_KEY,
+        "action_id": _ACTION_ID,
+        "position": _GRAPH_POSITION,
+    },
+    "required": ["key", "action_id", "position"],
+    "additionalProperties": False,
+}
+_BLOCK_PIN_DEFAULT = {
+    "type": "object",
+    "properties": {
+        "endpoint": _BLOCK_PIN_ENDPOINT,
+        "value": _K2_DEFAULT,
+    },
+    "required": ["endpoint", "value"],
+    "additionalProperties": False,
+}
+_BLOCK_DIRECT_CONNECTION = {
+    "type": "object",
+    "properties": {
+        "from": _BLOCK_PIN_ENDPOINT,
+        "to": _BLOCK_PIN_ENDPOINT,
+    },
+    "required": ["from", "to"],
+    "additionalProperties": False,
+}
+_BLOCK_CONVERTED_CONNECTION = {
+    "type": "object",
+    "properties": {
+        "from": _BLOCK_PIN_ENDPOINT,
+        "to": _BLOCK_PIN_ENDPOINT,
+        "automatic_conversion": {"const": True},
+        "conversion_position": _GRAPH_POSITION,
+    },
+    "required": ["from", "to", "automatic_conversion", "conversion_position"],
+    "additionalProperties": False,
+}
+_BLOCK_CONNECTION = {
+    "oneOf": [_BLOCK_DIRECT_CONNECTION, _BLOCK_CONVERTED_CONNECTION],
 }
 _MEMBER_METADATA = {
     "type": "object",

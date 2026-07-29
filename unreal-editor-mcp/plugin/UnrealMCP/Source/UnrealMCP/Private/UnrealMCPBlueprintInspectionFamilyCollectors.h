@@ -1,6 +1,7 @@
 #pragma once
 
 #include "UnrealMCPBlueprintInspectionSupport.h"
+#include "UnrealMCPBlueprintFunctionFingerprint.h"
 
 namespace UnrealMCP::BlueprintInspectionPrivate
 {
@@ -250,6 +251,9 @@ for (const TPair<UBlueprint*, FString>& Owner : Owners)
         const FString DeclarationKind = FunctionOwnership(Owner.Key, FunctionGraph);
         const bool bLocalOwner = Owner.Key == Blueprint;
         const bool bEditable = bLocalOwner && DeclarationKind == TEXT("user_owned") && Entry != nullptr && FunctionId.Len() == 32;
+        UnrealMCP::BlueprintFunctionFingerprint::FBoundary ReplacementBoundary;
+        const bool bReplaceableBoundary =
+            UnrealMCP::BlueprintFunctionFingerprint::Describe(FunctionGraph, ReplacementBoundary);
         if (Entry == nullptr)
         {
             Sink.Fingerprint.Add(TEXT("function|missing_entry|") + Owner.Value + TEXT("|") + FunctionId + TEXT("|") + FunctionGraph->GetName());
@@ -286,6 +290,23 @@ for (const TPair<UBlueprint*, FString>& Owner : Owners)
             Required->SetBoolField(TEXT("result_present"), !Results.IsEmpty());
             Required->SetBoolField(TEXT("valid"), !Results.IsEmpty());
             Value->SetObjectField(TEXT("required_nodes"), Required);
+            const TSharedRef<FJsonObject> Boundary = MakeShared<FJsonObject>();
+            Boundary->SetBoolField(TEXT("replaceable"), bEditable && bReplaceableBoundary);
+            Boundary->SetStringField(TEXT("function_fingerprint"),
+                bReplaceableBoundary ? ReplacementBoundary.Fingerprint : FString());
+            Boundary->SetStringField(TEXT("entry_node_id"),
+                bReplaceableBoundary ? GuidString(ReplacementBoundary.Entry->NodeGuid) : FString());
+            Boundary->SetStringField(TEXT("result_node_id"),
+                bReplaceableBoundary ? GuidString(ReplacementBoundary.Result->NodeGuid) : FString());
+            TArray<TSharedPtr<FJsonValue>> OwnedNodeIds;
+            for (const FString& Id : ReplacementBoundary.OwnedNodeIds)
+                OwnedNodeIds.Add(MakeShared<FJsonValueString>(Id));
+            Boundary->SetArrayField(TEXT("owned_node_ids"), OwnedNodeIds);
+            TArray<TSharedPtr<FJsonValue>> LocalVariableIds;
+            for (const FString& Id : ReplacementBoundary.LocalVariableIds)
+                LocalVariableIds.Add(MakeShared<FJsonValueString>(Id));
+            Boundary->SetArrayField(TEXT("local_variable_ids"), LocalVariableIds);
+            Value->SetObjectField(TEXT("replacement_boundary"), Boundary);
             Value->SetArrayField(TEXT("rep_notify_member_ids"), RepNotifyMembers);
             Value->SetNumberField(TEXT("local_variable_count"), Entry->LocalVariables.Num());
             AddRecord(Sink.Records, Value);

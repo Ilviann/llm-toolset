@@ -2,7 +2,7 @@
 
 This detailed operational reference covers every released tool family. For installation, first connection, and the concise contract overview, start with the [project README](../../README.md).
 
-Unreal Editor MCP 0.22.1 is an offline-first MCP bridge for Unreal Engine 5.8+. It pairs a dependency-free Python 3.10+ stdio server with an editor-only C++ plugin. Default mode exposes exactly twenty tools:
+Unreal Editor MCP 0.23.0 is an offline-first MCP bridge for Unreal Engine 5.8+. It pairs a dependency-free Python 3.10+ stdio server with an editor-only C++ plugin. Default mode exposes exactly twenty-one tools:
 
 - `capabilities` reports the exact Python/plugin/Unreal versions, commands, features, listener state, effective limits, and published Blueprint-family matrix.
 - `editor_state` reports project identity, bridge readiness, play/simulate/save/GC state, and concise queued-operation state.
@@ -14,6 +14,7 @@ Unreal Editor MCP 0.22.1 is an offline-first MCP bridge for Unreal Engine 5.8+. 
 - `blueprint_inspect` discovers every published Blueprint family across mounted content and returns bounded pages of one selected Blueprint's structure.
 - `blueprint_action_catalog` discovers bounded context-valid function, variable, event, flow-control, cast, literal, and operator actions for one exact Blueprint graph snapshot.
 - `blueprint_graph_edit` creates, moves, removes, configures, or connects graph nodes and pins, including wildcard specialization and explicitly requested bounded conversions.
+- `blueprint_block_replace` atomically replaces one complete user-owned function after an isolated scratch compile and exact boundary preconditions.
 - `blueprint_create` creates, compiles, saves, and verifies one new supported Blueprint family without overwriting content.
 - `blueprint_compile` explicitly compiles one mutable supported-family Blueprint and returns bounded diagnostics.
 - `blueprint_save` explicitly saves one mutable supported-family Blueprint package without interactive dialogs.
@@ -24,7 +25,7 @@ Unreal Editor MCP 0.22.1 is an offline-first MCP bridge for Unreal Engine 5.8+. 
 - `game_data_inspect` reads one user-defined struct schema or bounded page of typed Data Table rows from an exact asset snapshot.
 - `game_data_edit` creates or atomically edits user-defined structs and typed Data Table rows with validation, saving, and read-back.
 
-Opt-in large mode adds a twentieth tool, `editor_lifecycle`, for configured launch, safe graceful shutdown, durable restart, and cancellation. CSV/JSON filesystem import/export, Curve Tables, Data Assets, arbitrary UObject assets, supplied struct code, General Project Settings beyond the narrow framework operation, world overrides, runtime server/client control, builds, Blueprint reparenting, console access, unrestricted reflection, forced process termination, and code execution remain unavailable.
+Opt-in large mode adds a twenty-second tool, `editor_lifecycle`, for configured launch, safe graceful shutdown, durable restart, and cancellation. CSV/JSON filesystem import/export, Curve Tables, Data Assets, arbitrary UObject assets, supplied struct code, General Project Settings beyond the narrow framework operation, world overrides, runtime server/client control, builds, Blueprint reparenting, console access, unrestricted reflection, forced process termination, and code execution remain unavailable.
 
 ## Security model
 
@@ -56,7 +57,7 @@ Python 3.10 or newer with tkinter is required. Official Windows Python installer
 
 1. Copy [`plugin/UnrealMCP`](../../plugin/UnrealMCP) to `<YourProject>/Plugins/UnrealMCP` or add this repository's `plugin/` folder as an `AdditionalPluginDirectories` entry in a disposable development `.uproject`.
 2. Enable the `UnrealMCP` plugin and compile the project's Editor target with Unreal 5.8 or a newer version that passes the included public-API probes.
-3. Open the project. Look for `Unreal MCP 0.22.1 ready on 127.0.0.1:15485` in the editor log.
+3. Open the project. Look for `Unreal MCP 0.23.0 ready on 127.0.0.1:15485` in the editor log.
 4. Install the Python package offline from this folder:
 
    ```sh
@@ -279,7 +280,7 @@ Optional filters are exact case-insensitive `text`, exact `owner_class`, `functi
 
 `function` applies to function-backed `function_call`, `event`, `literal`, and `operator` actions; `member` applies only to variable get/set actions. Every result has already passed Unreal's live Blueprint, graph, uniqueness, and optional pin filters. Function-backed records report pure, static, const, and latent flags; every record reports whether it is a wildcard candidate, and casts report whether they cast class references. Latent calls are excluded from incompatible function graphs, events are excluded from function and macro graphs, and pin context removes incompatible candidates. The catalog never accepts a node class or forged field/spawner signature.
 
-Each result has an opaque `action_id`. Repeating an identical live query reuses IDs, but they expire after 60 seconds and are invalidated by retention eviction, structural snapshot changes, or editor/bridge restart. `blueprint_graph_edit` accepts the ID only for `add_node`; the plugin re-resolves its rebuildable signature and re-applies Unreal's live graph and optional pin filters immediately before invocation. Re-catalog whenever the ID lifetime or snapshot is uncertain.
+Each result has an opaque `action_id`. Repeating an identical live query reuses IDs, but they expire after 60 seconds and are invalidated by retention eviction, structural snapshot changes, or editor/bridge restart. `blueprint_graph_edit` accepts the ID only for `add_node`; `blueprint_block_replace` accepts context-free IDs for its bounded body plan. The plugin re-resolves rebuildable signatures and reapplies Unreal's live graph filters immediately before use. Re-catalog whenever the ID lifetime or snapshot is uncertain.
 
 Broad scans are intentionally bounded and report `truncated` and `timed_out`. Prefer an exact function/member and family, then add owner class or pin context when ambiguity remains. See [`examples/action-catalog-workflow.json`](../../examples/action-catalog-workflow.json) for inspect-first queries.
 
@@ -318,6 +319,16 @@ Use the returned node ID and latest snapshot to move or remove it:
 `remove_node` uses the same shape without `position`. Only local event graphs, editable user-function graphs, and local macro graphs are mutable. Inherited, interface, construction, delegate/signature, intermediate, non-K2, and read-only graphs reject. Required entry/result/tunnel nodes, intermediate nodes, nodes without stable identity, and nodes Unreal does not consider user-deletable cannot be moved or removed. Removal breaks that node's links; reconnect surviving nodes explicitly with `connect_pins` when needed.
 
 Every accepted edit is one Unreal transaction and remains dirty until `blueprint_save`. Re-inspect after each edit, compile, Undo/Redo, save/reload, or bridge restart; never reuse a prior action ID or snapshot. See [`examples/graph-node-lifecycle-workflow.json`](../../examples/graph-node-lifecycle-workflow.json) for the complete three-operation flow.
+
+## Complete function replacement
+
+Inspect the Blueprint's unfiltered `functions` section first, then select the exact function record by ID. The unfiltered result supplies the current structural Blueprint snapshot, while that function record publishes `replacement_boundary` with replaceability, the entry/result IDs, exact old owned-node and local-variable ID sets, and a function fingerprint. Echo that entire boundary plus the snapshot in `blueprint_block_replace`; never infer or omit old identities. A `function_id`-filtered inspection is query-scoped, so do not use its snapshot for the action catalog or replacement precondition.
+
+The first contract replaces one complete editable user-owned function only. Supply body nodes as unique semantic keys plus freshly cataloged context-free action IDs and explicit positions. Pin defaults and connections use those keys and exact pin names; `$entry` and `$result` address the preserved declaration nodes. Conversions require both `automatic_conversion: true` and an explicit conversion position. Events, custom events, macros, overrides, inherited/interface functions, arbitrary regions, and automatic layout remain unsupported.
+
+The plugin applies the plan to an isolated non-transient scratch Blueprint, compiles it, compares its semantic structure, destroys scratch state, rechecks live preconditions, then applies the same plan in one live transaction. Rejected preflight creates no live transaction; an unexpected live mismatch rolls back and verifies the prior snapshot, dirty state, and compile status. A successful result remains dirty: call `blueprint_compile` and `blueprint_save` explicitly.
+
+Body nodes are limited to 64, old owned nodes to 256, locals to 64, defaults to 128, and connections to 256. Use `operation_status` after a lost response; replaying the identical request returns its retained outcome. Prefer `blueprint_graph_edit` for one atomic node, pin, connection, or position change. See [`examples/function-replace-workflow.json`](../../examples/function-replace-workflow.json).
 
 ## Complete atomic pin and connection editing
 

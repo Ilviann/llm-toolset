@@ -15,6 +15,147 @@ FUnrealMCPBlueprintActionCatalog::FUnrealMCPBlueprintActionCatalog(
 {
 }
 
+bool FUnrealMCPBlueprintActionCatalog::ResolveManyForReplacement(
+    const TArray<FString>& ActionIds,
+    UBlueprint* Blueprint,
+    UEdGraph* Graph,
+    const FString& AssetPath,
+    const FString& GraphId,
+    const FString& SnapshotId,
+    TMap<FString, FResolvedAction>& OutActions,
+    FUnrealMCPError& OutError)
+{
+    using namespace UnrealMCP::BlueprintActionCatalogPrivate;
+    check(IsInGameThread());
+    OutActions.Reset();
+    RemoveExpired(Now());
+    if (ActionIds.Num() > UnrealMCP::MaxFunctionReplacementNodes)
+    {
+        OutError = {TEXT("graph_limit_exceeded"), TEXT("The replacement contains too many action-backed nodes")};
+        return false;
+    }
+
+    const UEdGraphSchema* Schema = Graph != nullptr ? Graph->GetSchema() : nullptr;
+    TMap<FString, TArray<FString>> IdsBySignature;
+    TArray<UObject*> PriorityOwners;
+    for (const FString& ActionId : ActionIds)
+    {
+        if (OutActions.Contains(ActionId)) continue;
+        const FRetainedAction* Retained = RetainedActions.Find(ActionId);
+        if (!IsGuidString(ActionId, 32) || Retained == nullptr)
+        {
+            OutError = {TEXT("invalid_action"), TEXT("One retained replacement action is unknown or expired")};
+            return false;
+        }
+        if (Blueprint == nullptr || Graph == nullptr || Schema == nullptr
+            || Retained->AssetPath != AssetPath || Retained->GraphId != GraphId
+            || Retained->SnapshotId != SnapshotId || !Retained->PinId.IsEmpty()
+            || Blueprint->GeneratedClass == nullptr
+            || Blueprint->GeneratedClass->GetPathName() != Retained->TargetClass
+            || Schema->GetClass()->GetPathName() != Retained->GraphSchema)
+        {
+            OutError = {TEXT("invalid_action"),
+                TEXT("Replacement actions must be context-free actions from this exact live function snapshot")};
+            return false;
+        }
+        IdsBySignature.FindOrAdd(Retained->RebuildSignature).Add(ActionId);
+        if (Retained->PublicRecord.IsValid())
+        {
+            const FString OwnerPath = Retained->PublicRecord->GetStringField(TEXT("owner_class"));
+            if (!OwnerPath.IsEmpty()) PriorityOwners.AddUnique(FindObject<UClass>(nullptr, *OwnerPath));
+        }
+    }
+    if (IdsBySignature.IsEmpty()) return true;
+
+    FBlueprintActionFilter Filter;
+    Filter.Context.Blueprints.Add(Blueprint);
+    Filter.Context.Graphs.Add(Graph);
+    FBlueprintActionDatabase& Database = FBlueprintActionDatabase::Get();
+    const FBlueprintActionDatabase::FActionRegistry& RegistryActions = Database.GetAllActions();
+    const double StartedAt = ScanNow();
+    int32 ScannedCount = 0;
+    bool bStopped = false;
+    auto TryActions = [&](UObject* ActionOwner, const FBlueprintActionDatabase::FActionList& Actions)
+    {
+        if (ActionOwner == nullptr || bStopped) return;
+        for (const UBlueprintNodeSpawner* Spawner : Actions)
+        {
+            if (++ScannedCount > UnrealMCP::MaxActionScan || ScanNow() - StartedAt > UnrealMCP::ActionScanSeconds)
+            {
+                bStopped = true;
+                break;
+            }
+            if (Spawner == nullptr) continue;
+            FBlueprintActionInfo ActionInfo(ActionOwner, Spawner);
+            FString Family;
+            bool bWildcard = false;
+            if (!ClassifyAction(Spawner, ActionInfo, Family, bWildcard) || Filter.IsFiltered(ActionInfo)) continue;
+            const UFunction* Function = ActionInfo.GetAssociatedFunction();
+            const FProperty* Property = ActionInfo.GetAssociatedProperty();
+            FFieldVariant MemberField = ActionInfo.GetAssociatedMemberField();
+            const UClass* NodeClass = Spawner->NodeClass.Get();
+            const FBlueprintActionUiSpec Ui = Spawner->GetUiSpec(Filter.Context, ActionInfo.GetBindings());
+            const FString Title = Ui.MenuName.ToString().Left(256);
+            const FString MemberName = Function != nullptr ? Function->GetName()
+                : Property != nullptr ? Property->GetName()
+                : MemberField ? MemberField.GetName()
+                : Family == TEXT("flow_control") && NodeClass != nullptr
+                    && NodeClass->IsChildOf(UK2Node_MacroInstance::StaticClass()) ? Title
+                : NodeClass != nullptr ? NodeClass->GetName() : Title;
+            const FString OwnerPath = Function != nullptr ? CanonicalOwnerPath(Function->GetOwnerClass(), Blueprint)
+                : Property != nullptr ? CanonicalOwnerPath(Property->GetOwnerClass(), Blueprint)
+                : CanonicalActionOwnerPath(ActionInfo, Blueprint);
+            const FString Signature = ActionSignature(Family, OwnerPath, MemberName, ActionOwner, Spawner);
+            const TArray<FString>* MatchingIds = IdsBySignature.Find(Signature);
+            if (MatchingIds == nullptr) continue;
+            for (const FString& Id : *MatchingIds)
+                OutActions.Add(Id, FResolvedAction{Spawner, ActionInfo.GetBindings()});
+            IdsBySignature.Remove(Signature);
+            if (IdsBySignature.IsEmpty())
+            {
+                bStopped = true;
+                break;
+            }
+        }
+    };
+
+    PriorityOwners.Append({Blueprint, Blueprint->SkeletonGeneratedClass, Blueprint->GeneratedClass});
+    for (UClass* Class = Blueprint->GeneratedClass; Class != nullptr; Class = Class->GetSuperClass())
+        PriorityOwners.AddUnique(Class);
+    for (UClass* Class = Blueprint->SkeletonGeneratedClass; Class != nullptr; Class = Class->GetSuperClass())
+        PriorityOwners.AddUnique(Class);
+    TSet<FObjectKey> ProcessedOwners;
+    for (UObject* Owner : PriorityOwners)
+    {
+        if (Owner == nullptr) continue;
+        const FObjectKey Key(Owner);
+        if (const FBlueprintActionDatabase::FActionList* Actions = RegistryActions.Find(Key))
+        {
+            ProcessedOwners.Add(Key);
+            TryActions(Owner, *Actions);
+        }
+        if (IdsBySignature.IsEmpty() || bStopped) break;
+    }
+    if (!IdsBySignature.IsEmpty() && !bStopped)
+    {
+        for (auto It = RegistryActions.CreateConstIterator(); It; ++It)
+        {
+            if (ProcessedOwners.Contains(It.Key())) continue;
+            TryActions(It.Key().ResolveObjectPtr(), It.Value());
+            if (IdsBySignature.IsEmpty() || bStopped) break;
+        }
+    }
+    if (!IdsBySignature.IsEmpty())
+    {
+        OutActions.Reset();
+        OutError = {TEXT("invalid_action"),
+            bStopped ? TEXT("Replacement action resolution exceeded the bounded live scan")
+                     : TEXT("One replacement action is no longer context-valid")};
+        return false;
+    }
+    return true;
+}
+
 bool FUnrealMCPBlueprintActionCatalog::ResolveForInvocation(
     const FString& ActionId,
     UBlueprint* Blueprint,

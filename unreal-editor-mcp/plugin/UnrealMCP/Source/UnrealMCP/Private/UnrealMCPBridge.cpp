@@ -18,6 +18,7 @@
 #include "UnrealMCPBlueprintInspector.h"
 #include "UnrealMCPBlueprintActionCatalog.h"
 #include "UnrealMCPBlueprintGraphEditor.h"
+#include "UnrealMCPBlueprintBlockReplacementService.h"
 #include "UnrealMCPBlueprintFamilyPolicy.h"
 #include "UnrealMCPBlueprintMutator.h"
 #include "UnrealMCPWidgetTreeService.h"
@@ -61,6 +62,7 @@ bool IsMutationCommand(const FString& Command)
         || Command == TEXT("blueprint_create") || Command == TEXT("blueprint_compile") || Command == TEXT("blueprint_save")
         || Command == TEXT("blueprint_component_edit") || Command == TEXT("blueprint_default_edit")
         || Command == TEXT("blueprint_member_edit") || Command == TEXT("blueprint_graph_edit")
+        || Command == TEXT("blueprint_block_replace")
         || Command == TEXT("widget_tree_edit")
         || Command == TEXT("gameplay_framework_edit") || Command == TEXT("game_data_edit");
 }
@@ -172,6 +174,7 @@ void FUnrealMCPBridge::Stop()
     Route.Reset();
     Router.Reset();
     BlueprintGraphEditor.Reset();
+    BlueprintBlockReplacementService.Reset();
     BlueprintMutator.Reset();
     WidgetTreeService.Reset();
     GameplayFrameworkEditor.Reset();
@@ -228,7 +231,8 @@ bool FUnrealMCPBridge::HandleRequest(const FHttpServerRequest& Request, const FH
         && Command != TEXT("blueprint_inspect") && Command != TEXT("blueprint_create") && Command != TEXT("blueprint_compile")
         && Command != TEXT("blueprint_save") && Command != TEXT("blueprint_component_edit") && Command != TEXT("blueprint_default_edit")
         && Command != TEXT("blueprint_member_edit") && Command != TEXT("blueprint_action_catalog")
-        && Command != TEXT("blueprint_graph_edit") && Command != TEXT("gameplay_framework_edit")
+        && Command != TEXT("blueprint_graph_edit") && Command != TEXT("blueprint_block_replace")
+        && Command != TEXT("gameplay_framework_edit")
         && Command != TEXT("widget_tree_edit")
         && Command != TEXT("game_data_inspect") && Command != TEXT("game_data_edit"))
     {
@@ -462,6 +466,21 @@ bool FUnrealMCPBridge::Execute(const FString& Command, const TSharedPtr<FJsonObj
         }
         return BlueprintGraphEditor->Execute(Arguments, OutResult, OutError);
     }
+    if (Command == TEXT("blueprint_block_replace"))
+    {
+        if (!BlueprintActionCatalog)
+        {
+            BlueprintActionCatalog = MakeUnique<FUnrealMCPBlueprintActionCatalog>(
+                *BlueprintInspector, BridgeInstanceId);
+        }
+        if (!BlueprintBlockReplacementService)
+        {
+            BlueprintBlockReplacementService =
+                MakeUnique<FUnrealMCPBlueprintBlockReplacementService>(
+                    *BlueprintInspector, *BlueprintActionCatalog);
+        }
+        return BlueprintBlockReplacementService->Execute(Arguments, OutResult, OutError);
+    }
     if (Command == TEXT("widget_tree_edit"))
     {
         if (!WidgetTreeService)
@@ -489,7 +508,8 @@ TSharedPtr<FJsonObject> FUnrealMCPBridge::Capabilities() const
     Result->SetBoolField(TEXT("bridge_ready"), bReady);
     Result->SetArrayField(TEXT("commands"), Strings({TEXT("capabilities"), TEXT("editor_state"), TEXT("editor_shutdown"), TEXT("operation_status"), TEXT("asset_references"), TEXT("asset_delete"),
         TEXT("level_inspect"), TEXT("level_open"),
-        TEXT("blueprint_inspect"), TEXT("blueprint_action_catalog"), TEXT("blueprint_graph_edit"), TEXT("blueprint_create"), TEXT("blueprint_compile"),
+        TEXT("blueprint_inspect"), TEXT("blueprint_action_catalog"), TEXT("blueprint_graph_edit"),
+        TEXT("blueprint_block_replace"), TEXT("blueprint_create"), TEXT("blueprint_compile"),
         TEXT("blueprint_save"), TEXT("blueprint_component_edit"), TEXT("blueprint_default_edit"), TEXT("blueprint_member_edit"),
         TEXT("widget_tree_edit"),
         TEXT("gameplay_framework_edit"), TEXT("game_data_inspect"), TEXT("game_data_edit")}));
@@ -516,6 +536,8 @@ TSharedPtr<FJsonObject> FUnrealMCPBridge::Capabilities() const
     Features->SetBoolField(TEXT("blueprint_graph_direct_connections"), true);
     Features->SetBoolField(TEXT("blueprint_graph_wildcard_specialization"), true);
     Features->SetBoolField(TEXT("blueprint_graph_automatic_conversion"), true);
+    Features->SetBoolField(TEXT("blueprint_function_replacement"), true);
+    Features->SetBoolField(TEXT("blueprint_function_replacement_scratch_preflight"), true);
     Features->SetBoolField(TEXT("blueprint_family_policy"), true);
     Features->SetBoolField(TEXT("game_mode_families"), true);
     Features->SetBoolField(TEXT("game_state_families"), true);
@@ -585,6 +607,11 @@ TSharedPtr<FJsonObject> FUnrealMCPBridge::Capabilities() const
     Limits->SetNumberField(TEXT("graph_links_per_pin"), UnrealMCP::MaxGraphLinksPerPin);
     Limits->SetNumberField(TEXT("graph_automatic_conversion_nodes"), UnrealMCP::MaxAutomaticConversionNodes);
     Limits->SetNumberField(TEXT("pin_default_chars"), UnrealMCP::MaxPinDefaultChars);
+    Limits->SetNumberField(TEXT("function_replacement_nodes"), UnrealMCP::MaxFunctionReplacementNodes);
+    Limits->SetNumberField(TEXT("function_replacement_owned_nodes"), UnrealMCP::MaxFunctionReplacementOwnedNodes);
+    Limits->SetNumberField(TEXT("function_replacement_locals"), UnrealMCP::MaxFunctionReplacementLocals);
+    Limits->SetNumberField(TEXT("function_replacement_defaults"), UnrealMCP::MaxFunctionReplacementDefaults);
+    Limits->SetNumberField(TEXT("function_replacement_connections"), UnrealMCP::MaxFunctionReplacementConnections);
     Limits->SetNumberField(TEXT("game_data_fields"), UnrealMCP::MaxGameDataFields);
     Limits->SetNumberField(TEXT("game_data_rows"), UnrealMCP::MaxGameDataRows);
     Limits->SetNumberField(TEXT("game_data_batch_rows"), UnrealMCP::MaxGameDataBatchRows);

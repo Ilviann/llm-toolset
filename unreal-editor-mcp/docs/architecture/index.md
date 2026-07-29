@@ -9,6 +9,7 @@ Each file in this directory documents one implemented cohesive component: what i
 - [`blueprint-inspector.md`](blueprint-inspector.md) — bounded Asset Registry discovery, exact published-family Blueprint inspection, snapshots, identities, values, and cursors.
 - [`blueprint-action-catalog.md`](blueprint-action-catalog.md) — bounded live graph-action discovery, filters, opaque identities, caching, and invalidation.
 - [`blueprint-graph-editor.md`](blueprint-graph-editor.md) — request decoding, focused node/pin operation handlers, transactional graph editing, identity completion, and result read-back.
+- [`blueprint-block-replacement.md`](blueprint-block-replacement.md) — complete user-function boundaries, scratch compilation, semantic parity, transactional apply, and rollback.
 - [`blueprint-mutator.md`](blueprint-mutator.md) — safe published-family Blueprint creation, compilation, package saving, diagnostics, cleanup, and read-back.
 - [`widget-tree-service.md`](widget-tree-service.md) — bounded Widget Blueprint hierarchy/default inspection and stale-safe structural editing.
 - [`umg-layout-service.md`](umg-layout-service.md) — typed common panel-slot layout editing and inspection.

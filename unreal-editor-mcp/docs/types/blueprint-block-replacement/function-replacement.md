@@ -1,0 +1,11 @@
+# Complete function replacement
+
+An unfiltered `functions` inspection publishes a current structural Blueprint snapshot. Select the target function record by ID; its `replacement_boundary` contains `replaceable`, a 40-hex `function_fingerprint`, entry/result node IDs, the complete sorted old `owned_node_ids`, and complete sorted `local_variable_ids`. A write must echo all of those values with that snapshot and function ID. A `function_id`-filtered inspection is query-scoped and its snapshot is not a valid global action-catalog or replacement precondition.
+
+The replacement plan contains explicit entry/result positions; up to 64 `{key,action_id,position}` body nodes; up to 128 semantic input defaults; and up to 256 semantic output-to-input connections. Keys are unique, bounded identifiers. `$entry` and `$result` are reserved boundary keys. Each connection names pins by exact semantic pin name. A conversion is permitted only when `automatic_conversion: true` and `conversion_position` are both present and the live K2 schema requires exactly one conversion node.
+
+Old owned nodes are limited to 256 and locals to 64. Coordinates are bounded to ±1,000,000. Existing graph/node/pin and global request/response limits remain authoritative. Context-dependent action IDs, duplicate identities/keys/default targets/connections, missing or ambiguous pins, protected defaults, mismatched direct/conversion plans, and outputs outside the complete declared plan reject.
+
+The service applies and compiles the plan in an isolated non-transient scratch Blueprint before any live transaction. It compares semantic structure after compile, destroys scratch state, rechecks the live snapshot, and performs one live transaction. The result reports the new snapshot and function fingerprint, semantic fingerprint, created/removed/conversion counts, created node records, scratch/compile success, diagnostics, family capabilities, and dirty state.
+
+Use a fresh operation ID for a new plan. Reconcile a lost response with `operation_status`; replaying the identical request returns the retained terminal result. Compile and save explicitly after a successful replacement. Atomic `blueprint_graph_edit` remains preferable for a single node, pin, connection, or position change.

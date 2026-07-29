@@ -381,6 +381,7 @@ def main() -> int:
                 "asset_references", "asset_delete",
                 "level_inspect", "level_open",
                 "blueprint_inspect", "blueprint_action_catalog", "blueprint_graph_edit",
+                "blueprint_block_replace",
                 "blueprint_create", "blueprint_compile", "blueprint_save",
                 "blueprint_component_edit", "blueprint_default_edit", "blueprint_member_edit",
                 "widget_tree_edit", "gameplay_framework_edit", "game_data_inspect", "game_data_edit",
@@ -395,6 +396,12 @@ def main() -> int:
             for feature in ("blueprint_functions", "blueprint_local_variables", "blueprint_rep_notify"):
                 if capabilities.get("features", {}).get(feature) is not True:
                     raise AssertionError(f"Phase 6 capability is unavailable: {feature}")
+            for feature in (
+                "blueprint_function_replacement",
+                "blueprint_function_replacement_scratch_preflight",
+            ):
+                if capabilities.get("features", {}).get(feature) is not True:
+                    raise AssertionError(f"function replacement capability is unavailable: {feature}")
             for feature in ("blueprint_macros", "blueprint_custom_events"):
                 if capabilities.get("features", {}).get(feature) is not True:
                     raise AssertionError(f"Phase 7 capability is unavailable: {feature}")
@@ -464,6 +471,17 @@ def main() -> int:
             }
             if any(capabilities.get("limits", {}).get(name) != value for name, value in expected_graph_limits.items()):
                 raise AssertionError(f"Phase 13 graph limits mismatch: {capabilities.get('limits')!r}")
+            expected_replacement_limits = {
+                "function_replacement_nodes": 64,
+                "function_replacement_owned_nodes": 256,
+                "function_replacement_locals": 64,
+                "function_replacement_defaults": 128,
+                "function_replacement_connections": 256,
+            }
+            if any(capabilities.get("limits", {}).get(name) != value
+                   for name, value in expected_replacement_limits.items()):
+                raise AssertionError(
+                    f"function replacement limits mismatch: {capabilities.get('limits')!r}")
             expected_game_data_limits = {
                 "game_data_fields": 64, "game_data_rows": 2048, "game_data_batch_rows": 64,
                 "game_data_collection_items": 64, "game_data_depth": 4, "game_data_dependencies": 256,

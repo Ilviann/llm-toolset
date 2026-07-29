@@ -42,7 +42,7 @@ class ReleaseContractTests(unittest.TestCase):
         native = re.search(r'Version\[\].*TEXT\("([^"]+)"\)', header)
         self.assertIsNotNone(native)
         versions = {project["project"]["version"], plugin["VersionName"], native.group(1), unreal_editor_mcp.__version__}
-        self.assertEqual(versions, {"0.22.1"})
+        self.assertEqual(versions, {"0.23.0"})
 
     def test_only_released_asset_delete_commands_are_registered(self):
         names = [tool["name"] for tool in TOOLS]
@@ -50,6 +50,7 @@ class ReleaseContractTests(unittest.TestCase):
             "capabilities", "editor_state", "operation_status", "asset_references", "asset_delete",
             "level_inspect", "level_open",
             "blueprint_inspect", "blueprint_action_catalog", "blueprint_graph_edit",
+            "blueprint_block_replace",
             "blueprint_create", "blueprint_compile", "blueprint_save",
             "blueprint_component_edit", "blueprint_default_edit",
             "blueprint_member_edit", "widget_tree_edit",

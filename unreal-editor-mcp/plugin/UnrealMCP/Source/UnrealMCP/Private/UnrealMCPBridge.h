@@ -13,6 +13,7 @@ class FUnrealMCPDiscovery;
 class FUnrealMCPBlueprintInspector;
 class FUnrealMCPBlueprintActionCatalog;
 class FUnrealMCPBlueprintGraphEditor;
+class FUnrealMCPBlueprintBlockReplacementService;
 class FUnrealMCPBlueprintMutator;
 class FUnrealMCPWidgetTreeService;
 class FUnrealMCPGameplayFrameworkEditor;
@@ -54,6 +55,7 @@ private:
     TUniquePtr<FUnrealMCPBlueprintInspector> BlueprintInspector;
     TUniquePtr<FUnrealMCPBlueprintActionCatalog> BlueprintActionCatalog;
     TUniquePtr<FUnrealMCPBlueprintGraphEditor> BlueprintGraphEditor;
+    TUniquePtr<FUnrealMCPBlueprintBlockReplacementService> BlueprintBlockReplacementService;
     TUniquePtr<FUnrealMCPBlueprintMutator> BlueprintMutator;
     TUniquePtr<FUnrealMCPWidgetTreeService> WidgetTreeService;
     TUniquePtr<FUnrealMCPGameplayFrameworkEditor> GameplayFrameworkEditor;
