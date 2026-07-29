@@ -315,6 +315,39 @@ bool FUnrealMCPGameDataService::Edit(const TSharedPtr<FJsonObject>& Arguments, T
             *InspectArgs, ActualTarget, ActualObject, ActualPackage, BeforeRecords, BeforeSchema, BeforeSnapshot, BeforeMetadata, OutError)
         || !ValidateExpected(*Arguments, BeforeSnapshot, OutError)) return false;
     UObject* Asset = StaticLoadObject(UObject::StaticClass(), nullptr, *ObjectPath, nullptr, LOAD_NoWarn | LOAD_Quiet);
+    if (Target == TEXT("user_defined_struct") && Operation != TEXT("add_member"))
+    {
+        UUserDefinedStruct* Struct = CastChecked<UUserDefinedStruct>(Asset);
+        FGuid MemberId;
+        if (!RequestValidation::ParseGuidField(*Arguments, TEXT("member_id"), MemberId, OutError)) return false;
+        if (FStructureEditorUtils::GetVarDescByGuid(Struct, MemberId) == nullptr)
+        {
+            OutError = {TEXT("invalid_schema"), TEXT("The struct member identity is missing or stale")};
+            return false;
+        }
+        FString Field;
+        const bool bDestructive = Operation == TEXT("remove_member")
+            || (Operation == TEXT("update_member")
+                && Arguments->TryGetStringField(TEXT("field"), Field)
+                && Field == TEXT("type"));
+        if (bDestructive)
+        {
+            TArray<FString> Dependencies;
+            bool bTruncated = false;
+            InspectionBuilder::GatherDependencies(PackageName, Dependencies, bTruncated);
+            if (!Dependencies.IsEmpty() || bTruncated)
+            {
+                OutError = {
+                    TEXT("referenced_schema"),
+                    Operation == TEXT("remove_member")
+                        ? TEXT("Struct member removal rejects while dependent assets exist")
+                        : TEXT("Struct type changes reject while dependent assets exist")
+                };
+                OutError.Details->SetNumberField(TEXT("dependency_count"), Dependencies.Num());
+                return false;
+            }
+        }
+    }
     FScopedTransaction Transaction(NSLOCTEXT("UnrealMCP", "GameDataEdit", "Unreal MCP Game Data Edit")); Asset->Modify();
     TArray<FString> ChangedNames;
     if (Target == TEXT("user_defined_struct"))
@@ -344,8 +377,6 @@ bool FUnrealMCPGameDataService::Edit(const TSharedPtr<FJsonObject>& Arguments, T
             }
             else if (Field == TEXT("type"))
             {
-                TArray<FString> Dependencies; bool bTruncated = false; InspectionBuilder::GatherDependencies(PackageName, Dependencies, bTruncated);
-                if (!Dependencies.IsEmpty() || bTruncated) { Transaction.Cancel(); OutError = {TEXT("referenced_schema"), TEXT("Struct type changes reject while dependent assets exist")}; OutError.Details->SetNumberField(TEXT("dependency_count"), Dependencies.Num()); return false; }
                 const TSharedPtr<FJsonObject>* Type = nullptr; FEdGraphPinType PinType;
                 bChanged = Arguments->TryGetObjectField(TEXT("type"), Type) && Type != nullptr
                     && UnrealMCP::K2TypeCodec::DecodeType(*Type, PinType, OutError) && !PinType.bIsReference && !PinType.bIsConst
@@ -364,8 +395,6 @@ bool FUnrealMCPGameDataService::Edit(const TSharedPtr<FJsonObject>& Arguments, T
         }
         else if (Operation == TEXT("remove_member"))
         {
-            TArray<FString> Dependencies; bool bTruncated = false; InspectionBuilder::GatherDependencies(PackageName, Dependencies, bTruncated);
-            if (!Dependencies.IsEmpty() || bTruncated) { Transaction.Cancel(); OutError = {TEXT("referenced_schema"), TEXT("Struct member removal rejects while dependent assets exist")}; OutError.Details->SetNumberField(TEXT("dependency_count"), Dependencies.Num()); return false; }
             ChangedNames.Add(ExistingMemberName); bChanged = FStructureEditorUtils::RemoveVariable(Struct, MemberId);
         }
         else if (Operation == TEXT("add_member"))

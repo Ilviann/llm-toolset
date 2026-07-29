@@ -14,6 +14,7 @@ The service asks the store for a capture boundary and delegates page creation/co
 - A cursor is single-use, expires after 30 seconds, and rejects after any observed registry add, remove, rename, update, or files-loaded event.
 - Retention is limited to eight cursors and evicts the earliest-expiring entry when full.
 - Page output preserves the existing response and limitations contract.
+- Teardown unregisters observers while the Asset Registry is live and remains safe after the engine has already destroyed the registry singleton.
 
 ## Verification
 

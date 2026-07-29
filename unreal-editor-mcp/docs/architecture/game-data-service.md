@@ -13,7 +13,7 @@ The HTTP bridge owns one lazily created service and admits `game_data_edit` thro
 - Targets are exactly `user_defined_struct` or `data_table`; every operation has one exact native-validated shape.
 - Read access covers visible mounted assets. Mutation uses the shared `/Game` and symlink-free local-project-plugin scope policy.
 - User-defined struct members use persistent `VarGuid` identities. Add, rename, type/default update, reorder, and reject-only removal are supported; every accepted result is compiled, saved, and read back.
-- Type changes and removals reject if the bounded Asset Registry dependency scan finds any referencer or truncates. No dependent asset is silently rewritten by a destructive schema edit.
+- Member identity and destructive dependency preflight complete before the transaction or package modification begins. Type changes and removals reject if the bounded Asset Registry dependency scan finds any referencer or truncates, preserving the package's prior dirty state. No dependent asset is silently rewritten by a destructive schema edit.
 - Data Tables bind to one exact live native `FTableRowBase` descendant or user-defined struct. Their schema, sorted row names, and typed values contribute to one query-independent snapshot.
 - Add, replace, rename, remove, and mixed batch upsert/remove operations prevalidate complete staged rows before mutation. Batch names must be unique ignoring `FName` case semantics, and upserts cannot overlap removals.
 - `preserve_unspecified` is explicit and valid only when a row already exists. Otherwise omitted fields receive the live row-struct defaults.

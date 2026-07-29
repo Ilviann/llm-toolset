@@ -23,6 +23,7 @@ sys.path.insert(0, str(ROOT))
 from unreal_editor_mcp import __version__  # noqa: E402
 from unreal_editor_mcp.bridge import BRIDGE_PATH, UnrealBridge  # noqa: E402
 from unreal_editor_mcp.discovery import read_discovery, read_token  # noqa: E402
+from unreal_editor_mcp.errors import BridgeError, ErrorCode  # noqa: E402
 from unreal_editor_mcp.project import ProjectLayout  # noqa: E402
 
 from .assets import run_asset_scenario, verify_restarted_assets
@@ -153,9 +154,19 @@ def reconcile_operation(bridge: UnrealBridge, operation_id: str, bridge_instance
     raise TimeoutError("lost mutation response did not reach a retained terminal state")
 
 
-def stop_editor(process: subprocess.Popen[bytes], timeout: float = 30.0) -> None:
+def stop_editor(
+    process: subprocess.Popen[bytes],
+    timeout: float = 30.0,
+    bridge: UnrealBridge | None = None,
+) -> None:
     if process.poll() is not None:
         return
+    if bridge is not None:
+        try:
+            shutdown_editor(bridge, process, timeout)
+            return
+        except Exception:
+            pass
     process.send_signal(signal.SIGTERM)
     try:
         process.wait(timeout=timeout)
@@ -163,6 +174,55 @@ def stop_editor(process: subprocess.Popen[bytes], timeout: float = 30.0) -> None
         process.kill()
         process.wait(timeout=10)
         raise RuntimeError("Unreal Editor did not unload cleanly")
+
+
+def shutdown_editor(bridge: UnrealBridge, process: subprocess.Popen[bytes], timeout: float = 30.0) -> None:
+    try:
+        shutdown = bridge.call("editor_shutdown")
+    except BridgeError as error:
+        raise AssertionError(f"graceful shutdown was refused: {error.as_dict()!r}") from error
+    if shutdown.get("accepted") is not True:
+        raise AssertionError(f"graceful shutdown was not accepted: {shutdown!r}")
+    deadline = time.monotonic() + timeout
+    while process.poll() is None and time.monotonic() < deadline:
+        time.sleep(0.1)
+    if process.poll() is None:
+        raise AssertionError("graceful shutdown did not terminate the configured editor")
+    if process.returncode != 0:
+        raise AssertionError(f"graceful shutdown exited with status {process.returncode}")
+
+
+def restore_framework_defaults(
+    bridge: UnrealBridge,
+    project_hash: str,
+) -> None:
+    defaults = {
+        "default_game_mode": "/Script/Engine.GameModeBase",
+        "default_game_instance": "/Script/Engine.GameInstance",
+    }
+    for setting, default_class in defaults.items():
+        arguments = {
+            "operation_id": uuid.uuid4().hex,
+            "project_hash": project_hash,
+            "setting": setting,
+            "class_path": default_class,
+            "expected_class": default_class,
+        }
+        try:
+            bridge.call("gameplay_framework_edit", arguments)
+        except BridgeError as error:
+            if error.code == ErrorCode.INVALID_ARGUMENT:
+                continue
+            if error.code != ErrorCode.STALE_PRECONDITION:
+                raise
+            current_class = error.details.get("current_class")
+            if not isinstance(current_class, str) or not current_class:
+                raise
+            arguments["operation_id"] = uuid.uuid4().hex
+            arguments["expected_class"] = current_class
+            result = bridge.call("gameplay_framework_edit", arguments)
+            if result.get("verified") is not True or result.get("new_class") != default_class:
+                raise AssertionError(f"gameplay-framework retry cleanup failed: {result!r}")
 
 
 def run_widget_restart_integration(
@@ -173,34 +233,36 @@ def run_widget_restart_integration(
     """Run the focused Widget Blueprint author/save/restart inspection gate."""
     command = [
         str(executable), str(layout.descriptor), "-unattended", "-nop4", "-nosplash",
-        "-nullrhi", "-nosound", "-NoAssetRegistryCache",
+        "-nullrhi", "-nosound", "-nocrashreports", "-NoAssetRegistryCache",
     ]
     with tempfile.TemporaryFile() as log:
+        bridge = None
         process = subprocess.Popen(command, cwd=ROOT, env=environment, stdout=log, stderr=subprocess.STDOUT)
         try:
             wait_until_ready(layout, process, time.monotonic() + 120.0)
-            scenario = author_widget_scenario(UnrealBridge(layout, timeout=3.0))
+            bridge = UnrealBridge(layout, timeout=3.0)
+            scenario = author_widget_scenario(bridge)
+            shutdown_editor(bridge, process)
         except Exception:
             log.seek(0)
             sys.stderr.buffer.write(log.read()[-32_000:])
             raise
         finally:
-            stop_editor(process)
+            stop_editor(process, bridge=bridge)
 
+        bridge = None
         process = subprocess.Popen(command, cwd=ROOT, env=environment, stdout=log, stderr=subprocess.STDOUT)
         try:
             wait_until_ready(layout, process, time.monotonic() + 120.0)
             bridge = UnrealBridge(layout, timeout=3.0)
             verify_restarted_widgets(bridge, scenario)
-            shutdown = bridge.call("editor_shutdown")
-            if shutdown.get("accepted") is not True:
-                raise AssertionError(f"graceful shutdown was not accepted: {shutdown!r}")
+            shutdown_editor(bridge, process)
         except Exception:
             log.seek(0)
             sys.stderr.buffer.write(log.read()[-32_000:])
             raise
         finally:
-            stop_editor(process)
+            stop_editor(process, bridge=bridge)
     print("Integration passed: Widget Blueprint authoring, save, restart, and inspection")
     return 0
 
@@ -241,6 +303,9 @@ def run_automation(executable: Path, project: Path, environment: dict[str, str],
         "PreflightPersistenceAndReferences",
         "RegistryLiveMemoryAndCursors",
         "FamilyInspectionMutationAndPersistence",
+        "LayoutStyleBindingsAndEvents",
+        "PreflightTransactionPreservation",
+        "Protocol",
     )
     if test_filter == "UnrealMCP":
         expected = all_expected
@@ -279,7 +344,7 @@ def run_automation(executable: Path, project: Path, environment: dict[str, str],
         expected = (leaf,) if leaf in all_expected else ()
     command = [
         str(executable), str(project), "-unattended", "-nop4", "-nosplash", "-nullrhi",
-        "-stdout", "-FullStdOutLogOutput", "-NoAssetRegistryCache",
+        "-stdout", "-FullStdOutLogOutput", "-nocrashreports", "-NoAssetRegistryCache",
         f"-ExecCmds=Automation RunTests {test_filter};Quit",
         "-TestExit=Automation Test Queue Empty",
     ]
@@ -305,7 +370,7 @@ def run_automation(executable: Path, project: Path, environment: dict[str, str],
 def prepare_phase_two_fixture(executable: Path, project: Path, environment: dict[str, str]) -> str:
     command = [
         str(executable), str(project), "-unattended", "-nop4", "-nosplash", "-nullrhi",
-        "-stdout", "-FullStdOutLogOutput", "-NoAssetRegistryCache",
+        "-stdout", "-FullStdOutLogOutput", "-nocrashreports", "-NoAssetRegistryCache",
         "-ExecCmds=Automation RunTests UnrealMCP.Phase2.LiveFixture;Quit",
         "-TestExit=Automation Test Queue Empty",
     ]
@@ -367,14 +432,16 @@ def main() -> int:
         raise AssertionError("Phase 2 saved fixture did not report a structural snapshot")
     command = [
         str(executable), str(layout.descriptor), "-unattended", "-nop4", "-nosplash",
-        "-nullrhi", "-nosound", "-NoAssetRegistryCache",
+        "-nullrhi", "-nosound", "-nocrashreports", "-NoAssetRegistryCache",
     ]
     with tempfile.TemporaryFile() as log:
+        bridge = None
         process = subprocess.Popen(command, cwd=ROOT, env=environment, stdout=log, stderr=subprocess.STDOUT)
         try:
             wait_until_ready(layout, process, time.monotonic() + 120.0)
             bridge = UnrealBridge(layout, timeout=3.0)
             capabilities = bridge.call("capabilities")
+            restore_framework_defaults(bridge, capabilities["project_hash"])
             state = bridge.call("editor_state")
             if capabilities.get("commands") != [
                 "capabilities", "editor_state", "editor_shutdown", "operation_status",
@@ -554,12 +621,14 @@ def main() -> int:
             assigned_game_mode_class = blueprint_scenario["assigned_game_mode_class"]
             reject_bad_token(layout)
             verify_loopback_only(read_discovery(layout).port)
+            shutdown_editor(bridge, process)
         except Exception:
             log.seek(0)
             sys.stderr.buffer.write(log.read()[-32_000:])
             raise
         finally:
-            stop_editor(process)
+            stop_editor(process, bridge=bridge)
+        reloaded_bridge = None
         process = subprocess.Popen(command, cwd=ROOT, env=environment, stdout=log, stderr=subprocess.STDOUT)
         try:
             wait_until_ready(layout, process, time.monotonic() + 120.0)
@@ -600,20 +669,13 @@ def main() -> int:
                 phase_fifteen_game_instance,
                 blueprint_scenario,
             )
-            shutdown = reloaded_bridge.call("editor_shutdown")
-            if shutdown.get("accepted") is not True:
-                raise AssertionError(f"graceful shutdown was not accepted: {shutdown!r}")
-            shutdown_deadline = time.monotonic() + 30.0
-            while process.poll() is None and time.monotonic() < shutdown_deadline:
-                time.sleep(0.1)
-            if process.poll() is None:
-                raise AssertionError("graceful shutdown did not terminate the configured editor")
+            shutdown_editor(reloaded_bridge, process)
         except Exception:
             log.seek(0)
             sys.stderr.buffer.write(log.read()[-32_000:])
             raise
         finally:
-            stop_editor(process)
+            stop_editor(process, bridge=reloaded_bridge)
     deadline = time.monotonic() + 5.0
     while layout.discovery_file.exists() and time.monotonic() < deadline:
         time.sleep(0.1)

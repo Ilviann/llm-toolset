@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.23.1 — 2026-07-30
+
+- Verified every released feature on Apple Silicon macOS 26.5.2 with Unreal Engine 5.8 and Xcode 26.1.1 through 95 Python tests, adaptive and forced-unity editor builds, 37 native Automation cases, packaging validation, and the complete two-process production bridge workflow; cleared the macOS native platform backlog.
+- Fixed rejected destructive user-defined-struct edits marking an otherwise clean package dirty by moving identity and dependency preflight ahead of the transaction and package modification.
+- Fixed graceful editor shutdown crashing after Asset Registry teardown, corrected macOS lifecycle path expectations, made cross-process verification retry-safe and consistently graceful, completed the native-case manifest, and made overloaded Widget Tree API probing explicit for Clang and MSVC.
+
 ## 0.23.0 — 2026-07-29
 
 - Added `blueprint_block_replace` for one complete user-owned function with exact inspected entry/result/body/local fingerprints, bounded action-backed semantic plans, explicit positions, typed defaults, and direct or explicitly positioned conversion connections.

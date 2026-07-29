@@ -30,12 +30,14 @@ FUnrealMCPAssetReferenceCursorStore::FUnrealMCPAssetReferenceCursorStore(
 
 FUnrealMCPAssetReferenceCursorStore::~FUnrealMCPAssetReferenceCursorStore()
 {
-    IAssetRegistry& Registry = FAssetRegistryModule::GetRegistry();
-    Registry.OnAssetAdded().RemoveAll(this);
-    Registry.OnAssetRemoved().RemoveAll(this);
-    Registry.OnAssetRenamed().RemoveAll(this);
-    Registry.OnAssetUpdated().RemoveAll(this);
-    Registry.OnFilesLoaded().RemoveAll(this);
+    if (IAssetRegistry* Registry = IAssetRegistry::Get())
+    {
+        Registry->OnAssetAdded().RemoveAll(this);
+        Registry->OnAssetRemoved().RemoveAll(this);
+        Registry->OnAssetRenamed().RemoveAll(this);
+        Registry->OnAssetUpdated().RemoveAll(this);
+        Registry->OnFilesLoaded().RemoveAll(this);
+    }
 }
 
 uint64 FUnrealMCPAssetReferenceCursorStore::GetRegistrySerial() const

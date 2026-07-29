@@ -1,6 +1,6 @@
 # `widget-tree` — Widget Blueprint family and widget trees
 
-**Implementation status:** Completed in 0.21.0 and verified natively on Windows. Native macOS verification remains in the roadmap platform test backlog.
+**Implementation status:** Completed in 0.21.0 and verified natively on macOS and Windows.
 
 **Outcome:** Agents can create and safely modify the structural widget hierarchy of HUD and menu Widget Blueprints while retaining the established Blueprint compile, save, inspection, and graph contracts.
 

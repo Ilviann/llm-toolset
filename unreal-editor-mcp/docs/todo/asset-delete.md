@@ -1,6 +1,6 @@
 # `asset-delete` — Delete asset
 
-**Implementation status:** Completed in 0.20.0 and verified natively on Windows. Native macOS verification remains in the roadmap platform test backlog.
+**Implementation status:** Completed in 0.20.0 and verified natively on macOS and Windows.
 
 **Outcome:** Agents can delete one exact, unreferenced asset package through Unreal Editor only after conservative reference and editor-state preflight, with a retained and verified result.
 

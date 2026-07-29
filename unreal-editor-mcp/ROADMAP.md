@@ -89,15 +89,7 @@ Feature identifiers are stable names, not execution indexes. Unfinished features
 Feature checkboxes record implementation completion. This section separately lists completed features that have not yet passed their applicable native platform verification.
 
 - macOS:
-  - `editor-launch`
-  - `editor-shutdown`
-  - `editor-restart`
-  - `level-open`
-  - `asset-references`
-  - `asset-delete`
-  - `widget-tree`
-  - `umg-authoring`
-  - `function-replace`
+  - None
 - Windows:
   - None
 - Linux:

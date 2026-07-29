@@ -91,6 +91,8 @@ bool FUnrealMCPPhase17GameDataAuthoringTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("dependent schema removal has stable code"), Error.Code, FString(TEXT("referenced_schema")));
     if (!TestTrue(TEXT("rejected schema removal remains inspectable"), Inspect(Service, TEXT("user_defined_struct"), StructPath, Result, Error))) return false;
     TestEqual(TEXT("dependent schema rejection preserves snapshot"), Result->GetStringField(TEXT("snapshot_id")), DependentStructSnapshot);
+    TestFalse(TEXT("dependent schema rejection preserves clean package"),
+        StaticLoadObject(UObject::StaticClass(), nullptr, *StructPath)->GetOutermost()->IsDirty());
 
     TSharedRef<FJsonObject> Add = DataArguments(TEXT("data_table"), TEXT("add_row"), TablePath); Add->SetStringField(TEXT("expected_snapshot"), TableSnapshot);
     Add->SetStringField(TEXT("row_name"), TEXT("Rifle")); const TSharedRef<FJsonObject> RifleValues = MakeShared<FJsonObject>(); RifleValues->SetNumberField(TEXT("BaseDamage"), 42); RifleValues->SetStringField(TEXT("AmmoType"), TEXT("Rifle")); Add->SetObjectField(TEXT("values"), RifleValues);

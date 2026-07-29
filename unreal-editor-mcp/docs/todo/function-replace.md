@@ -1,6 +1,6 @@
 # `function-replace` — Complete function replacement
 
-**Implementation status:** Completed in 0.23.0 and verified natively on Windows. Native macOS verification remains in the roadmap platform test backlog.
+**Implementation status:** Completed in 0.23.0 and verified natively on macOS and Windows.
 
 **Outcome:** Agents can replace one complete user-owned function as a single prevalidated operation while preserving unrelated Blueprint content.
 

@@ -127,7 +127,10 @@ class LifecycleTests(unittest.TestCase):
         })
         self.assertEqual(result["state"], "ready")
         self.assertEqual(result["new_bridge_instance_id"], "2" * 32)
-        self.assertEqual(captured["command"], (str(self.editor), str(self.descriptor)))
+        self.assertEqual(
+            captured["command"],
+            (str(self.editor.resolve()), str(self.descriptor.resolve())),
+        )
         self.assertFalse(captured["options"]["shell"])
         self.assertEqual(captured["options"]["creationflags"], 0x208)
 
@@ -275,7 +278,10 @@ class LifecycleTests(unittest.TestCase):
         self.assertEqual(caught.exception.code, ErrorCode.OUTCOME_UNKNOWN)
 
     def test_executable_validation_and_linux_command_are_fail_closed(self):
-        self.assertEqual(resolve_editor_executable(self.editor, self.platform), self.editor)
+        self.assertEqual(
+            resolve_editor_executable(self.editor, self.platform),
+            self.editor.resolve(),
+        )
         with self.assertRaises(ConfigurationError):
             resolve_editor_executable(Path("UnrealEditor.exe"), self.platform)
         linux = PlatformAdapter("linux", process_probe=lambda _pid: False)

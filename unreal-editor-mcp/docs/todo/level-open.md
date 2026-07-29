@@ -1,5 +1,7 @@
 # `level-open` — Level discovery, safe opening, and snapshot foundations
 
+**Implementation status:** Completed in 0.18.0 and verified natively on macOS and Windows.
+
 **Outcome:** Agents can discover mounted maps, safely open one exact map, and obtain a stable current-map snapshot suitable for bounded level inspection and stale-write protection.
 
 **Depends on:**

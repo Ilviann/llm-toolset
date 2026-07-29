@@ -1,5 +1,7 @@
 # `umg-authoring` — UMG layout, styling, bindings, and UI logic
 
+**Implementation status:** Completed in 0.22.0 and verified natively on macOS and Windows.
+
 **Outcome:** Agents can turn a Widget Blueprint hierarchy into a practical responsive HUD or menu by configuring layout and appearance and wiring supported widget events and data flow.
 
 **Depends on:**

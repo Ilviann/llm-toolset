@@ -81,7 +81,8 @@ void RequirePublicTypes()
     static_assert(TIsDerivedFrom<AGameState, AGameStateBase>::Value);
     static_assert(TIsDerivedFrom<UUserWidget, UWidget>::Value);
     static_assert(TIsDerivedFrom<UWidgetBlueprint, UBlueprint>::Value);
-    (void)&UWidgetTree::FindWidget;
+    using FFindWidgetByName = UWidget* (UWidgetTree::*)(const FName&) const;
+    (void)static_cast<FFindWidgetByName>(&UWidgetTree::FindWidget);
     (void)&UWidgetTree::RemoveWidget;
     (void)&FWidgetBlueprintOperationUtils::CreateWidgetBlueprint;
     (void)&FWidgetBlueprintOperationUtils::AddWidget;
