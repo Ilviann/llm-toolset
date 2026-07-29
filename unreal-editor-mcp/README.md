@@ -36,6 +36,36 @@ python3 scripts/package_plugin.py
 
 Windows Command Prompt users can run `scripts\package_plugin.cmd`. See the [detailed tool and deployment guides](docs/user/index.md) for packaging options, macOS requirements, custom ports, and optional editor lifecycle configuration.
 
+### Optional large mode
+
+Large mode is enabled with `--tool-mode large`. It adds the `editor_lifecycle` tool for the configured project. To allow launch and restart, also pass the absolute Unreal Editor executable with `--editor`; without it, large mode can report state and gracefully shut down an already-running editor, but launch and restart are unavailable.
+
+For example, add the following arguments to an LM Studio MCP entry on macOS:
+
+```json
+"args": [
+  "/absolute/path/to/Project.uproject",
+  "--tool-mode",
+  "large",
+  "--editor",
+  "/Users/Shared/Epic Games/UE_5.8/Engine/Binaries/Mac/UnrealEditor.app/Contents/MacOS/UnrealEditor"
+]
+```
+
+On Windows:
+
+```json
+"args": [
+  "C:\\absolute\\path\\to\\Project.uproject",
+  "--tool-mode",
+  "large",
+  "--editor",
+  "C:\\Program Files\\Epic Games\\UE_5.8\\Engine\\Binaries\\Win64\\UnrealEditor.exe"
+]
+```
+
+Each item must remain a separate `args` value; paths containing spaces do not need shell quoting. Add `--lifecycle-timeout` followed by a value from 5 to 900 seconds to override the 120-second default. Native launch and restart are supported on macOS and Windows; Linux rejects those operations. See [Optional editor lifecycle](docs/user/tool-guides.md#optional-editor-lifecycle) for operation examples and safety behavior.
+
 ## Quickstart
 
 1. Install and enable the plugin, then open the target Unreal project.
