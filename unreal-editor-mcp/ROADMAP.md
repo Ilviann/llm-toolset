@@ -1,26 +1,11 @@
 # Unreal Editor MCP Roadmap
 
-Feature identifiers are stable names, not execution indexes. Unfinished features may be implemented and completed in any order once every direct dependency in their description is complete. Completed features retain their historical `phase-*` identifiers.
+Feature identifiers are stable names, not execution indexes. Unfinished features may be implemented and completed in any order once every direct dependency in their description is complete. The checklist retains a completed feature only while an unfinished feature directly depends on it; completed feature documents and historical `phase-*` identifiers remain available under [`docs/todo/`](docs/todo/index.md).
 
-- [x] [`phase-4` — Reliable mutations, Actor components, and defaults](docs/todo/phase-4.md) — Add reliable mutation delivery, Actor component editing, and Blueprint/component defaults.
-- [x] [`phase-5` — Blueprint member variables](docs/todo/phase-5.md) — Add typed Blueprint member-variable inspection and editing.
-- [x] [`phase-6` — Function signatures and local variables](docs/todo/phase-6.md) — Add function signatures, function shells, and local variables.
-- [x] [`phase-7` — Macros and custom events](docs/todo/phase-7.md) — Add macro and custom-event shells with matching inspection.
-- [x] [`phase-8` — Action-catalog infrastructure and core actions](docs/todo/phase-8.md) — Add the bounded action-catalog infrastructure and core actions.
-- [x] [`phase-9` — C++ architecture and test decomposition](docs/todo/phase-9.md) — Split oversized native components and Automation Tests along cohesive internal boundaries without changing behavior.
-- [x] [`phase-10` — Expanded action-catalog families](docs/todo/phase-10.md) — Expand the action catalog to the remaining supported action families.
-- [x] [`phase-11` — Graph-node lifecycle](docs/todo/phase-11.md) — Add transactional graph-node creation, movement, and removal.
-- [x] [`phase-12` — Pin defaults and direct connections](docs/todo/phase-12.md) — Add pin defaults and direct graph connections without automatic conversion.
 - [x] [`phase-13` — Wildcards, conversions, and complete atomic graph editing](docs/todo/phase-13.md) — Add wildcard specialization, explicit conversion insertion, and complete atomic graph editing.
-- [x] [`phase-14` — GameMode and GameState families](docs/todo/phase-14.md) — Formalize GameMode and GameState family support.
-- [x] [`phase-15` — GameInstance family](docs/todo/phase-15.md) — Add GameInstance family support.
-- [x] [`phase-16` — Multiplayer Blueprint authoring and framework assignment](docs/todo/phase-16.md) — Add RPC custom events, replication settings, and narrow GameMode/GameInstance project assignment.
-- [x] [`phase-17` — User-defined structs and Data Tables](docs/todo/phase-17.md) — Add bounded row-schema and typed game-design table authoring.
-- [x] [`asset-references` — Find asset references](docs/todo/asset-references.md) — Find bounded serialized and live-memory referencers for one exact mounted asset.
 - [x] [`asset-delete` — Delete asset](docs/todo/asset-delete.md) — Safely delete one exact unreferenced asset package through Unreal Editor.
   - Depends on:
     - `asset-references`
-- [x] [`widget-tree` — Widget Blueprint family and widget trees](docs/todo/widget-tree.md) — Add Widget Blueprint creation, inspection, compilation, saving, and widget-tree editing.
 - [x] [`umg-authoring` — UMG layout, styling, bindings, and UI logic](docs/todo/umg-authoring.md) — Complete practical HUD and menu authoring on the Widget Blueprint family.
   - Depends on:
     - `widget-tree`
@@ -40,10 +25,6 @@ Feature identifiers are stable names, not execution indexes. Unfinished features
 - [ ] [`node-layout` — Deterministic changed-node layout](docs/todo/node-layout.md) — Add deterministic layout for changed nodes.
   - Depends on:
     - `event-macro-replace`
-- [x] [`editor-launch` — Optional configured editor launch](docs/todo/editor-launch.md) — Add optional configured editor launch.
-- [x] [`editor-shutdown` — Optional graceful editor shutdown](docs/todo/editor-shutdown.md) — Add optional graceful editor shutdown.
-  - Depends on:
-    - `editor-launch`
 - [x] [`editor-restart` — Optional durable editor restart](docs/todo/editor-restart.md) — Add optional durable editor restart.
   - Depends on:
     - `editor-launch`

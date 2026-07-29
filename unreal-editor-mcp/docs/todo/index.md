@@ -1,12 +1,12 @@
 # Roadmap feature details
 
-This directory contains the detailed implementation, verification, documentation, and completion requirements for every roadmap feature. [`ROADMAP.md`](../../ROADMAP.md) remains the concise feature checklist.
+This directory contains the detailed implementation, verification, documentation, and completion requirements for current and completed roadmap features. [`ROADMAP.md`](../../ROADMAP.md) remains the concise active feature checklist.
 
 ## Roadmap workflow
 
 The target is Unreal Engine 5.8 and newer. macOS remains the primary development host. Platform verification requirements remain documented by each applicable feature, while missing native coverage for completed features is tracked separately in the [`ROADMAP.md` native platform test backlog](../../ROADMAP.md#native-platform-test-backlog). Linux remains source-portable with unit-tested platform branches until a native host is available.
 
-Keep the authoritative checklist in [`ROADMAP.md`](../../ROADMAP.md) synchronized one-for-one with the feature documents below. Feature identifiers are stable names rather than execution indexes. A feature may be implemented and completed whenever every direct dependency listed in its description is complete. Every feature must include implementation, tests, documentation, examples, and a releasable completion gate.
+Keep the authoritative checklist in [`ROADMAP.md`](../../ROADMAP.md) synchronized with every unfinished feature and each completed feature that is its direct prerequisite. Remove other completed checklist entries while retaining their feature documents below. Feature identifiers are stable names rather than execution indexes. A feature may be implemented and completed whenever every direct dependency listed in its description is complete. Every feature must include implementation, tests, documentation, examples, and a releasable completion gate.
 
 ## Feature documents
 
