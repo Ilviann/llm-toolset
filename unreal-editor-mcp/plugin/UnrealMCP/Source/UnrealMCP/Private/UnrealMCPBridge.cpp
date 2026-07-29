@@ -563,7 +563,10 @@ TSharedPtr<FJsonObject> FUnrealMCPBridge::Capabilities() const
     Features->SetBoolField(TEXT("level_discovery"), true);
     Features->SetBoolField(TEXT("level_open"), true);
     Features->SetBoolField(TEXT("level_snapshots"), true);
-    Features->SetBoolField(TEXT("level_actor_inspection"), false);
+    Features->SetBoolField(TEXT("level_actor_inspection"), true);
+    Features->SetBoolField(TEXT("level_world_partition_descriptors"), true);
+    Features->SetBoolField(TEXT("level_targeted_actor_loading"), true);
+    Features->SetBoolField(TEXT("level_instance_properties"), true);
     Features->SetBoolField(TEXT("level_actor_editing"), false);
     Features->SetBoolField(TEXT("editor_lifecycle"), true);
     Features->SetBoolField(TEXT("graceful_editor_shutdown"), true);
@@ -627,6 +630,12 @@ TSharedPtr<FJsonObject> FUnrealMCPBridge::Capabilities() const
     Limits->SetNumberField(TEXT("asset_reference_traversal_depth"), 1);
     Limits->SetNumberField(TEXT("level_discovery_scan"), UnrealMCP::MaxLevelDiscoveryScan);
     Limits->SetNumberField(TEXT("level_external_packages"), UnrealMCP::MaxLevelExternalPackages);
+    Limits->SetNumberField(TEXT("level_actor_scan"), UnrealMCP::MaxLevelActorScan);
+    Limits->SetNumberField(TEXT("level_actor_records"), UnrealMCP::MaxLevelActorRecords);
+    Limits->SetNumberField(TEXT("level_components"), UnrealMCP::MaxLevelComponents);
+    Limits->SetNumberField(TEXT("level_actor_tags"), UnrealMCP::MaxLevelActorTags);
+    Limits->SetNumberField(TEXT("level_data_layers"), UnrealMCP::MaxLevelDataLayers);
+    Limits->SetNumberField(TEXT("level_targeted_loads"), UnrealMCP::MaxLevelTargetedLoads);
     Limits->SetNumberField(TEXT("dirty_package_summary"), UnrealMCP::MaxDirtyPackageSummary);
     Limits->SetNumberField(TEXT("widget_tree_widgets"), UnrealMCP::MaxWidgetTreeWidgets);
     Limits->SetNumberField(TEXT("widget_tree_depth"), UnrealMCP::MaxWidgetTreeDepth);

@@ -11,6 +11,7 @@
 #include "IO/IoHash.h"
 #include "Misc/PackageName.h"
 #include "Misc/SecureHash.h"
+#include "UnrealMCPLevelActorInspector.h"
 #include "UnrealMCPVersion.h"
 #include "UObject/GarbageCollection.h"
 #include "UObject/Package.h"
@@ -201,9 +202,10 @@ bool FUnrealMCPLevelService::InspectInitial(
 {
     FString Mode;
     if (!Arguments->TryGetStringField(TEXT("mode"), Mode)
-        || (Mode != TEXT("discover") && Mode != TEXT("current")))
+        || (Mode != TEXT("discover") && Mode != TEXT("current")
+            && Mode != TEXT("actors") && Mode != TEXT("actor") && Mode != TEXT("component")))
     {
-        OutError = {TEXT("invalid_argument"), TEXT("mode must be discover or current")};
+        OutError = {TEXT("invalid_argument"), TEXT("mode must be discover, current, actors, actor, or component")};
         return false;
     }
     if (Mode == TEXT("current"))
@@ -243,13 +245,35 @@ bool FUnrealMCPLevelService::InspectInitial(
     TArray<TSharedPtr<FJsonValue>> Records;
     FString Snapshot;
     bool bScanTruncated = false;
-    if (!BuildDiscovery(*Arguments, Records, Snapshot, bScanTruncated, OutError))
+    if (Mode == TEXT("discover"))
     {
-        return false;
+        if (!BuildDiscovery(*Arguments, Records, Snapshot, bScanTruncated, OutError))
+        {
+            return false;
+        }
+    }
+    else
+    {
+        TSharedPtr<FJsonObject> CurrentRecord;
+        if (!BuildCurrent(CurrentRecord, Snapshot, OutError))
+        {
+            return false;
+        }
+        if (!FUnrealMCPLevelActorInspector::BuildRecords(
+                *Arguments,
+                CurrentEditorWorld(),
+                CurrentRecord->GetStringField(TEXT("map_id")),
+                Snapshot,
+                Records,
+                bScanTruncated,
+                OutError))
+        {
+            return false;
+        }
     }
     if (!ExpectedSnapshot.IsEmpty() && Snapshot != ExpectedSnapshot)
     {
-        OutError = {TEXT("stale_precondition"), TEXT("The mounted-map discovery snapshot changed before continuation")};
+        OutError = {TEXT("stale_precondition"), TEXT("The level inspection snapshot changed before continuation")};
         return false;
     }
     if (Offset < 0 || Offset > Records.Num())

@@ -42,7 +42,7 @@ class ReleaseContractTests(unittest.TestCase):
         native = re.search(r'Version\[\].*TEXT\("([^"]+)"\)', header)
         self.assertIsNotNone(native)
         versions = {project["project"]["version"], plugin["VersionName"], native.group(1), unreal_editor_mcp.__version__}
-        self.assertEqual(versions, {"0.23.1"})
+        self.assertEqual(versions, {"0.24.0"})
 
     def test_only_released_asset_delete_commands_are_registered(self):
         names = [tool["name"] for tool in TOOLS]
@@ -111,6 +111,25 @@ class ReleaseContractTests(unittest.TestCase):
             self.assertIn(safety, service)
         self.assertIn("FEditorFileUtils::LoadMap", service)
         self.assertIn("UnrealMCP.LevelOpen.DiscoverySnapshotsAndSafety", native_test)
+
+    def test_level_inspect_is_bounded_read_only_and_covered(self):
+        bridge = (ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private/UnrealMCPBridge.cpp").read_text(encoding="utf-8")
+        service = (ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private/UnrealMCPLevelActorInspector.cpp").read_text(encoding="utf-8")
+        native_test = (ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private/Tests/UnrealMCPAutomationTestsLevelInspect.cpp").read_text(encoding="utf-8")
+        for feature in [
+            "level_actor_inspection", "level_world_partition_descriptors",
+            "level_targeted_actor_loading", "level_instance_properties",
+        ]:
+            self.assertIn(f'TEXT("{feature}"), true', bridge)
+        for limit in [
+            "MaxLevelActorScan", "MaxLevelActorRecords", "MaxLevelComponents",
+            "MaxLevelActorTags", "MaxLevelDataLayers", "MaxLevelTargetedLoads",
+        ]:
+            self.assertIn(limit, service + bridge)
+        self.assertIn("FWorldPartitionHelpers::ForEachActorDescInstance", service)
+        self.assertIn("FWorldPartitionReference", service)
+        self.assertNotIn("FScopedTransaction", service)
+        self.assertIn("UnrealMCP.LevelInspect.ActorsComponentsPropertiesAndSafety", native_test)
 
     def test_phase_sixteen_multiplayer_policy_is_published_and_covered(self):
         policy = (ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private/UnrealMCPBlueprintFamilyPolicy.cpp").read_text(encoding="utf-8")

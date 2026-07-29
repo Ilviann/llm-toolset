@@ -190,7 +190,77 @@ def open_acceptance_level(
     replay = bridge.call("level_open", arguments)
     if replay.get("request_digest") != opened.get("request_digest"):
         raise AssertionError("same-ID level-open replay did not return the retained result")
-    return {"map_path": map_path, "snapshot_id": snapshot_id}
+
+    map_id = records[0]["map_id"]
+    actor_page = bridge.call("level_inspect", {
+        "mode": "actors",
+        "map_id": map_id,
+        "expected_snapshot": snapshot_id,
+        "page_size": 1,
+    })
+    actor_records = actor_page.get("records", [])
+    if len(actor_records) != 1:
+        raise AssertionError(f"acceptance level actor descriptors are unavailable: {actor_page!r}")
+    if actor_page.get("has_more") is True:
+        continuation = bridge.call("level_inspect", {
+            "cursor": actor_page.get("next_cursor"),
+            "page_size": 1,
+        })
+        if len(continuation.get("records", [])) != 1:
+            raise AssertionError(f"actor descriptor continuation failed: {continuation!r}")
+
+    region_page = bridge.call("level_inspect", {
+        "mode": "actors",
+        "map_id": map_id,
+        "expected_snapshot": snapshot_id,
+        "filters": {
+            "region": {
+                "min": {"x": -1000000000, "y": -1000000000, "z": -1000000000},
+                "max": {"x": 1000000000, "y": 1000000000, "z": 1000000000},
+            },
+        },
+        "page_size": 1,
+    })
+    if not region_page.get("records"):
+        raise AssertionError(f"acceptance level region filter returned no bounded actors: {region_page!r}")
+
+    loaded_page = bridge.call("level_inspect", {
+        "mode": "actors",
+        "map_id": map_id,
+        "expected_snapshot": snapshot_id,
+        "filters": {"loaded": True},
+        "page_size": 100,
+    })
+    loaded_records = loaded_page.get("records", [])
+    if not loaded_records:
+        raise AssertionError(f"acceptance level has no exact live actor target: {loaded_page!r}")
+    preferred = next(
+        (
+            record for record in loaded_records
+            if any(name in record.get("class_path", "") for name in (
+                "WorldDataLayers", "WorldPartitionMiniMap", "DefaultPhysicsVolume",
+            ))
+        ),
+        loaded_records[0],
+    )
+    actor_id = preferred.get("actor_id")
+    actor_inspection = bridge.call("level_inspect", {
+        "mode": "actor",
+        "map_id": map_id,
+        "expected_snapshot": snapshot_id,
+        "actor_id": actor_id,
+        "property_names": ["Tags"],
+        "page_size": 100,
+    })
+    sections = [record.get("section") for record in actor_inspection.get("records", [])]
+    if sections.count("actor") != 1 or sections.count("property") != 1:
+        raise AssertionError(f"exact actor/property inspection failed: {actor_inspection!r}")
+    return {
+        "map_path": map_path,
+        "map_id": map_id,
+        "snapshot_id": snapshot_id,
+        "actor_id": actor_id,
+    }
 
 
 def verify_restarted_game_data_and_level(
@@ -209,6 +279,17 @@ def verify_restarted_game_data_and_level(
     if current_level.get("snapshot_id") != level["snapshot_id"] \
             or current_level.get("records", [{}])[0].get("map_path") != level["map_path"]:
         raise AssertionError(f"current level snapshot changed across clean restart: {current_level!r}")
+    restarted_actor = bridge.call("level_inspect", {
+        "mode": "actors",
+        "map_id": level["map_id"],
+        "expected_snapshot": level["snapshot_id"],
+        "filters": {"actor_id": level["actor_id"]},
+        "page_size": 1,
+    })
+    if len(restarted_actor.get("records", [])) != 1 \
+            or restarted_actor["records"][0].get("actor_id") != level["actor_id"]:
+        raise AssertionError(
+            f"actor identity changed across clean restart: {restarted_actor!r}")
 
     reloaded_struct = collect_game_data(bridge, {
         "target": "user_defined_struct",

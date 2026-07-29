@@ -12,6 +12,7 @@
 #include "Blueprint/UserWidget.h"
 #include "Blueprint/WidgetTree.h"
 #include "Components/PanelWidget.h"
+#include "Components/ActorComponent.h"
 #include "EdGraphSchema_K2.h"
 #include "Editor.h"
 #include "Engine/Level.h"
@@ -22,6 +23,7 @@
 #include "IHttpRouter.h"
 #include "GameFramework/GameMode.h"
 #include "GameFramework/GameModeBase.h"
+#include "GameFramework/Actor.h"
 #include "GameMapsSettings.h"
 #include "GameFramework/GameState.h"
 #include "GameFramework/GameStateBase.h"
@@ -50,9 +52,31 @@
 #include "UObject/UObjectIterator.h"
 #include "WidgetBlueprint.h"
 #include "WidgetBlueprintOperationUtils.h"
+#include "WorldPartition/WorldPartition.h"
+#include "WorldPartition/WorldPartitionActorDescInstance.h"
+#include "WorldPartition/WorldPartitionHandle.h"
+#include "WorldPartition/WorldPartitionHelpers.h"
 
 namespace UnrealMCP::ApiProbe
 {
+void RequireLevelInspectionApis(
+    UWorldPartition* WorldPartition,
+    FWorldPartitionActorDescInstance* Descriptor,
+    AActor* Actor)
+{
+    FWorldPartitionHelpers::ForEachActorDescInstance(
+        WorldPartition,
+        [](const FWorldPartitionActorDescInstance*) { return false; });
+    const FGuid Guid = Descriptor->GetGuid();
+    (void)Descriptor->GetActor(false, false);
+    (void)Descriptor->GetEditorBounds();
+    (void)Descriptor->GetDataLayers();
+    FWorldPartitionReference Reference(WorldPartition, Guid);
+    (void)Reference.GetActor();
+    TArray<UActorComponent*> Components;
+    Actor->GetComponents(Components);
+}
+
 void RequirePublicTypes()
 {
     static_assert(sizeof(FScopedTransaction) > 0);
@@ -81,6 +105,7 @@ void RequirePublicTypes()
     static_assert(TIsDerivedFrom<AGameState, AGameStateBase>::Value);
     static_assert(TIsDerivedFrom<UUserWidget, UWidget>::Value);
     static_assert(TIsDerivedFrom<UWidgetBlueprint, UBlueprint>::Value);
+    static_assert(TIsDerivedFrom<UActorComponent, UObject>::Value);
     using FFindWidgetByName = UWidget* (UWidgetTree::*)(const FName&) const;
     (void)static_cast<FFindWidgetByName>(&UWidgetTree::FindWidget);
     (void)&UWidgetTree::RemoveWidget;

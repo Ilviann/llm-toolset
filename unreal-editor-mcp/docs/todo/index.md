@@ -132,7 +132,7 @@ Keep the public surface compact. Add typed operations to these remaining tool fa
 | `blueprint_block_replace` | `function-replace` | Replace one complete bounded logic unit as a prevalidated transaction |
 | `editor_lifecycle` | `editor-launch` | Run one opt-in configured launch, restart, or graceful-shutdown operation |
 | `project_build` | `project-files` | Run one opt-in configured project-generation or editor-target build operation |
-| `level_inspect` | `level-open` | Discover mounted maps and inspect bounded current-map, actor, component, property, and spline snapshot pages |
+| `level_inspect` | `level-inspect` | Discover mounted maps and inspect bounded current-map, actor, component, property, and spline snapshot pages |
 | `level_open` | `level-open` | Safely open one exact mounted map without implicit save or discard |
 | `level_manage` | `level-management` | Create and configure one exact map; map deletion reuses the safe `asset_delete` operation |
 | `level_actor_edit` | `level-edit` | Apply one stale-safe bounded actor/component/spline mutation batch in the current map |

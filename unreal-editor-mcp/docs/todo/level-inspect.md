@@ -1,5 +1,7 @@
 # `level-inspect` — World Partition actor and instance inspection
 
+**Implementation status:** Completed in 0.24.0 and verified natively on macOS. Windows verification remains in the roadmap platform backlog.
+
 **Outcome:** Agents can inspect bounded actor pages and selected actor/component instance state in the current map without loading the entire World Partition world.
 
 **Depends on:**

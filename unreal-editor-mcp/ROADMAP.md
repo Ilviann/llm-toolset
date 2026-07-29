@@ -42,7 +42,7 @@ Feature identifiers are stable names, not execution indexes. Unfinished features
   - Depends on:
     - `level-open`
     - `asset-delete`
-- [ ] [`level-inspect` — World Partition actor and instance inspection](docs/todo/level-inspect.md) — Inspect bounded descriptor, actor, component, and reflected instance state without loading the entire world.
+- [x] [`level-inspect` — World Partition actor and instance inspection](docs/todo/level-inspect.md) — Inspect bounded descriptor, actor, component, and reflected instance state without loading the entire world.
   - Depends on:
     - `level-open`
 - [ ] [`level-edit` — Transactional level actor editing and verified saving](docs/todo/level-edit.md) — Add stale-safe actor batches and honest per-package World Partition save verification.
@@ -72,7 +72,7 @@ Feature checkboxes record implementation completion. This section separately lis
 - macOS:
   - None
 - Windows:
-  - None
+  - `level-inspect`
 - Linux:
   - None
 

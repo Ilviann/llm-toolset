@@ -300,6 +300,7 @@ def run_automation(executable: Path, project: Path, environment: dict[str, str],
         "FrameworkAssignment",
         "GameDataAuthoring",
         "DiscoverySnapshotsAndSafety",
+        "ActorsComponentsPropertiesAndSafety",
         "PreflightPersistenceAndReferences",
         "RegistryLiveMemoryAndCursors",
         "FamilyInspectionMutationAndPersistence",
@@ -507,6 +508,14 @@ def main() -> int:
             for feature in ("level_discovery", "level_open", "level_snapshots"):
                 if capabilities.get("features", {}).get(feature) is not True:
                     raise AssertionError(f"level-open capability is unavailable: {feature}")
+            for feature in (
+                "level_actor_inspection",
+                "level_world_partition_descriptors",
+                "level_targeted_actor_loading",
+                "level_instance_properties",
+            ):
+                if capabilities.get("features", {}).get(feature) is not True:
+                    raise AssertionError(f"level-inspect capability is unavailable: {feature}")
             for feature in ("asset_reference_discovery", "asset_reference_live_memory"):
                 if capabilities.get("features", {}).get(feature) is not True:
                     raise AssertionError(f"asset-references capability is unavailable: {feature}")
@@ -569,6 +578,18 @@ def main() -> int:
             if capabilities.get("limits", {}).get("level_discovery_scan") != 2048 \
                     or capabilities.get("limits", {}).get("level_external_packages") != 2048:
                 raise AssertionError(f"level-open limits mismatch: {capabilities.get('limits')!r}")
+            expected_level_inspect_limits = {
+                "level_actor_scan": 4096,
+                "level_actor_records": 2048,
+                "level_components": 64,
+                "level_actor_tags": 64,
+                "level_data_layers": 32,
+                "level_targeted_loads": 1,
+            }
+            if any(capabilities.get("limits", {}).get(name) != value
+                   for name, value in expected_level_inspect_limits.items()):
+                raise AssertionError(
+                    f"level-inspect limits mismatch: {capabilities.get('limits')!r}")
             expected_asset_reference_limits = {
                 "asset_reference_registry_candidates": 4096,
                 "asset_reference_live_objects": 8192,
@@ -686,7 +707,7 @@ def main() -> int:
             pass
         else:
             raise AssertionError("a live discovery heartbeat remained after editor termination")
-    print("Integration passed: Widget Blueprint authoring, asset references/deletion, level-open, Phase 17 authoring, replay/restart, and graceful lifecycle shutdown")
+    print("Integration passed: Widget Blueprint authoring, asset references/deletion, level inspection/opening, Phase 17 authoring, replay/restart, and graceful lifecycle shutdown")
     return 0
 
 

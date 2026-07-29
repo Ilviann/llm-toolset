@@ -2,14 +2,14 @@
 
 This detailed operational reference covers every released tool family. For installation, first connection, and the concise contract overview, start with the [project README](../../README.md).
 
-Unreal Editor MCP 0.23.1 is an offline-first MCP bridge for Unreal Engine 5.8+. It pairs a dependency-free Python 3.10+ stdio server with an editor-only C++ plugin. Default mode exposes exactly twenty-one tools:
+Unreal Editor MCP 0.24.0 is an offline-first MCP bridge for Unreal Engine 5.8+. It pairs a dependency-free Python 3.10+ stdio server with an editor-only C++ plugin. Default mode exposes exactly twenty-one tools:
 
 - `capabilities` reports the exact Python/plugin/Unreal versions, commands, features, listener state, effective limits, and published Blueprint-family matrix.
 - `editor_state` reports project identity, bridge readiness, play/simulate/save/GC state, and concise queued-operation state.
 - `operation_status` reconciles or safely cancels one retained mutation by operation and bridge identity.
 - `asset_references` finds bounded Asset Registry and live-memory referencers for one exact mounted asset without loading candidate packages.
 - `asset_delete` deletes one exact unreferenced project asset package after retained stale-safe preflight and persistence verification.
-- `level_inspect` discovers bounded pages of mounted World assets or reports the current map's exact identity, revision, snapshot, and dirtiness.
+- `level_inspect` discovers mounted World assets, reports the current map snapshot, pages World Partition actor descriptors, and inspects exact actor/component properties.
 - `level_open` safely opens one exact mounted World asset through the retained mutation ledger.
 - `blueprint_inspect` discovers every published Blueprint family across mounted content and returns bounded pages of one selected Blueprint's structure.
 - `blueprint_action_catalog` discovers bounded context-valid function, variable, event, flow-control, cast, literal, and operator actions for one exact Blueprint graph snapshot.
@@ -57,7 +57,7 @@ Python 3.10 or newer with tkinter is required. Official Windows Python installer
 
 1. Copy [`plugin/UnrealMCP`](../../plugin/UnrealMCP) to `<YourProject>/Plugins/UnrealMCP` or add this repository's `plugin/` folder as an `AdditionalPluginDirectories` entry in a disposable development `.uproject`.
 2. Enable the `UnrealMCP` plugin and compile the project's Editor target with Unreal 5.8 or a newer version that passes the included public-API probes.
-3. Open the project. Look for `Unreal MCP 0.23.1 ready on 127.0.0.1:15485` in the editor log.
+3. Open the project. Look for `Unreal MCP 0.24.0 ready on 127.0.0.1:15485` in the editor log.
 4. Install the Python package offline from this folder:
 
    ```sh
@@ -147,6 +147,42 @@ Inspect the current editor map without mutation:
 ```
 
 The response identifies the exact map, a project-qualified map ID, revision, snapshot, dirty state, World Partition and external-actor state, and bounded dirty/external-package counts. An unsaved template map remains inspectable but is reported as unmounted.
+
+List actors against that exact map and snapshot. World Partition lists use descriptors, so unloaded actors are visible without broad loading:
+
+```json
+{
+  "mode": "actors",
+  "map_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "expected_snapshot": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "filters": {
+    "region": {
+      "min": {"x": -5000, "y": -5000, "z": -1000},
+      "max": {"x": 5000, "y": 5000, "z": 5000}
+    },
+    "tag": "Authoring",
+    "loaded": false
+  },
+  "page_size": 25
+}
+```
+
+Filters are exact for actor identity, label, class path, tag, folder, data layer, loaded state, and intersecting region. Actor identities qualify the 32-hex Actor GUID with the 40-hex map ID. Records distinguish descriptor availability from live loaded state and include transforms, bounds, attachment, external package/dirty state, and bounded tag/data-layer arrays. Continue `next_cursor` once with the normal cursor-only request.
+
+To read components or values, select one exact actor from the page and request only supported property names:
+
+```json
+{
+  "mode": "actor",
+  "map_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "expected_snapshot": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "actor_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:dddddddddddddddddddddddddddddddd",
+  "property_names": ["Tags"],
+  "page_size": 100
+}
+```
+
+Actor inspection returns stable actor-scoped component IDs and their native-default, Blueprint-created, construction-script, or instance origin. `mode:"component"` adds one returned `component_id` and can request component properties. Exact inspection may temporarily load only the selected World Partition actor; unavailable data returns `actor_unavailable`, and hidden/unsafe/unsupported properties return `unsupported_property`. The scoped reference is released before return, and inspection never saves, dirties, selects, or changes loaded regions. See [`examples/level-inspect-workflow.json`](../../examples/level-inspect-workflow.json).
 
 Open only an exact mounted World asset path:
 

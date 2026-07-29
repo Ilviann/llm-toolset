@@ -1,0 +1,39 @@
+{
+  "inspect_current_map": {
+    "mode": "current"
+  },
+  "filter_world_partition_region": {
+    "mode": "actors",
+    "map_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "expected_snapshot": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "filters": {
+      "region": {
+        "min": {"x": -5000, "y": -5000, "z": -1000},
+        "max": {"x": 5000, "y": 5000, "z": 5000}
+      },
+      "tag": "Authoring"
+    },
+    "page_size": 25
+  },
+  "continue_actor_page": {
+    "cursor": "cccccccccccccccccccccccccccccccc",
+    "page_size": 25
+  },
+  "inspect_selected_actor_and_properties": {
+    "mode": "actor",
+    "map_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "expected_snapshot": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "actor_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:dddddddddddddddddddddddddddddddd",
+    "property_names": ["Tags"],
+    "page_size": 100
+  },
+  "inspect_selected_component_property": {
+    "mode": "component",
+    "map_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "expected_snapshot": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "actor_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:dddddddddddddddddddddddddddddddd",
+    "component_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "property_names": ["Mobility"],
+    "page_size": 25
+  }
+}

@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.24.0 — 2026-07-30
+
+- Extended `level_inspect` with exact-snapshot actor pages, World Partition descriptor records, map-qualified Actor GUID identities, exact filters, and bounded single-use pagination without broad actor loading.
+- Added exact actor/component inspection with stable component identities and origins, one-actor targeted loading, and requested-only reflected instance properties using the shared bounded value codec and stricter unsafe-property rejection.
+- Added published limits, Python schemas and contracts, public Unreal API probes, macOS native Automation coverage, production cross-process paging/filter/property/restart verification, architecture/type documentation, and a complete World Partition workflow example. Windows native verification remains tracked in the platform backlog.
+
 ## 0.23.1 — 2026-07-30
 
 - Verified every released feature on Apple Silicon macOS 26.5.2 with Unreal Engine 5.8 and Xcode 26.1.1 through 95 Python tests, adaptive and forced-unity editor builds, 37 native Automation cases, packaging validation, and the complete two-process production bridge workflow; cleared the macOS native platform backlog.

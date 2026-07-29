@@ -1,15 +1,70 @@
-"""Level discovery and opening tools."""
+"""Level discovery, inspection, and opening tools."""
 
 from __future__ import annotations
 
 from typing import Final
 
-from .schemas import _OPERATION_ID, _PATH
+from .schemas import _OPERATION_ID, _PATH, _SNAPSHOT_ID
+
+_ACTOR_ID = {
+    "type": "string",
+    "minLength": 73,
+    "maxLength": 73,
+    "pattern": "^[0-9a-f]{40}:[0-9a-f]{32}$",
+}
+_COMPONENT_ID = {
+    "type": "string",
+    "minLength": 32,
+    "maxLength": 32,
+    "pattern": "^[0-9a-f]{32}$",
+}
+_VECTOR = {
+    "type": "object",
+    "properties": {
+        "x": {"type": "number", "minimum": -1000000000, "maximum": 1000000000},
+        "y": {"type": "number", "minimum": -1000000000, "maximum": 1000000000},
+        "z": {"type": "number", "minimum": -1000000000, "maximum": 1000000000},
+    },
+    "required": ["x", "y", "z"],
+    "additionalProperties": False,
+}
+_REGION = {
+    "type": "object",
+    "properties": {"min": _VECTOR, "max": _VECTOR},
+    "required": ["min", "max"],
+    "additionalProperties": False,
+}
+_ACTOR_FILTERS = {
+    "type": "object",
+    "properties": {
+        "actor_id": _ACTOR_ID,
+        "label": {"type": "string", "minLength": 1, "maxLength": 128},
+        "class_path": _PATH,
+        "tag": {"type": "string", "minLength": 1, "maxLength": 128},
+        "folder": {"type": "string", "minLength": 1, "maxLength": 512},
+        "data_layer": {"type": "string", "minLength": 1, "maxLength": 512},
+        "loaded": {"type": "boolean"},
+        "region": _REGION,
+    },
+    "additionalProperties": False,
+}
+_PROPERTY_NAMES = {
+    "type": "array",
+    "minItems": 1,
+    "maxItems": 32,
+    "uniqueItems": True,
+    "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128,
+        "pattern": r"^[^.\\]+$",
+    },
+}
 
 LEVEL_TOOLS: Final = (
     {
         "name": "level_inspect",
-        "description": "Discover mounted World assets or report the exact current-map identity, revision, dirty state, and snapshot.",
+        "description": "Discover maps or inspect the current map, bounded actor descriptors, and exact actor/component instance properties.",
         "inputSchema": {
             "oneOf": [
                 {
@@ -32,6 +87,47 @@ LEVEL_TOOLS: Final = (
                     "type": "object",
                     "properties": {"mode": {"const": "current"}},
                     "required": ["mode"],
+                    "additionalProperties": False,
+                },
+                {
+                    "type": "object",
+                    "properties": {
+                        "mode": {"const": "actors"},
+                        "map_id": _SNAPSHOT_ID,
+                        "expected_snapshot": _SNAPSHOT_ID,
+                        "filters": _ACTOR_FILTERS,
+                        "page_size": {"type": "integer", "minimum": 1, "maximum": 100},
+                    },
+                    "required": ["mode", "map_id", "expected_snapshot"],
+                    "additionalProperties": False,
+                },
+                {
+                    "type": "object",
+                    "properties": {
+                        "mode": {"const": "actor"},
+                        "map_id": _SNAPSHOT_ID,
+                        "expected_snapshot": _SNAPSHOT_ID,
+                        "actor_id": _ACTOR_ID,
+                        "property_names": _PROPERTY_NAMES,
+                        "page_size": {"type": "integer", "minimum": 1, "maximum": 100},
+                    },
+                    "required": ["mode", "map_id", "expected_snapshot", "actor_id"],
+                    "additionalProperties": False,
+                },
+                {
+                    "type": "object",
+                    "properties": {
+                        "mode": {"const": "component"},
+                        "map_id": _SNAPSHOT_ID,
+                        "expected_snapshot": _SNAPSHOT_ID,
+                        "actor_id": _ACTOR_ID,
+                        "component_id": _COMPONENT_ID,
+                        "property_names": _PROPERTY_NAMES,
+                        "page_size": {"type": "integer", "minimum": 1, "maximum": 100},
+                    },
+                    "required": [
+                        "mode", "map_id", "expected_snapshot", "actor_id", "component_id",
+                    ],
                     "additionalProperties": False,
                 },
                 {

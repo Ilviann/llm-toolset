@@ -10,10 +10,10 @@ The CLI constructs a `ProjectLayout`, `UnrealBridge`, and `MCPServer`; the trans
 
 ## Invariants
 
-- Default mode contains the twenty-one tools released through `function-replace`. Only large mode adds `editor_lifecycle`.
+- Default mode contains the twenty-one tools released through `level-inspect`. Only large mode adds `editor_lifecycle`.
 - The public catalog order is assembled once from disjoint family tuples; every tool name is unique.
 - `asset_references` has exact mounted-object-path and cursor-continuation shapes with bounded page size.
-- `level_inspect` has exact mounted discovery, current-map, and cursor-continuation shapes. `level_open` requires one 32-hex operation ID and one exact mounted World object path.
+- `level_inspect` has exact mounted discovery, current-map, actor-list, actor, component, and cursor-continuation shapes. Actor queries require an exact current map identity and snapshot; exact actor/component properties are requested by bounded names. `level_open` requires one 32-hex operation ID and one exact mounted World object path.
 - Tool arguments are exact objects with no additional fields.
 - `blueprint_inspect` has three mutually exclusive shapes: discovery, exact inspection, or cursor continuation; Python bounds paths, sections, cursor size, and page size before HTTP.
 - `blueprint_action_catalog` requires an exact asset, graph, and snapshot and bounds exact text/owner/function/member/family filters, optional node/pin context, and result count before HTTP.

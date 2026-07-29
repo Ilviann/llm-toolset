@@ -58,7 +58,9 @@ int64 EnumValue(const UEnum* Enum, const FString& Name)
 bool IsUnsafe(const FProperty* Property)
 {
     return Property == nullptr || Property->ArrayDim != 1
-        || Property->HasAnyPropertyFlags(CPF_Transient | CPF_Deprecated | CPF_InstancedReference | CPF_ContainsInstancedReference)
+        || Property->HasAnyPropertyFlags(
+            CPF_Transient | CPF_Deprecated | CPF_EditorOnly | CPF_InstancedReference
+            | CPF_ContainsInstancedReference | CPF_ExportObject)
         || Property->IsA<FDelegateProperty>() || Property->IsA<FMulticastDelegateProperty>() || Property->IsA<FInterfaceProperty>();
 }
 

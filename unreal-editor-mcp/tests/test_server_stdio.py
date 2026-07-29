@@ -15,7 +15,7 @@ class FakeBridge:
     def call(self, command, arguments=None):
         self.calls.append((command, arguments))
         if command == "capabilities":
-            return {"bridge_version": "0.23.1", "commands": [
+            return {"bridge_version": "0.24.0", "commands": [
                 "capabilities", "editor_state", "operation_status", "asset_references", "asset_delete",
                 "level_inspect", "level_open",
                 "blueprint_inspect", "blueprint_action_catalog", "blueprint_graph_edit",
@@ -40,7 +40,7 @@ class ServerStdioTests(unittest.TestCase):
         bridge = FakeBridge()
         server = MCPServer(bridge)
         initialized = server.handle({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2025-06-18"}})
-        self.assertEqual(initialized["result"]["serverInfo"]["version"], "0.23.1")
+        self.assertEqual(initialized["result"]["serverInfo"]["version"], "0.24.0")
         listed = server.handle({"jsonrpc": "2.0", "id": 2, "method": "tools/list"})
         self.assertEqual([tool["name"] for tool in listed["result"]["tools"]], [
             "capabilities", "editor_state", "operation_status", "asset_references", "asset_delete",
@@ -57,13 +57,35 @@ class ServerStdioTests(unittest.TestCase):
         self.assertTrue(payload["version_match"])
         self.assertEqual(payload["mcp_protocol_version"], "2025-06-18")
 
-    def test_level_open_schemas_are_exact_and_bounded(self):
+    def test_level_inspect_and_open_schemas_are_exact_and_bounded(self):
         server = MCPServer(FakeBridge())
+        map_id = "c" * 40
+        snapshot = "d" * 40
+        actor_id = map_id + ":" + "e" * 32
         valid = (
             ("level_inspect", {"mode": "discover"}),
             ("level_inspect", {"mode": "discover", "package_path": "/Game/Maps",
                                "asset_name": "Example", "page_size": 100}),
             ("level_inspect", {"mode": "current"}),
+            ("level_inspect", {"mode": "actors", "map_id": map_id,
+                               "expected_snapshot": snapshot, "page_size": 1}),
+            ("level_inspect", {"mode": "actors", "map_id": map_id,
+                               "expected_snapshot": snapshot, "filters": {
+                                   "actor_id": actor_id, "label": "Door",
+                                   "class_path": "/Script/Engine.Actor", "tag": "Interactive",
+                                   "folder": "Gameplay/Doors", "data_layer": "Gameplay",
+                                   "loaded": False,
+                                   "region": {
+                                       "min": {"x": -100, "y": -100, "z": -100},
+                                       "max": {"x": 100, "y": 100, "z": 100},
+                                   },
+                               }}),
+            ("level_inspect", {"mode": "actor", "map_id": map_id,
+                               "expected_snapshot": snapshot, "actor_id": actor_id,
+                               "property_names": ["Tags"]}),
+            ("level_inspect", {"mode": "component", "map_id": map_id,
+                               "expected_snapshot": snapshot, "actor_id": actor_id,
+                               "component_id": "f" * 32, "property_names": ["RelativeLocation"]}),
             ("level_inspect", {"cursor": "a" * 32, "page_size": 1}),
             ("level_open", {"operation_id": "b" * 32,
                             "map_path": "/Game/Maps/Example.Example"}),
@@ -78,6 +100,18 @@ class ServerStdioTests(unittest.TestCase):
         invalid = (
             ("level_inspect", {}),
             ("level_inspect", {"mode": "current", "page_size": 1}),
+            ("level_inspect", {"mode": "actors", "map_id": map_id}),
+            ("level_inspect", {"mode": "actors", "map_id": map_id,
+                               "expected_snapshot": snapshot,
+                               "filters": {"region": {
+                                   "min": {"x": 1, "y": 0},
+                                   "max": {"x": 0, "y": 1, "z": 1},
+                               }}}),
+            ("level_inspect", {"mode": "actor", "map_id": map_id,
+                               "expected_snapshot": snapshot, "actor_id": "e" * 32}),
+            ("level_inspect", {"mode": "component", "map_id": map_id,
+                               "expected_snapshot": snapshot, "actor_id": actor_id,
+                               "component_id": "short"}),
             ("level_inspect", {"mode": "discover", "package_path": "/Game/../Engine"}),
             ("level_inspect", {"cursor": "short"}),
             ("level_open", {"operation_id": "b" * 32, "map_path": "Game/Maps/Example.Example"}),
