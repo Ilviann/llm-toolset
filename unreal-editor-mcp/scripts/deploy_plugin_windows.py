@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build and install a symbol-free UnrealMCP binary plugin on Windows."""
+"""Build and install an UnrealMCP binary plugin on Windows."""
 
 from __future__ import annotations
 
@@ -296,11 +296,26 @@ def run_packaging(engine_root: Path, output: Path, log: Callable[[str], None]) -
         raise DeploymentError(str(error)) from error
 
 
-def ignored_binary_items(directory: str, names: list[str]) -> set[str]:
+def ignored_binary_items(
+    directory: str,
+    names: list[str],
+    *,
+    include_pdb: bool = False,
+) -> set[str]:
     current = Path(directory)
+    is_win64_binary_root = (
+        current.name.casefold() == "win64"
+        and current.parent.name.casefold() == "binaries"
+    )
+    dll_stems = {
+        Path(name).stem.casefold()
+        for name in names
+        if Path(name).suffix.casefold() == ".dll"
+    }
     ignored: set[str] = set()
     for name in names:
         lowered = name.casefold()
+        suffix = Path(name).suffix.casefold()
         is_module_source_root = (
             current.name.casefold() == PLUGIN_NAME.casefold()
             and current.parent.name.casefold() == "source"
@@ -309,12 +324,17 @@ def ignored_binary_items(directory: str, names: list[str]) -> set[str]:
             ignored.add(name)
         elif lowered.endswith(".dsym"):
             ignored.add(name)
-        elif Path(name).suffix.casefold() in DEBUG_SUFFIXES:
+        elif suffix in DEBUG_SUFFIXES and not (
+            include_pdb
+            and suffix == ".pdb"
+            and is_win64_binary_root
+            and Path(name).stem.casefold() in dll_stems
+        ):
             ignored.add(name)
     return ignored
 
 
-def verify_binary_plugin(plugin_root: Path) -> None:
+def verify_binary_plugin(plugin_root: Path, *, include_pdb: bool = False) -> None:
     descriptor = plugin_root / f"{PLUGIN_NAME}.uplugin"
     value = read_json_object(descriptor, "installed plugin descriptor")
     if value.get("Installed") is not True:
@@ -341,10 +361,34 @@ def verify_binary_plugin(plugin_root: Path) -> None:
             f"binary deployment unexpectedly contains implementation source: {implementation_source}"
         )
     binary_root = plugin_root / "Binaries" / "Win64"
-    if not binary_root.is_dir() or not any(
-        path.is_file() and path.suffix.casefold() == ".dll" for path in binary_root.iterdir()
-    ):
+    binary_dlls = (
+        [
+            path
+            for path in binary_root.iterdir()
+            if path.is_file() and path.suffix.casefold() == ".dll"
+        ]
+        if binary_root.is_dir()
+        else []
+    )
+    if not binary_dlls:
         raise DeploymentError(f"binary deployment contains no Win64 plugin DLL: {binary_root}")
+    binary_dll_stems = {path.stem.casefold() for path in binary_dlls}
+    binary_pdbs = [
+        path
+        for path in binary_root.iterdir()
+        if path.is_file() and path.suffix.casefold() == ".pdb"
+    ]
+    matching_pdb_stems = {
+        path.stem.casefold()
+        for path in binary_pdbs
+        if path.stem.casefold() in binary_dll_stems
+    }
+    if include_pdb and matching_pdb_stems != binary_dll_stems:
+        missing = sorted(binary_dll_stems - matching_pdb_stems)
+        raise DeploymentError(
+            "binary deployment is missing matching Win64 PDB crash symbols for: "
+            + ", ".join(missing)
+        )
     precompiled_root = plugin_root / "Intermediate" / "Build" / "Win64"
     if not precompiled_root.is_dir() or not any(
         path.is_file() and path.suffix.casefold() == ".lib"
@@ -357,7 +401,14 @@ def verify_binary_plugin(plugin_root: Path) -> None:
         (
             path
             for path in plugin_root.rglob("*")
-            if path.is_file() and path.suffix.casefold() in DEBUG_SUFFIXES
+            if path.is_file()
+            and path.suffix.casefold() in DEBUG_SUFFIXES
+            and not (
+                include_pdb
+                and path.parent == binary_root
+                and path.suffix.casefold() == ".pdb"
+                and path.stem.casefold() in binary_dll_stems
+            )
         ),
         None,
     )
@@ -415,6 +466,7 @@ def install_binary_plugin(
     project: ProjectInfo,
     *,
     replace_existing: bool,
+    include_pdb: bool = False,
 ) -> Path:
     destination = plugin_destination(project)
     if destination.exists() and not destination.is_dir():
@@ -427,14 +479,22 @@ def install_binary_plugin(
     staging = destination.parent / f".{PLUGIN_NAME}.install-{nonce}"
     backup = destination.parent / f".{PLUGIN_NAME}.backup-{nonce}"
     try:
-        shutil.copytree(package_root, staging, ignore=ignored_binary_items)
+        shutil.copytree(
+            package_root,
+            staging,
+            ignore=lambda directory, names: ignored_binary_items(
+                directory,
+                names,
+                include_pdb=include_pdb,
+            ),
+        )
         configure_precompiled_module_rules(staging)
-        verify_binary_plugin(staging)
+        verify_binary_plugin(staging, include_pdb=include_pdb)
         if destination.exists():
             destination.rename(backup)
         try:
             staging.rename(destination)
-            verify_binary_plugin(destination)
+            verify_binary_plugin(destination, include_pdb=include_pdb)
         except BaseException:
             if destination.exists():
                 shutil.rmtree(destination, ignore_errors=True)
@@ -471,16 +531,21 @@ def deploy(
     engine_root: Path,
     *,
     replace_existing: bool,
+    include_pdb: bool = False,
     log: Callable[[str], None],
 ) -> Path:
     with tempfile.TemporaryDirectory(prefix="unreal-mcp-package-") as temporary:
         package_root = Path(temporary) / PLUGIN_NAME
         run_packaging(engine_root, package_root, log)
-        log("Removing implementation source and debug-symbol artifacts")
+        if include_pdb:
+            log("Removing implementation source and debug artifacts except matching Win64 PDBs")
+        else:
+            log("Removing implementation source and debug-symbol artifacts")
         destination = install_binary_plugin(
             package_root,
             project,
             replace_existing=replace_existing,
+            include_pdb=include_pdb,
         )
     log(f"Installed binary plugin at {destination}")
     return destination
@@ -500,6 +565,7 @@ class DeploymentWindow:
         self.events: queue.Queue[tuple[str, object]] = queue.Queue()
         self.project_value = tk.StringVar()
         self.engine_value = tk.StringVar(value=default_engine_root())
+        self.include_pdb_value = tk.BooleanVar(value=False)
         self.status_value = tk.StringVar(value="Select the folder containing your .uproject file.")
         self.busy = False
         self._build()
@@ -512,7 +578,7 @@ class DeploymentWindow:
         frame = self.ttk.Frame(self.root, padding=14)
         frame.pack(fill="both", expand=True)
         frame.columnconfigure(1, weight=1)
-        frame.rowconfigure(5, weight=1)
+        frame.rowconfigure(6, weight=1)
         frame.rowconfigure(8, weight=1)
 
         self.ttk.Label(frame, text="Unreal project folder").grid(row=0, column=0, sticky="w")
@@ -534,22 +600,34 @@ class DeploymentWindow:
             text="Close Unreal Editor before installing. The build uses the selected Engine and Visual Studio.",
             wraplength=760,
         ).grid(row=2, column=0, columnspan=3, sticky="w", pady=(12, 0))
+        self.include_pdb_checkbox = self.ttk.Checkbutton(
+            frame,
+            text="Include matching PDB crash symbols (larger installation)",
+            variable=self.include_pdb_value,
+        )
+        self.include_pdb_checkbox.grid(
+            row=3,
+            column=0,
+            columnspan=3,
+            sticky="w",
+            pady=(10, 0),
+        )
         self.install_button = self.ttk.Button(frame, text="Build and install plugin", command=self._install)
-        self.install_button.grid(row=3, column=0, columnspan=3, sticky="ew", pady=12)
+        self.install_button.grid(row=4, column=0, columnspan=3, sticky="ew", pady=12)
         self.ttk.Label(frame, textvariable=self.status_value, wraplength=760).grid(
-            row=4, column=0, columnspan=3, sticky="w"
+            row=5, column=0, columnspan=3, sticky="w"
         )
 
         self.log_text = scrolledtext.ScrolledText(frame, height=12, state="disabled", wrap="word")
-        self.log_text.grid(row=5, column=0, columnspan=3, sticky="nsew", pady=(8, 12))
+        self.log_text.grid(row=6, column=0, columnspan=3, sticky="nsew", pady=(8, 12))
 
         self.ttk.Label(frame, text="LM Studio mcp.json entry").grid(
-            row=6, column=0, columnspan=2, sticky="w"
+            row=7, column=0, columnspan=2, sticky="w"
         )
         self.copy_button = self.ttk.Button(
             frame, text="Copy JSON", command=self._copy_json, state="disabled"
         )
-        self.copy_button.grid(row=6, column=2, sticky="e")
+        self.copy_button.grid(row=7, column=2, sticky="e")
         self.json_text = scrolledtext.ScrolledText(frame, height=11, state="disabled", wrap="none")
         self.json_text.grid(row=8, column=0, columnspan=3, sticky="nsew", pady=(8, 0))
 
@@ -609,6 +687,7 @@ class DeploymentWindow:
             self.project_button,
             self.engine_entry,
             self.engine_button,
+            self.include_pdb_checkbox,
             self.install_button,
         ):
             widget.configure(state=state)
@@ -631,6 +710,7 @@ class DeploymentWindow:
             messagebox.showerror("Cannot install Unreal MCP", str(error))
             return
         replace_existing = destination.exists()
+        include_pdb = bool(self.include_pdb_value.get())
         if replace_existing and not messagebox.askyesno(
             "Replace existing plugin?",
             f"{destination} already exists.\n\nReplace it with a newly built binary plugin?",
@@ -650,6 +730,7 @@ class DeploymentWindow:
                     project,
                     engine,
                     replace_existing=replace_existing,
+                    include_pdb=include_pdb,
                     log=lambda message: self.events.put(("log", message)),
                 )
                 result = (destination_path, lm_studio_json(project))

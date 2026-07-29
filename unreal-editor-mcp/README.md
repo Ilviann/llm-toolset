@@ -1,6 +1,6 @@
 # Unreal Editor MCP
 
-Unreal Editor MCP 0.22.0 is an offline-first MCP bridge for Unreal Engine 5.8+. It pairs a dependency-free Python 3.10+ stdio server with an editor-only C++ plugin.
+Unreal Editor MCP 0.22.1 is an offline-first MCP bridge for Unreal Engine 5.8+. It pairs a dependency-free Python 3.10+ stdio server with an editor-only C++ plugin.
 
 ## Installation
 
@@ -12,7 +12,7 @@ Close Unreal Editor, then double-click:
 scripts\deploy_plugin_windows.cmd
 ```
 
-Select the folder containing the game's `.uproject`. Confirm or select the matching Unreal Engine 5.8+ installation, then choose **Build and install plugin**. The helper packages and installs the verified binary plugin at `<YourProject>\Plugins\UnrealMCP` without replacing an existing installation unless you approve it.
+Select the folder containing the game's `.uproject`. Confirm or select the matching Unreal Engine 5.8+ installation, optionally enable **Include matching PDB crash symbols** for symbolicated plugin crash stacks, then choose **Build and install plugin**. The helper packages and installs the verified binary plugin at `<YourProject>\Plugins\UnrealMCP` without replacing an existing installation unless you approve it. PDB deployment is disabled by default and retains only a `Binaries/Win64` PDB whose basename matches a deployed DLL.
 
 Python 3.10 or newer with tkinter is required. The build and installation are offline.
 
@@ -20,7 +20,7 @@ Python 3.10 or newer with tkinter is required. The build and installation are of
 
 1. Copy [`plugin/UnrealMCP`](plugin/UnrealMCP) to `<YourProject>/Plugins/UnrealMCP`, or add this repository's `plugin/` directory to `AdditionalPluginDirectories` in a disposable development `.uproject`.
 2. Enable `UnrealMCP` and compile the project's Editor target with Unreal Engine 5.8 or newer.
-3. Open the project and wait for `Unreal MCP 0.22.0 ready on 127.0.0.1:15485` in the editor log.
+3. Open the project and wait for `Unreal MCP 0.22.1 ready on 127.0.0.1:15485` in the editor log.
 4. Create a virtual environment and install the Python package offline:
 
    ```sh

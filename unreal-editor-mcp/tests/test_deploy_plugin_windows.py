@@ -178,6 +178,98 @@ class WindowsDeploymentScriptTests(unittest.TestCase):
             self.assertEqual(list(destination.rglob("*.pdb")), [])
             deploy.verify_binary_plugin(destination)
 
+    def test_install_can_keep_only_matching_win64_pdb_crash_symbols(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            project_folder = root / "Game"
+            project_folder.mkdir()
+            project = self.write_project(project_folder)
+            package = root / "Package"
+            package.mkdir()
+            self.write_package(package)
+            binary_root = package / "Binaries" / "Win64"
+            (binary_root / "Unrelated.pdb").write_bytes(b"unrelated symbols")
+            (binary_root / "UnrealEditor-UnrealMCP.ipdb").write_bytes(b"incremental symbols")
+            intermediate_pdb = (
+                package
+                / "Intermediate"
+                / "Build"
+                / "Win64"
+                / "UnrealEditor"
+                / "Development"
+                / "UnrealMCP"
+                / "UnrealMCP.pdb"
+            )
+            intermediate_pdb.write_bytes(b"intermediate symbols")
+
+            destination = deploy.install_binary_plugin(
+                package,
+                project,
+                replace_existing=False,
+                include_pdb=True,
+            )
+
+            self.assertEqual(
+                [path.name for path in destination.rglob("*.pdb")],
+                ["UnrealEditor-UnrealMCP.pdb"],
+            )
+            self.assertEqual(list(destination.rglob("*.ipdb")), [])
+            deploy.verify_binary_plugin(destination, include_pdb=True)
+
+    def test_symbol_deployment_requires_a_pdb_matching_the_plugin_dll(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            project_folder = root / "Game"
+            project_folder.mkdir()
+            project = self.write_project(project_folder)
+            package = root / "Package"
+            package.mkdir()
+            self.write_package(package)
+            (package / "Binaries" / "Win64" / "UnrealEditor-UnrealMCP.pdb").unlink()
+
+            with self.assertRaisesRegex(deploy.DeploymentError, "missing matching Win64 PDB"):
+                deploy.install_binary_plugin(
+                    package,
+                    project,
+                    replace_existing=False,
+                    include_pdb=True,
+                )
+            self.assertFalse((project_folder / "Plugins" / "UnrealMCP").exists())
+
+    def test_deploy_forwards_the_pdb_checkbox_selection(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            project_folder = root / "Game"
+            project_folder.mkdir()
+            project = self.write_project(project_folder)
+            messages: list[str] = []
+
+            def write_packaged_plugin(
+                engine_root: Path,
+                package_root: Path,
+                log: object,
+            ) -> None:
+                package_root.mkdir()
+                self.write_package(package_root)
+
+            with mock.patch.object(
+                deploy,
+                "run_packaging",
+                side_effect=write_packaged_plugin,
+            ):
+                destination = deploy.deploy(
+                    project,
+                    root / "UE_5.8",
+                    replace_existing=False,
+                    include_pdb=True,
+                    log=messages.append,
+                )
+
+            self.assertTrue(
+                (destination / "Binaries" / "Win64" / "UnrealEditor-UnrealMCP.pdb").is_file()
+            )
+            self.assertTrue(any("except matching Win64 PDBs" in message for message in messages))
+
     def test_replace_existing_plugin_does_not_mix_old_files(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -224,10 +316,14 @@ class WindowsDeploymentScriptTests(unittest.TestCase):
             real_verify = deploy.verify_binary_plugin
             calls = 0
 
-            def fail_second_verification(plugin_root: Path) -> None:
+            def fail_second_verification(
+                plugin_root: Path,
+                *,
+                include_pdb: bool = False,
+            ) -> None:
                 nonlocal calls
                 calls += 1
-                real_verify(plugin_root)
+                real_verify(plugin_root, include_pdb=include_pdb)
                 if calls == 2:
                     raise deploy.DeploymentError("injected post-install failure")
 

@@ -7,8 +7,8 @@ The helper depends on `scripts/package_plugin.py` for trusted source-plugin iden
 ## Invariants
 
 - Packaging is offline, targets only `Win64`, embeds the selected Engine version, and uses the fixed repository plugin descriptor.
-- The deployment keeps the packaged descriptor, Win64 DLL, `UnrealMCP.Build.cs` module rule, and precompiled build metadata, but omits C++ implementation/header source, external symbol/debug artifacts, object files, and debug-symbol bundles. The installed module rule explicitly sets `bUsePrecompiled = true` so a later C++ game-project build consumes rather than replaces the packaged module.
-- The installed descriptor must have `Installed: true`, a Win64 plugin DLL must exist, and no filtered debug artifact may remain.
+- The deployment keeps the packaged descriptor, Win64 DLL, `UnrealMCP.Build.cs` module rule, and precompiled build metadata, but omits C++ implementation/header source, object files, and debug-symbol bundles. External symbol/debug artifacts are omitted by default. The opt-in PDB checkbox retains only direct `Binaries/Win64` PDBs whose basenames match deployed DLLs. The installed module rule explicitly sets `bUsePrecompiled = true` so a later C++ game-project build consumes rather than replaces the packaged module.
+- The installed descriptor must have `Installed: true`, a Win64 plugin DLL must exist, and no filtered debug artifact may remain. Symbol-enabled deployment additionally requires a matching PDB for every direct Win64 DLL.
 - Installation is confined to `<SelectedProject>/Plugins/UnrealMCP`. Reparse-point plugin paths and destinations outside the resolved project root reject.
 - An existing plugin is replaced only after explicit GUI confirmation. Copy and verification happen in a new sibling staging directory; a temporary rename preserves the old plugin until the new directory is in place and verified.
 - Build failure never changes the project's existing plugin.
@@ -17,4 +17,4 @@ The helper depends on `scripts/package_plugin.py` for trusted source-plugin iden
 
 ## Verification
 
-`tests/test_deploy_plugin_windows.py` covers bounded project parsing, exact Engine-association candidate selection, 5.8+ validation, fixed Win64 arguments, binary filtering, guarded precompiled-module-rule configuration, precompiled-metadata retention, explicit replacement, non-mixing replacement, failed-verification restoration, result verification, and exact LM Studio JSON. `tests/test_package_plugin.py` continues to cover the shared packaging boundary. A native plugin build is required when the source plugin or its packaging compatibility changes; the helper itself has no Unreal runtime behavior.
+`tests/test_deploy_plugin_windows.py` covers bounded project parsing, exact Engine-association candidate selection, 5.8+ validation, fixed Win64 arguments, default symbol filtering, opt-in matching-PDB retention and enforcement, guarded precompiled-module-rule configuration, precompiled-metadata retention, explicit replacement, non-mixing replacement, failed-verification restoration, result verification, and exact LM Studio JSON. `tests/test_package_plugin.py` continues to cover the shared packaging boundary. A native plugin build is required when the source plugin or its packaging compatibility changes; the helper itself has no Unreal runtime behavior.

@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 0.22.1 — 2026-07-29
+
+- Added an opt-in Windows deployment checkbox that installs matching `Binaries/Win64` PDB crash symbols beside plugin DLLs while continuing to exclude unrelated and intermediate debug artifacts.
+- Added strict matching-symbol verification, rollback-compatible installation coverage, and updated deployment documentation. Symbol-free deployment remains the default.
+
 ## 0.22.0 — 2026-07-28
 
 - Added stale-safe common panel-slot layout and bounded widget presentation edits through recursively typed reflected values, with live allowlists and inspection read-back.
