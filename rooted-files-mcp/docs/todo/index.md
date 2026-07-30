@@ -25,6 +25,9 @@ and record missing applicable native verification for completed features in the
 ## Feature documents
 
 - [`markdown-read` — Markdown section reads and read-only Markdown host mode](markdown-read.md) — Add bounded heading-section and front-matter reads plus a Markdown-only `read_text` host mode.
+- [`mcp-definition-gui` — Local MCP definition generator](mcp-definition-gui.md)
+  — Add a tkinter helper that generates host JSON and copyable Codex STDIO
+  launch fields.
 
 ## Shared roadmap contracts
 

@@ -9,6 +9,8 @@ Protect configuration precedence/confinement, filesystem security, text/atomic e
 - `tests/test_configuration.py` — configuration schema, precedence, paths, case/allowlist behavior, and immutable settings.
 - `tests/test_filesystem.py` — path/hidden/symlink/permission policy, text classification/ranges, format preservation, and atomic safeguards.
 - `tests/test_server.py` — MCP catalog/dispatch/errors plus subprocess stdio and startup behavior.
+- `tests/test_mcp_definition_gui.py` — pure launch-definition generation,
+  validation, mode, and JSON formatting behavior behind the tkinter helper.
 
 ## Test layers
 
@@ -25,6 +27,9 @@ Protect configuration precedence/confinement, filesystem security, text/atomic e
 - Markdown coverage includes exact sections/front matter, generated anchors,
   ignored code/front-matter headings, formats, safe errors, full-source
   validation, mode policy, and subprocess configuration precedence.
+- Definition-helper coverage checks exact resolved command/argument ordering,
+  real subprocess startup in both modes, complete JSON structure, and invalid
+  roots or launcher files without requiring an interactive display.
 
 ## Known pressure
 

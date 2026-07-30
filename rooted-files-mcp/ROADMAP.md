@@ -18,5 +18,7 @@ platform verification.
   - None
 - Windows:
   - `markdown-read`
+  - `mcp-definition-gui`
 - Linux:
   - `markdown-read`
+  - `mcp-definition-gui`

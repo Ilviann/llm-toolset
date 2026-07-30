@@ -344,6 +344,46 @@ interactive PowerShell commands. Backslashes in JSON strings must be doubled.
 In LM Studio, open the **Program** tab, choose **Install → Edit mcp.json**, add
 the server entry, and save. LM Studio reloads saved MCP servers automatically.
 
+### GUI definition helper
+
+To generate these values without manually locating or escaping paths, launch
+the tkinter helper:
+
+macOS or Linux:
+
+```sh
+/path/to/rooted-files-mcp/scripts/generate_mcp_definition.sh
+```
+
+Windows PowerShell:
+
+```powershell
+py -3 "C:\path\to\rooted-files-mcp\scripts\generate_mcp_definition.py"
+```
+
+The `python3` installation must include its optional tkinter module and
+must still satisfy the server's Python 3.10-or-newer requirement. Check the
+intended interpreter with `python3 -m tkinter` on macOS/Linux or
+`py -3 -m tkinter` on Windows; a small Tk test window should open. If the module
+is unavailable, prepare a matching OS package or Python distribution with Tk
+support before taking the machine offline.
+
+Choose the folder that the server may expose, select `standard` or `markdown`,
+and click **Generate definition**. The helper shows:
+
+- a complete `mcpServers` JSON object for LM Studio's `mcp.json` and compatible
+  JSON-based MCP harnesses;
+- the stable server name and absolute Python executable for a ChatGPT Codex app
+  STDIO server; and
+- the server launcher, served root, `--mode`, and selected mode as four
+  individually copyable arguments.
+
+The displayed Python command is the interpreter used to launch the helper. In
+the ChatGPT Codex app, open **Settings → MCP servers**, add a **STDIO** server,
+and copy the displayed name, command, and arguments in order. The helper only
+displays and copies values; it never writes or merges `mcp.json`,
+`config.toml`, or another host configuration file.
+
 ## Test
 
 ```sh
