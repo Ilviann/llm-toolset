@@ -36,7 +36,7 @@ TOOLS = [
     },
     {
         "name": "read_text",
-        "description": "Read all UTF-8 text or give both one-based, end-inclusive line bounds.",
+        "description": "Read UTF-8 text, a one-based end-inclusive line range, or a Markdown #anchor/#--- block.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -88,8 +88,10 @@ def build_tools(settings: Settings) -> list[dict[str, Any]]:
 
     enabled = set()
     if settings.read:
-        enabled.update(READ_TOOLS)
-    if settings.write:
+        enabled.update(
+            {"read_text"} if settings.mode == "markdown" else READ_TOOLS
+        )
+    if settings.write and settings.mode == "standard":
         enabled.update(WRITE_TOOLS)
     return [tool for tool in TOOLS if tool["name"] in enabled]
 
@@ -237,6 +239,9 @@ def main() -> None:
     hidden_group.add_argument(
         "--hide-hidden", dest="show_hidden", action="store_false"
     )
+    parser.add_argument(
+        "--mode", choices=("standard", "markdown"), help="Effective host mode"
+    )
     parser.set_defaults(read=None, write=None, show_hidden=None)
     args = parser.parse_args()
     try:
@@ -246,6 +251,7 @@ def main() -> None:
             read=args.read,
             write=args.write,
             show_hidden=args.show_hidden,
+            mode=args.mode,
         )
         run(settings)
     except (ConfigurationError, FileAccessError) as exc:

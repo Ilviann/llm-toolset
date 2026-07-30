@@ -18,7 +18,8 @@ This is the lowest-level internal component and has no project-source dependency
 - The configuration path must resolve inside the workspace to a regular UTF-8 file no larger than 64 KiB and containing no NUL bytes.
 - Sections and keys are closed-world; duplicates, defaults, malformed booleans, and unknown values fail startup.
 - An INI root must resolve inside the workspace; an explicit CLI root is a trusted override and may be elsewhere.
-- Effective settings are frozen and record workspace, root, permissions, hidden policy, allowlist, and native case sensitivity.
+- Effective settings are frozen and record workspace, root, permissions, host mode, hidden policy, allowlist, and native case sensitivity.
+- Host mode is exactly `standard` or `markdown`, with CLI-over-INI-over-default precedence.
 - `.mcp` is protected and cannot be allowlisted. Allowlist names are exact single components, bounded, unique under native case rules, and additive to built-ins.
 
 ## Known pressure

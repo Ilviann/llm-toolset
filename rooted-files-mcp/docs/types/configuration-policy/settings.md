@@ -12,5 +12,6 @@ Frozen dataclass passed to the server and filesystem as the complete effective p
 | `show_hidden` | Whether non-protected hidden entries may be visible. |
 | `hidden_allowlist` | Effective built-in plus configured exact component names. |
 | `case_sensitive` | Detected native name-comparison behavior for the root. |
+| `mode` | Effective `standard` or read-only `markdown` host policy. |
 
 `Settings.for_root()` supplies backward-compatible trusted-root defaults. Instances are immutable so catalog and filesystem policy cannot drift after startup.

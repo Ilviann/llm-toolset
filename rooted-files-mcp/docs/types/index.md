@@ -6,4 +6,5 @@ References are grouped by the component that owns each contract or reusable libr
 - [`configuration-policy/`](configuration-policy/index.md) — effective/INI settings, startup errors, configuration readers, precedence, case, and allowlist libraries.
 - [`root-confinement-visibility/`](root-confinement-visibility/index.md) — filesystem errors, hidden policy, permissions, resolution, listing, and tree libraries.
 - [`text-validation-atomic-editing/`](text-validation-atomic-editing/index.md) — line metadata, text classification/scanning, format preservation, and atomic replacement libraries.
+- [`markdown-reading/`](markdown-reading/index.md) — supported paths, fragment decoding, generated anchors, Markdown parsing, and exact selection.
 - [`mcp-api-stdio/`](mcp-api-stdio/index.md) — tool definition/catalog, MCP server, JSON-RPC envelopes, and stdio library.

@@ -1,5 +1,8 @@
 # `markdown-read` — Markdown section reads and read-only Markdown host mode
 
+**Status:** Completed in 0.4.0; native macOS verification passed, with native
+Linux and Windows verification tracked in the roadmap backlog.
+
 **Outcome:** Agents can retrieve one exact Markdown heading section or YAML
 front-matter block without loading the complete document into model context, and
 operators can expose a read-only host containing only the `read_text` tool and

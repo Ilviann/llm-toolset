@@ -10,7 +10,7 @@ from pathlib import Path
 
 from rooted_files_mcp.filesystem import FileAccessError
 from rooted_files_mcp.filesystem import RootedFilesystem
-from rooted_files_mcp.server import MCPServer
+from rooted_files_mcp.server import MCPServer, TOOLS
 
 
 class MCPServerTests(unittest.TestCase):
@@ -33,7 +33,7 @@ class MCPServerTests(unittest.TestCase):
         initialized = self.request("initialize", {"protocolVersion": "2025-06-18"})
         self.assertEqual(initialized["result"]["protocolVersion"], "2025-06-18")
         self.assertEqual(
-            initialized["result"]["serverInfo"]["version"], "0.3.0"
+            initialized["result"]["serverInfo"]["version"], "0.4.0"
         )
         tools = self.request("tools/list")["result"]["tools"]
         self.assertEqual([tool["name"] for tool in tools], [
@@ -48,6 +48,7 @@ class MCPServerTests(unittest.TestCase):
             self.assertIn("one-based", by_name[name]["description"])
             self.assertIn("end-inclusive", by_name[name]["description"])
         self.assertEqual(by_name["read_text"]["inputSchema"]["required"], ["path"])
+        self.assertEqual(tools, TOOLS)
 
     def test_tool_error_uses_mcp_tool_result(self) -> None:
         response = self.request("tools/call", {
@@ -104,6 +105,51 @@ class MCPServerTests(unittest.TestCase):
         assert response is not None
         self.assertNotIn("isError", response["result"])
         self.assertEqual((self.root / "note.txt").read_text(encoding="utf-8"), "new")
+
+    def test_markdown_mode_catalog_and_direct_call_rejection(self) -> None:
+        (self.root / "guide.md").write_text(
+            "# Intro\nbody\n", encoding="utf-8"
+        )
+        settings = replace(self.server.settings, mode="markdown")
+        self.server = MCPServer(RootedFilesystem(settings), settings)
+        tools = self.request("tools/list")["result"]["tools"]
+        self.assertEqual(tools, [next(tool for tool in TOOLS if tool["name"] == "read_text")])
+
+        section = self.request("tools/call", {
+            "name": "read_text",
+            "arguments": {"path": "guide.md#intro"},
+        })
+        self.assertEqual(
+            section["result"]["content"][0]["text"], "# Intro\nbody\n"
+        )
+        for name, arguments in (
+            ("list_dir", {}),
+            ("tree", {}),
+            ("write_text", {"path": "new.md", "content": "no"}),
+            (
+                "write_lines",
+                {
+                    "path": "guide.md",
+                    "start_line": 1,
+                    "end_line": 1,
+                    "content": "no",
+                },
+            ),
+        ):
+            with self.subTest(name=name):
+                response = self.request(
+                    "tools/call", {"name": name, "arguments": arguments}
+                )
+                self.assertTrue(response["result"]["isError"])
+                self.assertEqual(
+                    response["result"]["content"][0]["text"], "Tool is disabled"
+                )
+
+        no_read = replace(settings, read=False)
+        self.server = MCPServer(RootedFilesystem(no_read), no_read)
+        self.assertEqual(
+            self.request("tools/list")["result"]["tools"], []
+        )
 
     def test_optional_read_range_and_line_write_calls(self) -> None:
         target = self.root / "lines.txt"
@@ -236,6 +282,65 @@ class StdioStartupTests(unittest.TestCase):
         self.assertEqual(names, ["list_dir", "tree", "read_text"])
         self.assertTrue(responses[1]["result"]["isError"])
         self.assertFalse((exposed / "new.txt").exists())
+
+    def test_markdown_mode_ini_cli_precedence_and_protocol_framing(self) -> None:
+        workspace = self.base / "markdown workspace"
+        exposed = workspace / "files"
+        config_dir = workspace / ".mcp"
+        exposed.mkdir(parents=True)
+        config_dir.mkdir()
+        (exposed / "guide.md").write_text(
+            "---\ntitle: Guide\n---\n# Intro\nbody\n", encoding="utf-8"
+        )
+        (exposed / "plain.txt").write_text("plain", encoding="utf-8")
+        (config_dir / "rooted-files-mcp.ini").write_text(
+            "[paths]\nroot = files\n[features]\nmode = markdown\n",
+            encoding="utf-8",
+        )
+        stdin = self.message("initialize", {"protocolVersion": "2025-06-18"})
+        stdin += self.message("tools/list", request_id=2)
+        stdin += self.message(
+            "tools/call",
+            {"name": "read_text", "arguments": {"path": "guide.md#---"}},
+            request_id=3,
+        )
+        stdin += self.message(
+            "tools/call",
+            {"name": "read_text", "arguments": {"path": "plain.txt"}},
+            request_id=4,
+        )
+        result = self.launch("--workspace", str(workspace), stdin=stdin)
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(result.stderr, "")
+        responses = [json.loads(line) for line in result.stdout.splitlines()]
+        self.assertEqual(
+            [tool["name"] for tool in responses[1]["result"]["tools"]],
+            ["read_text"],
+        )
+        self.assertEqual(
+            responses[2]["result"]["content"][0]["text"],
+            "---\ntitle: Guide\n---\n",
+        )
+        self.assertEqual(
+            responses[3]["result"]["content"][0]["text"],
+            "Markdown mode permits only .md and .markdown files",
+        )
+
+        standard = self.launch(
+            "--workspace",
+            str(workspace),
+            "--mode",
+            "standard",
+            stdin=self.message("tools/list"),
+        )
+        self.assertEqual(standard.returncode, 0)
+        names = [
+            tool["name"]
+            for tool in json.loads(standard.stdout)["result"]["tools"]
+        ]
+        self.assertEqual(
+            names, ["list_dir", "tree", "read_text", "write_text", "write_lines"]
+        )
 
     def test_mcp_configuration_is_never_exposed_by_file_tools(self) -> None:
         workspace = self.base / "protected workspace"

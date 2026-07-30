@@ -21,6 +21,7 @@ Composition depends on configuration/effective policy, the rooted filesystem fac
 - A positional root remains the backward-compatible trusted-root form.
 - Configuration-only startup resolves its workspace before serving.
 - CLI values override INI values, which override built-in defaults.
+- `--mode {standard,markdown}` participates in the same precedence contract.
 - Startup failures are concise stderr diagnostics; stdout remains protocol-only.
 - Runtime uses only the Python standard library.
 

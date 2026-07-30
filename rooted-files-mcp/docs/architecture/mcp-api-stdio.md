@@ -17,6 +17,8 @@ Uses package version, immutable settings, `RootedFilesystem`, and safe configura
 - The public surface remains five focused tools with stable compact schemas.
 - `READ_TOOLS`, `WRITE_TOOLS`, catalog names, and dispatch branches remain synchronized.
 - Disabled tools are omitted from `tools/list` and rejected if called directly.
+- Standard mode applies permission filtering to all five tools; Markdown mode
+  exposes only `read_text` with read permission and otherwise exposes none.
 - Notifications receive no response; malformed JSON/requests/params use JSON-RPC errors.
 - Expected file/type/missing-argument failures become MCP tool errors without terminating the process.
 - Unexpected request failures are reported on stderr and become bounded internal errors.

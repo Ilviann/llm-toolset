@@ -5,7 +5,7 @@ Status: deferred design work. No shared library has been implemented.
 Snapshot recorded: 2026-07-21 02:56:48 MSK (UTC+0300)
 
 - Repository HEAD: `ec8756d0cd2cef6dd45ea1d8b0160c6421c61c23`
-- Rooted Files MCP: `0.3.0`
+- Rooted Files MCP: `0.4.0`
 - Godot Editor MCP: `0.16.1`
 - Unreal Editor MCP: `0.1.0`
 

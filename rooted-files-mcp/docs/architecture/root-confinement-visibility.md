@@ -22,6 +22,7 @@ Consumes immutable `Settings`, `ConfigurationError`, and `PROTECTED_NAMES`. Text
 - Listings prune denied entries without disclosing which component failed and do not count them against the 100-entry tree bound.
 - Tree traversal never follows directory symlinks; later file reads still validate their targets.
 - Read/write permissions are enforced inside the filesystem even if MCP catalog filtering is bypassed.
+- Markdown mode also rejects listing/tree and every write inside the filesystem facade.
 
 ## Known pressure
 

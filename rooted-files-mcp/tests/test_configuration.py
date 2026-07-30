@@ -43,6 +43,7 @@ class ConfigurationTests(unittest.TestCase):
         self.assertTrue(settings.read)
         self.assertTrue(settings.write)
         self.assertTrue(settings.show_hidden)
+        self.assertEqual(settings.mode, "standard")
 
     def test_configuration_only_startup_uses_native_relative_root(self) -> None:
         exposed = self.workspace / "source files"
@@ -51,13 +52,14 @@ class ConfigurationTests(unittest.TestCase):
             "[paths]\n"
             f"root = {exposed.relative_to(self.workspace)}\n"
             "[permissions]\nread = false\nwrite = true\n"
-            "[features]\nshow_hidden = false\n"
+            "[features]\nshow_hidden = false\nmode = markdown\n"
         )
         settings = load_settings(workspace=str(self.workspace))
         self.assertEqual(settings.root, exposed.resolve())
         self.assertFalse(settings.read)
         self.assertTrue(settings.write)
         self.assertFalse(settings.show_hidden)
+        self.assertEqual(settings.mode, "markdown")
 
     def test_current_directory_is_the_configuration_only_workspace(self) -> None:
         exposed = self.workspace / "root"
@@ -75,7 +77,7 @@ class ConfigurationTests(unittest.TestCase):
         self.write_config(
             "[paths]\nroot = configured\n"
             "[permissions]\nread = true\nwrite = false\n"
-            "[features]\nshow_hidden = true\n"
+            "[features]\nshow_hidden = true\nmode = markdown\n"
         )
         settings = load_settings(
             root=explicit,
@@ -83,11 +85,34 @@ class ConfigurationTests(unittest.TestCase):
             read=False,
             write=True,
             show_hidden=False,
+            mode="standard",
         )
         self.assertEqual(settings.root, explicit.resolve())
         self.assertFalse(settings.read)
         self.assertTrue(settings.write)
         self.assertFalse(settings.show_hidden)
+        self.assertEqual(settings.mode, "standard")
+
+    def test_host_mode_validation_and_precedence(self) -> None:
+        self.write_config(
+            "[paths]\nroot = .\n[features]\nmode = markdown\n"
+        )
+        self.assertEqual(
+            load_settings(workspace=self.workspace).mode, "markdown"
+        )
+        self.assertEqual(
+            load_settings(workspace=self.workspace, mode="standard").mode,
+            "standard",
+        )
+        for mode in ("Markdown", "read-only", ""):
+            with self.subTest(mode=mode):
+                self.write_config(
+                    f"[paths]\nroot = .\n[features]\nmode = {mode}\n"
+                )
+                with self.assertRaisesRegex(ConfigurationError, "Invalid host mode"):
+                    load_settings(workspace=self.workspace)
+        with self.assertRaisesRegex(ConfigurationError, "Invalid host mode"):
+            load_settings(root=self.workspace, mode="invalid")
 
     def test_settings_are_frozen(self) -> None:
         settings = load_settings(root=self.workspace)

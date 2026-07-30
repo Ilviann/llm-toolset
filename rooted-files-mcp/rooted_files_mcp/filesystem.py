@@ -10,6 +10,13 @@ from pathlib import Path
 from typing import Any, Callable
 
 from .configuration import ConfigurationError, PROTECTED_NAMES, Settings
+from .markdown import (
+    MarkdownReadError,
+    decode_markdown_fragment,
+    extract_markdown,
+    is_markdown_path,
+    split_markdown_fragment,
+)
 
 
 TREE_LIMIT = 100
@@ -198,6 +205,10 @@ class RootedFilesystem:
         if not self.settings.write:
             raise FileAccessError("Write access is disabled")
 
+    def _require_standard_mode(self) -> None:
+        if self.settings.mode != "standard":
+            raise FileAccessError("Operation is unavailable in markdown mode")
+
     def resolve(self, user_path: str, *, must_exist: bool = True) -> Path:
         if not isinstance(user_path, str):
             raise FileAccessError("Path must be a string")
@@ -235,6 +246,7 @@ class RootedFilesystem:
 
     def list_dir(self, user_path: str = ".") -> str:
         self._require_read()
+        self._require_standard_mode()
         folder = self.resolve(user_path)
         if not folder.is_dir():
             raise FileAccessError("Path is not a folder")
@@ -249,6 +261,7 @@ class RootedFilesystem:
 
     def tree(self, user_path: str = ".") -> str:
         self._require_read()
+        self._require_standard_mode()
         folder = self.resolve(user_path)
         if not folder.is_dir():
             raise FileAccessError("Path is not a folder")
@@ -443,13 +456,56 @@ class RootedFilesystem:
         end_line: Any = None,
     ) -> str:
         self._require_read()
+        if not isinstance(user_path, str):
+            raise FileAccessError("Path must be a string")
+        plain_path, raw_fragment = split_markdown_fragment(user_path)
         if (start_line is None) != (end_line is None):
             raise FileAccessError(
                 "Start line and end line must be provided together"
             )
-        path = self.resolve(user_path)
+        if raw_fragment is not None and start_line is not None:
+            raise FileAccessError("Anchored reads cannot use line ranges")
+        if self.settings.mode == "markdown" and not is_markdown_path(plain_path):
+            raise FileAccessError(
+                "Markdown mode permits only .md and .markdown files"
+            )
+        try:
+            path = self.resolve(plain_path)
+        except FileAccessError as original_error:
+            candidate_path, separator, candidate_anchor = user_path.rpartition("#")
+            if (
+                raw_fragment is None
+                and separator
+                and candidate_anchor
+                and not is_markdown_path(candidate_path)
+            ):
+                try:
+                    unsupported = self.resolve(candidate_path)
+                except FileAccessError:
+                    pass
+                else:
+                    if unsupported.is_file():
+                        raise FileAccessError(
+                            "Markdown anchors require .md or .markdown files"
+                        ) from None
+            raise original_error
+        if self.settings.mode == "markdown" and not is_markdown_path(path):
+            raise FileAccessError(
+                "Markdown mode permits only .md and .markdown files"
+            )
+        if raw_fragment is not None and not is_markdown_path(path):
+            raise FileAccessError(
+                "Markdown anchors require .md or .markdown files"
+            )
         if start_line is None:
-            return self._read_text_file(path)
+            text = self._read_text_file(path)
+            if raw_fragment is None:
+                return text
+            try:
+                fragment = decode_markdown_fragment(raw_fragment)
+                return extract_markdown(text, fragment)
+            except MarkdownReadError as exc:
+                raise FileAccessError(str(exc)) from None
         start_line, end_line = self._validate_line_range(start_line, end_line)
         return self._scan_text_lines(path, start_line, end_line).selected_text
 
@@ -518,6 +574,7 @@ class RootedFilesystem:
 
     def write_text(self, user_path: str, content: str) -> str:
         self._require_write()
+        self._require_standard_mode()
         if not isinstance(content, str):
             raise FileAccessError("Content must be a string")
         try:
@@ -563,6 +620,7 @@ class RootedFilesystem:
         content: Any,
     ) -> str:
         self._require_write()
+        self._require_standard_mode()
         start_line, end_line = self._validate_line_range(start_line, end_line)
         if not isinstance(content, str):
             raise FileAccessError("Content must be a string")

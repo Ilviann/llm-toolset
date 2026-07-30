@@ -21,8 +21,9 @@ PROTECTED_NAMES = frozenset({".mcp"})
 _ALLOWED_SETTINGS = {
     "paths": {"root"},
     "permissions": {"read", "write"},
-    "features": {"show_hidden", "hidden_allowlist"},
+    "features": {"show_hidden", "hidden_allowlist", "mode"},
 }
+HOST_MODES = frozenset({"standard", "markdown"})
 
 
 class ConfigurationError(Exception):
@@ -40,6 +41,7 @@ class Settings:
     show_hidden: bool = True
     hidden_allowlist: frozenset[str] = BUILTIN_HIDDEN_ALLOWLIST
     case_sensitive: bool = True
+    mode: str = "standard"
 
     @classmethod
     def for_root(cls, root: str | os.PathLike[str]) -> "Settings":
@@ -62,6 +64,7 @@ class IniSettings:
     write: bool | None = None
     show_hidden: bool | None = None
     hidden_allowlist: tuple[str, ...] | None = None
+    mode: str | None = None
 
 
 def _filesystem_is_case_sensitive(path: Path) -> bool:
@@ -183,6 +186,17 @@ def _hidden_allowlist(parser: configparser.ConfigParser) -> tuple[str, ...] | No
     return names
 
 
+def _host_mode(parser: configparser.ConfigParser) -> str | None:
+    if not parser.has_option("features", "mode"):
+        return None
+    mode = parser.get("features", "mode", raw=True).strip()
+    if mode not in HOST_MODES:
+        raise ConfigurationError(
+            "Invalid host mode: expected standard or markdown"
+        )
+    return mode
+
+
 def _effective_hidden_allowlist(
     configured: tuple[str, ...] | None, *, case_sensitive: bool
 ) -> frozenset[str]:
@@ -236,6 +250,7 @@ def load_ini(workspace: Path) -> IniSettings | None:
         write=_optional_boolean(parser, "permissions", "write"),
         show_hidden=_optional_boolean(parser, "features", "show_hidden"),
         hidden_allowlist=_hidden_allowlist(parser),
+        mode=_host_mode(parser),
     )
 
 
@@ -254,6 +269,7 @@ def load_settings(
     read: bool | None = None,
     write: bool | None = None,
     show_hidden: bool | None = None,
+    mode: str | None = None,
     cwd: str | os.PathLike[str] | None = None,
 ) -> Settings:
     """Resolve workspace, validate INI values, and apply CLI precedence."""
@@ -278,6 +294,8 @@ def load_settings(
         raise ConfigurationError("Configuration must define [paths] root")
 
     ini = ini or IniSettings()
+    if mode is not None and mode not in HOST_MODES:
+        raise ConfigurationError("Invalid host mode: expected standard or markdown")
     case_sensitive = _filesystem_is_case_sensitive(resolved_root)
     return Settings(
         workspace=resolved_workspace,
@@ -289,4 +307,5 @@ def load_settings(
             ini.hidden_allowlist, case_sensitive=case_sensitive
         ),
         case_sensitive=case_sensitive,
+        mode=mode if mode is not None else (ini.mode or "standard"),
     )

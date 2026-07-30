@@ -22,6 +22,9 @@ Protect configuration precedence/confinement, filesystem security, text/atomic e
 - Every platform branch is exercised even when native validation is pending.
 - Security coverage includes traversal, requested/resolved symlinks, hidden/protected names, Windows attributes, permissions, binary/UTF-8/size limits, write revalidation, mode preservation, and cleanup.
 - Protocol coverage includes initialization/version, permission-filtered schemas, tool errors, notifications, parse/internal errors, and stdout/stderr isolation.
+- Markdown coverage includes exact sections/front matter, generated anchors,
+  ignored code/front-matter headings, formats, safe errors, full-source
+  validation, mode policy, and subprocess configuration precedence.
 
 ## Known pressure
 

@@ -17,6 +17,7 @@ from rooted_files_mcp.filesystem import (
     HiddenPathPolicy,
     RootedFilesystem,
 )
+from rooted_files_mcp.markdown import MarkdownReadError, _Heading, extract_markdown
 
 
 class RootedFilesystemTests(unittest.TestCase):
@@ -331,6 +332,236 @@ class RootedFilesystemTests(unittest.TestCase):
         self.assertEqual(
             self.fs.read_text("lines.txt", 1, 4), "first\n\nthird\nfourth"
         )
+
+    def test_markdown_atx_sections_include_nested_content_and_stop_at_peers(self) -> None:
+        target = self.root / "guide.md"
+        target.write_text(
+            "# Intro\n"
+            "opening\n"
+            "## Details\n"
+            "nested\n"
+            "### Deep\n"
+            "deep body\n"
+            "## Next\n"
+            "next body\n"
+            "# Finish\n"
+            "last",
+            encoding="utf-8",
+        )
+        self.assertEqual(
+            self.fs.read_text("guide.md#intro"),
+            "# Intro\nopening\n## Details\nnested\n### Deep\ndeep body\n"
+            "## Next\nnext body\n",
+        )
+        self.assertEqual(
+            self.fs.read_text("guide.md#details"),
+            "## Details\nnested\n### Deep\ndeep body\n",
+        )
+        self.assertEqual(
+            self.fs.read_text("guide.md#finish"), "# Finish\nlast"
+        )
+
+    def test_markdown_setext_crlf_bom_and_final_newline_are_exact(self) -> None:
+        target = self.root / "FORMAT.MARKDOWN"
+        target.write_bytes(
+            b"\xef\xbb\xbfTitle\r\n=====\r\nbody\r\n"
+            b"Child\r\n-----\r\nnested\r\n"
+            b"Next\r\n====\r\nend"
+        )
+        self.assertEqual(
+            self.fs.read_text("FORMAT.MARKDOWN#title"),
+            "Title\r\n=====\r\nbody\r\nChild\r\n-----\r\nnested\r\n",
+        )
+        self.assertEqual(
+            self.fs.read_text("FORMAT.MARKDOWN#next"),
+            "Next\r\n====\r\nend",
+        )
+
+    def test_markdown_generated_anchors_cover_duplicates_unicode_and_markup(self) -> None:
+        target = self.root / "anchors.md"
+        target.write_text(
+            "# Hello,   WORLD!\nfirst\n"
+            "# Hello, WORLD!\nsecond\n"
+            "# hello-world-1\ncollision\n"
+            "# Привет, Мир!\nunicode\n"
+            r"# A [link](https://example.test) &amp; \_value\_" "\nmarkup\n",
+            encoding="utf-8",
+        )
+        self.assertEqual(
+            self.fs.read_text("anchors.md#hello-world"),
+            "# Hello,   WORLD!\nfirst\n",
+        )
+        self.assertEqual(
+            self.fs.read_text("anchors.md#hello-world-1"),
+            "# Hello, WORLD!\nsecond\n",
+        )
+        self.assertEqual(
+            self.fs.read_text("anchors.md#hello-world-1-1"),
+            "# hello-world-1\ncollision\n",
+        )
+        self.assertEqual(
+            self.fs.read_text(
+                "anchors.md#%D0%BF%D1%80%D0%B8%D0%B2%D0%B5%D1%82-%D0%BC%D0%B8%D1%80"
+            ),
+            "# Привет, Мир!\nunicode\n",
+        )
+        self.assertEqual(
+            self.fs.read_text("anchors.md#a-link--_value_"),
+            r"# A [link](https://example.test) &amp; \_value\_" "\nmarkup\n",
+        )
+
+    def test_markdown_ignores_front_matter_fences_and_indented_code(self) -> None:
+        target = self.root / "ignored.md"
+        target.write_text(
+            "---\n"
+            "# metadata heading\n"
+            "---\n"
+            "```md\n"
+            "# fenced heading\n"
+            "```\n"
+            "    # indented heading\n"
+            "~~~\n"
+            "Setext in fence\n"
+            "===\n"
+            "~~~\n"
+            "# Real\n"
+            "body\n",
+            encoding="utf-8",
+        )
+        self.assertEqual(
+            self.fs.read_text("ignored.md#real"), "# Real\nbody\n"
+        )
+        for anchor in ("metadata-heading", "fenced-heading", "indented-heading"):
+            with self.subTest(anchor=anchor), self.assertRaisesRegex(
+                FileAccessError, "Markdown anchor was not found"
+            ):
+                self.fs.read_text(f"ignored.md#{anchor}")
+
+    def test_markdown_front_matter_is_exact_and_requires_both_delimiters(self) -> None:
+        cases = {
+            "empty.md": (b"---\n---\n# Body\n", "---\n---\n"),
+            "dots.md": (
+                b"---\r\ntitle: Test\r\n...\r\n# Body\r\n",
+                "---\r\ntitle: Test\r\n...\r\n",
+            ),
+            "bom.md": (
+                b"\xef\xbb\xbf---\ntitle: Test\n---",
+                "---\ntitle: Test\n---",
+            ),
+        }
+        for name, (data, expected) in cases.items():
+            with self.subTest(name=name):
+                (self.root / name).write_bytes(data)
+                self.assertEqual(self.fs.read_text(f"{name}#---"), expected)
+
+        invalid = {
+            "absent.md": b"title: Test\n---\n",
+            "unclosed.md": b"---\ntitle: Test\n----\n",
+            "extra.md": b"--- extra\n---\n",
+        }
+        for name, data in invalid.items():
+            with self.subTest(name=name):
+                (self.root / name).write_bytes(data)
+                with self.assertRaisesRegex(
+                    FileAccessError, "Markdown front matter was not found"
+                ):
+                    self.fs.read_text(f"{name}#---")
+
+    def test_markdown_anchor_errors_ranges_extensions_and_hash_filenames(self) -> None:
+        (self.root / "guide.md").write_text("# Intro\nbody\n", encoding="utf-8")
+        (self.root / "plain.txt").write_text("# Intro\nbody\n", encoding="utf-8")
+        (self.root / "literal#draft.md").write_text("literal", encoding="utf-8")
+        (self.root / "literal#name.txt").write_text("literal txt", encoding="utf-8")
+
+        cases = {
+            "guide.md#": "Markdown anchor is empty",
+            "guide.md#bad%2": "Markdown anchor is malformed",
+            "guide.md#bad%FF": "Markdown anchor is malformed",
+            "guide.md#two words": "Markdown anchor is malformed",
+            "guide.md#missing": "Markdown anchor was not found",
+        }
+        for path, message in cases.items():
+            with self.subTest(path=path), self.assertRaisesRegex(
+                FileAccessError, f"^{re.escape(message)}$"
+            ):
+                self.fs.read_text(path)
+        with self.assertRaisesRegex(FileAccessError, "Anchored reads"):
+            self.fs.read_text("guide.md#intro", 1, 1)
+        with self.assertRaisesRegex(
+            FileAccessError, "Markdown anchors require"
+        ):
+            self.fs.read_text("plain.txt#intro")
+        self.assertEqual(self.fs.read_text("literal#draft.md"), "literal")
+        self.assertEqual(self.fs.read_text("literal#name.txt"), "literal txt")
+
+    def test_markdown_reads_validate_complete_source_and_path_security(self) -> None:
+        (self.root / "invalid.md").write_bytes(b"# Good\nbody\n# Bad\n\xff")
+        with self.assertRaisesRegex(FileAccessError, "UTF-8"):
+            self.fs.read_text("invalid.md#good")
+        with self.assertRaisesRegex(FileAccessError, "UTF-8"):
+            self.fs.read_text("invalid.md#bad%2")
+
+        (self.root / "nul.md").write_bytes(b"# Good\nbody\n\x00bad")
+        with self.assertRaisesRegex(FileAccessError, "Binary file"):
+            self.fs.read_text("nul.md#good")
+
+        (self.root / "large.md").write_bytes(
+            b"# Good\n" + b"x" * MAX_TEXT_BYTES
+        )
+        with self.assertRaisesRegex(FileAccessError, "5 MiB"):
+            self.fs.read_text("large.md#good")
+
+        (self.root / ".hidden.md").write_text("# Secret\nno\n", encoding="utf-8")
+        hidden = self.hidden_fs()
+        with self.assertRaisesRegex(FileAccessError, "Hidden path access is denied"):
+            hidden.read_text(".hidden.md#secret")
+        with self.assertRaises(FileAccessError):
+            self.fs.read_text("../outside.md#secret")
+
+    def test_markdown_mode_is_enforced_below_dispatch(self) -> None:
+        (self.root / "guide.MD").write_text("# Intro\nbody\n", encoding="utf-8")
+        (self.root / "plain.txt").write_text("plain", encoding="utf-8")
+        settings = replace(self.fs.settings, mode="markdown")
+        markdown_fs = RootedFilesystem(settings)
+        self.assertEqual(
+            markdown_fs.read_text("guide.MD#intro"), "# Intro\nbody\n"
+        )
+        with self.assertRaisesRegex(FileAccessError, "only .md and .markdown"):
+            markdown_fs.read_text("plain.txt")
+        try:
+            os.symlink(self.root / "plain.txt", self.root / "alias.md")
+        except OSError:
+            pass
+        else:
+            with self.assertRaisesRegex(
+                FileAccessError, "only .md and .markdown"
+            ):
+                markdown_fs.read_text("alias.md")
+            with self.assertRaisesRegex(
+                FileAccessError, "Markdown anchors require"
+            ):
+                self.fs.read_text("alias.md#intro")
+        for operation in (
+            lambda: markdown_fs.list_dir(),
+            lambda: markdown_fs.tree(),
+            lambda: markdown_fs.write_text("new.md", "no"),
+            lambda: markdown_fs.write_lines("guide.MD", 1, 1, "no"),
+        ):
+            with self.assertRaisesRegex(FileAccessError, "markdown mode"):
+                operation()
+
+    def test_markdown_ambiguous_error_is_stable(self) -> None:
+        headings = [
+            _Heading(1, 0, "One", "same"),
+            _Heading(1, 1, "Two", "same"),
+        ]
+        with mock.patch(
+            "rooted_files_mcp.markdown._headings", return_value=headings
+        ):
+            with self.assertRaisesRegex(
+                MarkdownReadError, "^Markdown anchor is ambiguous$"
+            ):
+                extract_markdown("# One\n# Two\n", "same")
 
     def test_write_lines_replaces_expands_contracts_and_deletes_ranges(self) -> None:
         target = self.root / "edit.txt"

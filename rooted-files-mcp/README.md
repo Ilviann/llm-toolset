@@ -24,7 +24,7 @@ recommended model-facing form.
 |---|---|
 | `list_dir` | List direct entries in a folder; requires read permission |
 | `tree` | Show a recursive tree, limited to 100 entries; requires read permission |
-| `read_text` | Read a whole UTF-8 text file or a one-based, end-inclusive line range; requires read permission |
+| `read_text` | Read a whole UTF-8 text file, a one-based end-inclusive line range, a Markdown heading section, or YAML front matter; requires read permission |
 | `write_text` | Create or replace a UTF-8 text file; requires write permission |
 | `write_lines` | Atomically replace a one-based, end-inclusive range of UTF-8 text lines; requires write permission |
 
@@ -35,13 +35,14 @@ Tools disabled by the effective permissions are omitted from `tools/list` and
 direct calls to them are rejected. Hidden-path settings are enforced for every
 tool, not only directory output.
 
-The default `tools/list` response, including all five descriptions and input
-schemas, is 1,344 characters of compact JSON (1,300 characters for the tool
-definitions), or roughly 340–470 tokens for common model tokenizers. Disabling
-read or write permission makes the catalog smaller. This is the tool-schema
-context cost before system prompts, the conversation, tool calls, and file
-contents. Exact usage varies by model and by how the MCP client represents tool
-definitions.
+The standard-mode `tools/list` payload, including all five descriptions and
+input schemas, is 1,328 characters of compact JSON (1,318 characters for the
+tool definitions), or roughly 330–465 tokens for common model tokenizers. The
+Markdown-mode payload containing only `read_text` is 344 characters (334 for
+the definition), roughly 85–120 tokens. Disabling the relevant permission makes
+either catalog smaller. This is the tool-schema context cost before system
+prompts, the conversation, tool calls, and file contents. Exact usage varies by
+model and by how the MCP client represents tool definitions.
 
 When pairing this server with `godot-editor-mcp` for GDScript work, prefer the
 Godot server's default `tiny` mode below 8k context. Use `small` only when the
@@ -52,11 +53,11 @@ combined schemas and file results bounded.
 ## Agentic usage by context size
 
 Agentic use is practical when the exposed root and task are kept narrow. The
-5 MiB file limit is a safety limit, not a useful context target. Prefer
-the ranged form of `read_text` and use `write_lines` when the relevant
-coordinates are known so only the selected text enters the model context.
-Without range arguments, `read_text` returns a whole file; `write_text` always
-replaces a whole file.
+5 MiB file limit is a safety limit, not a useful context target. Prefer a
+Markdown anchor or the ranged form of `read_text`, and use `write_lines` when
+the relevant coordinates are known, so only selected text enters model
+context. Without a fragment or range arguments, `read_text` returns a whole
+file; `write_text` always replaces a whole file.
 
 - **4k context:** Suitable for inspecting a small folder and reading or updating
   one small file. Expose the closest useful subfolder, start with `list_dir`, and
@@ -70,6 +71,63 @@ replaces a whole file.
   repository-wide autonomous development. Keep the root scoped, read files on
   demand, and divide large refactors into checkpoints; a single large
   `read_text` result can still consume the window.
+
+## Markdown section access
+
+For `.md` and `.markdown` files, append a generated heading fragment to the
+root-relative path:
+
+```text
+read_text("docs/setup.md#installation")
+read_text("docs/setup.md#example-1")
+read_text("docs/setup.md#---")
+```
+
+A heading fragment returns the heading source and its complete section,
+including nested subsections, stopping before the next heading of the same or a
+higher level. ATX headings (`#` through `######`) and Setext headings (`===` or
+`---`) are supported with up to three leading spaces. Heading-like content in
+backtick/tilde fenced code, four-space/tab-indented code, and leading YAML front
+matter is ignored. Selected source is not normalized: `\n`/`\r\n` endings and a
+missing final newline remain exact. A leading UTF-8 BOM is omitted, consistently
+with whole-file reads.
+
+Generated fragments use this dependency-free GitHub-style algorithm. The
+heading's rendered label is approximated by retaining link labels, removing
+HTML tags and code ticks, resolving Markdown backslash escapes and HTML
+entities, and collapsing whitespace. Unicode letters, numbers, marks, and
+symbols retain their authored code points and are lowercased without Unicode
+normalization. Punctuation is removed except `-` and `_`; each remaining space
+becomes `-`. Punctuation removal can therefore leave adjacent hyphens. Repeated
+or colliding fragments receive the first available `-1`, `-2`, and so on
+suffix. Fragment matching is exact and case-sensitive, independent of the host
+filesystem's case rules. UTF-8 URL percent escapes are decoded once, so either
+`#привет-мир` or its percent-encoded equivalent is accepted.
+
+The reserved `#---` fragment returns YAML front matter only when the first
+logical line after an optional BOM is exactly `---` and a later logical line is
+exactly `---` or `...`. Both delimiter lines are included. Later horizontal
+rules and delimiter lines with extra characters do not count.
+
+Anchors cannot be combined with `start_line`/`end_line`. A final `#` is
+interpreted as a fragment only when the portion before it ends in `.md` or
+`.markdown`, case-insensitively, so names such as `draft#notes.txt` and
+`draft#notes.md` remain readable. The complete file still passes confinement,
+visibility, symlink, binary, UTF-8, and 5 MiB validation before any section is
+selected.
+
+Expected selection failures use these stable messages:
+
+- `Markdown anchor is empty`
+- `Markdown anchor is malformed`
+- `Markdown anchor is ambiguous`
+- `Markdown anchor was not found`
+- `Markdown front matter was not found`
+- `Anchored reads cannot use line ranges`
+- `Markdown anchors require .md or .markdown files`
+
+Malformed anchors include incomplete or non-UTF-8 percent escapes and decoded
+whitespace, control/format characters, path separators, or `#`.
 
 ## Granular line access
 
@@ -160,6 +218,7 @@ read = true
 write = true
 
 [features]
+mode = standard
 show_hidden = false
 hidden_allowlist =
     .editorconfig
@@ -174,15 +233,26 @@ and native macOS, Linux, or Windows path syntax are supported. Model-facing
 paths remain relative to the effective root and should use forward slashes.
 
 Settings use this precedence: explicit command-line value, INI value, then the
-built-in default. With no corresponding INI or CLI setting, read and write are
-enabled and hidden paths are visible. Boolean command-line overrides are paired
-so either value can override the INI:
+built-in default. With no corresponding INI or CLI setting, mode is `standard`,
+read and write are enabled, and hidden paths are visible. Set
+`[features] mode = markdown` or use `--mode markdown` for a read-only Markdown
+host; `--mode standard` can override an INI value. Boolean command-line
+overrides are paired so either value can override the INI:
 
 ```text
 --read / --no-read
 --write / --no-write
 --show-hidden / --hide-hidden
+--mode standard / --mode markdown
 ```
+
+In `standard` mode the permission-filtered five-tool behavior is unchanged. In
+`markdown` mode, `tools/list` contains only `read_text` when read permission is
+enabled and is empty when it is disabled. Only requested and resolved `.md` and
+`.markdown` files are accepted, including whole-file, line-range,
+heading-section, and front-matter reads. Directory discovery and every write
+are unavailable even if write permission is enabled; the same restrictions are
+enforced below MCP dispatch.
 
 When `show_hidden = false`, every dot-prefixed path component is hidden on all
 platforms. On Windows, the native Hidden attribute also hides files, folders,
@@ -205,9 +275,9 @@ listing, reading, or changing `.mcp/rooted-files-mcp.ini` after the server loads
 it. Direct hidden or protected access returns the stable error `Hidden path
 access is denied` without identifying which component caused the denial.
 
-Range access is always available. Read permission controls both whole-file and
-ranged `read_text` calls; write permission controls `write_text` and
-`write_lines`. The removed `line_access` INI setting and
+Read permission controls whole-file, ranged, and Markdown-selection
+`read_text` calls in both modes. In standard mode, write permission controls
+`write_text` and `write_lines`. The removed `line_access` INI setting and
 `--line-access`/`--no-line-access` CLI options are rejected as unknown input.
 
 The configuration must be a regular UTF-8 file no larger than 64 KiB. NUL
@@ -226,6 +296,24 @@ Example LM Studio MCP configuration for macOS or Linux:
       "args": [
         "/path/to/rooted-files-mcp/server.py",
         "/path/to/folder/to/expose"
+      ]
+    }
+  }
+}
+```
+
+For a Markdown-only host, add the mode argument:
+
+```json
+{
+  "mcpServers": {
+    "markdown-files": {
+      "command": "/absolute/path/to/python3",
+      "args": [
+        "/path/to/rooted-files-mcp/server.py",
+        "/path/to/folder/to/expose",
+        "--mode",
+        "markdown"
       ]
     }
   }

@@ -10,7 +10,10 @@ Limit access to bounded UTF-8 text, support whole-file or validated one-based ra
 
 ## Dependencies
 
-Consumes effective settings plus the root/visibility component for permissions, resolution, hidden policy, parent confinement, and write-target revalidation. MCP dispatch exposes its four read/write paths through three model tools.
+Consumes effective settings plus the root/visibility component for permissions,
+resolution, hidden policy, parent confinement, and write-target revalidation.
+Markdown extraction consumes only completely validated decoded text. MCP
+dispatch exposes the read/write paths through three model tools.
 
 ## Invariants
 
