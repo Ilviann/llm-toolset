@@ -72,7 +72,7 @@ Feature checkboxes record implementation completion. This section separately lis
 - macOS:
   - None
 - Windows:
-  - `level-inspect`
+  - None
 - Linux:
   - None
 
