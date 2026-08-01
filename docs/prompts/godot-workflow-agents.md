@@ -1,4 +1,4 @@
-## Godot Implementation and Knowledge Rules
+# Godot Implementation and Knowledge Rules
 
 ### Before implementation
 

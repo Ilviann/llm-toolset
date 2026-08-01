@@ -21,6 +21,8 @@ Do not apply any skill stored under this repository's `/skills` directory to thi
 
 Keep one file per component under `docs/architecture/`. Under `docs/types/`, group related component-owned contracts into section-addressable files; do not create a separate tiny page for every type or helper. Keep an immediate relative-link `index.md` in every docs directory. Do not create a `CODE.md` monolith.
 
+After changing Markdown documentation, run `python internal/tools/lint_docs.py` from the repository root. The dependency-free linter validates documentation indexes, local links and anchors, section headings, and feature front matter and dependencies; `/skills` is excluded.
+
 Store feature documents under `docs/features/<status>/`, where status is `planned`, `active`, `completed`, or `deferred`. Begin each feature document with YAML front matter containing string `feature_id`, enum `status`, string-list `depends_on`, and nullable string `released_in`; the status must match its directory, completed features must name their release version, and front-matter dependencies must match the document's direct-prerequisite section. Dependencies may name stable feature IDs or explicit issue IDs.
 
 Executable source, project assets, configuration, build files, schemas, metadata including runtime capabilities, runtime contracts, and behavioral tests define behavior. Documentation explains them and must not be executable input or a test fixture.

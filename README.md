@@ -30,6 +30,20 @@ The implementations support Python 3.10 or newer. macOS is the currently
 verified development platform; native Linux and Windows validation is pending.
 Each project README includes platform-specific commands and LM Studio examples.
 
+## Internal tooling
+
+Run the dependency-free documentation linter from the repository root after changing Markdown documentation:
+
+```sh
+python internal/tools/lint_docs.py
+```
+
+Its standard-library tests run with:
+
+```sh
+python -m unittest discover -s internal/tools/tests -v
+```
+
 ## Skills
 
 - [`maintain-project-documentation`](skills/maintain-project-documentation/SKILL.md):
