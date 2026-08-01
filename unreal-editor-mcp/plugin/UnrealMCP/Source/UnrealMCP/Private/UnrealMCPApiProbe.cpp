@@ -19,6 +19,7 @@
 #include "Engine/World.h"
 #include "Engine/AssetManager.h"
 #include "FileHelpers.h"
+#include "Factories/WorldFactory.h"
 #include "HttpServerModule.h"
 #include "IHttpRouter.h"
 #include "GameFramework/GameMode.h"
@@ -31,6 +32,7 @@
 #include "Kismet2/CompilerResultsLog.h"
 #include "Kismet2/KismetEditorUtilities.h"
 #include "ObjectTools.h"
+#include "PackageTools.h"
 #include "K2Node_FunctionEntry.h"
 #include "K2Node_FunctionResult.h"
 #include "K2Node_CustomEvent.h"
@@ -101,6 +103,7 @@ void RequirePublicTypes()
     static_assert(TIsDerivedFrom<UGameMapsSettings, UObject>::Value);
     static_assert(TIsDerivedFrom<UUserDefinedStruct, UScriptStruct>::Value);
     static_assert(TIsDerivedFrom<UDataTableFactory, UFactory>::Value);
+    static_assert(TIsDerivedFrom<UWorldFactory, UFactory>::Value);
     static_assert(TIsDerivedFrom<AGameStateBase, AActor>::Value);
     static_assert(TIsDerivedFrom<AGameState, AGameStateBase>::Value);
     static_assert(TIsDerivedFrom<UUserWidget, UWidget>::Value);
@@ -144,6 +147,8 @@ void RequirePublicTypes()
     (void)&ObjectTools::GatherObjectReferencersForDeletion;
     using FDeleteSingleObject = bool (*)(UObject*, bool);
     (void)static_cast<FDeleteSingleObject>(&ObjectTools::DeleteSingleObject);
+    using FDeleteAssets = int32 (*)(const TArray<FAssetData>&, bool);
+    (void)static_cast<FDeleteAssets>(&ObjectTools::DeleteAssets);
     using FCleanupAfterDelete = void (*)(const TArray<UPackage*>&, bool);
     (void)static_cast<FCleanupAfterDelete>(&ObjectTools::CleanupAfterSuccessfulDelete);
     static_assert(sizeof(FThreadSafeObjectIterator) > 0);
@@ -167,6 +172,12 @@ void RequirePublicTypes()
     (void)static_cast<FSaveDirtyPackages>(&FEditorFileUtils::SaveDirtyPackages);
     using FLoadMap = bool (*)(const FString&, bool, const bool);
     (void)static_cast<FLoadMap>(&FEditorFileUtils::LoadMap);
+    using FSaveMap = bool (*)(UWorld*, const FString&);
+    (void)static_cast<FSaveMap>(&UEditorLoadingAndSavingUtils::SaveMap);
+    using FSavePackages = bool (*)(const TArray<UPackage*>&, bool);
+    (void)static_cast<FSavePackages>(&UEditorLoadingAndSavingUtils::SavePackages);
+    using FUnloadPackages = bool (*)(UPackageTools::FUnloadPackageParams&);
+    (void)static_cast<FUnloadPackages>(&UPackageTools::UnloadPackages);
     (void)&UWorld::GetWorldPartition;
     (void)&ULevel::IsUsingExternalActors;
     (void)&ULevel::GetLoadedExternalObjectPackages;

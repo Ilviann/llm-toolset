@@ -3,9 +3,6 @@
 Feature identifiers are stable names, not execution indexes. Unfinished features may be implemented and completed in any order once every direct dependency in their description is complete. The checklist retains a completed feature only while an unfinished feature directly depends on it; completed feature documents and historical `phase-*` identifiers remain available under [`docs/todo/`](docs/todo/index.md).
 
 - [x] [`phase-13` — Wildcards, conversions, and complete atomic graph editing](docs/todo/phase-13.md) — Add wildcard specialization, explicit conversion insertion, and complete atomic graph editing.
-- [x] [`asset-delete` — Delete asset](docs/todo/asset-delete.md) — Safely delete one exact unreferenced asset package through Unreal Editor.
-  - Depends on:
-    - `asset-references`
 - [x] [`umg-authoring` — UMG layout, styling, bindings, and UI logic](docs/todo/umg-authoring.md) — Complete practical HUD and menu authoring on the Widget Blueprint family.
   - Depends on:
     - `widget-tree`
@@ -39,10 +36,6 @@ Feature identifiers are stable names, not execution indexes. Unfinished features
 - [x] [`level-open` — Level discovery, safe opening, and snapshot foundations](docs/todo/level-open.md) — Add bounded map discovery, explicit safe map opening, and restart-stable level snapshots.
   - Depends on:
     - [`issue-1` resolution](docs/issues/issue-1.md) — resolved in 0.17.1
-- [ ] [`level-management` — Level management](docs/todo/level-management.md) — Create, configure, save, and safely delete exact map assets.
-  - Depends on:
-    - `level-open`
-    - `asset-delete`
 - [x] [`level-inspect` — World Partition actor and instance inspection](docs/todo/level-inspect.md) — Inspect bounded descriptor, actor, component, and reflected instance state without loading the entire world.
   - Depends on:
     - `level-open`
@@ -75,7 +68,7 @@ Feature identifiers are stable names, not execution indexes. Unfinished features
 Feature checkboxes record implementation completion. This section separately lists completed features that have not yet passed their applicable native platform verification.
 
 - macOS:
-  - None
+  - `level-management`
 - Windows:
   - None
 - Linux:

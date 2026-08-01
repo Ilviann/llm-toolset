@@ -42,13 +42,13 @@ class ReleaseContractTests(unittest.TestCase):
         native = re.search(r'Version\[\].*TEXT\("([^"]+)"\)', header)
         self.assertIsNotNone(native)
         versions = {project["project"]["version"], plugin["VersionName"], native.group(1), unreal_editor_mcp.__version__}
-        self.assertEqual(versions, {"0.24.0"})
+        self.assertEqual(versions, {"0.25.0"})
 
     def test_only_released_asset_delete_commands_are_registered(self):
         names = [tool["name"] for tool in TOOLS]
         self.assertEqual(names, [
             "capabilities", "editor_state", "operation_status", "asset_references", "asset_delete",
-            "level_inspect", "level_open",
+            "level_inspect", "level_open", "level_manage",
             "blueprint_inspect", "blueprint_action_catalog", "blueprint_graph_edit",
             "blueprint_block_replace",
             "blueprint_create", "blueprint_compile", "blueprint_save",
@@ -111,6 +111,31 @@ class ReleaseContractTests(unittest.TestCase):
             self.assertIn(safety, service)
         self.assertIn("FEditorFileUtils::LoadMap", service)
         self.assertIn("UnrealMCP.LevelOpen.DiscoverySnapshotsAndSafety", native_test)
+
+    def test_level_management_is_ledger_backed_bounded_and_covered(self):
+        root = ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private"
+        bridge = (root / "UnrealMCPBridge.cpp").read_text(encoding="utf-8")
+        service = (root / "UnrealMCPLevelManagementService.cpp").read_text(encoding="utf-8")
+        deletion = (root / "UnrealMCPAssetDeletionService.cpp").read_text(encoding="utf-8")
+        native_test = (root / "Tests/UnrealMCPAutomationTestsLevelManagement.cpp").read_text(encoding="utf-8")
+        self.assertIn('Command == TEXT("level_manage")', bridge)
+        for feature in [
+            "level_management", "level_blank_creation", "level_template_creation",
+            "level_world_settings", "level_map_deletion",
+        ]:
+            self.assertIn(f'TEXT("{feature}"), true', bridge)
+        for safety in [
+            "IsPlayingSessionInEditor()", "IsSimulatingInEditor()", "IsSavingPackage()",
+            "IsGarbageCollecting()", "IsTransactionActive()", "IsAsyncLoading()",
+        ]:
+            self.assertIn(safety, service)
+        self.assertIn("MaxLevelSetupProperties", service + bridge)
+        self.assertIn("MaxLevelOwnedPackages", deletion + bridge)
+        self.assertIn("PropertyCodec::Set", service)
+        self.assertIn("UPackageTools::UnloadPackages", service)
+        self.assertIn("ObjectTools::DeleteAssets", deletion)
+        self.assertNotIn("DeleteObjectsUnchecked", deletion)
+        self.assertIn("UnrealMCP.LevelManagement.CreateConfigurePersistAndDelete", native_test)
 
     def test_level_inspect_is_bounded_read_only_and_covered(self):
         bridge = (ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private/UnrealMCPBridge.cpp").read_text(encoding="utf-8")

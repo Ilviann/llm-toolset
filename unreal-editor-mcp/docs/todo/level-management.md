@@ -1,5 +1,7 @@
 # `level-management` — Level management
 
+**Implementation status:** Completed in 0.25.0 and verified natively on Windows. macOS verification remains in the native platform backlog.
+
 **Outcome:** Agents can create, perform bounded initial setup on, save, and safely delete exact Unreal map assets without raw `.umap` filesystem access, implicit dirty-work decisions, or orphaned map-owned packages.
 
 **Depends on:**

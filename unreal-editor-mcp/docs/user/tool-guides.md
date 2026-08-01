@@ -2,15 +2,16 @@
 
 This detailed operational reference covers every released tool family. For installation, first connection, and the concise contract overview, start with the [project README](../../README.md).
 
-Unreal Editor MCP 0.24.0 is an offline-first MCP bridge for Unreal Engine 5.8+. It pairs a dependency-free Python 3.10+ stdio server with an editor-only C++ plugin. Default mode exposes exactly twenty-one tools:
+Unreal Editor MCP 0.25.0 is an offline-first MCP bridge for Unreal Engine 5.8+. It pairs a dependency-free Python 3.10+ stdio server with an editor-only C++ plugin. Default mode exposes exactly twenty-two tools:
 
 - `capabilities` reports the exact Python/plugin/Unreal versions, commands, features, listener state, effective limits, and published Blueprint-family matrix.
 - `editor_state` reports project identity, bridge readiness, play/simulate/save/GC state, and concise queued-operation state.
 - `operation_status` reconciles or safely cancels one retained mutation by operation and bridge identity.
 - `asset_references` finds bounded Asset Registry and live-memory referencers for one exact mounted asset without loading candidate packages.
-- `asset_delete` deletes one exact unreferenced project asset package after retained stale-safe preflight and persistence verification.
+- `asset_delete` deletes one exact unreferenced project asset package or complete inactive-map package closure after retained stale-safe preflight and persistence verification.
 - `level_inspect` discovers mounted World assets, reports the current map snapshot, pages World Partition actor descriptors, and inspects exact actor/component properties.
 - `level_open` safely opens one exact mounted World asset through the retained mutation ledger.
+- `level_manage` creates or configures and reload-verifies one exact project map with bounded World Settings.
 - `blueprint_inspect` discovers every published Blueprint family across mounted content and returns bounded pages of one selected Blueprint's structure.
 - `blueprint_action_catalog` discovers bounded context-valid function, variable, event, flow-control, cast, literal, and operator actions for one exact Blueprint graph snapshot.
 - `blueprint_graph_edit` creates, moves, removes, configures, or connects graph nodes and pins, including wildcard specialization and explicitly requested bounded conversions.
@@ -25,7 +26,7 @@ Unreal Editor MCP 0.24.0 is an offline-first MCP bridge for Unreal Engine 5.8+. 
 - `game_data_inspect` reads one user-defined struct schema or bounded page of typed Data Table rows from an exact asset snapshot.
 - `game_data_edit` creates or atomically edits user-defined structs and typed Data Table rows with validation, saving, and read-back.
 
-Opt-in large mode adds a twenty-second tool, `editor_lifecycle`, for configured launch, safe graceful shutdown, durable restart, and cancellation. CSV/JSON filesystem import/export, Curve Tables, Data Assets, arbitrary UObject assets, supplied struct code, General Project Settings beyond the narrow framework operation, world overrides, runtime server/client control, builds, Blueprint reparenting, console access, unrestricted reflection, forced process termination, and code execution remain unavailable.
+Opt-in large mode adds a twenty-third tool, `editor_lifecycle`, for configured launch, safe graceful shutdown, durable restart, and cancellation. CSV/JSON filesystem import/export, Curve Tables, Data Assets, arbitrary UObject assets, supplied struct code, General Project Settings beyond the narrow framework operation, unrestricted world overrides, runtime server/client control, builds, Blueprint reparenting, console access, unrestricted reflection, forced process termination, and code execution remain unavailable.
 
 ## Security model
 
@@ -57,7 +58,7 @@ Python 3.10 or newer with tkinter is required. Official Windows Python installer
 
 1. Copy [`plugin/UnrealMCP`](../../plugin/UnrealMCP) to `<YourProject>/Plugins/UnrealMCP` or add this repository's `plugin/` folder as an `AdditionalPluginDirectories` entry in a disposable development `.uproject`.
 2. Enable the `UnrealMCP` plugin and compile the project's Editor target with Unreal 5.8 or a newer version that passes the included public-API probes.
-3. Open the project. Look for `Unreal MCP 0.24.0 ready on 127.0.0.1:15485` in the editor log.
+3. Open the project. Look for `Unreal MCP 0.25.0 ready on 127.0.0.1:15485` in the editor log.
 4. Install the Python package offline from this folder:
 
    ```sh
@@ -192,6 +193,47 @@ Open only an exact mounted World asset path:
 
 Map switching refuses PIE/simulation, save, garbage collection, transactions, asset compilation, async loading, dirty packages, or another queued mutation. It never accepts filesystem paths, saves, discards, or prompts. Reuse the operation ID with `operation_status` after a lost response. See [`examples/level-open-workflow.json`](../../examples/level-open-workflow.json) for the complete request sequence.
 
+## Level management
+
+`level_manage` accepts mounted `UWorld` object paths such as `/Game/Maps/Arena.Arena`; it never accepts `.umap` filenames. Start with `level_inspect {"mode":"current"}` and pass its exact `snapshot_id`. Every operation refuses dirty or incompletely inspected current-map work, PIE/simulation, saving, compilation, async loading, garbage collection, Undo/Redo, transactions, and conflicting mutations.
+
+Create a blank map without changing the current editor map:
+
+```json
+{
+  "operation_id":"0123456789abcdef0123456789abcdef",
+  "operation":"create",
+  "destination_path":"/Game/Maps/Arena.Arena",
+  "source":{"kind":"blank"},
+  "creation_options":{"world_partition":false,"world_partition_streaming":false,"external_actors":false},
+  "settings":[
+    {"property_name":"DefaultGameMode","value":"/Script/Engine.GameModeBase"},
+    {"property_name":"KillZ","value":-25000}
+  ],
+  "open_after_create":false,
+  "expected_current_snapshot":"0123456789abcdef0123456789abcdef01234567"
+}
+```
+
+Blank creation requires all three topology choices; streaming requires World Partition, and World Partition requires external actors. Template creation instead uses `source:{"kind":"template","map_path":"/Game/Maps/Template.Template"}` and omits `creation_options`. The template must be exact and clean. Its World Partition, external-actor, streaming, and package topology are inherited and never converted. The destination must be new writable `/Game` or symlink-free local project-plugin content.
+
+Configuration applies only to the exact current map, so open it explicitly first. It accepts at most 16 unique allowlisted World Settings fields through the shared typed property codec. Set `reload_after_save:true` to request the documented save/reload persistence proof:
+
+```json
+{
+  "operation_id":"1123456789abcdef0123456789abcdef",
+  "operation":"configure",
+  "map_path":"/Game/Maps/Arena.Arena",
+  "expected_current_snapshot":"1123456789abcdef0123456789abcdef11234567",
+  "settings":[{"property_name":"WorldToMeters","value":250}],
+  "reload_after_save":true
+}
+```
+
+The allowlist is published in the MCP schema and includes compatible `DefaultGameMode`, world bounds/AI, gravity, scale, Kill Z, selected physics classes, color/lighting, and bounded rendering values. World Partition, external actors, streaming, collections, and arbitrary reflected fields are not post-creation edits. Results return exact changed-property read-back, effective creation facts, map identity/revision/snapshot, and per-package persistence.
+
+Map deletion remains an `asset_delete` operation. First open another clean map, inspect `asset_references` for the inactive target, then pass that snapshot to `asset_delete`. The service enumerates at most 2,048 owned root, build-data, and external actor/object packages; refuses current/streaming/dirty/read-only/incompletely owned or referenced maps; uses Unreal's public reference-aware delete path; and verifies every package in both Asset Registry and storage views. It never removes `.umap` or sidecar files directly, never force-deletes or rewrites referencers, and does not claim Undo. Reconcile lost, partial, or unknown outcomes through `operation_status` and verify absence after restart. See [`examples/level-management-workflow.json`](../../examples/level-management-workflow.json).
+
 ## Asset references
 
 Find inbound evidence for one exact mounted asset object path:
@@ -216,7 +258,7 @@ Delete only a disposable exact asset after `asset_references` returns the latest
 }
 ```
 
-`asset_delete` accepts no filesystem path or force option. It is confined to `/Game` and symlink-free local project-plugin mounts, and requires one persisted writable asset in one package. It rejects maps/worlds, redirectors, generated/external content, dirty packages, open target editors, read-only storage, stale/unsupported or nonempty reference scans, Undo references, unsafe editor work, and concurrent mutations. If the target was unloaded during inspection, the service may load only that exact target, then repeats preflight immediately before deletion. Registry categories must be complete; if the bounded live diagnostic reaches 8,192 objects, Unreal's deletion-specific full memory/Undo check covers the remaining loaded state and the result reports that distinction.
+`asset_delete` accepts no filesystem path or force option. It is confined to `/Game` and symlink-free local project-plugin mounts. Ordinary assets must occupy one persisted writable package. World assets instead require a complete bounded closure of the root map, separate build data, and external actor/object packages; the map must not be current, loaded as a streaming level, dirty, or externally referenced. The tool also rejects redirectors, unsupported generated/external content, open target editors, read-only storage, stale/unsupported or nonempty reference scans, Undo references, unsafe editor work, and concurrent mutations. If a target was unloaded during inspection, the service may load only that exact target, then repeats preflight immediately before deletion. Registry categories must be complete; if the bounded live diagnostic reaches 8,192 objects, Unreal's deletion-specific full memory/Undo check covers the remaining loaded state and the result reports that distinction.
 
 Deletion uses Unreal's public non-force asset/package path and is not Undoable. A result is `committed` only after both Asset Registry and storage absence are verified. A retained `partial` result means Unreal accepted deletion but verification disagreed; never retry with a new operation ID until `operation_status`, a restart, and fresh inspection establish whether the exact asset still exists. See [`examples/asset-delete-workflow.json`](../../examples/asset-delete-workflow.json).
 
@@ -435,7 +477,7 @@ If a mutation times out or its response is lost, do not retry it with a new ID. 
 }
 ```
 
-`queued` may be cancelled by adding `"cancel": true`; `executing` is not interrupted unsafely. `committed` contains the verified retained result, `partial` contains a non-retry-safe destructive result whose persistence verification disagreed, and `rejected` contains the retained error. `outcome_unknown` means either an explicitly retained unknown destructive result or that the bridge restarted/forgot the record: inspect the asset before deciding on another mutation.
+`queued` may be cancelled by adding `"cancel": true`; `executing` is not interrupted unsafely. `committed` contains the verified retained result, `partial` contains a non-retry-safe mutation result whose persistence or reload verification disagreed, and `rejected` contains the retained error. `outcome_unknown` means either an explicitly retained unknown result or that the bridge restarted/forgot the record: inspect the asset before deciding on another mutation.
 
 ## Creation, components, defaults, compile, and save
 

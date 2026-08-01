@@ -34,8 +34,10 @@ from .blueprints import (
 )
 from .game_data_levels import (
     author_phase_seventeen_game_data,
+    manage_disposable_level,
     open_acceptance_level,
     verify_restarted_game_data_and_level,
+    verify_restarted_level_deletion,
 )
 from .widgets import author_widget_scenario, verify_restarted_widgets
 
@@ -301,6 +303,7 @@ def run_automation(executable: Path, project: Path, environment: dict[str, str],
         "GameDataAuthoring",
         "DiscoverySnapshotsAndSafety",
         "ActorsComponentsPropertiesAndSafety",
+        "CreateConfigurePersistAndDelete",
         "PreflightPersistenceAndReferences",
         "RegistryLiveMemoryAndCursors",
         "FamilyInspectionMutationAndPersistence",
@@ -340,6 +343,8 @@ def run_automation(executable: Path, project: Path, environment: dict[str, str],
         expected = tuple(name for name in all_expected if name == "GameDataAuthoring")
     elif test_filter == "UnrealMCP.AssetReferences":
         expected = tuple(name for name in all_expected if name == "RegistryLiveMemoryAndCursors")
+    elif test_filter == "UnrealMCP.LevelManagement":
+        expected = tuple(name for name in all_expected if name == "CreateConfigurePersistAndDelete")
     else:
         leaf = test_filter.rsplit(".", 1)[-1]
         expected = (leaf,) if leaf in all_expected else ()
@@ -447,7 +452,7 @@ def main() -> int:
             if capabilities.get("commands") != [
                 "capabilities", "editor_state", "editor_shutdown", "operation_status",
                 "asset_references", "asset_delete",
-                "level_inspect", "level_open",
+                "level_inspect", "level_open", "level_manage",
                 "blueprint_inspect", "blueprint_action_catalog", "blueprint_graph_edit",
                 "blueprint_block_replace",
                 "blueprint_create", "blueprint_compile", "blueprint_save",
@@ -516,6 +521,14 @@ def main() -> int:
             ):
                 if capabilities.get("features", {}).get(feature) is not True:
                     raise AssertionError(f"level-inspect capability is unavailable: {feature}")
+            for feature in (
+                "level_management", "level_blank_creation", "level_template_creation",
+                "level_world_settings", "level_map_deletion",
+            ):
+                if capabilities.get("features", {}).get(feature) is not True:
+                    raise AssertionError(f"level-management capability is unavailable: {feature}")
+            if capabilities.get("features", {}).get("level_world_partition_conversion") is not False:
+                raise AssertionError("level World Partition conversion must remain unsupported")
             for feature in ("asset_reference_discovery", "asset_reference_live_memory"):
                 if capabilities.get("features", {}).get(feature) is not True:
                     raise AssertionError(f"asset-references capability is unavailable: {feature}")
@@ -578,6 +591,9 @@ def main() -> int:
             if capabilities.get("limits", {}).get("level_discovery_scan") != 2048 \
                     or capabilities.get("limits", {}).get("level_external_packages") != 2048:
                 raise AssertionError(f"level-open limits mismatch: {capabilities.get('limits')!r}")
+            if capabilities.get("limits", {}).get("level_setup_properties") != 16 \
+                    or capabilities.get("limits", {}).get("level_owned_packages") != 2048:
+                raise AssertionError(f"level-management limits mismatch: {capabilities.get('limits')!r}")
             expected_level_inspect_limits = {
                 "level_actor_scan": 4096,
                 "level_actor_records": 2048,
@@ -610,6 +626,11 @@ def main() -> int:
             }:
                 raise AssertionError("asset access policy contract mismatch")
             level_scenario = open_acceptance_level(
+                bridge,
+                layout,
+                capabilities["bridge_instance_id"],
+            )
+            deleted_level_path = manage_disposable_level(
                 bridge,
                 layout,
                 capabilities["bridge_instance_id"],
@@ -677,6 +698,7 @@ def main() -> int:
                 phase_seventeen_game_data,
                 level_scenario,
             )
+            verify_restarted_level_deletion(reloaded_bridge, deleted_level_path)
             verify_restarted_assets(
                 reloaded_bridge,
                 phase_seventeen_game_data,
@@ -707,7 +729,7 @@ def main() -> int:
             pass
         else:
             raise AssertionError("a live discovery heartbeat remained after editor termination")
-    print("Integration passed: Widget Blueprint authoring, asset references/deletion, level inspection/opening, Phase 17 authoring, replay/restart, and graceful lifecycle shutdown")
+    print("Integration passed: Widget Blueprint authoring, asset references/deletion, level management, Phase 17 authoring, replay/restart, and graceful lifecycle shutdown")
     return 0
 
 

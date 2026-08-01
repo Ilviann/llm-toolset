@@ -9,6 +9,7 @@ public class UnrealMCP : ModuleRules
         PrivateDependencyModuleNames.AddRange(new[]
         {
             "AssetRegistry",
+            "AssetTools",
             "BlueprintGraph",
             "CoreUObject",
             "Engine",

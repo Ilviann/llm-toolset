@@ -35,7 +35,7 @@ ASSET_TOOLS: Final = (
     },
     {
         "name": "asset_delete",
-        "description": "Delete one exact unreferenced project asset after stale-safe reference and editor-state preflight.",
+        "description": "Delete one exact unreferenced project asset or complete map-owned package closure after stale-safe preflight.",
         "inputSchema": {
             "type": "object",
             "properties": {

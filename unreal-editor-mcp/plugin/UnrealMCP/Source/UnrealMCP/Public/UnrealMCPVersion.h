@@ -4,7 +4,7 @@
 
 namespace UnrealMCP
 {
-inline constexpr TCHAR Version[] = TEXT("0.24.0");
+inline constexpr TCHAR Version[] = TEXT("0.25.0");
 inline constexpr uint32 DefaultPort = 15485;
 inline constexpr int32 MaxRequestBytes = 64 * 1024;
 inline constexpr int32 MaxResponseBytes = 256 * 1024;
@@ -65,6 +65,8 @@ inline constexpr int32 MaxLevelComponents = 64;
 inline constexpr int32 MaxLevelActorTags = 64;
 inline constexpr int32 MaxLevelDataLayers = 32;
 inline constexpr int32 MaxLevelTargetedLoads = 1;
+inline constexpr int32 MaxLevelSetupProperties = 16;
+inline constexpr int32 MaxLevelOwnedPackages = 2048;
 inline constexpr int32 MaxDirtyPackageSummary = 16;
 inline constexpr int32 MaxWidgetTreeWidgets = 512;
 inline constexpr int32 MaxWidgetTreeDepth = 32;

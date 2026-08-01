@@ -1,0 +1,80 @@
+{
+  "description": "Create, configure, reload, leave, reference-check, and delete one exact non-World-Partition map. Replace IDs and snapshots with fresh values returned by earlier steps.",
+  "steps": [
+    {
+      "tool": "level_inspect",
+      "arguments": {"mode": "current"}
+    },
+    {
+      "tool": "level_manage",
+      "arguments": {
+        "operation_id": "0123456789abcdef0123456789abcdef",
+        "operation": "create",
+        "destination_path": "/Game/Maps/MCP_Disposable.MCP_Disposable",
+        "source": {"kind": "blank"},
+        "creation_options": {
+          "world_partition": false,
+          "world_partition_streaming": false,
+          "external_actors": false
+        },
+        "settings": [
+          {"property_name": "DefaultGameMode", "value": "/Script/Engine.GameModeBase"},
+          {"property_name": "KillZ", "value": -25000}
+        ],
+        "open_after_create": true,
+        "expected_current_snapshot": "0123456789abcdef0123456789abcdef01234567"
+      }
+    },
+    {
+      "tool": "level_manage",
+      "arguments": {
+        "operation_id": "1123456789abcdef0123456789abcdef",
+        "operation": "configure",
+        "map_path": "/Game/Maps/MCP_Disposable.MCP_Disposable",
+        "expected_current_snapshot": "1123456789abcdef0123456789abcdef01234567",
+        "settings": [
+          {"property_name": "WorldToMeters", "value": 250}
+        ],
+        "reload_after_save": true
+      }
+    },
+    {
+      "tool": "level_open",
+      "arguments": {
+        "operation_id": "2123456789abcdef0123456789abcdef",
+        "map_path": "/Game/Maps/AnotherCleanMap.AnotherCleanMap"
+      }
+    },
+    {
+      "tool": "asset_references",
+      "arguments": {
+        "asset_path": "/Game/Maps/MCP_Disposable.MCP_Disposable",
+        "page_size": 100
+      }
+    },
+    {
+      "tool": "asset_delete",
+      "arguments": {
+        "operation_id": "3123456789abcdef0123456789abcdef",
+        "asset_path": "/Game/Maps/MCP_Disposable.MCP_Disposable",
+        "expected_snapshot": "3123456789abcdef0123456789abcdef01234567"
+      }
+    },
+    {
+      "tool": "operation_status",
+      "arguments": {
+        "operation_id": "3123456789abcdef0123456789abcdef",
+        "bridge_instance_id": "4123456789abcdef0123456789abcdef"
+      }
+    },
+    {
+      "tool": "level_inspect",
+      "arguments": {
+        "mode": "discover",
+        "package_path": "/Game/Maps",
+        "asset_name": "MCP_Disposable",
+        "page_size": 1
+      }
+    }
+  ]
+}

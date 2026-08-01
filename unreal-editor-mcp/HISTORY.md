@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.25.0 — 2026-08-01
+
+- Added ledger-backed `level_manage` blank/template creation and exact-current-map configuration with explicit mounted World paths, current-map snapshots, topology facts, a 16-field World Settings allowlist, shared typed property encoding, save/reload read-back, and exact map identities.
+- Extended `asset_delete` with inactive-map deletion: bounded complete root/build-data/external package closure enumeration, whole-closure registry/live reference and editor-state preflight, public Unreal reference-aware deletion, and per-package registry/storage verification without force or direct filesystem removal.
+- Added synchronized schemas/capabilities/limits, a complete create-configure-delete example, Python contracts, focused non-partitioned and World Partition Windows Automation, and production cross-process/restart coverage; advanced the exact-version pair to 0.25.0. macOS native verification remains in the platform backlog.
+
 ## 0.24.0 — 2026-07-30
 
 - Extended `level_inspect` with exact-snapshot actor pages, World Partition descriptor records, map-qualified Actor GUID identities, exact filters, and bounded single-use pagination without broad actor loading.

@@ -2,7 +2,7 @@
 
 ## Ownership
 
-`UnrealMCPLevelService` owns mounted World discovery, current editor-map summaries, map identities, revisions, snapshots, pagination cursors, safe map opening, and editor-delegate invalidation. It delegates actor/component/property record construction to `FUnrealMCPLevelActorInspector`. `UnrealMCPBridge` owns HTTP admission and the shared operation ledger; `level_open` is admitted as a mutation before the service runs.
+`UnrealMCPLevelService` owns mounted World discovery, current editor-map summaries, map identities, revisions, snapshots, pagination cursors, safe map opening, and editor-delegate invalidation. It delegates actor/component/property record construction to `FUnrealMCPLevelActorInspector` and supplies current-map safety state to `FUnrealMCPLevelManagementService`. `UnrealMCPBridge` owns HTTP admission and the shared operation ledger.
 
 ## Dependency direction
 

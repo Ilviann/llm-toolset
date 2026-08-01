@@ -15,9 +15,9 @@ class FakeBridge:
     def call(self, command, arguments=None):
         self.calls.append((command, arguments))
         if command == "capabilities":
-            return {"bridge_version": "0.24.0", "commands": [
+            return {"bridge_version": "0.25.0", "commands": [
                 "capabilities", "editor_state", "operation_status", "asset_references", "asset_delete",
-                "level_inspect", "level_open",
+                "level_inspect", "level_open", "level_manage",
                 "blueprint_inspect", "blueprint_action_catalog", "blueprint_graph_edit",
                 "blueprint_block_replace",
                 "blueprint_create", "blueprint_compile", "blueprint_save",
@@ -40,11 +40,11 @@ class ServerStdioTests(unittest.TestCase):
         bridge = FakeBridge()
         server = MCPServer(bridge)
         initialized = server.handle({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2025-06-18"}})
-        self.assertEqual(initialized["result"]["serverInfo"]["version"], "0.24.0")
+        self.assertEqual(initialized["result"]["serverInfo"]["version"], "0.25.0")
         listed = server.handle({"jsonrpc": "2.0", "id": 2, "method": "tools/list"})
         self.assertEqual([tool["name"] for tool in listed["result"]["tools"]], [
             "capabilities", "editor_state", "operation_status", "asset_references", "asset_delete",
-            "level_inspect", "level_open",
+            "level_inspect", "level_open", "level_manage",
             "blueprint_inspect", "blueprint_action_catalog", "blueprint_graph_edit",
             "blueprint_block_replace",
             "blueprint_create", "blueprint_compile", "blueprint_save",
@@ -126,6 +126,64 @@ class ServerStdioTests(unittest.TestCase):
                     "params": {"name": name, "arguments": arguments},
                 })
                 self.assertEqual(response["error"]["code"], -32602)
+
+    def test_level_manage_schema_is_exact_bounded_and_explicit(self):
+        server = MCPServer(FakeBridge())
+        operation_id = "a" * 32
+        snapshot = "b" * 40
+        blank = {
+            "operation_id": operation_id,
+            "operation": "create",
+            "destination_path": "/Game/Maps/NewMap.NewMap",
+            "source": {"kind": "blank"},
+            "creation_options": {
+                "world_partition": False,
+                "world_partition_streaming": False,
+                "external_actors": False,
+            },
+            "settings": [{"property_name": "DefaultGameMode", "value": "/Script/Engine.GameModeBase"}],
+            "open_after_create": False,
+            "expected_current_snapshot": snapshot,
+        }
+        template = {
+            "operation_id": operation_id,
+            "operation": "create",
+            "destination_path": "/Game/Maps/FromTemplate.FromTemplate",
+            "source": {"kind": "template", "map_path": "/Game/Maps/Template.Template"},
+            "open_after_create": True,
+            "expected_current_snapshot": snapshot,
+        }
+        configure = {
+            "operation_id": operation_id,
+            "operation": "configure",
+            "map_path": "/Game/Maps/NewMap.NewMap",
+            "expected_current_snapshot": snapshot,
+            "settings": [
+                {"property_name": "WorldToMeters", "value": 100},
+                {"property_name": "DefaultColorScale", "value": "(X=1,Y=1,Z=1)"},
+            ],
+            "reload_after_save": True,
+        }
+        for arguments in (blank, template, configure):
+            response = server.handle({
+                "jsonrpc": "2.0", "id": 24, "method": "tools/call",
+                "params": {"name": "level_manage", "arguments": arguments},
+            })
+            self.assertNotIn("error", response)
+        for arguments in (
+            {},
+            {**blank, "destination_path": "C:\\Project\\Content\\NewMap.umap"},
+            {**blank, "force": True},
+            {**blank, "settings": [{"property_name": "WorldPartition", "value": True}]},
+            {**configure, "reload_after_save": "yes"},
+            {**configure, "settings": configure["settings"] * 9},
+            {**template, "creation_options": blank["creation_options"]},
+        ):
+            response = server.handle({
+                "jsonrpc": "2.0", "id": 25, "method": "tools/call",
+                "params": {"name": "level_manage", "arguments": arguments},
+            })
+            self.assertEqual(response["error"]["code"], -32602)
 
     def test_asset_references_schema_is_exact_and_bounded(self):
         server = MCPServer(FakeBridge())

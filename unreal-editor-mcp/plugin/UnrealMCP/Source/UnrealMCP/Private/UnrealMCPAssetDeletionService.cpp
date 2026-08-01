@@ -6,6 +6,8 @@
 #include "AssetRegistry/IAssetRegistry.h"
 #include "Editor.h"
 #include "Engine/World.h"
+#include "Engine/Level.h"
+#include "Engine/LevelStreaming.h"
 #include "HAL/FileManager.h"
 #include "HAL/PlatformFileManager.h"
 #include "Misc/PackageName.h"
@@ -13,6 +15,7 @@
 #include "ObjectTools.h"
 #include "Subsystems/AssetEditorSubsystem.h"
 #include "UnrealMCPAssetReferenceService.h"
+#include "UnrealMCPVersion.h"
 #include "UObject/GarbageCollection.h"
 #include "UObject/Package.h"
 #include "UObject/SoftObjectPath.h"
@@ -284,6 +287,248 @@ TSharedRef<FJsonObject> BuildResult(
     Result->SetStringField(TEXT("operation_state"), OperationState);
     return Result;
 }
+
+bool IsLoadedLevelPackage(const FString& PackageName)
+{
+    if (GEditor == nullptr) return false;
+    UWorld* Current = GEditor->GetEditorWorldContext().World();
+    if (Current == nullptr) return false;
+    for (const ULevelStreaming* Streaming : Current->GetStreamingLevels())
+    {
+        if (Streaming != nullptr && (Streaming->GetWorldAssetPackageFName() == FName(*PackageName)
+            || (Streaming->GetLoadedLevel() != nullptr
+                && Streaming->GetLoadedLevel()->GetOutermost()->GetName() == PackageName))) return true;
+    }
+    return false;
+}
+
+bool AddPackagesBelowPath(
+    const FString& LongPackagePath,
+    TSet<FString>& OutPackages,
+    FUnrealMCPError& OutError)
+{
+    FString Directory;
+    if (!FPackageName::TryConvertLongPackageNameToFilename(LongPackagePath, Directory))
+    {
+        OutError = {TEXT("package_closure_unsupported"), TEXT("A map-owned package path could not be resolved")};
+        return false;
+    }
+    TArray<FString> Filenames;
+    FPackageName::FindPackagesInDirectory(Filenames, Directory);
+    for (const FString& Filename : Filenames)
+    {
+        FString PackageName;
+        if (!FPackageName::TryConvertFilenameToLongPackageName(Filename, PackageName))
+        {
+            OutError = {TEXT("package_closure_unsupported"), TEXT("A map-owned package filename could not be mapped to mounted content")};
+            return false;
+        }
+        OutPackages.Add(PackageName);
+        if (OutPackages.Num() > UnrealMCP::MaxLevelOwnedPackages)
+        {
+            OutError = {TEXT("package_closure_truncated"), TEXT("The complete map-owned package closure exceeds the published bound")};
+            return false;
+        }
+    }
+    return true;
+}
+
+bool BuildMapClosure(
+    UWorld* World,
+    const FString& RootPackage,
+    TSet<FString>& OutPackages,
+    TArray<UObject*>& OutObjects,
+    FUnrealMCPError& OutError)
+{
+    if (World == nullptr || World->PersistentLevel == nullptr)
+    {
+        OutError = {TEXT("package_closure_unsupported"), TEXT("The map package could not provide a persistent level")};
+        return false;
+    }
+    OutPackages.Add(RootPackage);
+    OutObjects.Add(World);
+    ObjectTools::AddExtraObjectsToDelete(OutObjects);
+    for (UObject* Object : OutObjects)
+    {
+        if (Object != nullptr && Object->GetOutermost() != nullptr)
+        {
+            OutPackages.Add(Object->GetOutermost()->GetName());
+        }
+    }
+    TArray<FString> OwnedPaths = ULevel::GetExternalActorsPaths(RootPackage);
+    OwnedPaths.Append(ULevel::GetExternalObjectsPaths(RootPackage));
+    for (const FString& Path : OwnedPaths)
+    {
+        if (!AddPackagesBelowPath(Path, OutPackages, OutError)) return false;
+    }
+    for (UPackage* Package : World->PersistentLevel->GetLoadedExternalObjectPackages())
+    {
+        if (Package != nullptr) OutPackages.Add(Package->GetName());
+    }
+    if (OutPackages.Num() > UnrealMCP::MaxLevelOwnedPackages)
+    {
+        OutError = {TEXT("package_closure_truncated"), TEXT("The complete map-owned package closure exceeds the published bound")};
+        return false;
+    }
+    return true;
+}
+
+bool HasExternalClosureReferencers(
+    IAssetRegistry& Registry,
+    const TSet<FString>& Closure,
+    FUnrealMCPError& OutError)
+{
+    if (Registry.IsGathering())
+    {
+        OutError = {TEXT("reference_preflight_incomplete"), TEXT("Map deletion requires a current complete Asset Registry"), MakeShared<FJsonObject>(), true};
+        return true;
+    }
+    int32 CandidateCount = 0;
+    for (const FString& PackageName : Closure)
+    {
+        TArray<FAssetIdentifier> Referencers;
+        Registry.GetReferencers(
+            FAssetIdentifier(FName(*PackageName)), Referencers,
+            UE::AssetRegistry::EDependencyCategory::All);
+        CandidateCount += Referencers.Num();
+        if (CandidateCount > UnrealMCP::MaxAssetReferenceRegistryCandidates)
+        {
+            OutError = {TEXT("reference_preflight_incomplete"), TEXT("Map-closure referencer enumeration exceeds the published bound")};
+            return true;
+        }
+        for (const FAssetIdentifier& Referencer : Referencers)
+        {
+            const FString ReferencerPackage = Referencer.PackageName.ToString();
+            if (ReferencerPackage.IsEmpty() || !Closure.Contains(ReferencerPackage))
+            {
+                const TSharedRef<FJsonObject> Details = MakeShared<FJsonObject>();
+                Details->SetStringField(TEXT("owned_package"), PackageName);
+                Details->SetStringField(TEXT("referencer"), Referencer.ToString().Left(512));
+                OutError = {TEXT("asset_referenced"), TEXT("A map-owned package has an external registry referencer"), Details};
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+bool RecordsContainExternalReferences(
+    const FUnrealMCPAssetReferenceSnapshot& Snapshot,
+    const TSet<FString>& Closure,
+    FUnrealMCPError& OutError)
+{
+    for (const TSharedPtr<FJsonValue>& Value : Snapshot.Records)
+    {
+        const TSharedPtr<FJsonObject> Record = Value.IsValid() ? Value->AsObject() : nullptr;
+        FString ReferencerPackage;
+        if (!Record.IsValid() || !Record->TryGetStringField(TEXT("referencer_package"), ReferencerPackage)
+            || ReferencerPackage.IsEmpty() || !Closure.Contains(ReferencerPackage))
+        {
+            OutError = {TEXT("asset_referenced"), TEXT("The map has an external serialized or live-memory referencer")};
+            return true;
+        }
+    }
+    return false;
+}
+
+bool DeleteMap(
+    FUnrealMCPAssetReferenceService& References,
+    const FAssetData& Asset,
+    const FString& AssetPath,
+    const FString& ExpectedSnapshot,
+    TSharedPtr<FJsonObject>& OutResult,
+    FUnrealMCPError& OutError)
+{
+    const FString PackageName = Asset.PackageName.ToString();
+    if (IsCurrentMapPackage(PackageName) || IsLoadedLevelPackage(PackageName))
+    {
+        OutError = {TEXT("active_map"), TEXT("Map deletion refuses the current map and loaded streaming or sublevel maps")};
+        return false;
+    }
+    UWorld* World = Cast<UWorld>(Asset.GetAsset({ULevel::LoadAllExternalObjectsTag}));
+    // The exact map load may queue post-load work for its owned external objects. Drain only
+    // that operation-owned work before the fresh reference and editor-state preflight.
+    FlushAsyncLoading();
+    TSet<FString> Closure;
+    TArray<UObject*> DeleteObjects;
+    if (!BuildMapClosure(World, PackageName, Closure, DeleteObjects, OutError)) return false;
+    TMap<FString, FString> OriginalFiles;
+    for (const FString& OwnedPackage : Closure)
+    {
+        if (!ValidateMutationScope(OwnedPackage, OutError)) return false;
+        UPackage* Loaded = FindPackage(nullptr, *OwnedPackage);
+        if (Loaded != nullptr && Loaded->IsDirty())
+        {
+            OutError = {TEXT("dirty_package"), TEXT("A map-owned package has unsaved changes")};
+            return false;
+        }
+        FString Filename;
+        if (!FPackageName::DoesPackageExist(OwnedPackage, &Filename) || Filename.IsEmpty())
+        {
+            OutError = {TEXT("package_closure_unsupported"), TEXT("A map-owned package has no verifiable persisted storage")};
+            return false;
+        }
+        if (FPlatformFileManager::Get().GetPlatformFile().IsSymlink(*Filename) == ESymlinkResult::Symlink
+            || IFileManager::Get().IsReadOnly(*Filename))
+        {
+            OutError = {TEXT("write_conflict"), TEXT("A map-owned package is symlinked or read-only")};
+            return false;
+        }
+        OriginalFiles.Add(OwnedPackage, Filename);
+    }
+    IAssetRegistry& Registry = FAssetRegistryModule::GetRegistry();
+    if (HasExternalClosureReferencers(Registry, Closure, OutError)) return false;
+    FUnrealMCPAssetReferenceSnapshot Final;
+    bool bLiveScanComplete = false;
+    if (!References.Capture(AssetPath, Final, OutError)
+        || !ReferenceScansSufficient(Final, bLiveScanComplete, OutError)
+        || RecordsContainExternalReferences(Final, Closure, OutError)) return false;
+    bool bReferenced = false;
+    bool bReferencedByUndo = false;
+    ObjectTools::GatherObjectReferencersForDeletion(World, bReferenced, bReferencedByUndo, nullptr, false);
+    if (bReferenced || bReferencedByUndo)
+    {
+        OutError = {TEXT("asset_referenced"), TEXT("Unreal's full deletion check found retained map or Undo references")};
+        return false;
+    }
+    if (HasUnsafeEditorWork(OutError)) return false;
+    const TArray<FAssetData> Assets{Asset};
+    const int32 DeletedCount = ObjectTools::DeleteAssets(Assets, false);
+    TArray<TSharedPtr<FJsonValue>> PackageResults;
+    bool bAllRegistryAbsent = true;
+    bool bAllStorageAbsent = true;
+    TArray<FString> Sorted = Closure.Array();
+    Sorted.Sort();
+    for (const FString& OwnedPackage : Sorted)
+    {
+        TArray<FAssetData> Remaining;
+        Registry.GetAssetsByPackageName(FName(*OwnedPackage), Remaining, true);
+        const bool bRegistryAbsent = Remaining.IsEmpty();
+        FString RemainingFilename;
+        const bool bStorageAbsent = !FPackageName::DoesPackageExist(OwnedPackage, &RemainingFilename)
+            && !IFileManager::Get().FileExists(*OriginalFiles.FindChecked(OwnedPackage));
+        bAllRegistryAbsent &= bRegistryAbsent;
+        bAllStorageAbsent &= bStorageAbsent;
+        const TSharedRef<FJsonObject> Record = MakeShared<FJsonObject>();
+        Record->SetStringField(TEXT("package_name"), OwnedPackage);
+        Record->SetBoolField(TEXT("asset_registry_absent"), bRegistryAbsent);
+        Record->SetBoolField(TEXT("storage_absent"), bStorageAbsent);
+        PackageResults.Add(MakeShared<FJsonValueObject>(Record));
+    }
+    const bool bDeleted = DeletedCount > 0 && bAllRegistryAbsent && bAllStorageAbsent;
+    const TSharedRef<FJsonObject> Result = BuildResult(
+        AssetPath, PackageName, ExpectedSnapshot, Final.SnapshotId,
+        bAllRegistryAbsent, bAllStorageAbsent, bLiveScanComplete,
+        bDeleted ? TEXT("committed") : TEXT("partial"));
+    Result->SetBoolField(TEXT("map_deletion"), true);
+    Result->SetNumberField(TEXT("owned_package_count"), Closure.Num());
+    Result->SetArrayField(TEXT("package_closure"), PackageResults);
+    Result->SetBoolField(TEXT("package_closure_complete"), true);
+    Result->SetBoolField(TEXT("delete_api_succeeded"), DeletedCount > 0);
+    Result->SetBoolField(TEXT("deleted"), bDeleted);
+    OutResult = Result;
+    return true;
+}
 }
 
 FUnrealMCPAssetDeletionService::FUnrealMCPAssetDeletionService(
@@ -362,10 +607,14 @@ bool FUnrealMCPAssetDeletionService::Delete(
         OutError = {TEXT("unsupported_asset"), TEXT("Redirectors cannot be deleted by asset_delete")};
         return false;
     }
-    if (Asset.AssetClassPath == UWorld::StaticClass()->GetClassPathName()
-        || UnrealMCPAssetDeletionPrivate::IsCurrentMapPackage(PackageName))
+    if (Asset.AssetClassPath == UWorld::StaticClass()->GetClassPathName())
     {
-        OutError = {TEXT("unsupported_asset"), TEXT("Map and current-world packages are outside asset_delete scope")};
+        return UnrealMCPAssetDeletionPrivate::DeleteMap(
+            References, Asset, AssetPath, ExpectedSnapshot, OutResult, OutError);
+    }
+    if (UnrealMCPAssetDeletionPrivate::IsCurrentMapPackage(PackageName))
+    {
+        OutError = {TEXT("unsupported_asset"), TEXT("Current-world packages are outside ordinary asset_delete scope")};
         return false;
     }
     if (PackageName.Contains(TEXT("/__ExternalActors__/"))

@@ -60,6 +60,42 @@ _PROPERTY_NAMES = {
         "pattern": r"^[^.\\]+$",
     },
 }
+_LEVEL_SETTING = {
+    "type": "object",
+    "properties": {
+        "property_name": {
+            "type": "string",
+            "enum": [
+                "DefaultGameMode", "bEnableWorldBoundsChecks", "bEnableAISystem",
+                "bUseClientSideLevelStreamingVolumes", "bEnableWorldOriginRebasing",
+                "bGlobalGravitySet", "GlobalGravityZ", "WorldToMeters", "KillZ",
+                "KillZDamageType", "DefaultPhysicsVolumeClass",
+                "PhysicsCollisionHandlerClass", "DefaultColorScale",
+                "PackedLightAndShadowMapTextureSize", "bForceNoPrecomputedLighting",
+                "DefaultMaxDistanceFieldOcclusionDistance",
+            ],
+        },
+        "value": {
+            "oneOf": [
+                {"type": "boolean"},
+                {"type": "number", "minimum": -1000000000, "maximum": 1000000000},
+                {"type": "string", "maxLength": 4096},
+                {
+                    "type": "array", "maxItems": 64, "uniqueItems": True,
+                    "items": {"type": "string", "minLength": 1, "maxLength": 128},
+                },
+            ]
+        },
+    },
+    "required": ["property_name", "value"],
+    "additionalProperties": False,
+}
+_LEVEL_SETTINGS = {
+    "type": "array",
+    "minItems": 1,
+    "maxItems": 16,
+    "items": _LEVEL_SETTING,
+}
 
 LEVEL_TOOLS: Final = (
     {
@@ -153,6 +189,84 @@ LEVEL_TOOLS: Final = (
             },
             "required": ["operation_id", "map_path"],
             "additionalProperties": False,
+        },
+    },
+    {
+        "name": "level_manage",
+        "description": "Create or configure and persist one exact project map with explicit current-map safety and bounded World Settings.",
+        "inputSchema": {
+            "oneOf": [
+                {
+                    "type": "object",
+                    "properties": {
+                        "operation_id": _OPERATION_ID,
+                        "operation": {"const": "create"},
+                        "destination_path": _PATH,
+                        "source": {
+                            "type": "object",
+                            "properties": {"kind": {"const": "blank"}},
+                            "required": ["kind"],
+                            "additionalProperties": False,
+                        },
+                        "creation_options": {
+                            "type": "object",
+                            "properties": {
+                                "world_partition": {"type": "boolean"},
+                                "world_partition_streaming": {"type": "boolean"},
+                                "external_actors": {"type": "boolean"},
+                            },
+                            "required": ["world_partition", "world_partition_streaming", "external_actors"],
+                            "additionalProperties": False,
+                        },
+                        "settings": _LEVEL_SETTINGS,
+                        "open_after_create": {"type": "boolean"},
+                        "expected_current_snapshot": _SNAPSHOT_ID,
+                    },
+                    "required": [
+                        "operation_id", "operation", "destination_path", "source",
+                        "creation_options", "open_after_create", "expected_current_snapshot",
+                    ],
+                    "additionalProperties": False,
+                },
+                {
+                    "type": "object",
+                    "properties": {
+                        "operation_id": _OPERATION_ID,
+                        "operation": {"const": "create"},
+                        "destination_path": _PATH,
+                        "source": {
+                            "type": "object",
+                            "properties": {"kind": {"const": "template"}, "map_path": _PATH},
+                            "required": ["kind", "map_path"],
+                            "additionalProperties": False,
+                        },
+                        "settings": _LEVEL_SETTINGS,
+                        "open_after_create": {"type": "boolean"},
+                        "expected_current_snapshot": _SNAPSHOT_ID,
+                    },
+                    "required": [
+                        "operation_id", "operation", "destination_path", "source",
+                        "open_after_create", "expected_current_snapshot",
+                    ],
+                    "additionalProperties": False,
+                },
+                {
+                    "type": "object",
+                    "properties": {
+                        "operation_id": _OPERATION_ID,
+                        "operation": {"const": "configure"},
+                        "map_path": _PATH,
+                        "expected_current_snapshot": _SNAPSHOT_ID,
+                        "settings": _LEVEL_SETTINGS,
+                        "reload_after_save": {"type": "boolean"},
+                    },
+                    "required": [
+                        "operation_id", "operation", "map_path",
+                        "expected_current_snapshot", "settings", "reload_after_save",
+                    ],
+                    "additionalProperties": False,
+                },
+            ]
         },
     },
 )
