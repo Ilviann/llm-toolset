@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.25.1 — 2026-08-01
+
+- Ported the plugin to the exact Unreal Engine 5.7 API line with compile/runtime version gates, a public-API Widget Blueprint compatibility facade, and 5.7-specific object-iteration, actor-inspection, and native row-schema handling.
+- Split disposable test fixtures by engine line: preserved the prior 5.8 project under `ue-test/ue58` and added a clean 5.7 project under `ue-test/ue57` using the same `UnrealMCPTest` project/module identity.
+- Updated packaging/deployment validation, versioned contracts, tests, and user/developer documentation for UE 5.7; verified the native compatibility port on macOS.
+
 ## 0.25.0 — 2026-08-01
 
 - Added ledger-backed `level_manage` blank/template creation and exact-current-map configuration with explicit mounted World paths, current-map snapshots, topology facts, a 16-field World Settings allowlist, shared typed property encoding, save/reload read-back, and exact map identities.

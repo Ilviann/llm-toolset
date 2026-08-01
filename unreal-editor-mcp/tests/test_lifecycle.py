@@ -76,7 +76,7 @@ class LifecycleTests(unittest.TestCase):
             "process_id": pid,
             "port": 15485,
             "bridge_version": version or unreal_editor_mcp.__version__,
-            "unreal_version": "5.8.0",
+            "unreal_version": "5.7.4",
             "updated_at_ms": updated_at_ms or __import__("time").time_ns() // 1_000_000,
         }
         self.layout.discovery_file.write_text(json.dumps(value), encoding="utf-8")
@@ -147,7 +147,7 @@ class LifecycleTests(unittest.TestCase):
             "process_id": 10,
             "port": 15485,
             "bridge_version": unreal_editor_mcp.__version__,
-            "unreal_version": "5.8.0",
+            "unreal_version": "5.7.4",
             "updated_at_ms": 1,
         }), encoding="utf-8")
         with self.assertRaises(BridgeError) as caught:

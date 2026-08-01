@@ -25,7 +25,7 @@ Unreal's HTTPServer owns listener sockets process-wide. The plugin owns and unbi
 
 ## Public Unreal boundary
 
-`UnrealMCPApiProbe.cpp` is compiled in every build and includes only public headers for HTTPServer/router, `FScopedTransaction`, Kismet/Blueprint utilities, Subobject Data, K2 schema and spawners, compiler logs, Asset Registry, and package saving. Function probes take addresses rather than relying on permissive function-name expressions, and overloaded public functions use an explicit expected signature so Clang and MSVC verify the same boundary. Unreal 5.8 is the first compatibility branch; later branches belong only in `UnrealMCPCompatibility` and require a test.
+`UnrealMCPApiProbe.cpp` is compiled in every build and includes only public headers for HTTPServer/router, `FScopedTransaction`, Kismet/Blueprint utilities, Subobject Data, K2 schema and spawners, compiler logs, Asset Registry, and package saving. Function probes take addresses rather than relying on permissive function-name expressions, and overloaded public functions use an explicit expected signature so Clang and MSVC verify the same boundary. This compatibility branch accepts only Unreal 5.7.x; older and newer API lines fail compilation and runtime capability matching. Another Unreal release requires a separate compatibility branch and native test fixture.
 
 ## Verification
 

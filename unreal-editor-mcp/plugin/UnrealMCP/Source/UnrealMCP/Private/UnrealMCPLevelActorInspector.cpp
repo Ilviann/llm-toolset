@@ -739,7 +739,8 @@ bool FUnrealMCPLevelActorInspector::BuildRecords(
     {
         for (UActorComponent* Component : Components)
         {
-            OutRecords.Add(MakeShared<FJsonValueObject>(ComponentRecord(Component, RequestedActorId)));
+            OutRecords.Add(MakeShared<FJsonValueObject>(
+                UnrealMCPLevelActorInspectorPrivate::ComponentRecord(Component, RequestedActorId)));
         }
         return AddProperties(
             Candidate.Actor,
@@ -772,7 +773,8 @@ bool FUnrealMCPLevelActorInspector::BuildRecords(
         OutError = {TEXT("not_found"), TEXT("The requested actor-scoped component was not found")};
         return false;
     }
-    OutRecords.Add(MakeShared<FJsonValueObject>(ComponentRecord(Selected, RequestedActorId)));
+    OutRecords.Add(MakeShared<FJsonValueObject>(
+        UnrealMCPLevelActorInspectorPrivate::ComponentRecord(Selected, RequestedActorId)));
     return AddProperties(
         Selected,
         TEXT("component"),

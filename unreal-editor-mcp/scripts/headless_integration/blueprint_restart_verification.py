@@ -12,6 +12,7 @@ def verify_restarted_blueprints(
     reloaded_bridge: UnrealBridge,
     layout: ProjectLayout,
     phase_two_loaded_snapshot: str,
+    phase_two_loaded_inspection: dict[str, object],
     phase_fourteen_families: dict[str, dict[str, object]],
     phase_fifteen_game_instance: dict[str, object],
     scenario: dict[str, object],
@@ -46,9 +47,20 @@ def verify_restarted_blueprints(
         "page_size": 100,
     })
     if phase_two_reloaded.get("snapshot_id") != phase_two_loaded_snapshot:
+        before_records = {
+            json.dumps(record, sort_keys=True, separators=(",", ":"))
+            for record in phase_two_loaded_inspection.get("records", [])
+        }
+        after_records = {
+            json.dumps(record, sort_keys=True, separators=(",", ":"))
+            for record in phase_two_reloaded.get("records", [])
+        }
+        removed = sorted(before_records - after_records)
+        added = sorted(after_records - before_records)
         raise AssertionError(
             "Phase 2 persisted structural snapshot changed between editor reloads: "
-            f"expected {phase_two_loaded_snapshot}, received {phase_two_reloaded.get('snapshot_id')}"
+            f"expected {phase_two_loaded_snapshot}, received {phase_two_reloaded.get('snapshot_id')}; "
+            f"first removed record={removed[:1]!r}; first added record={added[:1]!r}"
         )
     reloaded = collect_inspection(reloaded_bridge, {
         "mode": "inspect",

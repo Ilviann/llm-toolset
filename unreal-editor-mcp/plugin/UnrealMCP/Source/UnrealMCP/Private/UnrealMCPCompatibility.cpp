@@ -6,8 +6,8 @@
 #include <sys/stat.h>
 #endif
 
-#if UE_VERSION_OLDER_THAN(5, 8, 0)
-#error Unreal Editor MCP requires Unreal Engine 5.8 or newer.
+#if ENGINE_MAJOR_VERSION != 5 || ENGINE_MINOR_VERSION != 7
+#error Unreal Editor MCP requires Unreal Engine 5.7.
 #endif
 
 bool UnrealMCP::Compatibility::SupportsCurrentEngine()
@@ -17,11 +17,7 @@ bool UnrealMCP::Compatibility::SupportsCurrentEngine()
 
 FString UnrealMCP::Compatibility::EngineApiLine()
 {
-#if UE_VERSION_NEWER_THAN(5, 8, 99)
-    return TEXT("5.9+");
-#else
-    return TEXT("5.8");
-#endif
+    return TEXT("5.7");
 }
 
 bool UnrealMCP::Compatibility::SecureTokenFile(const FString& Path)

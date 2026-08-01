@@ -637,6 +637,7 @@ def main() -> int:
             )
             blueprint_fixtures = prepare_blueprint_scenario(bridge)
             phase_two_loaded_snapshot = blueprint_fixtures["phase_two_loaded_snapshot"]
+            phase_two_loaded_inspection = blueprint_fixtures["phase_two_loaded_inspection"]
             created = blueprint_fixtures["created"]
             phase_fourteen_families = blueprint_fixtures["phase_fourteen_families"]
             phase_fifteen_game_instance = blueprint_fixtures["phase_fifteen_game_instance"]
@@ -708,6 +709,7 @@ def main() -> int:
                 reloaded_bridge,
                 layout,
                 phase_two_loaded_snapshot,
+                phase_two_loaded_inspection,
                 phase_fourteen_families,
                 phase_fifteen_game_instance,
                 blueprint_scenario,

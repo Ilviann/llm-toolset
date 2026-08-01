@@ -15,7 +15,7 @@ Every feature document begins with YAML front matter containing string `feature_
 
 ## Roadmap workflow
 
-The target is Unreal Engine 5.8 and newer. macOS remains the primary development host. Platform verification requirements remain documented by each applicable feature, while missing native coverage for completed features is tracked separately in the [`ROADMAP.md` native platform test backlog](../../ROADMAP.md#native-platform-test-backlog). Linux remains source-portable with unit-tested platform branches until a native host is available.
+This branch targets exactly Unreal Engine 5.7. macOS remains the primary development host. Platform verification requirements remain documented by each applicable feature, while missing native coverage for completed features is tracked separately in the [`ROADMAP.md` native platform test backlog](../../ROADMAP.md#native-platform-test-backlog). Linux remains source-portable with unit-tested platform branches until a native host is available.
 
 Keep the authoritative checklist in [`ROADMAP.md`](../../ROADMAP.md) synchronized with every unfinished feature and each completed feature that is its direct prerequisite. Remove other completed checklist entries while retaining their feature documents below. Feature identifiers are stable names rather than execution indexes. A feature may be implemented and completed whenever every direct dependency listed in its description is complete. Every feature must include implementation, tests, documentation, examples, and a releasable completion gate.
 
@@ -230,7 +230,7 @@ The following are not part of the committed remaining roadmap unless separately 
 - General Play-in-Editor input injection, screenshots, runtime object mutation beyond exact configured test functions, arbitrary gameplay assertions, or unrestricted raw-log capture.
 - Cloud services, accounts, telemetry, dependency downloads, or a model-facing game-side network listener.
 
-## Primary Unreal 5.8 API references
+## Primary Unreal 5.7 API references
 
 These references establish feasibility only. Each owning feature must add compiled public-header probes and behavioral tests before freezing its model-facing contract:
 

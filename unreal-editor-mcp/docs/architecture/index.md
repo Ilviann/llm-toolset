@@ -12,6 +12,7 @@ Each file in this directory documents one implemented cohesive component: what i
 - [`blueprint-block-replacement.md`](blueprint-block-replacement.md) — complete user-function boundaries, scratch compilation, semantic parity, transactional apply, and rollback.
 - [`blueprint-mutator.md`](blueprint-mutator.md) — safe published-family Blueprint creation, compilation, package saving, diagnostics, cleanup, and read-back.
 - [`widget-tree-service.md`](widget-tree-service.md) — bounded Widget Blueprint hierarchy/default inspection and stale-safe structural editing.
+- [`widget-compatibility.md`](widget-compatibility.md) — UE 5.7 public-API facade for Widget Blueprint creation, tree mutation, rename, variable exposure, and event binding.
 - [`umg-layout-service.md`](umg-layout-service.md) — typed common panel-slot layout editing and inspection.
 - [`umg-style-service.md`](umg-style-service.md) — bounded reflected widget presentation editing.
 - [`umg-binding-service.md`](umg-binding-service.md) — exact property bindings and Designer-event graph nodes.

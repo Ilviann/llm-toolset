@@ -244,9 +244,9 @@ def validate_supported_engine_root(engine_root: Path) -> Path:
     minor = version.get("MinorVersion")
     if type(major) is not int or type(minor) is not int:
         raise DeploymentError(f"Unreal Engine build version has invalid major/minor fields: {version_file}")
-    if (major, minor) < (5, 8):
+    if (major, minor) != (5, 7):
         raise DeploymentError(
-            f"Unreal MCP requires Unreal Engine 5.8 or newer; selected Engine is {major}.{minor}"
+            f"Unreal MCP requires Unreal Engine 5.7; selected Engine is {major}.{minor}"
         )
     return run_uat
 

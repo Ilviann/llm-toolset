@@ -18,6 +18,7 @@ public class UnrealMCP : ModuleRules
             "Json",
             "Kismet",
             "KismetCompiler",
+            "MovieScene",
             "Projects",
             "SubobjectDataInterface",
             "UMG",

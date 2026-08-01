@@ -1,6 +1,7 @@
 #include "UnrealMCPBlueprintCallableMutationSupport.h"
 #include "Blueprint/UserWidget.h"
-#include "WidgetBlueprintOperationUtils.h"
+#include "UnrealMCPWidgetCompatibility.h"
+#include "WidgetBlueprint.h"
 
 
 FUnrealMCPBlueprintMutator::FUnrealMCPBlueprintMutator(
@@ -92,9 +93,9 @@ bool FUnrealMCPBlueprintMutator::Create(
     const FString AssetName = FPackageName::GetLongPackageAssetName(PackageName);
     UPackage* Package = CreatePackage(*PackageName);
     UBlueprint* Blueprint = ParentClass->IsChildOf(UUserWidget::StaticClass())
-        ? FWidgetBlueprintOperationUtils::CreateWidgetBlueprint(
+        ? static_cast<UBlueprint*>(FUnrealMCPWidgetCompatibility::CreateWidgetBlueprint(
             Package, FName(*AssetName), BPTYPE_Normal, ParentClass, nullptr,
-            FName(TEXT("UnrealMCP")), false)
+            FName(TEXT("UnrealMCP")), false))
         : FKismetEditorUtilities::CreateBlueprint(
             ParentClass, Package, FName(*AssetName), BPTYPE_Normal, FName(TEXT("UnrealMCP")));
     if (Blueprint == nullptr)

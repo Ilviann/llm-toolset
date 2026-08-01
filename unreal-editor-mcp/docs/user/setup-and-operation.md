@@ -20,7 +20,7 @@ Close Unreal Editor, then double-click:
 scripts\deploy_plugin_windows.cmd
 ```
 
-Select the folder that directly contains your game's `.uproject` file. When `UNREAL_MCP_ENGINE_ROOT` is set, its value is already shown in the Unreal Engine field and is preserved after project selection when valid. Otherwise, the helper detects a matching Unreal Engine 5.8+ installation from `EngineAssociation` and standard Epic/user-build registry records; use the second Browse button if manual selection is needed. For readable plugin frames in Windows crash reports, enable **Include matching PDB crash symbols (larger installation)**. Click **Build and install plugin**.
+Select the folder that directly contains your game's `.uproject` file. When `UNREAL_MCP_ENGINE_ROOT` is set, its value is already shown in the Unreal Engine field and is preserved after project selection when valid. Otherwise, the helper detects a matching Unreal Engine 5.7 installation from `EngineAssociation` and standard Epic/user-build registry records; use the second Browse button if manual selection is needed. For readable plugin frames in Windows crash reports, enable **Include matching PDB crash symbols (larger installation)**. Click **Build and install plugin**.
 
 The helper uses the installed Engine and Visual Studio toolchain to package `Win64`, removes C++ implementation source and external debug/symbol artifacts by default, and installs the verified binary plugin at `<YourProject>\Plugins\UnrealMCP`. When PDB deployment is enabled, it retains only PDBs directly under `Binaries/Win64` whose basenames match deployed DLLs and rejects an installation missing a matching symbol file. The small `UnrealMCP.Build.cs` module rule and precompiled Unreal Build Tool metadata are retained, and the installed rule explicitly selects the packaged module so later game-project builds do not rebuild it. If that plugin folder already exists, the GUI asks before replacing it, and a failed build leaves the existing installation unchanged.
 
@@ -31,8 +31,8 @@ Python 3.10 or newer with tkinter is required. Official Windows Python installer
 ### Manual/source installation
 
 1. Copy [`plugin/UnrealMCP`](../../plugin/UnrealMCP) to `<YourProject>/Plugins/UnrealMCP` or add this repository's `plugin/` folder as an `AdditionalPluginDirectories` entry in a disposable development `.uproject`.
-2. Enable the `UnrealMCP` plugin and compile the project's Editor target with Unreal 5.8 or a newer version that passes the included public-API probes.
-3. Open the project. Look for `Unreal MCP 0.25.0 ready on 127.0.0.1:15485` in the editor log.
+2. Enable the `UnrealMCP` plugin and compile the project's Editor target with Unreal 5.7.
+3. Open the project. Look for `Unreal MCP 0.25.1 ready on 127.0.0.1:15485` in the editor log.
 4. Install the Python package offline from this folder:
 
    ```sh
@@ -89,8 +89,8 @@ Start the Unreal project before calling a tool. `capabilities` remains available
 `editor_lifecycle` is absent from default mode. Enable it only for an MCP entry dedicated to one trusted project by adding `--tool-mode large` and an absolute `--editor` path. Windows requires `UnrealEditor.exe`; macOS requires the executable inside `UnrealEditor.app`. For example, the configured argument arrays end with:
 
 ```text
-Windows: C:\absolute\Project.uproject --tool-mode large --editor C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe
-macOS:   /absolute/Project.uproject --tool-mode large --editor /Users/Shared/Epic Games/UE_5.8/Engine/Binaries/Mac/UnrealEditor.app/Contents/MacOS/UnrealEditor
+Windows: C:\absolute\Project.uproject --tool-mode large --editor C:\Program Files\Epic Games\UE_5.7\Engine\Binaries\Win64\UnrealEditor.exe
+macOS:   /absolute/Project.uproject --tool-mode large --editor /Users/Shared/Epic Games/UE_5.7/Engine/Binaries/Mac/UnrealEditor.app/Contents/MacOS/UnrealEditor
 ```
 
 Pass each shown value as a separate MCP `args` element; spaces are part of a path, not shell quoting. `--lifecycle-timeout` configures one 5–900 second bound and defaults to 120 seconds. Linux rejects launch/restart; its command construction remains unit-tested without a native-support claim. Large mode without `--editor` can report and gracefully shut down the configured running project, but launch and restart reject as unavailable.

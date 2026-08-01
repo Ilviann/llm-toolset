@@ -26,7 +26,7 @@ class PlatformAdapterTests(unittest.TestCase):
             return object()
 
         adapter = PlatformAdapter("macos", process_probe=lambda _pid: True)
-        executable = Path("/Applications/UE 5.8/UnrealEditor")
+        executable = Path("/Applications/UE 5.7/UnrealEditor")
         project = Path("/Users/test/My Game/MyGame.uproject")
         adapter.launch_editor(executable, project, process_factory=factory)
         self.assertEqual(captured["command"], (str(executable), str(project)))

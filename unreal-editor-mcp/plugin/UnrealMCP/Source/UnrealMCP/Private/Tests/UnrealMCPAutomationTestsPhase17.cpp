@@ -123,7 +123,7 @@ bool FUnrealMCPPhase17GameDataAuthoringTest::RunTest(const FString& Parameters)
     TSharedRef<FJsonObject> CreateNativeTable = DataArguments(TEXT("data_table"), TEXT("create"), NativeTablePackage);
     CreateNativeTable->SetStringField(TEXT("row_struct"), TEXT("/Script/Engine.MirrorTableRow"));
     const TSharedRef<FJsonObject> NativeValues = MakeShared<FJsonObject>(); NativeValues->SetStringField(TEXT("Name"), TEXT("hand_l"));
-    NativeValues->SetStringField(TEXT("MirroredName"), TEXT("hand_r")); NativeValues->SetBoolField(TEXT("bEnabled"), true);
+    NativeValues->SetStringField(TEXT("MirroredName"), TEXT("hand_r"));
     const TSharedRef<FJsonObject> NativeRow = MakeShared<FJsonObject>(); NativeRow->SetStringField(TEXT("row_name"), TEXT("LeftHand")); NativeRow->SetObjectField(TEXT("values"), NativeValues);
     CreateNativeTable->SetArrayField(TEXT("rows"), {MakeShared<FJsonValueObject>(NativeRow)});
     if (!TestTrue(TEXT("native row-struct Data Table creates and saves"), Service.Edit(CreateNativeTable, Result, Error)))

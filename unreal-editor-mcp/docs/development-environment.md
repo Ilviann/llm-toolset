@@ -4,11 +4,11 @@ This page records the local build and integration-test requirements for Unreal E
 
 ## Required software
 
-- Unreal Engine 5.8 or newer with the host editor executable, public C++ headers, UnrealBuildTool, bundled .NET SDK, and platform build scripts installed. Support for a newer Unreal release must be demonstrated by the Phase 1 compilation probes and integration suite.
-- Xcode 26.1.1 for the primary Unreal Engine 5.8 macOS baseline. Xcode must have completed first-launch setup and license acceptance. Select this version per build rather than assuming the globally selected or newest Xcode is compatible. See Epic's [macOS development requirements](https://dev.epicgames.com/documentation/unreal-engine/macos-development-requirements-for-unreal-engine?lang=en-US).
+- Unreal Engine 5.7 with the host editor executable, public C++ headers, UnrealBuildTool, bundled .NET SDK, and platform build scripts installed. This branch rejects older and newer API lines; support for another release belongs in a separate compatibility branch with its own compilation probes and integration suite.
+- Xcode 26.1.1 for the primary Unreal Engine 5.7 macOS baseline. Xcode must have completed first-launch setup and license acceptance. Select this version per build rather than assuming the globally selected or newest Xcode is compatible. See Epic's [macOS development requirements](https://dev.epicgames.com/documentation/unreal-engine/macos-development-requirements-for-unreal-engine?lang=en-US).
 - Visual Studio with the Desktop development with C++ workload and an Unreal-supported MSVC and Windows SDK for native Windows validation. Confirm the exact installed SDK with AutomationTool Turnkey before compiling.
 - Python 3.10 or newer. Production code and tests use the standard library unless a later roadmap change explicitly authorizes and pins a dependency.
-- A macOS or Windows host capable of running Unreal Engine 5.8. Development and tests must remain usable on the repository's 16 GB reference machine.
+- A macOS or Windows host capable of running Unreal Engine 5.7. Development and tests must remain usable on the repository's 16 GB reference machine.
 - Enough local storage for Unreal-generated `Binaries`, `Build`, `Intermediate`, `Saved`, workspace, compiler, and Derived Data Cache output. Native build and test workflows must not require network downloads.
 
 Native macOS validation comes first. Platform-specific discovery, path, process, and build behavior must remain isolated for mandatory native Windows qualification and Linux source portability.
@@ -39,13 +39,13 @@ The authenticated bridge token is not an environment variable. The Unreal plugin
 
 ## Disposable Unreal project
 
-Use `ue-test/` as the local project for plugin compilation, Unreal Automation Tests, command-line editor checks, and cross-process bridge integration. The entire directory is ignored because Unreal regenerates substantial machine-specific state.
+Use `ue-test/ue57/` as the local project for this branch's plugin compilation, Unreal Automation Tests, command-line editor checks, and cross-process bridge integration. `ue-test/ue58/` preserves the prior 5.8 fixture for its separate branch. The entire `ue-test/` directory is ignored because Unreal regenerates substantial machine-specific state.
 
 The test project must:
 
-- use `EngineAssociation` 5.8;
+- use `EngineAssociation` 5.7;
 - contain minimal C++ Game and Editor targets;
-- use `BuildSettingsVersion.V7` and `EngineIncludeOrderVersion.Unreal5_8`;
+- use `BuildSettingsVersion.V6` and `EngineIncludeOrderVersion.Unreal5_7`;
 - compile the `UnrealMCPTestEditor` target with the configured Launcher engine;
 - remain disposable and contain no personal game content;
 - create behavioral test assets at runtime rather than treating generated project state or prose documentation as fixtures.
@@ -124,12 +124,12 @@ Use `--target-platforms` with Unreal's `+`-separated platform names when the ins
 
 ## Initial verified baseline
 
-The following combination generated project files and compiled the empty `UnrealMCPTestEditor` target successfully on 2026-07-21:
+The following combination compiled the `UnrealMCPTestEditor` target and ran the native suite successfully on 2026-08-01:
 
 | Component | Verified value |
 | --- | --- |
 | Host | Apple Silicon, macOS 26.5.2, 16 GB memory |
-| Unreal Engine | 5.8.0, changelist 55116800, Epic Games Launcher build |
+| Unreal Engine | 5.7.4, changelist 51494982, Epic Games Launcher build |
 | Xcode | 26.1.1, build 17B100 |
 | Compiler and SDK | Apple clang 17.0.0, macOS SDK 26.1 |
 | Python | CPython 3.14.6 |

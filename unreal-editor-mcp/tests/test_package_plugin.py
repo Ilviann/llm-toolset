@@ -76,7 +76,7 @@ class PackagePluginScriptTests(unittest.TestCase):
 
     def test_output_validation_rejects_protected_and_overlapping_directories(self):
         with tempfile.TemporaryDirectory() as temporary:
-            engine_root = Path(temporary) / "UE_5.8"
+            engine_root = Path(temporary) / "UE_5.7"
             engine_root.mkdir()
             with self.assertRaises(package_plugin.PackagingError):
                 package_plugin.validate_output(package_plugin.WORKSPACE_ROOT, engine_root)

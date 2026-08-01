@@ -8,7 +8,7 @@ from scripts import deploy_plugin_windows as deploy
 
 
 class WindowsDeploymentScriptTests(unittest.TestCase):
-    def write_project(self, folder: Path, association: object = "5.8") -> deploy.ProjectInfo:
+    def write_project(self, folder: Path, association: object = "5.7") -> deploy.ProjectInfo:
         descriptor = folder / "Shooter.uproject"
         descriptor.write_text(
             json.dumps({"FileVersion": 3, "EngineAssociation": association}),
@@ -47,7 +47,7 @@ class WindowsDeploymentScriptTests(unittest.TestCase):
         manifest.write_text("manifest", encoding="utf-8")
         manifest.with_name("UnrealEditor-UnrealMCP.lib").write_bytes(b"import library")
 
-    def write_engine(self, folder: Path, major: int = 5, minor: int = 8) -> None:
+    def write_engine(self, folder: Path, major: int = 5, minor: int = 7) -> None:
         launcher = folder / "Engine" / "Build" / "BatchFiles" / "RunUAT.bat"
         launcher.parent.mkdir(parents=True)
         launcher.write_text("@echo off\r\n", encoding="utf-8")
@@ -63,7 +63,7 @@ class WindowsDeploymentScriptTests(unittest.TestCase):
                 deploy.locate_project(folder)
             project = self.write_project(folder)
             self.assertEqual(project.descriptor.name, "Shooter.uproject")
-            self.assertEqual(project.engine_association, "5.8")
+            self.assertEqual(project.engine_association, "5.7")
             (folder / "Other.UPROJECT").write_text("{}", encoding="utf-8")
             with self.assertRaises(deploy.DeploymentError):
                 deploy.locate_project(folder)
@@ -93,7 +93,7 @@ class WindowsDeploymentScriptTests(unittest.TestCase):
                     deploy.locate_project(folder)
 
     def test_engine_candidates_prefer_exact_association_then_configuration(self):
-        project = deploy.ProjectInfo(Path("D:/Game"), Path("D:/Game/Game.uproject"), "5.8")
+        project = deploy.ProjectInfo(Path("D:/Game"), Path("D:/Game/Game.uproject"), "5.7")
         candidates = deploy.engine_candidates(
             project,
             environment={
@@ -101,16 +101,16 @@ class WindowsDeploymentScriptTests(unittest.TestCase):
                 "ProgramFiles": "C:/Program Files",
             },
             installations=[
+                ("5.6", Path("D:/Epic/UE_5.6")),
                 ("5.7", Path("D:/Epic/UE_5.7")),
-                ("5.8", Path("D:/Epic/UE_5.8")),
                 ("{custom}", Path("D:/Source/UE")),
             ],
         )
         self.assertEqual(
             candidates,
             [
-                Path("D:/Epic/UE_5.8"),
-                Path("C:/Program Files/Epic Games/UE_5.8"),
+                Path("D:/Epic/UE_5.7"),
+                Path("C:/Program Files/Epic Games/UE_5.7"),
                 Path("D:/Configured/UE"),
             ],
         )
@@ -118,16 +118,16 @@ class WindowsDeploymentScriptTests(unittest.TestCase):
     def test_default_engine_root_uses_trimmed_environment_value(self):
         self.assertEqual(
             deploy.default_engine_root(
-                {"UNREAL_MCP_ENGINE_ROOT": "  C:/Program Files/Epic Games/UE_5.8  "}
+                {"UNREAL_MCP_ENGINE_ROOT": "  C:/Program Files/Epic Games/UE_5.7  "}
             ),
-            "C:/Program Files/Epic Games/UE_5.8",
+            "C:/Program Files/Epic Games/UE_5.7",
         )
         self.assertEqual(deploy.default_engine_root({}), "")
 
     def test_build_command_is_fixed_to_installed_win64_package(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            engine = root / "UE_5.8"
+            engine = root / "UE_5.7"
             self.write_engine(engine)
             output = root / "Package"
             command = deploy.build_command(engine, output)
@@ -136,12 +136,17 @@ class WindowsDeploymentScriptTests(unittest.TestCase):
             self.assertIn("-Rocket", command)
             self.assertNotIn("-Unversioned", command)
 
-    def test_engine_validation_rejects_unsupported_version(self):
+    def test_engine_validation_requires_exact_supported_version(self):
         with tempfile.TemporaryDirectory() as temporary:
-            engine = Path(temporary) / "UE_5.7"
-            self.write_engine(engine, minor=7)
-            with self.assertRaisesRegex(deploy.DeploymentError, "5.8 or newer"):
-                deploy.validate_supported_engine_root(engine)
+            root = Path(temporary)
+            supported = root / "UE_5.7"
+            self.write_engine(supported, minor=7)
+            self.assertEqual(deploy.validate_supported_engine_root(supported).name, "RunUAT.bat")
+            for minor in (6, 8):
+                engine = root / f"UE_5.{minor}"
+                self.write_engine(engine, minor=minor)
+                with self.assertRaisesRegex(deploy.DeploymentError, "requires Unreal Engine 5.7"):
+                    deploy.validate_supported_engine_root(engine)
 
     def test_install_removes_source_and_debug_files_but_keeps_precompiled_metadata(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -259,7 +264,7 @@ class WindowsDeploymentScriptTests(unittest.TestCase):
             ):
                 destination = deploy.deploy(
                     project,
-                    root / "UE_5.8",
+                    root / "UE_5.7",
                     replace_existing=False,
                     include_pdb=True,
                     log=messages.append,
