@@ -1,6 +1,6 @@
 # Project-workflow and reload types
 
-- [`settings-patch.md`](settings-patch.md) — transactional project-setting changes.
-- [`input-map-patch.md`](input-map-patch.md) — normalized action binding changes.
-- [`autoload-patch.md`](autoload-patch.md) — guarded autoload changes and records.
-- [`reload-record.md`](reload-record.md) — durable reload operation and status contract.
+- [Type: project settings patch](contracts.md#type-project-settings-patch) — transactional project-setting changes.
+- [Type: Input Map patch](contracts.md#type-input-map-patch) — normalized action binding changes.
+- [Types: autoload record and patch](contracts.md#types-autoload-record-and-patch) — guarded autoload changes and records.
+- [Types: reload record and status](contracts.md#types-reload-record-and-status) — durable reload operation and status contract.

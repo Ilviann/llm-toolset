@@ -1,7 +1,7 @@
 # MCP API/stdio types and libraries
 
-- [`tool-definition.md`](tool-definition.md) — compact model-facing tool definition record.
-- [`tool-catalog-library.md`](tool-catalog-library.md) — stable tool sets and permission filtering.
-- [`mcp-server.md`](mcp-server.md) — JSON-RPC/MCP request and filesystem dispatch object.
-- [`json-rpc-envelope-library.md`](json-rpc-envelope-library.md) — JSON-RPC and MCP text-result construction.
-- [`stdio-loop-library.md`](stdio-loop-library.md) — newline-delimited parsing, error containment, and output isolation.
+- [Type: tool definition](contracts.md#type-tool-definition) — compact model-facing tool definition record.
+- [Library: permission-filtered tool catalog](contracts.md#library-permission-filtered-tool-catalog) — stable tool sets and permission filtering.
+- [Type: `MCPServer`](contracts.md#type-mcpserver) — JSON-RPC/MCP request and filesystem dispatch object.
+- [Library: JSON-RPC and MCP text envelopes](contracts.md#library-json-rpc-and-mcp-text-envelopes) — JSON-RPC and MCP text-result construction.
+- [Library: newline-delimited stdio](contracts.md#library-newline-delimited-stdio) — newline-delimited parsing, error containment, and output isolation.

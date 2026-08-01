@@ -1,0 +1,27 @@
+# Completed features
+
+- [`phase-4` — Reliable mutations, Actor components, and defaults](phase-4.md).
+- [`phase-5` — Blueprint member variables](phase-5.md).
+- [`phase-6` — Function signatures and local variables](phase-6.md).
+- [`phase-7` — Macros and custom events](phase-7.md).
+- [`phase-8` — Action-catalog infrastructure and core actions](phase-8.md).
+- [`phase-9` — C++ architecture and test decomposition](phase-9.md).
+- [`phase-10` — Expanded action-catalog families](phase-10.md).
+- [`phase-11` — Graph-node lifecycle](phase-11.md).
+- [`phase-12` — Pin defaults and direct connections](phase-12.md).
+- [`phase-13` — Wildcards, conversions, and complete atomic graph editing](phase-13.md).
+- [`phase-14` — GameMode and GameState families](phase-14.md).
+- [`phase-15` — GameInstance family](phase-15.md).
+- [`phase-16` — Multiplayer Blueprint authoring and framework assignment](phase-16.md).
+- [`phase-17` — User-defined structs and Data Tables](phase-17.md).
+- [`editor-launch` — Optional configured editor launch](editor-launch.md).
+- [`editor-shutdown` — Optional graceful editor shutdown](editor-shutdown.md).
+- [`editor-restart` — Optional durable editor restart](editor-restart.md).
+- [`level-open` — Level discovery, safe opening, and snapshot foundations](level-open.md).
+- [`asset-references` — Find asset references](asset-references.md).
+- [`asset-delete` — Delete asset](asset-delete.md).
+- [`widget-tree` — Widget Blueprint family and widget trees](widget-tree.md).
+- [`umg-authoring` — UMG layout, styling, bindings, and UI logic](umg-authoring.md).
+- [`function-replace` — Complete function replacement](function-replace.md).
+- [`level-inspect` — World Partition actor and instance inspection](level-inspect.md).
+- [`level-management` — Level management](level-management.md).

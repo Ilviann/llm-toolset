@@ -1,6 +1,6 @@
 # Types and function libraries
 
-References are grouped by the component that owns each contract or reusable library. Follow a component folder's `index.md` for its immediate files.
+References are grouped by the component that owns each contract or reusable library. Follow a component folder's `index.md` for links to its exact contract sections.
 
 - [`process-entry-composition/`](process-entry-composition/index.md) — entry-point and composition functions.
 - [`configuration-policy/`](configuration-policy/index.md) — effective/INI settings, startup errors, configuration readers, precedence, case, and allowlist libraries.

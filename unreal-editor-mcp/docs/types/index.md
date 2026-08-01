@@ -1,6 +1,6 @@
 # Types and function libraries
 
-References in this directory are grouped by the component that owns the contract or reusable library. Each component gets a subdirectory with its own `index.md`; that index links only to the custom data types, wire records, collaborator protocols, and reusable function libraries immediately inside it.
+References in this directory are grouped by the component that owns the contract or reusable library. Each component gets a subdirectory with its own `index.md`; that index links to the exact sections for its custom data types, wire records, collaborator protocols, and reusable function libraries.
 
 - [`python/`](python/index.md) — Python project, discovery, error, schema, bridge-client, and editor-lifecycle contracts.
 - [`editor-bridge/`](editor-bridge/index.md) — native request, error, capability, state, discovery, and limit contracts.

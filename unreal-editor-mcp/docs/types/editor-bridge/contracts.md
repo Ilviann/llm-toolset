@@ -1,0 +1,29 @@
+# Editor bridge contracts
+
+Use the index to retrieve only the contract section relevant to the task.
+
+## Native wire contracts
+
+The HTTP request has exactly two fields: `command` is one of the twenty-two model-facing commands released through `level-management` or internal `editor_shutdown`, and `arguments` follows its exact owning shape. `editor_shutdown` accepts no arguments and is not a model-facing tool. `asset_delete`, `level_open`, `level_manage`, `blueprint_block_replace`, `widget_tree_edit`, and `game_data_edit` are ledger-backed; `asset_references`, `level_inspect`, and `game_data_inspect` are read-only and cursor-capable. Authentication remains one exact bearer header.
+
+A success is `{ok:true,result:<object>}`. A failure is `{ok:false,error:{code,message,details,retryable}}`. Native errors use the same stable codes accepted by Python and never contain exceptions, addresses, tokens, absolute project paths, or unbounded logs.
+
+`capabilities` is authoritative for `bridge_version`, `unreal_version`, `platform`, `mode`, `bridge_ready`, `bridge_instance_id`, exact `commands`, optional `features`, effective `limits`, listener properties, `asset_access`, and the ordered `blueprint_families` operation matrix. `asset_access.read_scope` is `all_mounted_content`; `asset_access.mutation_scope` is `project_content_and_local_project_plugins`. `editor_state` contains project hash/name, readiness, ready/shutdown state, play/simulate/save/GC flags, queued count, and a bounded ledger summary.
+
+All mutating HTTP requests are admitted through the operation ledger before Game-thread dispatch. The mutation result adds `operation_id`, `operation_state`, `bridge_instance_id`, and `request_digest`. `operation_status` accepts exactly `operation_id`, `bridge_instance_id`, and optional `cancel`; see [Mutation operation ledger](#mutation-operation-ledger).
+
+## Limits and generated state
+
+`UnrealMCPVersion.h` is the executable native limit source: 64 KiB request, 256 KiB response, eight queued commands, JSON depth 16, string length 4096, five-second dispatch deadline, two-second heartbeat interval, and 16 dirty-package names in a refusal summary. Inspection adds 100 records per page, 32 retained cursors, and a 30-second cursor lifetime. Asset-reference discovery examines at most 4,096 registry candidates and 8,192 loaded objects, retains at most 2,048 records and eight reference cursors, expands 64 assets per package, reports 16 live properties, and traverses direct references only. Level discovery scans at most 2,048 World assets and current-map dirtiness inspects at most 2,048 loaded external packages. Level actor inspection scans 4,096 descriptors or loaded actors, retains 2,048 matching actor records, exposes at most 64 components, 64 tags, and 32 data-layer names per actor, and temporarily loads at most one exact actor per request. Widget trees permit 512 widgets, depth 32, 256 named slots, 16 visible changed defaults per widget, and 1,024 changed defaults total. Game data permits 64 fields, 2,048 scanned rows, 64 touched rows per batch, 64 values per container, nesting depth four, and 256 reported dependencies. Graph/action/Blueprint limits remain separately published. The operation ledger retains 128 records for 900 seconds. Python independently bounds its side and validates the native values returned by `capabilities`.
+
+The token file is durable secret state. The discovery file is replaceable non-secret state and contains project hash, process ID, port, exact bridge version, Unreal version, and UTC epoch milliseconds only. Both use temporary-file-plus-rename writes. A new startup deletes any stale discovery file before attempting the credential/listener gate.
+
+Pending requests transition from accepted to queued, then execute only on the Game thread. Queued ledger work may be cancelled; executing work is not interrupted unsafely. Shutdown rejects new work and cancels only queued work. Inspection never creates transactions, compiles, saves, or mutates objects. `level_open` is the only map-switching operation and never saves, discards, or prompts. Edits transact only the selected mutable Actor Blueprint and remain dirty until an explicit save; creation publishes only after its mandatory compile and save succeed.
+
+## Mutation operation ledger
+
+Every mutating command requires a caller-generated 32-character lowercase hexadecimal `operation_id`. At authenticated HTTP admission the bridge canonicalizes the command and complete argument object, binds it to the project, bridge instance, and authenticated context, and retains the resulting 40-character request digest. Reusing an ID with different normalized arguments returns `operation_conflict` without execution. Reusing it with the same terminal request replays the retained success or error.
+
+Entries move through `queued`, `executing`, and one terminal state: `committed`, `partial`, `outcome_unknown`, `rejected`, or `cancelled`. `partial` and retained `outcome_unknown` carry the mutation result but are never retry-safe; they cover mutations whose editor API ran but persistence or reload verification disagreed. `operation_status` accepts the operation ID and the 32-character `bridge_instance_id` published by `capabilities` and mutation results. It can cancel queued work; executing Unreal mutations are never interrupted. A missing/expired entry or another bridge instance returns `outcome_unknown`, `retained: false`, and `retry_safe: false`, requiring inspection before any new mutation.
+
+The ledger retains at most 128 operations for 15 minutes after their latest terminal outcome. It evicts the oldest terminal record when full and never evicts queued/executing work to admit another operation. Shutdown cancels queued entries. Committed outcomes are stored before HTTP response completion, so a disconnected caller can reconcile rather than duplicate the edit.

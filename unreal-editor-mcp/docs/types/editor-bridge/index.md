@@ -1,5 +1,5 @@
 # Editor bridge contracts
 
-- [`wire-contracts.md`](wire-contracts.md) — native request/result/error records and commands.
-- [`limits-and-state.md`](limits-and-state.md) — executable bounds, heartbeat, and operation state.
-- [`operation-ledger.md`](operation-ledger.md) — mutation identities, digests, states, replay, cancellation, expiry, and unknown outcomes.
+- [Native wire contracts](contracts.md#native-wire-contracts) — native request/result/error records and commands.
+- [Limits and generated state](contracts.md#limits-and-generated-state) — executable bounds, heartbeat, and operation state.
+- [Mutation operation ledger](contracts.md#mutation-operation-ledger) — mutation identities, digests, states, replay, cancellation, expiry, and unknown outcomes.

@@ -13,9 +13,15 @@ Build lightweight, offline-first MCP tools, primarily for LM Studio, on macOS, L
 
 Applications are `rooted-files-mcp/`, `godot-editor-mcp/`, and `unreal-editor-mcp/`. Keep each app self-contained; add shared code only when multiple apps need it.
 
+Before implementation work, verify that at least one available tool can retrieve a selected Markdown section by heading or fragment without loading the whole document. If no such tool is available, warn the user before proceeding.
+
 Before changing an app, follow its `AGENTS.md` and `docs/workflow.md`, beginning at `docs/index.md`. Use the indexes to locate the relevant design requirement, including a roadmap feature definition, when one exists; otherwise begin from the reported behavior, executable contract, or failing test. Follow links to identify the smallest relevant set of source, dependencies, tests, metadata, examples, roadmap/history, and documentation.
 
-Keep one file per component under `docs/architecture/`, component-owned references under `docs/types/`, and an immediate relative-link `index.md` in every docs directory. Do not create a `CODE.md` monolith.
+Do not apply any skill stored under this repository's `/skills` directory to this repository itself. That directory contains reusable skill templates for other repositories and project types; use this repository's indexed `docs/architecture/` workflow instead.
+
+Keep one file per component under `docs/architecture/`. Under `docs/types/`, group related component-owned contracts into section-addressable files; do not create a separate tiny page for every type or helper. Keep an immediate relative-link `index.md` in every docs directory. Do not create a `CODE.md` monolith.
+
+Store feature documents under `docs/features/<status>/`, where status is `planned`, `active`, `completed`, or `deferred`. Begin each feature document with YAML front matter containing string `feature_id`, enum `status`, string-list `depends_on`, and nullable string `released_in`; the status must match its directory, completed features must name their release version, and front-matter dependencies must match the document's direct-prerequisite section. Dependencies may name stable feature IDs or explicit issue IDs.
 
 Executable source, project assets, configuration, build files, schemas, metadata including runtime capabilities, runtime contracts, and behavioral tests define behavior. Documentation explains them and must not be executable input or a test fixture.
 

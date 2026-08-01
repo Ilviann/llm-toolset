@@ -1,6 +1,6 @@
 # Types and function libraries
 
-References are grouped by the component that owns the contract or reusable library. Follow a component's `index.md` for its immediate files.
+References are grouped by the component that owns each contract or reusable library. Follow a component folder's `index.md` for links to its exact contract sections.
 
 - [`mcp-presentation/`](mcp-presentation/index.md) — stdio/MCP result types, handler protocols, and envelope helpers.
 - [`tool-api-dispatch/`](tool-api-dispatch/index.md) — tool modes/specifications, dispatcher protocols, and schema validation.

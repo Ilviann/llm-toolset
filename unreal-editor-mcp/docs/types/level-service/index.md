@@ -1,4 +1,4 @@
 # Level service contracts
 
-- [`maps-and-snapshots.md`](maps-and-snapshots.md) — mounted map records, current-map identities, revisions, snapshots, cursors, opening, and refusal states.
-- [`actors-components-and-properties.md`](actors-components-and-properties.md) — actor queries and identities, descriptor/live records, component origins, reflected properties, limits, and unavailable states.
+- [Maps, revisions, and snapshots](contracts.md#maps-revisions-and-snapshots) — mounted map records, current-map identities, revisions, snapshots, cursors, opening, and refusal states.
+- [Actors, components, and reflected properties](contracts.md#actors-components-and-reflected-properties) — actor queries and identities, descriptor/live records, component origins, reflected properties, limits, and unavailable states.

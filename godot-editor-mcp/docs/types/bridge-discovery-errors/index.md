@@ -1,6 +1,6 @@
 # Bridge, discovery, and error types and libraries
 
-- [`godot-bridge.md`](godot-bridge.md) — authenticated bounded localhost client.
-- [`discovery-record.md`](discovery-record.md) — validated editor heartbeat record.
-- [`domain-errors.md`](domain-errors.md) — stable Python error hierarchy and bounded details.
-- [`discovery-identity-library.md`](discovery-identity-library.md) — cross-platform project normalization and port selection.
+- [Type: `GodotBridge`](contracts.md#type-godotbridge) — authenticated bounded localhost client.
+- [Type: `DiscoveryRecord`](contracts.md#type-discoveryrecord) — validated editor heartbeat record.
+- [Types: domain error hierarchy](contracts.md#types-domain-error-hierarchy) — stable Python error hierarchy and bounded details.
+- [Library: project identity and discovery selection](contracts.md#library-project-identity-and-discovery-selection) — cross-platform project normalization and port selection.

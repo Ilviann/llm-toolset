@@ -1,5 +1,5 @@
 # MCP presentation types and libraries
 
-- [`tool-image-result.md`](tool-image-result.md) — validated PNG result value passed to stdio encoding.
-- [`request-handler-protocols.md`](request-handler-protocols.md) — request and close lifecycle protocols.
-- [`json-rpc-library.md`](json-rpc-library.md) — JSON-RPC and MCP tool-result envelope helpers.
+- [Type: `ToolImageResult`](contracts.md#type-toolimageresult) — validated PNG result value passed to stdio encoding.
+- [Types: request handler protocols](contracts.md#types-request-handler-protocols) — request and close lifecycle protocols.
+- [Library: JSON-RPC and MCP result envelopes](contracts.md#library-json-rpc-and-mcp-result-envelopes) — JSON-RPC and MCP tool-result envelope helpers.

@@ -1,5 +1,5 @@
 # Python contracts
 
-- [`wire-contracts.md`](wire-contracts.md) — MCP tools, discovery, authenticated HTTP, and errors.
-- [`platform-adapter.md`](platform-adapter.md) — injected path and process behavior.
-- [`editor-lifecycle.md`](editor-lifecycle.md) — large-mode lifecycle operations, configured launch, states, cancellation, and durable records.
+- [Python wire contracts](contracts.md#python-wire-contracts) — MCP tools, discovery, authenticated HTTP, and errors.
+- [Platform adapter](contracts.md#platform-adapter) — injected path and process behavior.
+- [Editor lifecycle contracts](contracts.md#editor-lifecycle-contracts) — large-mode lifecycle operations, configured launch, states, cancellation, and durable records.

@@ -1,6 +1,6 @@
 # Plugin lifecycle/bridge types and libraries
 
-- [`bridge-client-record.md`](bridge-client-record.md) — per-connection bounded bridge state.
-- [`command-handler-map.md`](command-handler-map.md) — command ownership and dispatch library.
-- [`token-result.md`](token-result.md) — fail-closed credential result contract.
-- [`discovery-heartbeat.md`](discovery-heartbeat.md) — editor-side heartbeat publisher.
+- [Type: bridge client record](contracts.md#type-bridge-client-record) — per-connection bounded bridge state.
+- [Library: command handler ownership map](contracts.md#library-command-handler-ownership-map) — command ownership and dispatch library.
+- [Type: token result](contracts.md#type-token-result) — fail-closed credential result contract.
+- [Library: discovery heartbeat publisher](contracts.md#library-discovery-heartbeat-publisher) — editor-side heartbeat publisher.

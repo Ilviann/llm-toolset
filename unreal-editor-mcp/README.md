@@ -64,7 +64,7 @@ On Windows:
 ]
 ```
 
-Each item must remain a separate `args` value; paths containing spaces do not need shell quoting. Add `--lifecycle-timeout` followed by a value from 5 to 900 seconds to override the 120-second default. Native launch and restart are supported on macOS and Windows; Linux rejects those operations. See [Optional editor lifecycle](docs/user/tool-guides.md#optional-editor-lifecycle) for operation examples and safety behavior.
+Each item must remain a separate `args` value; paths containing spaces do not need shell quoting. Add `--lifecycle-timeout` followed by a value from 5 to 900 seconds to override the 120-second default. Native launch and restart are supported on macOS and Windows; Linux rejects those operations. See [Optional editor lifecycle](docs/user/setup-and-operation.md#optional-editor-lifecycle) for operation examples and safety behavior.
 
 ## Quickstart
 

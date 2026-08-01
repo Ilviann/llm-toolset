@@ -1,9 +1,0 @@
-# Macro and custom-event contracts
-
-`blueprint_member_edit` uses `target: "macro"` and `target: "custom_event"` for Phase 7 callable shells. Every request keeps the common operation ID, exact Actor Blueprint asset path, and expected structural snapshot contract.
-
-Macros are selected by their stable 32-character graph GUID. Only locally owned macro graphs are mutable. A complete macro signature contains `pure` plus at most 32 ordered parameters. Macro parameters carry name, direction (`input` or `output`), canonical K2 type, and an optional tagged default for non-reference inputs. Outputs cannot be reference/const or carry defaults. Impure signatures own one execution input and output in addition to their declared data parameters. Add and signature update preserve the required editable entry and exit tunnel nodes. Metadata supports bounded category, tooltip, and keywords.
-
-Custom events are selected by their stable node GUID and one local event graph. Metadata supports bounded category, tooltip, keywords, call-in-editor, `rpc_mode`, and `reliability`. RPC modes are not replicated, server, owning client, or multicast; only replicated modes may be reliable. Family mode support is live-validated, RPCs cannot be call-in-editor events, and conflicting/forged flags reject.
-
-Rename preserves the macro graph or custom-event node identity. Complete-signature updates and removal require `reject_if_referenced`. Macro instances and custom-event call nodes produce `referenced_member`; the mutator never deletes, reconstructs, or retargets those callers. Every accepted operation runs in one editor transaction, performs exact inspection read-back, returns the callable record and reference summary, and reports reconstructed or created identities without conflating functions, interfaces, override events, macros, and custom events.

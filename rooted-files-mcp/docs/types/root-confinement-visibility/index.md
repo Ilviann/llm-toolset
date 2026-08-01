@@ -1,8 +1,8 @@
 # Root-confinement/visibility types and libraries
 
-- [`file-access-error.md`](file-access-error.md) — model-safe filesystem failure hierarchy.
-- [`hidden-path-policy.md`](hidden-path-policy.md) — centralized hidden/protected component policy object.
-- [`permission-library.md`](permission-library.md) — runtime read/write enforcement helpers.
-- [`path-resolution-library.md`](path-resolution-library.md) — authoritative model-path confinement.
-- [`directory-listing-library.md`](directory-listing-library.md) — direct-entry labeling, filtering, and ordering.
-- [`tree-library.md`](tree-library.md) — bounded recursive tree rendering.
+- [Types: filesystem access errors](contracts.md#types-filesystem-access-errors) — model-safe filesystem failure hierarchy.
+- [Type: `HiddenPathPolicy`](contracts.md#type-hiddenpathpolicy) — centralized hidden/protected component policy object.
+- [Library: runtime permissions](contracts.md#library-runtime-permissions) — runtime read/write enforcement helpers.
+- [Library: rooted path resolution](contracts.md#library-rooted-path-resolution) — authoritative model-path confinement.
+- [Library: directory listing](contracts.md#library-directory-listing) — direct-entry labeling, filtering, and ordering.
+- [Library: bounded tree rendering](contracts.md#library-bounded-tree-rendering) — bounded recursive tree rendering.
