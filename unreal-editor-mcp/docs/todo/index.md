@@ -48,6 +48,7 @@ Keep the authoritative checklist in [`ROADMAP.md`](../../ROADMAP.md) synchronize
 - [`node-layout` — Deterministic changed-node layout](node-layout.md) — Add deterministic layout for changed nodes.
   - Depends on:
     - `event-macro-replace`
+- [`pcg-graph-authoring` — Procedural Content Generation graph authoring](pcg-graph-authoring.md) — Discover, inspect, create, and transactionally edit bounded PCG Graph assets.
 - [`editor-launch` — Optional configured editor launch](editor-launch.md) — Add optional configured editor launch.
 - [`editor-shutdown` — Optional graceful editor shutdown](editor-shutdown.md) — Add optional graceful editor shutdown.
   - Depends on:
@@ -75,6 +76,10 @@ Keep the authoritative checklist in [`ROADMAP.md`](../../ROADMAP.md) synchronize
 - [`level-edit` — Transactional level actor editing and verified saving](level-edit.md) — Add stale-safe actor batches and honest per-package World Partition save verification.
   - Depends on:
     - `level-inspect`
+- [`pcg-component-edit` — Level actor PCG Component editing](pcg-component-edit.md) — Inspect, configure, generate, clean up, and persist PCG Components on exact level actors.
+  - Depends on:
+    - `pcg-graph-authoring`
+    - `level-edit`
 - [`spline-edit` — Spline component inspection and editing](spline-edit.md) — Add bounded mixed-point spline inspection, mutation, persistence, and metadata safety.
   - Depends on:
     - `level-edit`
