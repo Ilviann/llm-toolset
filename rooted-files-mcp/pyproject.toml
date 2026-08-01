@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "rooted-files-mcp"
-version = "0.5.0"
+version = "0.5.1"
 description = "Small, dependency-free MCP server for rooted text file access"
 authors = [{ name = "Ilviann Zed", email = "ilviann.zed@gmail.com" }]
 readme = "README.md"

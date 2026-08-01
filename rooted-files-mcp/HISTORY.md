@@ -3,6 +3,12 @@
 This file records released changes. Planned work is tracked separately in
 [`ROADMAP.md`](ROADMAP.md).
 
+## 0.5.1 — 2026-08-01
+
+- Added a Windows CMD launcher for the MCP definition helper.
+- Simplified the helper around the supported Python installation's available
+  tkinter package.
+
 ## 0.5.0 — 2026-07-31
 
 - Added an offline tkinter helper that selects the served root and

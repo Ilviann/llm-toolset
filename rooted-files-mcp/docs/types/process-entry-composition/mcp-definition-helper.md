@@ -17,3 +17,7 @@ other host configuration.
 
 `generate_mcp_definition.sh` resolves the adjacent Python helper from its own
 location and replaces its process with `python3` running that helper.
+
+`generate_mcp_definition.cmd` resolves the adjacent Python helper from its own
+location, runs it with `python`, forwards any arguments, and returns the Python
+process exit code.

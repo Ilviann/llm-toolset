@@ -33,7 +33,7 @@ class MCPServerTests(unittest.TestCase):
         initialized = self.request("initialize", {"protocolVersion": "2025-06-18"})
         self.assertEqual(initialized["result"]["protocolVersion"], "2025-06-18")
         self.assertEqual(
-            initialized["result"]["serverInfo"]["version"], "0.5.0"
+            initialized["result"]["serverInfo"]["version"], "0.5.1"
         )
         tools = self.request("tools/list")["result"]["tools"]
         self.assertEqual([tool["name"] for tool in tools], [

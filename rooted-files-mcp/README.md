@@ -355,18 +355,14 @@ macOS or Linux:
 /path/to/rooted-files-mcp/scripts/generate_mcp_definition.sh
 ```
 
-Windows PowerShell:
+Windows Command Prompt or PowerShell:
 
-```powershell
-py -3 "C:\path\to\rooted-files-mcp\scripts\generate_mcp_definition.py"
+```bat
+C:\path\to\rooted-files-mcp\scripts\generate_mcp_definition.cmd
 ```
 
-The `python3` installation must include its optional tkinter module and
-must still satisfy the server's Python 3.10-or-newer requirement. Check the
-intended interpreter with `python3 -m tkinter` on macOS/Linux or
-`py -3 -m tkinter` on Windows; a small Tk test window should open. If the module
-is unavailable, prepare a matching OS package or Python distribution with Tk
-support before taking the machine offline.
+The Python installation must satisfy the server's Python 3.10-or-newer
+requirement.
 
 Choose the folder that the server may expose, select `standard` or `markdown`,
 and click **Generate definition**. The helper shows:

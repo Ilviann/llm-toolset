@@ -16,6 +16,7 @@ desktop helper.
 - `scripts/generate_mcp_definition.py` — tkinter definition generator for local
   MCP hosts.
 - `scripts/generate_mcp_definition.sh` — POSIX GUI launch helper.
+- `scripts/generate_mcp_definition.cmd` — Windows GUI launch helper.
 
 ## Dependencies
 
@@ -37,6 +38,8 @@ Composition depends on configuration/effective policy, the rooted filesystem fac
 - The helper displays configuration but never writes host configuration files.
 - The shell launcher resolves its own directory and invokes the adjacent helper
   with `python3`.
+- The Windows launcher resolves the adjacent helper from its own directory,
+  invokes it with `python`, and preserves the Python process exit code.
 
 ## Change and verification guide
 

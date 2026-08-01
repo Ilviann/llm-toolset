@@ -16,6 +16,8 @@ manually locating or escaping paths.
   no third-party dependencies.
 - Provide an adjacent POSIX shell launcher that resolves its directory and
   invokes the Python helper with `python3`.
+- Provide an adjacent Windows CMD launcher that resolves its directory, invokes
+  the Python helper with `python`, and preserves its exit code.
 - Require an existing served-root folder and offer exactly `standard` and
   `markdown` choices.
 - Resolve the interpreter used to run the helper and the repository's direct

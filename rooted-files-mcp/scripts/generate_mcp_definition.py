@@ -5,7 +5,9 @@ from __future__ import annotations
 
 import json
 import sys
+import tkinter as tk
 from pathlib import Path
+from tkinter import filedialog, messagebox, ttk
 
 
 SERVER_NAME = "rooted-files"
@@ -73,15 +75,6 @@ def format_mcp_json(server_definition: dict[str, object]) -> str:
 
 
 def main() -> None:
-    try:
-        import tkinter as tk
-        from tkinter import filedialog, messagebox, ttk
-    except ImportError:
-        raise SystemExit(
-            "tkinter is required to run the MCP definition generator "
-            f"(Python: {sys.executable or 'unknown'})"
-        ) from None
-
     class MCPDefinitionApp:
         def __init__(self, window: tk.Tk) -> None:
             self.window = window
