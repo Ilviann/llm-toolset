@@ -4,7 +4,7 @@
 
 - Planned: None.
 - Active: None.
-- Completed: None.
+- [Completed features](completed/index.md).
 - [Deferred features](deferred/index.md).
 
 ## Front matter contract

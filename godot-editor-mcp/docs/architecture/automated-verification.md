@@ -6,7 +6,9 @@ Protect behavior, security boundaries, release contracts, platform branches, God
 
 ## Owned source
 
-- `tests/*.py` — Python units, MCP/stdio integration, schemas, contracts, assets, bridge/discovery, payloads/waits, launcher, and optional live reload integration.
+- `tests/*.py` — Python units, MCP/stdio integration, schemas, contracts, assets,
+  bridge/discovery, payloads/waits, launcher, deployment/rollback, generated
+  launch settings, and optional live reload integration.
 - `plugin/tests/*.gd` — focused headless Godot checks for diagnostics, records, routing, infrastructure, trackers, cursors, service boundaries, runtime validation, transactions, workflows, and authenticated bridge startup.
 
 ## Test layers

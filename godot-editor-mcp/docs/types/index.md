@@ -3,6 +3,7 @@
 References are grouped by the component that owns each contract or reusable library. Follow a component folder's `index.md` for links to its exact contract sections.
 
 - [`mcp-presentation/`](mcp-presentation/index.md) — stdio/MCP result types, handler protocols, and envelope helpers.
+- [`deployment-helper/`](deployment-helper/index.md) — project/deployment results and configuration-generation helpers.
 - [`tool-api-dispatch/`](tool-api-dispatch/index.md) — tool modes/specifications, dispatcher protocols, and schema validation.
 - [`local-project-process-services/`](local-project-process-services/index.md) — confined asset and editor-launch services.
 - [`bridge-discovery-errors/`](bridge-discovery-errors/index.md) — bridge client, discovery records/identity, and domain errors.

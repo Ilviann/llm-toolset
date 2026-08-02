@@ -661,7 +661,30 @@ If that returns `"run_id":3`, stop only that run with:
 
 ## Install the Godot plugin
 
-Copy the bundled `addons` folder into the Godot project:
+For the easiest setup, close the Godot editor and run the graphical deployment
+helper from this checkout:
+
+```sh
+sh scripts/deploy_plugin.sh
+```
+
+On Windows, double-click `scripts\deploy_plugin.cmd` or run it from a terminal:
+
+```powershell
+.\scripts\deploy_plugin.cmd
+```
+
+Choose the project folder, select `tiny`, `small`, or `large`, then click
+**Install/update and enable Godot MCP**. The helper preselects `small`, replaces
+only `addons/godot_mcp` after confirmation, enables the addon in
+`project.godot`, and generates a complete LM Studio JSON object plus individual
+Codex STDIO fields. In `large` mode, optionally select the Godot executable to
+configure `start_editor`. The operation is bounded and transactional: unsafe
+links and unsupported configuration syntax are rejected, and a failed update
+restores the previous addon and project configuration.
+
+Manual installation remains available. Copy the bundled `addons` folder into
+the Godot project:
 
 ```sh
 cp -R /path/to/godot-editor-mcp/plugin/addons /path/to/game/
@@ -712,8 +735,10 @@ port=6506
 
 ## Configure LM Studio
 
-Add this entry to LM Studio's `mcp.json`, replacing all example paths. This
-macOS/Linux example uses the absolute Python interpreter path:
+The graphical deployment helper above generates this configuration and exposes
+each Codex STDIO field separately. For manual configuration, add this entry to
+LM Studio's `mcp.json`, replacing all example paths. This macOS/Linux example
+uses the absolute Python interpreter path:
 
 ```json
 {
@@ -838,13 +863,14 @@ Set-Location "C:\path\to\godot-editor-mcp"
 py -3 -m unittest discover -s tests -v
 ```
 
-The 85-test Python suite tests MCP initialization, end-to-end stdio initialization,
+The 103-test Python suite tests MCP initialization, end-to-end stdio initialization,
 tool listing and calls, per-mode dispatch, registry invariants, stable ordering,
 complete routes, path/wait policy, table-driven enforcement of every published
 schema keyword and nested transaction shape, executable-source release consistency,
 capability contracts, authentication, bounded transport behavior, staged imports,
 traversal and symlink denial, size limits, atomic publication-race and mocked
-Windows no-overwrite behavior, structured and
+Windows no-overwrite behavior, transactional addon deployment and rollback,
+automatic plugin enablement, generated launch settings, structured and
 legacy bridge errors, discovery, safe stdout/stderr error separation, typed state
 and reload payloads, exact wait-version enforcement, cancellation, diagnostic
 settling, stale identities, and run startup health.

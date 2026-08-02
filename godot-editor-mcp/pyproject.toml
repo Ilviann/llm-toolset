@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "godot-editor-mcp"
-version = "0.17.0"
+version = "0.18.0"
 description = "Small offline MCP bridge for the Godot 4 editor"
 authors = [{ name = "Ilviann Zed", email = "ilviann.zed@gmail.com" }]
 readme = "README.md"

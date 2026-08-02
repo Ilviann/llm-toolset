@@ -3,6 +3,19 @@
 This file records released changes. Planned work is tracked separately in
 [`ROADMAP.md`](ROADMAP.md).
 
+## 0.18.0 — 2026-08-02
+
+- Added a portable graphical deployment helper that installs or replaces the
+  bundled Godot addon, automatically enables it in `project.godot`, and
+  generates copyable LM Studio and Codex STDIO settings.
+- Added `tiny`, `small`, and `large` mode selection with `small` preselected,
+  plus an optional large-mode Godot executable picker.
+- Made addon replacement transactional and bounded, with link/reparse-point
+  rejection, exact source/staged/installed verification, atomic configuration
+  writes, and rollback to the prior addon and project configuration on failure.
+- Added Windows and POSIX launch wrappers and focused deployment, configuration,
+  security, rollback, and generated-server integration coverage.
+
 ## 0.17.0 — 2026-07-24
 
 - Added `--godot-executable` as a portable command-line configuration for the

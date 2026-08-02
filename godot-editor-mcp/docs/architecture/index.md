@@ -3,6 +3,7 @@
 Each file documents one cohesive component: what it owns, the source files inside it, its dependency direction, its invariants, and the checks to run when it changes.
 
 - [`python-entry-composition.md`](python-entry-composition.md) — Python process entry points and concrete service composition.
+- [`deployment-helper.md`](deployment-helper.md) — portable graphical addon installation, enablement, rollback, and MCP configuration generation.
 - [`mcp-presentation.md`](mcp-presentation.md) — JSON-RPC/MCP request handling and stdio presentation.
 - [`tool-api-dispatch.md`](tool-api-dispatch.md) — tool catalog, schema policy, routing, and dispatch.
 - [`local-project-process-services.md`](local-project-process-services.md) — confined asset writes and optional editor launch.
