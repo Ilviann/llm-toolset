@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Final
 
-from .schemas import _OPERATION_ID, _PATH, _SNAPSHOT_ID
+from .schemas import _OPERATION_ID, _PATH, _PROPERTY_VALUE, _SNAPSHOT_ID
 
 _ACTOR_ID = {
     "type": "string",
@@ -59,6 +59,120 @@ _PROPERTY_NAMES = {
         "maxLength": 128,
         "pattern": r"^[^.\\]+$",
     },
+}
+_ROTATOR = {
+    "type": "object",
+    "properties": {
+        "pitch": {"type": "number", "minimum": -1000000000, "maximum": 1000000000},
+        "yaw": {"type": "number", "minimum": -1000000000, "maximum": 1000000000},
+        "roll": {"type": "number", "minimum": -1000000000, "maximum": 1000000000},
+    },
+    "required": ["pitch", "yaw", "roll"],
+    "additionalProperties": False,
+}
+_SCALE = {
+    "type": "object",
+    "properties": {
+        "x": {"type": "number", "minimum": -1000000, "maximum": 1000000},
+        "y": {"type": "number", "minimum": -1000000, "maximum": 1000000},
+        "z": {"type": "number", "minimum": -1000000, "maximum": 1000000},
+    },
+    "required": ["x", "y", "z"],
+    "additionalProperties": False,
+}
+_TRANSFORM = {
+    "type": "object",
+    "properties": {"location": _VECTOR, "rotation": _ROTATOR, "scale": _SCALE},
+    "required": ["location", "rotation", "scale"],
+    "additionalProperties": False,
+}
+_TAGS = {
+    "type": "array", "maxItems": 64, "uniqueItems": True,
+    "items": {"type": "string", "minLength": 1, "maxLength": 128},
+}
+_DATA_LAYERS = {
+    "type": "array", "maxItems": 32, "uniqueItems": True,
+    "items": {"type": "string", "minLength": 1, "maxLength": 512},
+}
+_PROPERTY_ASSIGNMENT = {
+    "type": "object",
+    "properties": {
+        "property_name": {
+            "type": "string", "minLength": 1, "maxLength": 128,
+            "pattern": r"^[^.\\]+$",
+        },
+        "value": _PROPERTY_VALUE,
+    },
+    "required": ["property_name", "value"],
+    "additionalProperties": False,
+}
+_PROPERTY_ASSIGNMENTS = {
+    "type": "array", "maxItems": 32, "items": _PROPERTY_ASSIGNMENT,
+}
+
+
+def _level_actor_operation(operation: str, required: tuple[str, ...], **properties: object) -> dict[str, object]:
+    return {
+        "type": "object",
+        "properties": {"operation": {"const": operation}, **properties},
+        "required": ["operation", *required],
+        "additionalProperties": False,
+    }
+
+
+_LEVEL_ACTOR_OPERATION = {
+    "oneOf": [
+        _level_actor_operation(
+            "spawn", ("class_path", "transform"), class_path=_PATH,
+            transform=_TRANSFORM,
+            label={"type": "string", "minLength": 1, "maxLength": 128},
+            tags=_TAGS,
+            folder={"type": "string", "maxLength": 512},
+            data_layers=_DATA_LAYERS,
+            actor_properties=_PROPERTY_ASSIGNMENTS,
+        ),
+        _level_actor_operation("transform", ("actor_id", "transform"), actor_id=_ACTOR_ID, transform=_TRANSFORM),
+        _level_actor_operation("label", ("actor_id", "label"), actor_id=_ACTOR_ID,
+                               label={"type": "string", "minLength": 1, "maxLength": 128}),
+        _level_actor_operation("tags", ("actor_id", "tags"), actor_id=_ACTOR_ID, tags=_TAGS),
+        _level_actor_operation("folder", ("actor_id", "folder"), actor_id=_ACTOR_ID,
+                               folder={"type": "string", "maxLength": 512}),
+        _level_actor_operation("data_layers", ("actor_id", "data_layers"), actor_id=_ACTOR_ID,
+                               data_layers=_DATA_LAYERS),
+        _level_actor_operation("attach", ("actor_id", "parent_actor_id"), actor_id=_ACTOR_ID,
+                               parent_actor_id=_ACTOR_ID,
+                               socket_name={"type": "string", "maxLength": 128}),
+        _level_actor_operation("detach", ("actor_id",), actor_id=_ACTOR_ID),
+        _level_actor_operation("actor_property", ("actor_id", "property_name", "value"),
+                               actor_id=_ACTOR_ID, **_PROPERTY_ASSIGNMENT["properties"]),
+        _level_actor_operation("component_property", ("actor_id", "component_id", "property_name", "value"),
+                               actor_id=_ACTOR_ID, component_id=_COMPONENT_ID,
+                               **_PROPERTY_ASSIGNMENT["properties"]),
+        _level_actor_operation("move", ("actor_id", "target_level"), actor_id=_ACTOR_ID,
+                               target_level=_PATH),
+        _level_actor_operation("delete", ("actor_id",), actor_id=_ACTOR_ID),
+    ]
+}
+
+_EXPECTED_COMPONENT = {
+    "type": "object",
+    "properties": {"component_id": _COMPONENT_ID, "properties": _PROPERTY_ASSIGNMENTS},
+    "required": ["component_id", "properties"],
+    "additionalProperties": False,
+}
+_EXPECTED_ACTOR = {
+    "type": "object",
+    "properties": {
+        "actor_id": _ACTOR_ID,
+        "label": {"type": "string", "minLength": 1, "maxLength": 128},
+        "transform": _TRANSFORM,
+        "tags": _TAGS,
+        "folder": {"type": "string", "maxLength": 512},
+        "actor_properties": _PROPERTY_ASSIGNMENTS,
+        "components": {"type": "array", "maxItems": 32, "items": _EXPECTED_COMPONENT},
+    },
+    "required": ["actor_id"],
+    "additionalProperties": False,
 }
 _LEVEL_SETTING = {
     "type": "object",
@@ -267,6 +381,57 @@ LEVEL_TOOLS: Final = (
                     "additionalProperties": False,
                 },
             ]
+        },
+    },
+    {
+        "name": "level_actor_edit",
+        "description": "Apply one bounded, stale-safe, transactional batch to actors in the exact current map.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "operation_id": _OPERATION_ID,
+                "map_id": _SNAPSHOT_ID,
+                "expected_snapshot": _SNAPSHOT_ID,
+                "operations": {
+                    "type": "array", "minItems": 1, "maxItems": 32,
+                    "items": _LEVEL_ACTOR_OPERATION,
+                },
+            },
+            "required": ["operation_id", "map_id", "expected_snapshot", "operations"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "level_save",
+        "description": "Save and verify the exact current map and explicit affected package set with honest per-package results.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "operation_id": _OPERATION_ID,
+                "map_id": _SNAPSHOT_ID,
+                "expected_snapshot": _SNAPSHOT_ID,
+                "affected_packages": {
+                    "type": "array", "minItems": 1, "maxItems": 64, "uniqueItems": True,
+                    "items": _PATH,
+                },
+                "verification": {
+                    "type": "object",
+                    "properties": {
+                        "mode": {"type": "string", "enum": ["inspect", "reload"]},
+                        "actors": {
+                            "type": "array", "minItems": 1, "maxItems": 32,
+                            "items": _EXPECTED_ACTOR,
+                        },
+                    },
+                    "required": ["mode", "actors"],
+                    "additionalProperties": False,
+                },
+            },
+            "required": [
+                "operation_id", "map_id", "expected_snapshot",
+                "affected_packages", "verification",
+            ],
+            "additionalProperties": False,
         },
     },
 )

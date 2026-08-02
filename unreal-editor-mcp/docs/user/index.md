@@ -5,7 +5,7 @@ Start with the [project README](../../README.md) for installation, first connect
 ## Detailed guides
 
 - [Setup and operation](setup-and-operation.md) — security, deployment, LM Studio, and optional editor lifecycle.
-- [Levels and assets](levels-and-assets.md) — level discovery, inspection, opening and management, asset references, and safe deletion.
+- [Levels and assets](levels-and-assets.md) — level discovery, inspection, opening, management, transactional actor editing, verified saving, asset references, and safe deletion.
 - [Blueprint inspection](blueprint-inspection.md) — families, snapshots, identities, pagination, and mutation scope.
 - [Blueprint graph authoring](graph-authoring.md) — action discovery, node lifecycle, function replacement, pin defaults, and connections.
 - [Blueprint mutation](blueprint-mutation.md) — reliable mutations, creation, components, defaults, members, functions, locals, macros, and custom events.

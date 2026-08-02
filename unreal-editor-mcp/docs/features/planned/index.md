@@ -8,7 +8,6 @@
 - [`pcg-graph-authoring` — Procedural Content Generation graph authoring](pcg-graph-authoring.md).
 - [`project-files` — Optional editor-offline project-file generation](project-files.md).
 - [`editor-build` — Optional editor-target builds](editor-build.md).
-- [`level-edit` — Transactional level actor editing and verified saving](level-edit.md).
 - [`pcg-component-edit` — Level actor PCG Component editing](pcg-component-edit.md).
 - [`spline-edit` — Spline component inspection and editing](spline-edit.md).
 - [`pie-lifecycle` — Retained operations and single-process multiplayer PIE lifecycle](pie-lifecycle.md).

@@ -21,6 +21,7 @@ Each file in this directory documents one implemented cohesive component: what i
 - [`level-service.md`](level-service.md) — bounded mounted-map discovery, current-map identities and snapshots, delegate invalidation, and safe ledger-backed opening.
 - [`level-management-service.md`](level-management-service.md) — exact map creation/configuration, bounded World Settings, persistence/reload verification, and map-closure deletion coordination.
 - [`level-actor-inspector.md`](level-actor-inspector.md) — descriptor-only actor queries, exact targeted loading, stable component identities, and requested reflected values.
+- [`level-actor-editing-service.md`](level-actor-editing-service.md) — stale-safe actor batches, scoped World Partition mutation, transactions, affected packages, and verified saving.
 - [`asset-reference-service.md`](asset-reference-service.md) — request validation and facade composition for reference capture and pagination.
 - [`asset-reference-target-resolver.md`](asset-reference-target-resolver.md) — exact mounted-target validation, non-loading resolution, and metadata.
 - [`asset-reference-registry-scanner.md`](asset-reference-registry-scanner.md) — bounded serialized, management, and searchable-name inbound evidence.

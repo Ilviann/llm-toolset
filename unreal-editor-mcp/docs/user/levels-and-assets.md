@@ -101,6 +101,63 @@ The allowlist is published in the MCP schema and includes compatible `DefaultGam
 
 Map deletion remains an `asset_delete` operation. First open another clean map, inspect `asset_references` for the inactive target, then pass that snapshot to `asset_delete`. The service enumerates at most 2,048 owned root, build-data, and external actor/object packages; refuses current/streaming/dirty/read-only/incompletely owned or referenced maps; uses Unreal's public reference-aware delete path; and verifies every package in both Asset Registry and storage views. It never removes `.umap` or sidecar files directly, never force-deletes or rewrites referencers, and does not claim Undo. Reconcile lost, partial, or unknown outcomes through `operation_status` and verify absence after restart. See [`examples/level-management-workflow.json`](../../examples/level-management-workflow.json).
 
+## Level actor editing and saving
+
+Start from `level_inspect {"mode":"current"}` and exact actor/component inspection. `level_actor_edit` applies 1–32 operations to that exact `map_id` and `snapshot_id` in one retained editor transaction:
+
+```json
+{
+  "operation_id":"4123456789abcdef0123456789abcdef",
+  "map_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "expected_snapshot":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "operations":[
+    {
+      "operation":"spawn",
+      "class_path":"/Script/Engine.StaticMeshActor",
+      "transform":{
+        "location":{"x":0,"y":0,"z":100},
+        "rotation":{"pitch":0,"yaw":0,"roll":0},
+        "scale":{"x":1,"y":1,"z":1}
+      },
+      "label":"MCP_Native",
+      "tags":["Authored"]
+    },
+    {
+      "operation":"label",
+      "actor_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:dddddddddddddddddddddddddddddddd",
+      "label":"MCP_Existing"
+    }
+  ]
+}
+```
+
+The exact operation matrix is spawn, transform, label, complete tag/folder/Data Layer replacement, attach/detach, supported actor/component instance property assignment, loaded-level move, and delete. `move` is intentionally limited to already-loaded levels in a non-World-Partition current world. Spawn classes are exact concrete native or Blueprint generated-class paths. Property names are direct fields supported by the shared value codec; nested traversal and unsafe/default-only reflection are unavailable.
+
+The service prevalidates the whole batch, including identities, values, class/property policy, locked Data Layers, level ownership, operation conflicts, and attachment cycles. It loads only required World Partition actors through scoped references. Runtime failure invokes Undo and verifies a bounded rollback journal. Success returns exact ordered read-back, stable existing GUIDs, created actor IDs, a new snapshot, and `affected_packages`; it does not save. Operation order matters when Unreal defines side effects—for example, put `folder` after `attach` if it must override the parent's folder.
+
+Pass the returned package set and snapshot unchanged to a new `level_save` operation. Verification is explicit and may inspect current memory or reload the root map:
+
+```json
+{
+  "operation_id":"5123456789abcdef0123456789abcdef",
+  "map_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "expected_snapshot":"cccccccccccccccccccccccccccccccccccccccc",
+  "affected_packages":[
+    "/Game/Maps/Authoring",
+    "/Game/__ExternalActors__/Maps/Authoring/0/00/EXACTPACKAGE"
+  ],
+  "verification":{
+    "mode":"reload",
+    "actors":[{
+      "actor_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:dddddddddddddddddddddddddddddddd",
+      "label":"MCP_Existing"
+    }]
+  }
+}
+```
+
+Every requested package must be loaded, writable, and owned by the exact current world; the root map is mandatory. Results attribute save, storage or verified deletion, and clean-state evidence per package. Reload/inspection can verify labels, transforms, tags, folders, actor properties, and component properties. A retained partial result is honest evidence that some package or expected state did not verify, not permission to retry blindly: reconcile with `operation_status`, inspect fresh state, and verify after restart before recovery. Cross-package filesystem atomicity is not claimed. See [`examples/level-edit-workflow.json`](../../examples/level-edit-workflow.json) and the [complete contracts](../types/level-actor-editing-service/contracts.md).
+
 ## Asset references
 
 Find inbound evidence for one exact mounted asset object path:

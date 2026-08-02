@@ -25,3 +25,4 @@
 - [`function-replace` — Complete function replacement](function-replace.md).
 - [`level-inspect` — World Partition actor and instance inspection](level-inspect.md).
 - [`level-management` — Level management](level-management.md).
+- [`level-edit` — Transactional level actor editing and verified saving](level-edit.md).

@@ -39,7 +39,7 @@ Feature identifiers are stable names, not execution indexes. Unfinished features
 - [x] [`level-inspect` — World Partition actor and instance inspection](docs/features/completed/level-inspect.md) — Inspect bounded descriptor, actor, component, and reflected instance state without loading the entire world.
   - Depends on:
     - `level-open`
-- [ ] [`level-edit` — Transactional level actor editing and verified saving](docs/features/planned/level-edit.md) — Add stale-safe actor batches and honest per-package World Partition save verification.
+- [x] [`level-edit` — Transactional level actor editing and verified saving](docs/features/completed/level-edit.md) — Add stale-safe actor batches and honest per-package World Partition save verification.
   - Depends on:
     - `level-inspect`
 - [ ] [`pcg-component-edit` — Level actor PCG Component editing](docs/features/planned/pcg-component-edit.md) — Inspect, configure, generate, clean up, and persist PCG Components on exact level actors.
@@ -69,6 +69,7 @@ Feature checkboxes record implementation completion. This section separately lis
 
 - macOS:
   - `level-management`
+  - `level-edit`
 - Windows:
   - None
 - Linux:

@@ -2,7 +2,7 @@
 
 This page is the navigation entry point for every released tool family. For installation, first connection, and the concise contract overview, start with the [project README](../../README.md).
 
-Unreal Editor MCP 0.25.0 is an offline-first MCP bridge for Unreal Engine 5.8+. It pairs a dependency-free Python 3.10+ stdio server with an editor-only C++ plugin. Default mode exposes exactly twenty-two tools:
+Unreal Editor MCP 0.26.0 is an offline-first MCP bridge for Unreal Engine 5.8+. It pairs a dependency-free Python 3.10+ stdio server with an editor-only C++ plugin. Default mode exposes exactly twenty-four tools:
 
 - `capabilities` reports the exact Python/plugin/Unreal versions, commands, features, listener state, effective limits, and published Blueprint-family matrix.
 - `editor_state` reports project identity, bridge readiness, play/simulate/save/GC state, and concise queued-operation state.
@@ -12,6 +12,8 @@ Unreal Editor MCP 0.25.0 is an offline-first MCP bridge for Unreal Engine 5.8+. 
 - `level_inspect` discovers mounted World assets, reports the current map snapshot, pages World Partition actor descriptors, and inspects exact actor/component properties.
 - `level_open` safely opens one exact mounted World asset through the retained mutation ledger.
 - `level_manage` creates or configures and reload-verifies one exact project map with bounded World Settings.
+- `level_actor_edit` prevalidates and transactionally applies one bounded stale-safe Actor/component batch without saving.
+- `level_save` explicitly saves the returned current-map package set and verifies requested identities and values by inspection or reload.
 - `blueprint_inspect` discovers every published Blueprint family across mounted content and returns bounded pages of one selected Blueprint's structure.
 - `blueprint_action_catalog` discovers bounded context-valid function, variable, event, flow-control, cast, literal, and operator actions for one exact Blueprint graph snapshot.
 - `blueprint_graph_edit` creates, moves, removes, configures, or connects graph nodes and pins, including wildcard specialization and explicitly requested bounded conversions.
@@ -26,7 +28,7 @@ Unreal Editor MCP 0.25.0 is an offline-first MCP bridge for Unreal Engine 5.8+. 
 - `game_data_inspect` reads one user-defined struct schema or bounded page of typed Data Table rows from an exact asset snapshot.
 - `game_data_edit` creates or atomically edits user-defined structs and typed Data Table rows with validation, saving, and read-back.
 
-Opt-in large mode adds a twenty-third tool, `editor_lifecycle`, for configured launch, safe graceful shutdown, durable restart, and cancellation. CSV/JSON filesystem import/export, Curve Tables, Data Assets, arbitrary UObject assets, supplied struct code, General Project Settings beyond the narrow framework operation, unrestricted world overrides, runtime server/client control, builds, Blueprint reparenting, console access, unrestricted reflection, forced process termination, and code execution remain unavailable.
+Opt-in large mode adds a twenty-fifth tool, `editor_lifecycle`, for configured launch, safe graceful shutdown, durable restart, and cancellation. CSV/JSON filesystem import/export, Curve Tables, Data Assets, arbitrary UObject assets, supplied struct code, General Project Settings beyond the narrow framework operation, unrestricted world overrides, runtime server/client control, builds, Blueprint reparenting, console access, unrestricted reflection, forced process termination, and code execution remain unavailable.
 
 ## Task guides
 

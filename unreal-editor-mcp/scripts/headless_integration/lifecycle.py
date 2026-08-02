@@ -33,10 +33,12 @@ from .blueprints import (
     verify_restarted_blueprints,
 )
 from .game_data_levels import (
+    author_level_edit_scenario,
     author_phase_seventeen_game_data,
     manage_disposable_level,
     open_acceptance_level,
     verify_restarted_game_data_and_level,
+    verify_restarted_level_edit,
     verify_restarted_level_deletion,
 )
 from .widgets import author_widget_scenario, verify_restarted_widgets
@@ -452,7 +454,7 @@ def main() -> int:
             if capabilities.get("commands") != [
                 "capabilities", "editor_state", "editor_shutdown", "operation_status",
                 "asset_references", "asset_delete",
-                "level_inspect", "level_open", "level_manage",
+                "level_inspect", "level_open", "level_manage", "level_actor_edit", "level_save",
                 "blueprint_inspect", "blueprint_action_catalog", "blueprint_graph_edit",
                 "blueprint_block_replace",
                 "blueprint_create", "blueprint_compile", "blueprint_save",
@@ -527,6 +529,12 @@ def main() -> int:
             ):
                 if capabilities.get("features", {}).get(feature) is not True:
                     raise AssertionError(f"level-management capability is unavailable: {feature}")
+            for feature in (
+                "level_actor_editing", "level_actor_transactions",
+                "level_package_save_verification",
+            ):
+                if capabilities.get("features", {}).get(feature) is not True:
+                    raise AssertionError(f"level-edit capability is unavailable: {feature}")
             if capabilities.get("features", {}).get("level_world_partition_conversion") is not False:
                 raise AssertionError("level World Partition conversion must remain unsupported")
             for feature in ("asset_reference_discovery", "asset_reference_live_memory"):
@@ -606,6 +614,15 @@ def main() -> int:
                    for name, value in expected_level_inspect_limits.items()):
                 raise AssertionError(
                     f"level-inspect limits mismatch: {capabilities.get('limits')!r}")
+            expected_level_edit_limits = {
+                "level_edit_operations": 32,
+                "level_edit_actors": 64,
+                "level_save_packages": 64,
+            }
+            if any(capabilities.get("limits", {}).get(name) != value
+                   for name, value in expected_level_edit_limits.items()):
+                raise AssertionError(
+                    f"level-edit limits mismatch: {capabilities.get('limits')!r}")
             expected_asset_reference_limits = {
                 "asset_reference_registry_candidates": 4096,
                 "asset_reference_live_objects": 8192,
@@ -640,6 +657,11 @@ def main() -> int:
             created = blueprint_fixtures["created"]
             phase_fourteen_families = blueprint_fixtures["phase_fourteen_families"]
             phase_fifteen_game_instance = blueprint_fixtures["phase_fifteen_game_instance"]
+            level_edit_scenario = author_level_edit_scenario(
+                bridge,
+                layout,
+                capabilities["bridge_instance_id"],
+            )
             phase_seventeen_game_data = author_phase_seventeen_game_data(
                 bridge, layout, capabilities["bridge_instance_id"],
             )
@@ -698,6 +720,7 @@ def main() -> int:
                 phase_seventeen_game_data,
                 level_scenario,
             )
+            verify_restarted_level_edit(reloaded_bridge, level_edit_scenario)
             verify_restarted_level_deletion(reloaded_bridge, deleted_level_path)
             verify_restarted_assets(
                 reloaded_bridge,
@@ -729,7 +752,7 @@ def main() -> int:
             pass
         else:
             raise AssertionError("a live discovery heartbeat remained after editor termination")
-    print("Integration passed: Widget Blueprint authoring, asset references/deletion, level management, Phase 17 authoring, replay/restart, and graceful lifecycle shutdown")
+    print("Integration passed: Widget Blueprint authoring, asset references/deletion, level management/editing, Phase 17 authoring, replay/restart, and graceful lifecycle shutdown")
     return 0
 
 

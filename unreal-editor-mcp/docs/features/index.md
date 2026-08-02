@@ -84,7 +84,7 @@ Keep the authoritative checklist in [`ROADMAP.md`](../../ROADMAP.md) synchronize
 - [`level-inspect` — World Partition actor and instance inspection](completed/level-inspect.md) — Inspect bounded descriptor, actor, component, and reflected instance state without loading the entire world.
   - Depends on:
     - `level-open`
-- [`level-edit` — Transactional level actor editing and verified saving](planned/level-edit.md) — Add stale-safe actor batches and honest per-package World Partition save verification.
+- [`level-edit` — Transactional level actor editing and verified saving](completed/level-edit.md) — Add stale-safe actor batches and honest per-package World Partition save verification.
   - Depends on:
     - `level-inspect`
 - [`pcg-component-edit` — Level actor PCG Component editing](planned/pcg-component-edit.md) — Inspect, configure, generate, clean up, and persist PCG Components on exact level actors.

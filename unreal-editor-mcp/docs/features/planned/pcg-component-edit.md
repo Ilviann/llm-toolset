@@ -14,7 +14,7 @@ released_in: null
 **Depends on:**
 
 - [`pcg-graph-authoring`](pcg-graph-authoring.md)
-- [`level-edit`](level-edit.md)
+- [`level-edit`](../completed/level-edit.md)
 
 ### Implementation
 

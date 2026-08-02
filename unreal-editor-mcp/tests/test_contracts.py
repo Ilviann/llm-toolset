@@ -42,13 +42,13 @@ class ReleaseContractTests(unittest.TestCase):
         native = re.search(r'Version\[\].*TEXT\("([^"]+)"\)', header)
         self.assertIsNotNone(native)
         versions = {project["project"]["version"], plugin["VersionName"], native.group(1), unreal_editor_mcp.__version__}
-        self.assertEqual(versions, {"0.25.0"})
+        self.assertEqual(versions, {"0.26.0"})
 
-    def test_only_released_asset_delete_commands_are_registered(self):
+    def test_only_released_commands_are_registered(self):
         names = [tool["name"] for tool in TOOLS]
         self.assertEqual(names, [
             "capabilities", "editor_state", "operation_status", "asset_references", "asset_delete",
-            "level_inspect", "level_open", "level_manage",
+            "level_inspect", "level_open", "level_manage", "level_actor_edit", "level_save",
             "blueprint_inspect", "blueprint_action_catalog", "blueprint_graph_edit",
             "blueprint_block_replace",
             "blueprint_create", "blueprint_compile", "blueprint_save",
@@ -155,6 +155,40 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertIn("FWorldPartitionReference", service)
         self.assertNotIn("FScopedTransaction", service)
         self.assertIn("UnrealMCP.LevelInspect.ActorsComponentsPropertiesAndSafety", native_test)
+
+    def test_level_edit_is_ledger_backed_transactional_and_covered(self):
+        root = ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private"
+        bridge = (root / "UnrealMCPBridge.cpp").read_text(encoding="utf-8")
+        service = (root / "UnrealMCPLevelActorEditingService.cpp").read_text(encoding="utf-8")
+        native_test = (root / "Tests/UnrealMCPAutomationTestsLevelEdit.cpp").read_text(encoding="utf-8")
+        production = (ROOT / "scripts/headless_integration/game_data_levels.py").read_text(encoding="utf-8")
+        for command in ["level_actor_edit", "level_save"]:
+            self.assertIn(f'Command == TEXT("{command}")', bridge)
+        for feature in [
+            "level_actor_editing", "level_actor_transactions",
+            "level_package_save_verification",
+        ]:
+            self.assertIn(f'TEXT("{feature}"), true', bridge)
+        for limit in ["MaxLevelEditOperations", "MaxLevelEditActors", "MaxLevelSavePackages"]:
+            self.assertIn(limit, service + bridge)
+        for safety in [
+            "IsPlayingSessionInEditor()", "IsSimulatingInEditor()", "IsSavingPackage()",
+            "IsGarbageCollecting()", "IsTransactionActive()", "IsAsyncLoading()",
+        ]:
+            self.assertIn(safety, service)
+        for contract in [
+            "FScopedTransaction", "UndoTransaction", "FWorldPartitionReference",
+            "PropertyCodec::Set", "SavePackages", "FEditorFileUtils::LoadMap",
+            'TEXT("mutation_scope_denied")', "FPaths::ProjectContentDir()",
+        ]:
+            self.assertIn(contract, service)
+        self.assertIn("UnrealMCP.LevelEdit.TransactionalActorBatchAndPackageSave", native_test)
+        for acceptance in [
+            "author_level_edit_scenario", "verify_restarted_level_edit",
+            'send_without_reading(layout, "level_actor_edit"',
+            'send_without_reading(layout, "level_save"',
+        ]:
+            self.assertIn(acceptance, production)
 
     def test_phase_sixteen_multiplayer_policy_is_published_and_covered(self):
         policy = (ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private/UnrealMCPBlueprintFamilyPolicy.cpp").read_text(encoding="utf-8")

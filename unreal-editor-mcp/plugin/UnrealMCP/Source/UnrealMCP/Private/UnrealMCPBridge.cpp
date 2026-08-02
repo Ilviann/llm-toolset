@@ -26,6 +26,7 @@
 #include "UnrealMCPGameDataService.h"
 #include "UnrealMCPLevelService.h"
 #include "UnrealMCPLevelManagementService.h"
+#include "UnrealMCPLevelActorEditingService.h"
 #include "UnrealMCPAssetReferenceService.h"
 #include "UnrealMCPAssetDeletionService.h"
 #include "UnrealMCPProtocol.h"
@@ -60,6 +61,7 @@ FString Header(const FHttpServerRequest& Request, const TCHAR* LowercaseName)
 bool IsMutationCommand(const FString& Command)
 {
     return Command == TEXT("asset_delete") || Command == TEXT("level_open") || Command == TEXT("level_manage")
+        || Command == TEXT("level_actor_edit") || Command == TEXT("level_save")
         || Command == TEXT("blueprint_create") || Command == TEXT("blueprint_compile") || Command == TEXT("blueprint_save")
         || Command == TEXT("blueprint_component_edit") || Command == TEXT("blueprint_default_edit")
         || Command == TEXT("blueprint_member_edit") || Command == TEXT("blueprint_graph_edit")
@@ -180,6 +182,7 @@ void FUnrealMCPBridge::Stop()
     WidgetTreeService.Reset();
     GameplayFrameworkEditor.Reset();
     GameDataService.Reset();
+    LevelActorEditingService.Reset();
     LevelManagementService.Reset();
     LevelService.Reset();
     AssetDeletionService.Reset();
@@ -230,6 +233,7 @@ bool FUnrealMCPBridge::HandleRequest(const FHttpServerRequest& Request, const FH
         && Command != TEXT("operation_status") && Command != TEXT("asset_references")
         && Command != TEXT("asset_delete")
         && Command != TEXT("level_inspect") && Command != TEXT("level_open") && Command != TEXT("level_manage")
+        && Command != TEXT("level_actor_edit") && Command != TEXT("level_save")
         && Command != TEXT("blueprint_inspect") && Command != TEXT("blueprint_create") && Command != TEXT("blueprint_compile")
         && Command != TEXT("blueprint_save") && Command != TEXT("blueprint_component_edit") && Command != TEXT("blueprint_default_edit")
         && Command != TEXT("blueprint_member_edit") && Command != TEXT("blueprint_action_catalog")
@@ -404,13 +408,14 @@ bool FUnrealMCPBridge::Execute(const FString& Command, const TSharedPtr<FJsonObj
         }
         return AssetDeletionService->Delete(Arguments, OutResult, OutError);
     }
-    if (Command == TEXT("level_inspect") || Command == TEXT("level_open") || Command == TEXT("level_manage"))
+    if (Command == TEXT("level_inspect") || Command == TEXT("level_open") || Command == TEXT("level_manage")
+        || Command == TEXT("level_actor_edit") || Command == TEXT("level_save"))
     {
         if (!LevelService)
         {
             LevelService = MakeUnique<FUnrealMCPLevelService>(ProjectHash);
         }
-        if ((Command == TEXT("level_open") || Command == TEXT("level_manage")) && OperationLedger)
+        if (Command != TEXT("level_inspect") && OperationLedger)
         {
             const TSharedPtr<FJsonObject> State = OperationLedger->CurrentState();
             if (static_cast<int32>(State->GetNumberField(TEXT("queued"))) > 0
@@ -426,6 +431,14 @@ bool FUnrealMCPBridge::Execute(const FString& Command, const TSharedPtr<FJsonObj
         }
         if (Command == TEXT("level_inspect")) return LevelService->Inspect(Arguments, OutResult, OutError);
         if (Command == TEXT("level_open")) return LevelService->Open(Arguments, OutResult, OutError);
+        if (Command == TEXT("level_actor_edit") || Command == TEXT("level_save"))
+        {
+            if (!LevelActorEditingService)
+                LevelActorEditingService = MakeUnique<FUnrealMCPLevelActorEditingService>(*LevelService);
+            return Command == TEXT("level_actor_edit")
+                ? LevelActorEditingService->Edit(Arguments, OutResult, OutError)
+                : LevelActorEditingService->Save(Arguments, OutResult, OutError);
+        }
         if (!LevelManagementService)
         {
             LevelManagementService = MakeUnique<FUnrealMCPLevelManagementService>(ProjectHash, *LevelService);
@@ -513,7 +526,7 @@ TSharedPtr<FJsonObject> FUnrealMCPBridge::Capabilities() const
     Result->SetStringField(TEXT("mode"), TEXT("blueprint_family_authoring"));
     Result->SetBoolField(TEXT("bridge_ready"), bReady);
     Result->SetArrayField(TEXT("commands"), Strings({TEXT("capabilities"), TEXT("editor_state"), TEXT("editor_shutdown"), TEXT("operation_status"), TEXT("asset_references"), TEXT("asset_delete"),
-        TEXT("level_inspect"), TEXT("level_open"), TEXT("level_manage"),
+        TEXT("level_inspect"), TEXT("level_open"), TEXT("level_manage"), TEXT("level_actor_edit"), TEXT("level_save"),
         TEXT("blueprint_inspect"), TEXT("blueprint_action_catalog"), TEXT("blueprint_graph_edit"),
         TEXT("blueprint_block_replace"), TEXT("blueprint_create"), TEXT("blueprint_compile"),
         TEXT("blueprint_save"), TEXT("blueprint_component_edit"), TEXT("blueprint_default_edit"), TEXT("blueprint_member_edit"),
@@ -579,7 +592,9 @@ TSharedPtr<FJsonObject> FUnrealMCPBridge::Capabilities() const
     Features->SetBoolField(TEXT("level_world_partition_descriptors"), true);
     Features->SetBoolField(TEXT("level_targeted_actor_loading"), true);
     Features->SetBoolField(TEXT("level_instance_properties"), true);
-    Features->SetBoolField(TEXT("level_actor_editing"), false);
+    Features->SetBoolField(TEXT("level_actor_editing"), true);
+    Features->SetBoolField(TEXT("level_actor_transactions"), true);
+    Features->SetBoolField(TEXT("level_package_save_verification"), true);
     Features->SetBoolField(TEXT("editor_lifecycle"), true);
     Features->SetBoolField(TEXT("graceful_editor_shutdown"), true);
     Features->SetBoolField(TEXT("project_build"), false);
@@ -650,6 +665,9 @@ TSharedPtr<FJsonObject> FUnrealMCPBridge::Capabilities() const
     Limits->SetNumberField(TEXT("level_targeted_loads"), UnrealMCP::MaxLevelTargetedLoads);
     Limits->SetNumberField(TEXT("level_setup_properties"), UnrealMCP::MaxLevelSetupProperties);
     Limits->SetNumberField(TEXT("level_owned_packages"), UnrealMCP::MaxLevelOwnedPackages);
+    Limits->SetNumberField(TEXT("level_edit_operations"), UnrealMCP::MaxLevelEditOperations);
+    Limits->SetNumberField(TEXT("level_edit_actors"), UnrealMCP::MaxLevelEditActors);
+    Limits->SetNumberField(TEXT("level_save_packages"), UnrealMCP::MaxLevelSavePackages);
     Limits->SetNumberField(TEXT("dirty_package_summary"), UnrealMCP::MaxDirtyPackageSummary);
     Limits->SetNumberField(TEXT("widget_tree_widgets"), UnrealMCP::MaxWidgetTreeWidgets);
     Limits->SetNumberField(TEXT("widget_tree_depth"), UnrealMCP::MaxWidgetTreeDepth);

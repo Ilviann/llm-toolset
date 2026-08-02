@@ -12,7 +12,7 @@ released_in: null
 
 **Depends on:**
 
-- [`level-edit`](level-edit.md)
+- [`level-edit`](../completed/level-edit.md)
 
 ### Implementation
 

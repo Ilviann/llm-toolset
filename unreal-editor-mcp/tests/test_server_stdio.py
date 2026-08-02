@@ -15,9 +15,9 @@ class FakeBridge:
     def call(self, command, arguments=None):
         self.calls.append((command, arguments))
         if command == "capabilities":
-            return {"bridge_version": "0.25.0", "commands": [
+            return {"bridge_version": "0.26.0", "commands": [
                 "capabilities", "editor_state", "operation_status", "asset_references", "asset_delete",
-                "level_inspect", "level_open", "level_manage",
+                "level_inspect", "level_open", "level_manage", "level_actor_edit", "level_save",
                 "blueprint_inspect", "blueprint_action_catalog", "blueprint_graph_edit",
                 "blueprint_block_replace",
                 "blueprint_create", "blueprint_compile", "blueprint_save",
@@ -40,11 +40,11 @@ class ServerStdioTests(unittest.TestCase):
         bridge = FakeBridge()
         server = MCPServer(bridge)
         initialized = server.handle({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2025-06-18"}})
-        self.assertEqual(initialized["result"]["serverInfo"]["version"], "0.25.0")
+        self.assertEqual(initialized["result"]["serverInfo"]["version"], "0.26.0")
         listed = server.handle({"jsonrpc": "2.0", "id": 2, "method": "tools/list"})
         self.assertEqual([tool["name"] for tool in listed["result"]["tools"]], [
             "capabilities", "editor_state", "operation_status", "asset_references", "asset_delete",
-            "level_inspect", "level_open", "level_manage",
+            "level_inspect", "level_open", "level_manage", "level_actor_edit", "level_save",
             "blueprint_inspect", "blueprint_action_catalog", "blueprint_graph_edit",
             "blueprint_block_replace",
             "blueprint_create", "blueprint_compile", "blueprint_save",
@@ -212,6 +212,68 @@ class ServerStdioTests(unittest.TestCase):
                 response = server.handle({"jsonrpc": "2.0", "id": 20, "method": "tools/call",
                     "params": {"name": "asset_references", "arguments": arguments}})
                 self.assertEqual(response["error"]["code"], -32602)
+
+    def test_level_edit_and_save_schemas_are_exact_bounded_and_stale_safe(self):
+        server = MCPServer(FakeBridge())
+        operation_id = "a" * 32
+        map_id = "b" * 40
+        snapshot = "c" * 40
+        actor_id = map_id + ":" + "d" * 32
+        transform = {
+            "location": {"x": 1, "y": 2, "z": 3},
+            "rotation": {"pitch": 0, "yaw": 90, "roll": 0},
+            "scale": {"x": 1, "y": 1, "z": 1},
+        }
+        edit = {
+            "operation_id": operation_id,
+            "map_id": map_id,
+            "expected_snapshot": snapshot,
+            "operations": [
+                {"operation": "spawn", "class_path": "/Script/Engine.TextRenderActor",
+                 "transform": transform, "label": "Spawned", "tags": ["Authored"],
+                 "folder": "MCP/Actors", "data_layers": [],
+                 "actor_properties": [{"property_name": "InitialLifeSpan", "value": 5}]},
+                {"operation": "transform", "actor_id": actor_id, "transform": transform},
+                {"operation": "attach", "actor_id": actor_id,
+                 "parent_actor_id": map_id + ":" + "e" * 32},
+                {"operation": "component_property", "actor_id": actor_id,
+                 "component_id": "f" * 32, "property_name": "WorldSize", "value": 128},
+            ],
+        }
+        save = {
+            "operation_id": operation_id,
+            "map_id": map_id,
+            "expected_snapshot": snapshot,
+            "affected_packages": ["/Game/Maps/Test", "/Game/__ExternalActors__/Maps/Test/AA/Actor"],
+            "verification": {"mode": "reload", "actors": [{
+                "actor_id": actor_id, "label": "Edited", "transform": transform,
+                "tags": ["Authored"], "folder": "MCP/Actors",
+                "actor_properties": [{"property_name": "InitialLifeSpan", "value": 5}],
+                "components": [{"component_id": "f" * 32, "properties": [
+                    {"property_name": "WorldSize", "value": 128}]}],
+            }]},
+        }
+        for name, arguments in (("level_actor_edit", edit), ("level_save", save)):
+            response = server.handle({"jsonrpc": "2.0", "id": 26, "method": "tools/call",
+                "params": {"name": name, "arguments": arguments}})
+            self.assertNotIn("error", response)
+        invalid = (
+            ("level_actor_edit", {**edit, "operations": []}),
+            ("level_actor_edit", {**edit, "operations": edit["operations"] * 9}),
+            ("level_actor_edit", {**edit, "operations": [
+                {"operation": "delete", "actor_id": actor_id, "force": True}]}),
+            ("level_actor_edit", {**edit, "map_id": "short"}),
+            ("level_actor_edit", {**edit, "operations": [
+                {"operation": "transform", "actor_id": actor_id,
+                 "transform": {**transform, "scale": {"x": float("inf"), "y": 1, "z": 1}}}]}),
+            ("level_save", {**save, "affected_packages": []}),
+            ("level_save", {**save, "verification": {"mode": "none", "actors": []}}),
+            ("level_save", {**save, "force": True}),
+        )
+        for name, arguments in invalid:
+            response = server.handle({"jsonrpc": "2.0", "id": 27, "method": "tools/call",
+                "params": {"name": name, "arguments": arguments}})
+            self.assertEqual(response["error"]["code"], -32602)
 
     def test_asset_delete_schema_is_exact_and_stale_safe(self):
         server = MCPServer(FakeBridge())

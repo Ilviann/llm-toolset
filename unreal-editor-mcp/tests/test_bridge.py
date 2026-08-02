@@ -11,7 +11,7 @@ from unreal_editor_mcp.errors import BridgeError, ErrorCode
 from unreal_editor_mcp.project import ProjectLayout
 
 
-RECORD = DiscoveryRecord("a" * 40, 123, 15485, "0.25.0", "5.8.0", 1)
+RECORD = DiscoveryRecord("a" * 40, 123, 15485, "0.26.0", "5.8.0", 1)
 
 
 class FakeResponse:
@@ -89,6 +89,13 @@ class BridgeTests(unittest.TestCase):
                 "map_path": "/Game/Maps/Test.Test", "expected_current_snapshot": snapshot,
                 "settings": [{"property_name": "KillZ", "value": -10000}],
                 "reload_after_save": True}),
+            ("level_actor_edit", {"operation_id": operation_id, "map_id": "a" * 40,
+                "expected_snapshot": snapshot, "operations": [{"operation": "delete",
+                    "actor_id": "a" * 40 + ":" + "e" * 32}]}),
+            ("level_save", {"operation_id": operation_id, "map_id": "a" * 40,
+                "expected_snapshot": snapshot, "affected_packages": ["/Game/Maps/Test"],
+                "verification": {"mode": "inspect", "actors": [
+                    {"actor_id": "a" * 40 + ":" + "e" * 32}]}}),
             ("blueprint_create", {"operation_id": operation_id, "parent_class": "/Script/Engine.Actor", "package_path": "/Game/BP_New"}),
             ("blueprint_compile", {"operation_id": operation_id, "asset_path": "/Game/BP_New.BP_New", "expected_snapshot": snapshot}),
             ("blueprint_save", {"operation_id": operation_id, "asset_path": "/Game/BP_New.BP_New", "expected_snapshot": snapshot}),

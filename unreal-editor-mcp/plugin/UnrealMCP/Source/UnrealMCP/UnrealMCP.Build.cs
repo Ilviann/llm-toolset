@@ -12,6 +12,7 @@ public class UnrealMCP : ModuleRules
             "AssetTools",
             "BlueprintGraph",
             "CoreUObject",
+            "DataLayerEditor",
             "Engine",
             "EngineSettings",
             "HTTPServer",

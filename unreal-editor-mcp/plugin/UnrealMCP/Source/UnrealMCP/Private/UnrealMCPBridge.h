@@ -20,6 +20,7 @@ class FUnrealMCPGameplayFrameworkEditor;
 class FUnrealMCPGameDataService;
 class FUnrealMCPLevelService;
 class FUnrealMCPLevelManagementService;
+class FUnrealMCPLevelActorEditingService;
 class FUnrealMCPAssetReferenceService;
 class FUnrealMCPAssetDeletionService;
 class FUnrealMCPOperationLedger;
@@ -63,6 +64,7 @@ private:
     TUniquePtr<FUnrealMCPGameDataService> GameDataService;
     TUniquePtr<FUnrealMCPLevelService> LevelService;
     TUniquePtr<FUnrealMCPLevelManagementService> LevelManagementService;
+    TUniquePtr<FUnrealMCPLevelActorEditingService> LevelActorEditingService;
     TUniquePtr<FUnrealMCPAssetReferenceService> AssetReferenceService;
     TUniquePtr<FUnrealMCPAssetDeletionService> AssetDeletionService;
     TUniquePtr<FUnrealMCPOperationLedger> OperationLedger;

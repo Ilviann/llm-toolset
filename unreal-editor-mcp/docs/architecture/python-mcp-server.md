@@ -2,7 +2,7 @@
 
 ## Ownership
 
-`unreal_editor_mcp/` owns the Python 3.10+ process. `stdio.py` bounds newline-delimited JSON-RPC and keeps stdout protocol-only. `server.py` negotiates MCP, publishes the twenty-two default tools plus optional large-mode lifecycle tool, validates arguments, and converts domain failures to MCP tool errors. `tool_catalog.py` is the one ordered catalog assembler over the core, asset, level, Blueprint, widget, gameplay-framework, game-data, and lifecycle definitions in `tool_catalog_families/`. `project.py`, `platforms.py`, and `discovery.py` resolve one project and validate generated state. `bridge.py` is the only HTTP client. `lifecycle.py` owns configured editor process orchestration and durable lifecycle records. `cli.py` composes these responsibilities.
+`unreal_editor_mcp/` owns the Python 3.10+ process. `stdio.py` bounds newline-delimited JSON-RPC and keeps stdout protocol-only. `server.py` negotiates MCP, publishes the twenty-four default tools plus optional large-mode lifecycle tool, validates arguments, and converts domain failures to MCP tool errors. `tool_catalog.py` is the one ordered catalog assembler over the core, asset, level, Blueprint, widget, gameplay-framework, game-data, and lifecycle definitions in `tool_catalog_families/`. `project.py`, `platforms.py`, and `discovery.py` resolve one project and validate generated state. `bridge.py` is the only HTTP client. `lifecycle.py` owns configured editor process orchestration and durable lifecycle records. `cli.py` composes these responsibilities.
 
 ## Dependency direction
 
@@ -10,10 +10,10 @@ The CLI constructs a `ProjectLayout`, `UnrealBridge`, and `MCPServer`; the trans
 
 ## Invariants
 
-- Default mode contains the twenty-two tools released through `level-management`. Only large mode adds `editor_lifecycle`.
+- Default mode contains the twenty-four tools released through `level-edit`. Only large mode adds `editor_lifecycle`.
 - The public catalog order is assembled once from disjoint family tuples; every tool name is unique.
 - `asset_references` has exact mounted-object-path and cursor-continuation shapes with bounded page size.
-- `level_inspect` has exact mounted discovery, current-map, actor-list, actor, component, and cursor-continuation shapes. Actor queries require an exact current map identity and snapshot; exact actor/component properties are requested by bounded names. `level_open` requires one 32-hex operation ID and one exact mounted World object path. `level_manage` has exact blank-create, template-create, and current-map configure shapes with explicit snapshots, opening/reload choices, and bounded settings.
+- `level_inspect` has exact mounted discovery, current-map, actor-list, actor, component, and cursor-continuation shapes. Actor queries require an exact current map identity and snapshot; exact actor/component properties are requested by bounded names. `level_open` requires one 32-hex operation ID and one exact mounted World object path. `level_manage` has exact blank-create, template-create, and current-map configure shapes with explicit snapshots, opening/reload choices, and bounded settings. `level_actor_edit` requires one exact current map/snapshot and 1–32 discriminated operations; `level_save` requires its returned explicit package set and bounded exact verification expectations.
 - Tool arguments are exact objects with no additional fields.
 - `blueprint_inspect` has three mutually exclusive shapes: discovery, exact inspection, or cursor continuation; Python bounds paths, sections, cursor size, and page size before HTTP.
 - `blueprint_action_catalog` requires an exact asset, graph, and snapshot and bounds exact text/owner/function/member/family filters, optional node/pin context, and result count before HTTP.

@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.26.0 — 2026-08-02
+
+- Added ledger-backed `level_actor_edit` with exact current-map snapshots, full bounded-batch prevalidation, mixed native/Blueprint spawning, Actor/component metadata and property operations, attachment safety, non-World-Partition level moves, deletion, scoped World Partition loading, one editor transaction, verified rollback, and exact operation/package read-back.
+- Added ledger-backed `level_save` with explicit current-world package ownership and writability preflight, per-package persistence evidence including verified external-package deletion, inspect/reload Actor and component verification, and honest retained partial outcomes without claiming cross-package filesystem atomicity.
+- Added synchronized schemas, capabilities, limits, documentation, a mixed actor-placement workflow, Python contracts, focused Windows World Partition Automation, and production replay/stale/restart acceptance; advanced the exact-version pair to 0.26.0. macOS native verification remains in the platform backlog.
+
 ## 0.25.0 — 2026-08-01
 
 - Added ledger-backed `level_manage` blank/template creation and exact-current-map configuration with explicit mounted World paths, current-map snapshots, topology facts, a 16-field World Settings allowlist, shared typed property encoding, save/reload read-back, and exact map identities.

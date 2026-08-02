@@ -1,6 +1,14 @@
 # Unreal Engine and Xcode development pitfalls
 
-This page records toolchain and engine behavior encountered while implementing Phase 1 on 2026-07-21. The verified host was Apple Silicon macOS 26.5.2 with Unreal Engine 5.8.0 (changelist 55116800), Xcode 26.1.1, Apple clang 17.0.0, and the macOS 26.1 SDK. These observations are evidence for that environment, not claims about every Unreal or macOS installation.
+This page records confirmed toolchain and editor behavior encountered during development. Each observation is evidence for its stated environment, not a claim about every Unreal installation.
+
+The Phase 1 macOS observations below were verified on Apple Silicon macOS 26.5.2 with Unreal Engine 5.8.0 (changelist 55116800), Xcode 26.1.1, Apple clang 17.0.0, and the macOS 26.1 SDK.
+
+## Immediate opening can crash a newly created World Partition map
+
+During Windows Unreal Engine 5.8 headless verification for `level-edit` on 2026-08-02, creating a World Partition map through `level_manage` with `open_after_create: true` crashed the editor. Unreal's fatal check reported that the temporary created `UWorld` remained standalone when the immediate load began.
+
+Until that lifecycle issue is fixed, create the map with `open_after_create: false`, then open it with a separate `level_open` call.
 
 ## macOS is not covered by `PLATFORM_UNIX`
 

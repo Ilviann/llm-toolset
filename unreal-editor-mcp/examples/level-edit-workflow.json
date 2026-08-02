@@ -1,0 +1,126 @@
+{
+  "description": "Place three instances of one project Actor Blueprint plus one native Actor, edit exact returned identities, save the complete returned package set, reload-verify values, and reconcile. Replace the Blueprint path, IDs, snapshots, and package list with exact prior results.",
+  "steps": [
+    {
+      "tool": "level_inspect",
+      "arguments": {"mode": "current"}
+    },
+    {
+      "tool": "level_actor_edit",
+      "arguments": {
+        "operation_id": "0123456789abcdef0123456789abcdef",
+        "map_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "expected_snapshot": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "operations": [
+          {
+            "operation": "spawn",
+            "class_path": "/Game/Blueprints/BP_MCPProp.BP_MCPProp_C",
+            "transform": {"location": {"x": 0, "y": 0, "z": 100}, "rotation": {"pitch": 0, "yaw": 0, "roll": 0}, "scale": {"x": 1, "y": 1, "z": 1}},
+            "label": "MCP_BP_A",
+            "tags": ["MCP", "Placed"],
+            "actor_properties": [{"property_name": "MCPValue", "value": 1}]
+          },
+          {
+            "operation": "spawn",
+            "class_path": "/Game/Blueprints/BP_MCPProp.BP_MCPProp_C",
+            "transform": {"location": {"x": 200, "y": 0, "z": 100}, "rotation": {"pitch": 0, "yaw": 0, "roll": 0}, "scale": {"x": 1, "y": 1, "z": 1}},
+            "label": "MCP_BP_B"
+          },
+          {
+            "operation": "spawn",
+            "class_path": "/Game/Blueprints/BP_MCPProp.BP_MCPProp_C",
+            "transform": {"location": {"x": 400, "y": 0, "z": 100}, "rotation": {"pitch": 0, "yaw": 0, "roll": 0}, "scale": {"x": 1, "y": 1, "z": 1}},
+            "label": "MCP_BP_C"
+          },
+          {
+            "operation": "spawn",
+            "class_path": "/Script/Engine.StaticMeshActor",
+            "transform": {"location": {"x": 600, "y": 0, "z": 100}, "rotation": {"pitch": 0, "yaw": 0, "roll": 0}, "scale": {"x": 1, "y": 1, "z": 1}},
+            "label": "MCP_Native"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "level_actor_edit",
+      "arguments": {
+        "operation_id": "1123456789abcdef0123456789abcdef",
+        "map_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "expected_snapshot": "cccccccccccccccccccccccccccccccccccccccc",
+        "operations": [
+          {
+            "operation": "attach",
+            "actor_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:11111111111111111111111111111111",
+            "parent_actor_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:22222222222222222222222222222222"
+          },
+          {
+            "operation": "folder",
+            "actor_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:11111111111111111111111111111111",
+            "folder": "MCP/Placed"
+          },
+          {
+            "operation": "transform",
+            "actor_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:33333333333333333333333333333333",
+            "transform": {"location": {"x": 400, "y": 200, "z": 150}, "rotation": {"pitch": 0, "yaw": 45, "roll": 0}, "scale": {"x": 1, "y": 1, "z": 1}}
+          },
+          {
+            "operation": "actor_property",
+            "actor_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:11111111111111111111111111111111",
+            "property_name": "MCPValue",
+            "value": 7
+          }
+        ]
+      }
+    },
+    {
+      "tool": "level_save",
+      "arguments": {
+        "operation_id": "2123456789abcdef0123456789abcdef",
+        "map_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "expected_snapshot": "dddddddddddddddddddddddddddddddddddddddd",
+        "affected_packages": [
+          "/Game/Maps/MCP_Authoring",
+          "/Game/__ExternalActors__/Maps/MCP_Authoring/0/00/COPY_EACH_EXACT_RETURNED_PACKAGE"
+        ],
+        "verification": {
+          "mode": "reload",
+          "actors": [
+            {
+              "actor_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:11111111111111111111111111111111",
+              "label": "MCP_BP_A",
+              "folder": "MCP/Placed",
+              "tags": ["MCP", "Placed"],
+              "actor_properties": [{"property_name": "MCPValue", "value": 7}]
+            },
+            {
+              "actor_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:33333333333333333333333333333333",
+              "label": "MCP_BP_C",
+              "transform": {"location": {"x": 400, "y": 200, "z": 150}, "rotation": {"pitch": 0, "yaw": 45, "roll": 0}, "scale": {"x": 1, "y": 1, "z": 1}}
+            },
+            {
+              "actor_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:44444444444444444444444444444444",
+              "label": "MCP_Native"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "tool": "operation_status",
+      "arguments": {
+        "operation_id": "2123456789abcdef0123456789abcdef",
+        "bridge_instance_id": "3123456789abcdef0123456789abcdef"
+      }
+    },
+    {
+      "tool": "level_inspect",
+      "arguments": {
+        "mode": "actors",
+        "map_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "expected_snapshot": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "filters": {"tag": "MCP"},
+        "page_size": 10
+      }
+    }
+  ]
+}
