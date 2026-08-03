@@ -14,6 +14,7 @@
 #include "UnrealMCPWidgetTreeSupport.h"
 #include "UObject/UnrealType.h"
 #include "WidgetBlueprint.h"
+#include "UnrealMCPPropertyCodec.h"
 
 namespace
 {
@@ -130,9 +131,7 @@ FString FUnrealMCPWidgetLayoutService::Fingerprint(const UPanelSlot* Slot)
         FString Value;
         if (Property != nullptr)
         {
-            Property->ExportText_InContainer(
-                0, Value, Slot, Slot->GetArchetype(),
-                const_cast<UPanelSlot*>(Slot), PPF_None);
+            UnrealMCP::PropertyCodec::ExportValueText(Slot, Property, Value);
         }
         Parts.Add(Name + TEXT("=") + Value);
     }

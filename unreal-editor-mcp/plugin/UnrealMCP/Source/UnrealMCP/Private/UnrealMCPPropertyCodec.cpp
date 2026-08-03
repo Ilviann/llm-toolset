@@ -93,7 +93,7 @@ TSharedPtr<FJsonValue> EncodeValue(UObject* Object, FProperty* Property, const F
     if (UEnum* Enum = PropertyEnum(Property))
     {
         FString Exported;
-        Property->ExportText_InContainer(0, Exported, Object, Object->GetArchetype(), Object, PPF_None);
+        UnrealMCP::PropertyCodec::ExportValueText(Object, Property, Exported);
         if (IsFlagsEnum(Enum))
         {
             int64 NumericValue = 0;
@@ -132,7 +132,7 @@ TSharedPtr<FJsonValue> EncodeValue(UObject* Object, FProperty* Property, const F
         return MakeShared<FJsonValueString>(Value != nullptr ? Value->GetPathName() : FString());
     }
     FString Exported;
-    Property->ExportText_InContainer(0, Exported, Object, Object->GetArchetype(), Object, PPF_None);
+    UnrealMCP::PropertyCodec::ExportValueText(Object, Property, Exported);
     return MakeShared<FJsonValueString>(Exported.Left(4096));
 }
 
@@ -193,6 +193,43 @@ bool ImportReference(UObject* Object, FProperty* Property, const FString& Path, 
     OutError = {TEXT("unsupported_property"), TEXT("The reference property is unsupported")};
     return false;
 }
+}
+
+bool UnrealMCP::PropertyCodec::IsIdenticalToArchetype(const UObject* Object, const FProperty* Property)
+{
+    if (Object == nullptr || Property == nullptr)
+    {
+        return false;
+    }
+    const UObject* Archetype = Object->GetArchetype();
+    if (Archetype == nullptr)
+    {
+        return false;
+    }
+    const void* DefaultValue = Property->ContainerPtrToValuePtrForDefaults<void>(
+        Archetype->GetClass(), Archetype);
+    return Property->Identical(Property->ContainerPtrToValuePtr<void>(Object), DefaultValue, PPF_None);
+}
+
+bool UnrealMCP::PropertyCodec::ExportValueText(
+    const UObject* Object,
+    const FProperty* Property,
+    FString& OutText)
+{
+    if (Object == nullptr || Property == nullptr)
+    {
+        return false;
+    }
+    const UObject* Archetype = Object->GetArchetype();
+    const void* DefaultValue = Archetype != nullptr
+        ? Property->ContainerPtrToValuePtrForDefaults<void>(Archetype->GetClass(), Archetype)
+        : nullptr;
+    return Property->ExportText_Direct(
+        OutText,
+        Property->ContainerPtrToValuePtr<void>(Object),
+        DefaultValue,
+        const_cast<UObject*>(Object),
+        PPF_None);
 }
 
 bool UnrealMCP::PropertyCodec::IsSupportedEditable(const FProperty* Property, FString& OutKind)

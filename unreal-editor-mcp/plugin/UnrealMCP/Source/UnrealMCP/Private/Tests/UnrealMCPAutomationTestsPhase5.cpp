@@ -236,9 +236,25 @@ bool FUnrealMCPPhase5MemberVariableTest::RunTest(const FString& Parameters)
     HitPoints->PropertyFlags &= ~static_cast<uint64>(CPF_RepNotify);
     FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(Blueprint);
 
+    FEdGraphPinType ClassType;
+    ClassType.PinCategory = UEdGraphSchema_K2::PC_Class;
+    ClassType.PinSubCategoryObject = AActor::StaticClass();
+    TestTrue(TEXT("Blueprint-owned class-reference member is added"), FBlueprintEditorUtils::AddMemberVariable(
+        Blueprint, TEXT("ActorClass"), ClassType, AActor::StaticClass()->GetPathName()));
     FCompilerResultsLog Log;
     FKismetEditorUtilities::CompileBlueprint(Blueprint, EBlueprintCompileOptions::None, &Log);
     TestEqual(TEXT("member-edited Blueprint compiles without errors"), Log.NumErrors, 0);
+    const FString ActorClassId = MemberIdByName(Inspector, AssetPath, TEXT("ActorClass"));
+    TSharedRef<FJsonObject> ClassInspect = InspectArguments(AssetPath);
+    ClassInspect->SetArrayField(TEXT("sections"), {MakeShared<FJsonValueString>(TEXT("variables"))});
+    ClassInspect->SetStringField(TEXT("member_id"), ActorClassId);
+    if (TestTrue(TEXT("Blueprint-owned class-reference member inspection is safe"),
+        Inspector.Execute(ClassInspect, Result, Error)))
+    {
+        TestEqual(TEXT("class-reference default reads back exactly"),
+            Result->GetArrayField(TEXT("records"))[0]->AsObject()->GetObjectField(TEXT("default"))->GetStringField(TEXT("path")),
+            AActor::StaticClass()->GetPathName());
+    }
     TestTrue(TEXT("member-edited Blueprint saves"), SaveBlueprintFixture(Blueprint));
     return true;
 }

@@ -491,7 +491,7 @@ static FString VariableDefaultText(UBlueprint* Blueprint, const FBPVariableDescr
         if (Defaults != nullptr && Property != nullptr)
         {
             FString Text;
-            Property->ExportText_InContainer(0, Text, Defaults, Defaults->GetArchetype(), Defaults, PPF_None);
+            UnrealMCP::PropertyCodec::ExportValueText(Defaults, Property, Text);
             return Text;
         }
     }
@@ -551,12 +551,11 @@ static bool ReadPropertyNames(const FJsonObject& Arguments, TSet<FString>& OutNa
 static FString AddComponentDefaults(UActorComponent* Template, const TSet<FString>& RequestedProperties, const TSharedRef<FJsonObject>& Component)
 {
     TArray<FProperty*> Changed;
-    UObject* Archetype = Template->GetArchetype();
     for (TFieldIterator<FProperty> It(Template->GetClass(), EFieldIterationFlags::IncludeSuper); It; ++It)
     {
         FProperty* Property = *It;
         if (Property->HasAnyPropertyFlags(CPF_Edit) && !Property->HasAnyPropertyFlags(CPF_Transient)
-            && (Archetype == nullptr || !Property->Identical_InContainer(Template, Archetype)))
+            && !UnrealMCP::PropertyCodec::IsIdenticalToArchetype(Template, Property))
         {
             Changed.Add(Property);
         }
@@ -571,7 +570,7 @@ static FString AddComponentDefaults(UActorComponent* Template, const TSet<FStrin
         FString Kind;
         const bool bSupported = UnrealMCP::PropertyCodec::IsSupportedEditable(Property, Kind);
         FString Encoded;
-        Property->ExportText_InContainer(0, Encoded, Template, Archetype, Template, PPF_None);
+        UnrealMCP::PropertyCodec::ExportValueText(Template, Property, Encoded);
         Fingerprint.Add(Property->GetName() + TEXT("|") + (bSupported ? Kind : TEXT("unsupported")) + TEXT("|") + Encoded);
         if (Index < Count) Defaults.Add(MakeShared<FJsonValueObject>(UnrealMCP::PropertyCodec::Encode(Template, Property)));
     }
@@ -597,16 +596,15 @@ static void AddClassDefaultFingerprint(UBlueprint* Blueprint, TArray<FString>& F
 {
     UObject* Defaults = Blueprint != nullptr && Blueprint->GeneratedClass != nullptr ? Blueprint->GeneratedClass->GetDefaultObject(false) : nullptr;
     if (Defaults == nullptr) return;
-    UObject* Archetype = Defaults->GetArchetype();
     for (TFieldIterator<FProperty> It(Defaults->GetClass(), EFieldIterationFlags::IncludeSuper); It; ++It)
     {
         FProperty* Property = *It;
         FString Kind;
         if (UnrealMCP::PropertyCodec::IsSupportedEditable(Property, Kind)
-            && (Archetype == nullptr || !Property->Identical_InContainer(Defaults, Archetype)))
+            && !UnrealMCP::PropertyCodec::IsIdenticalToArchetype(Defaults, Property))
         {
             FString Encoded;
-            Property->ExportText_InContainer(0, Encoded, Defaults, Archetype, Defaults, PPF_None);
+            UnrealMCP::PropertyCodec::ExportValueText(Defaults, Property, Encoded);
             Fingerprint.Add(TEXT("class_default|") + Property->GetName() + TEXT("|") + Kind + TEXT("|") + Encoded);
         }
     }

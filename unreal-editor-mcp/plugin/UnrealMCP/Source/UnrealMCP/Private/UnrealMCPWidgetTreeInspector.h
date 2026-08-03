@@ -15,14 +15,13 @@ inline FString WidgetDefaultsFingerprint(
     int32& InOutChangedCount)
 {
     TArray<FProperty*> Changed;
-    UObject* Archetype = Widget != nullptr ? Widget->GetArchetype() : nullptr;
     if (Widget != nullptr)
     {
         for (TFieldIterator<FProperty> It(Widget->GetClass(), EFieldIterationFlags::IncludeSuper); It; ++It)
         {
             FProperty* Property = *It;
             if (Property->HasAnyPropertyFlags(CPF_Edit) && !Property->HasAnyPropertyFlags(CPF_Transient)
-                && (Archetype == nullptr || !Property->Identical_InContainer(Widget, Archetype)))
+                && !UnrealMCP::PropertyCodec::IsIdenticalToArchetype(Widget, Property))
             {
                 Changed.Add(Property);
             }
@@ -42,7 +41,7 @@ inline FString WidgetDefaultsFingerprint(
         FString Kind;
         const bool bSupported = UnrealMCP::PropertyCodec::IsSupportedEditable(Property, Kind);
         FString Encoded;
-        Property->ExportText_InContainer(0, Encoded, Widget, Archetype, Widget, PPF_None);
+        UnrealMCP::PropertyCodec::ExportValueText(Widget, Property, Encoded);
         Fingerprint.Add(Property->GetName() + TEXT("|")
             + (bSupported ? Kind : TEXT("unsupported")) + TEXT("|") + HashLines({Encoded}));
         if (Index < VisibleCount)

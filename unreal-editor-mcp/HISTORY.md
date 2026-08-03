@@ -4,6 +4,10 @@
 
 - Standardized Unreal Engine 5.8 development tooling on the `UE58` environment variable and moved the disposable integration project to `ue-test/ue58/`.
 
+## 0.32.2 — 2026-08-04
+
+- Fixed Blueprint inspection crashes when a Blueprint-owned reflected property, including a class-reference member, was exported or fingerprinted against a parent CDO that did not contain that field. Reflected property exports now use Unreal's archetype-size-aware default lookup across member, class, component, widget, and slot inspection.
+
 ## 0.32.1 — 2026-08-04
 
 - Fixed companion startup ordering by making the base registry the sole loader of companion modules, preventing `UnrealMCPGAS` or the test fixture from calling the unloaded `UnrealMCP` module. Binary packaging and the Windows deployment helper now restore and verify source-owned descriptor contracts that Unreal AutomationTool omits. Advanced `UnrealMCPGAS` to 0.2.1 and the fixture to 0.1.1 without changing companion API v1.
