@@ -87,14 +87,10 @@ Feature identifiers are stable names, not execution indexes. Unfinished features
 
 ## Native platform test backlog
 
-Feature checkboxes record implementation completion. This section separately lists completed features that have not yet passed their applicable native platform verification.
+Feature checkboxes record implementation completion after mandatory Windows verification. This section separately tracks preferred macOS verification that may occur after a feature is completed and released. Linux is outside the current support and verification scope and is not tracked.
 
 - macOS:
   - `level-management`
   - `level-edit`
 - Windows:
   - None
-- Linux:
-  - None
-
-Linux lifecycle launch and restart are intentionally unsupported, so the lifecycle features do not require native Linux verification.

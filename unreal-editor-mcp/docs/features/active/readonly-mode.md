@@ -10,7 +10,7 @@ released_in: null
 
 **Outcome:** Unreal Editor MCP starts with only inspection and non-persistent editor-state tools, while project-content mutation requires the explicit startup flag `--writable`.
 
-**Implementation status:** Active and unreleased. The implementation and host-independent contract coverage are present, but required native readonly persistence and lifecycle acceptance has not yet been recorded on both Windows and macOS.
+**Implementation status:** Active and unreleased. The implementation and host-independent contract coverage are present. Windows is the mandatory native release platform; macOS verification is preferred follow-up work and Linux verification is out of scope.
 
 **Depends on:**
 
@@ -48,11 +48,11 @@ released_in: null
 - Test `operation_status` schema rejection of `cancel`, writable-only `operation_cancel`, retained-result lookup and cancellation, unknown and stale identities, and readonly reconciliation of prior operation outcomes without mutation.
 - Test CLI parsing for default readonly behavior, `--writable`, the single `--editor-lifecycle` path, invalid or relative executables, every access/lifecycle combination, and rejection of the removed `--tool-mode` and `--editor` options on supported platform branches.
 - Test Windows deployment JSON for readonly default, writable-only, lifecycle-only, and combined argument arrays plus fail-closed lifecycle-executable validation.
-- Run MCP initialization, `tools/list`, and `tools/call` framing tests plus the full Python and native suites. Verify on macOS and Windows that readonly mode cannot dirty or persist project content and that lifecycle-only mode can open, stop, and restart the configured project without gaining content-write tools.
+- Run MCP initialization, `tools/list`, and `tools/call` framing tests plus the full Python and native suites. On Windows, verify that readonly mode cannot dirty or persist project content and that lifecycle-only mode can open, stop, and restart the configured project without gaining content-write tools. Repeat the native acceptance on macOS when available and track it as non-blocking follow-up; no Linux verification is required.
 
 ### Documentation and completion gate
 
 - Update setup examples, the complete tool catalog, capability fields, security guidance, lifecycle configuration, and migration instructions. Show readonly configuration first and mark `--writable` as an explicit trust decision for a dedicated project root.
-- Complete and release the feature only when readonly is the tested default, every project-content mutation tool is both absent and undispatchable without `--writable`, transient editor-state tools remain usable, the lifecycle option works without another enabling flag, all four configuration combinations pass their executable contract tests, and readonly persistence plus lifecycle-only behavior pass natively on Windows and macOS.
+- Complete and release the feature only when readonly is the tested default, every project-content mutation tool is both absent and undispatchable without `--writable`, transient editor-state tools remain usable, the lifecycle option works without another enabling flag, all four configuration combinations pass their executable contract tests, and readonly persistence plus lifecycle-only behavior pass natively on Windows. Missing macOS verification or bug checks do not block completion or release and remain tracked after release.
 
 [Back to roadmap](../../../ROADMAP.md) · [Shared roadmap contracts](../index.md)

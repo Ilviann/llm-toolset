@@ -4,7 +4,7 @@
 
 - Made readonly access the default nine-tool MCP catalog, required the explicit `--writable` trust decision for the 25-tool content-authoring catalog, and published the authoritative `access_mode` independently from native capabilities.
 - Replaced `--tool-mode` and `--editor` with the single `--editor-lifecycle <absolute-executable>` opt-in, yielding independent readonly/writable and lifecycle configurations with exact 9/10/25/26 tool catalogs.
-- Split retained-result lookup from cancellation: `operation_status` is readonly and lookup-only, while writable `operation_cancel` owns safe cancellation. Added access-before-dispatch contract coverage and a production readonly content-fingerprint scenario. Native Windows and macOS acceptance remains required before release.
+- Split retained-result lookup from cancellation: `operation_status` is readonly and lookup-only, while writable `operation_cancel` owns safe cancellation. Added access-before-dispatch contract coverage and a production readonly content-fingerprint scenario. Applicable native Windows acceptance remains required before release; macOS verification may follow, and Linux verification is out of scope.
 - Updated the Windows deployment helper to generate readonly LM Studio configuration by default and offer independent writable-access and selected-Engine lifecycle options.
 
 ## 0.27.0 — 2026-08-03

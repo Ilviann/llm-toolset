@@ -27,12 +27,12 @@ released_in: null
 ### Verification
 
 - Test fixed command construction, paths with spaces, missing tools, editor-running and uncertain-state rejection, timeout, cancellation, nonzero exit, oversized logs, retained-result replay, and process-tree cleanup.
-- Run native offline project generation from packaged configuration on macOS and Windows without network access or runtime downloads. Unit test Linux construction separately.
+- Run native offline project generation from packaged configuration on Windows without network access or runtime downloads. Repeat on macOS when available as non-blocking follow-up; no Linux verification is required.
 - Prove that tool arguments cannot alter the executable, project, environment, working directory, command template, or fixed arguments.
 
 ### Documentation and completion gate
 
 - Document offline engine/tool preparation, lifecycle interaction, bounded output, cancellation, platform behavior, default-mode exclusion, and use with the confined file MCP.
-- Complete the feature only when fixed native project generation is reproducible from clean documented configuration on macOS and Windows.
+- Complete the feature only when fixed native project generation is reproducible from clean documented configuration on Windows. macOS reproduction may follow the release.
 
 [Back to roadmap](../../../ROADMAP.md) · [Shared roadmap contracts](../index.md)

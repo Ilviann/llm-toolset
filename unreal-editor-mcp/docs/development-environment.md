@@ -5,13 +5,13 @@ This page records the local build and integration-test requirements for Unreal E
 ## Required software
 
 - Unreal Engine 5.8 or newer with the host editor executable, public C++ headers, UnrealBuildTool, bundled .NET SDK, and platform build scripts installed. Support for a newer Unreal release must be demonstrated by the Phase 1 compilation probes and integration suite.
-- Xcode 26.1.1 for the primary Unreal Engine 5.8 macOS baseline. Xcode must have completed first-launch setup and license acceptance. Select this version per build rather than assuming the globally selected or newest Xcode is compatible. See Epic's [macOS development requirements](https://dev.epicgames.com/documentation/unreal-engine/macos-development-requirements-for-unreal-engine?lang=en-US).
-- Visual Studio with the Desktop development with C++ workload and an Unreal-supported MSVC and Windows SDK for native Windows validation. Confirm the exact installed SDK with AutomationTool Turnkey before compiling.
+- Visual Studio with the Desktop development with C++ workload and an Unreal-supported MSVC and Windows SDK for mandatory native Windows validation. Confirm the exact installed SDK with AutomationTool Turnkey before compiling.
+- Xcode 26.1.1 when performing preferred Unreal Engine 5.8 macOS follow-up validation. Xcode must have completed first-launch setup and license acceptance. Select this version per build rather than assuming the globally selected or newest Xcode is compatible. See Epic's [macOS development requirements](https://dev.epicgames.com/documentation/unreal-engine/macos-development-requirements-for-unreal-engine?lang=en-US).
 - Python 3.10 or newer. Production code and tests use the standard library unless a later roadmap change explicitly authorizes and pins a dependency.
-- A macOS or Windows host capable of running Unreal Engine 5.8. Development and tests must remain usable on the repository's 16 GB reference machine.
+- A Windows host capable of running Unreal Engine 5.8 is required for release qualification. A macOS host is optional for preferred follow-up validation. Development and tests must remain usable on the repository's 16 GB reference machine.
 - Enough local storage for Unreal-generated `Binaries`, `Build`, `Intermediate`, `Saved`, workspace, compiler, and Derived Data Cache output. Native build and test workflows must not require network downloads.
 
-Native macOS validation comes first. Platform-specific discovery, path, process, and build behavior must remain isolated for mandatory native Windows qualification and Linux source portability.
+Native Windows qualification is the release gate. macOS validation is preferred but may occur after release. Linux is outside the current support and verification scope.
 
 ## Local path configuration
 

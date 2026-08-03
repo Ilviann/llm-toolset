@@ -28,7 +28,7 @@ released_in: null
 ### Verification
 
 - Test every topology shape, player limits, invalid combinations, map and GameMode validation, transient setting restoration, readiness, connection timeout, partial startup cleanup, replay, conflict, lost response, status polling, cancellation, stop replay, abnormal end, and leaked-world detection.
-- Run standalone, two-player listen-server, and dedicated-server-with-clients lifecycle cases natively on macOS and Windows. Verify Linux compatibility code without claiming native coverage.
+- Run standalone, two-player listen-server, and dedicated-server-with-clients lifecycle cases natively on Windows. Repeat on macOS when available as non-blocking follow-up; no Linux verification is required.
 - Prove a two-player listen server reports two worlds: the listen-server/host world and one remote-client world. Use a dedicated server plus two clients when three separate worlds are required.
 
 ### Documentation and completion gate

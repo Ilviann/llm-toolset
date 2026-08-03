@@ -47,7 +47,7 @@ released_in: null
 - Inspect Widget Blueprints with multiple ViewModels, every supported initialization mode and binding direction, compatible conversions and arguments, enabled and disabled bindings, nested ViewModel paths, legacy bindings, and Designer events; restart and verify exact separation and read-back.
 - Test invalid classes, inaccessible members, non-notifying sources, broken or cyclic paths, incompatible conversions, duplicate target bindings, unsupported records, stale identities, pages and snapshots, and collection, depth, scan, time, and response limits.
 - Fingerprint asset content, generated data, package dirtiness, and Undo history before and after every success and rejection. Prove inspection never creates, compiles, saves, normalizes, or changes ViewModels, Widget Blueprints, bindings, graphs, or referenced assets and that no MVVM mutation capability is advertised or accepted.
-- Run focused public-header probes, native Automation, packaging and version-contract tests, and full cross-process inspection verification on macOS and Windows against the supported Unreal Engine build.
+- Run focused public-header probes, native Automation, packaging and version-contract tests, and full cross-process inspection verification on Windows against the supported Unreal Engine build. Repeat on macOS when available as non-blocking follow-up.
 
 ### Documentation and completion gate
 

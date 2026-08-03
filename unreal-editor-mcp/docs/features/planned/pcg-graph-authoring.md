@@ -28,7 +28,7 @@ released_in: null
 - Test graph creation and every supported node and settings family, parameter operation, connection and disconnection, subgraph reference, comment, movement, removal, compilation, saving, restart, and exact structural read-back through the prerequisite inspection contract.
 - Test incompatible pins, subgraph cycles, unsupported or unsafe settings, malformed typed values, invalid asset paths, limits, stale identities and snapshots, compile and save failure, transaction rollback, undo and redo, replay, timeouts, lost-response recovery, and unchanged-content fingerprints.
 - Test missing, disabled, unloaded, stale, or excluded project `PCG` configuration plus absent, inspection-only, mismatched, disabled, stale, and unsupported companion states without partially registering or executing mutation handlers. Verify mutation capability registration and removal across editor restart and project-plugin state changes.
-- Prove accepted and rejected mutations preserve unrelated graph content, referenced assets, package state, generated output, and base-plugin behavior. Run the complete base and PCG companion suites natively on macOS and Windows against the supported Unreal Engine build.
+- Prove accepted and rejected mutations preserve unrelated graph content, referenced assets, package state, generated output, and base-plugin behavior. Run the complete base and PCG companion suites natively on Windows against the supported Unreal Engine build. Repeat on macOS when available as non-blocking follow-up.
 
 ### Documentation and completion gate
 

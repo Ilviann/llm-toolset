@@ -31,7 +31,7 @@ released_in: null
 - Create representative abilities from native and Blueprint-generated parents. Update every supported policy, tag and trigger form, and cost and cooldown reference; add representative context-valid ability events, ordinary graph nodes, and Ability Task nodes; compile, save, restart, and verify exact read-back through the prerequisite inspection contract.
 - Test invalid parents and references, unsupported policies and GAS asset families, malformed or excessive tag and trigger collections, stale snapshots and identities, compile failure, transaction restoration, undo and redo, timeout, replay, lost-response recovery, and unchanged-content fingerprints.
 - Test absent, inspection-only, mismatched, disabled, stale, and unsupported companion states without partially registering or executing mutation handlers. Verify mutation capability registration and removal across editor restart and plugin enablement changes.
-- Prove accepted and rejected changes preserve all unrelated Blueprint content, referenced assets, package state, and base-plugin behavior. Run the complete base and GAS companion suites natively on macOS and Windows against the supported Unreal Engine build.
+- Prove accepted and rejected changes preserve all unrelated Blueprint content, referenced assets, package state, and base-plugin behavior. Run the complete base and GAS companion suites natively on Windows against the supported Unreal Engine build. Repeat on macOS when available as non-blocking follow-up.
 
 ### Documentation and completion gate
 

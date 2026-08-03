@@ -39,7 +39,7 @@ released_in: null
 - Inspect representative existing PCG Graphs covering every supported node and settings family, typed parameters, pins, edges, subgraphs, comments, positions, defaults, asset references, and unsupported records; restart and verify the same bounded structural read-back.
 - Test invalid asset paths, incompatible or unresolved references, subgraph cycles, malformed values, stale pages and snapshots, duplicate identities, and discovery, traversal, time, and response limits.
 - Fingerprint graph content, referenced assets, package dirtiness, generated output, and Undo history before and after every success and rejection. Prove inspection never executes, compiles, saves, normalizes, or changes a graph and that no PCG mutation operation is advertised or accepted.
-- Run focused public-header probes, normal, forced-unity, and non-unity builds, native Automation, packaging and version-contract tests, and full cross-process inspection verification on macOS and Windows against the supported Unreal Engine build.
+- Run focused public-header probes, normal, forced-unity, and non-unity builds, native Automation, packaging and version-contract tests, and full cross-process inspection verification on Windows against the supported Unreal Engine build. Repeat on macOS when available as non-blocking follow-up.
 
 ### Documentation and completion gate
 

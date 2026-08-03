@@ -25,7 +25,7 @@ released_in: null
 
 - Test deterministic placement across functions, event handlers, custom events, and macros with branches, joins, cycles, comments, external links, and inserted conversion nodes.
 - Prove repeated equivalent plans produce identical changed-node positions and preserve all untouched positions and unrelated-content fingerprints.
-- Test bounds, timeout, rollback, undo/redo, save/reload, replay, and lost-response recovery natively on macOS and Windows.
+- Test bounds, timeout, rollback, undo/redo, save/reload, replay, and lost-response recovery natively on Windows. Repeat on macOS when available as non-blocking follow-up.
 
 ### Documentation and completion gate
 

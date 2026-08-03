@@ -30,7 +30,7 @@ released_in: null
 - Cover native and Blueprint-generated parents, inherited versus local values, every supported modifier magnitude form, attribute and tag resolution, component multiplicity, execution and calculation references, stable nested identities, ordering, and unsupported or unresolved records.
 - Test invalid duration and period combinations, incompatible attributes and classes, nonexistent tags, cyclic or excessive effect chains, unsupported components and magnitude forms, malformed collections, duplicate identities, stale pages or snapshots, and response and scan limits.
 - Prove every create, default-edit, graph, member, action, compile, and save operation rejects without mutation. Fingerprint all effect records, generated Blueprint data, referenced assets, package dirtiness, and Undo history before and after each successful and rejected inspection.
-- Run focused public-header probes, normal, forced-unity, and non-unity builds, native Automation, packaging and version-contract tests, and full cross-process inspection verification on macOS and Windows against the supported Unreal Engine build.
+- Run focused public-header probes, normal, forced-unity, and non-unity builds, native Automation, packaging and version-contract tests, and full cross-process inspection verification on Windows against the supported Unreal Engine build. Repeat on macOS when available as non-blocking follow-up.
 
 ### Documentation and completion gate
 

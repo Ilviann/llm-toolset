@@ -15,7 +15,7 @@ Every feature document begins with YAML front matter containing string `feature_
 
 ## Roadmap workflow
 
-The target is Unreal Engine 5.8 and newer. macOS remains the primary development host. Platform verification requirements remain documented by each applicable feature, while missing native coverage for completed features is tracked separately in the [`ROADMAP.md` native platform test backlog](../../ROADMAP.md#native-platform-test-backlog). Linux remains source-portable with unit-tested platform branches until a native host is available.
+The target is Unreal Engine 5.8 and newer. Windows support and applicable native verification are mandatory before feature completion and release. macOS support is preferred but non-blocking; completed features that still need macOS verification remain in the [`ROADMAP.md` native platform test backlog](../../ROADMAP.md#native-platform-test-backlog). Linux is outside the current support and verification scope.
 
 Keep the authoritative checklist in [`ROADMAP.md`](../../ROADMAP.md) synchronized with every unfinished feature and each completed feature that is its direct prerequisite. Remove other completed checklist entries while retaining their feature documents below. Feature identifiers are stable names rather than execution indexes. A feature may be implemented and completed whenever every direct dependency listed in its description is complete. Every feature must include implementation, tests, documentation, examples, and a releasable completion gate.
 

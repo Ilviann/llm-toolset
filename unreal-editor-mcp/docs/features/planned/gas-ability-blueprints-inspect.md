@@ -37,7 +37,7 @@ released_in: null
 - Inspect representative existing abilities with native and Blueprint-generated parents. Cover every supported policy, tag and trigger form, cost and cooldown reference, inherited and local value, member, graph, existing Gameplay Ability event, and Ability Task node; restart the editor and verify the same bounded read-back.
 - Test invalid and stale classes, unsupported GAS asset families, malformed or excessive tag and trigger collections, unresolved references, stale pagination or snapshots, response and scan limits, and capability registration and removal across editor restarts and plugin enablement changes.
 - Fingerprint asset content and package dirtiness before and after every success and rejection. Prove inspection never changes graphs, members, defaults, generated classes, referenced assets, package state, or Undo history and that no GAS mutation operation is advertised or accepted.
-- Run focused public-header probes, native Automation, packaging and version-contract tests, and full cross-process inspection verification on macOS and Windows against the supported Unreal Engine build.
+- Run focused public-header probes, native Automation, packaging and version-contract tests, and full cross-process inspection verification on Windows against the supported Unreal Engine build. Repeat on macOS when available as non-blocking follow-up.
 
 ### Documentation and completion gate
 

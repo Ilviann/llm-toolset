@@ -36,7 +36,7 @@ released_in: null
 - Attach multiple ViewModels to representative HUD, menu, and reusable user-widget Blueprints using each supported initialization mode. Author each supported binding direction, compatible conversion functions and arguments, enabled and disabled bindings, and nested ViewModel paths; compile, save, restart, and verify exact read-back.
 - Test invalid classes, inaccessible members, non-notifying sources, read and write direction failures, incompatible conversions, broken or cyclic paths, duplicate target bindings, stale identities and snapshots, collection and depth limits, compile failure, rollback, undo and redo, timeout, replay, and lost-response recovery.
 - Test absent, inspection-only, mismatched, disabled, stale, and unsupported companion states without partially registering or executing mutation handlers. Verify mutation capability registration and removal across editor restart and plugin enablement changes.
-- Prove every accepted and rejected operation preserves fingerprints for unrelated MVVM records, legacy bindings, Designer events, widget trees, graphs, animations, package dirtiness, and base-plugin behavior. Run the complete base and MVVM companion suites natively on macOS and Windows against the supported Unreal Engine build.
+- Prove every accepted and rejected operation preserves fingerprints for unrelated MVVM records, legacy bindings, Designer events, widget trees, graphs, animations, package dirtiness, and base-plugin behavior. Run the complete base and MVVM companion suites natively on Windows against the supported Unreal Engine build. Repeat on macOS when available as non-blocking follow-up.
 
 ### Documentation and completion gate
 

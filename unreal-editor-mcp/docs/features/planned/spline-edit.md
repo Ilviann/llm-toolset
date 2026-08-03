@@ -27,7 +27,7 @@ released_in: null
 
 - Test open and closed splines, local and world coordinates, mixed point types, rotations, scales, independent tangents, insertion, removal, reorder, invalid indices, non-finite values, limits, stale snapshots, replay, rollback, and undo/redo.
 - Test native and Blueprint-provided spline components, construction-script interactions, supported metadata preservation, unsupported metadata rejection, external actors, save/reload, and exact read-back.
-- Run the level-authoring spline acceptance with at least four mixed-type points on macOS and Windows.
+- Run the level-authoring spline acceptance with at least four mixed-type points on Windows. Repeat on macOS when available as non-blocking follow-up.
 
 ### Documentation and completion gate
 

@@ -24,12 +24,12 @@ released_in: null
 ### Verification
 
 - Test target and configuration allowlists, fixed command construction, missing tools, invalid selections, editor-running and uncertain-state rejection, timeout, cancellation, nonzero exit, oversized logs, normalized diagnostics, replay, and process-tree cleanup.
-- Run native offline editor-target builds from packaged configuration on macOS and Windows without network access or runtime downloads. Unit test Linux construction separately.
+- Run native offline editor-target builds from packaged configuration on Windows without network access or runtime downloads. Repeat on macOS when available as non-blocking follow-up; no Linux verification is required.
 - Prove that tool arguments cannot alter the executable, project, environment, working directory, command template, or unrestricted flags.
 
 ### Documentation and completion gate
 
 - Document configured allowlists, offline tool preparation, lifecycle interaction, bounded diagnostics, cancellation, platform behavior, and default-mode exclusion.
-- Complete the feature only when fixed native editor-target builds are reproducible from clean documented configuration on macOS and Windows.
+- Complete the feature only when fixed native editor-target builds are reproducible from clean documented configuration on Windows. macOS reproduction may follow the release.
 
 [Back to roadmap](../../../ROADMAP.md) · [Shared roadmap contracts](../index.md)

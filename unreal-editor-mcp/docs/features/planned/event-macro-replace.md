@@ -27,7 +27,7 @@ released_in: null
 - Replace representative event implementations, macros, and custom-event handlers with internal and declared external links.
 - Test invalid boundaries, cycles, latent nodes, locals, macro tunnels, stale snapshots, expired actions, compile failure, timeout, lost response, rollback, undo/redo, save/reload, and unchanged-content fingerprints.
 - Prove scratch preflight/live parity and exact restoration for every added logic-unit family.
-- Run the complete replacement and preservation suites natively on macOS and Windows.
+- Run the complete replacement and preservation suites natively on Windows. Repeat on macOS when available as non-blocking follow-up.
 
 ### Documentation and completion gate
 

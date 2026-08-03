@@ -20,4 +20,4 @@ The CLI validates the optional absolute editor executable and injects one `Edito
 
 ## Verification
 
-Run `python -m unittest tests.test_lifecycle -v`, the full Python suite, compile the disposable Editor target, run `UnrealMCP.Lifecycle`, then verify launch/shutdown/restart against a disposable project on macOS and Windows.
+Run `python -m unittest tests.test_lifecycle -v`, the full Python suite, compile the disposable Editor target, run `UnrealMCP.Lifecycle`, then verify launch/shutdown/restart against a disposable project on Windows. Repeat on macOS when available as non-blocking follow-up; no Linux verification is required.

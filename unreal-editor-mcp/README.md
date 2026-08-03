@@ -2,7 +2,7 @@
 
 Unreal Editor MCP 0.27.0 is an offline-first MCP bridge for Unreal Engine 5.8+. It pairs a dependency-free Python 3.10+ stdio server with an editor-only C++ plugin.
 
-The current checkout includes the active, unreleased `readonly-mode` implementation documented below. Its Windows and macOS native acceptance gate must pass before the next versioned release.
+The current checkout includes the active, unreleased `readonly-mode` implementation documented below. Its applicable Windows native acceptance gate must pass before the next versioned release; macOS verification may follow the release, and Linux verification is out of scope.
 
 ## Installation
 

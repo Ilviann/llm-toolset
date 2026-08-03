@@ -22,12 +22,12 @@ released_in: null
 - Apply the `pie-inspect` reflection and actor-handle policy and the `pie-test` command policy independently inside each child. Keep all payloads, queues, scans, properties, logs, waits, and retained state bounded.
 - Publish supported process modes, topologies, player/client limits, companion availability, protocol version, and degraded/failed-instance state through capabilities and session inspection.
 - Clean partial launches and every owned child on startup failure, cancellation, stop, bridge shutdown, or editor exit. Detect leaked child processes without exposing forced termination as a general model operation.
-- Preserve source portability with narrow macOS, Windows, and Linux IPC/process adapters and no new runtime dependency.
+- Keep IPC and process adapters narrow with mandatory Windows behavior and optional macOS behavior, and add no new runtime dependency. A Linux adapter is not required while Linux remains out of scope.
 
 ### Verification
 
 - Test credential and version mismatch, spoofed and duplicate companions, foreign processes, disconnect, crash, timeout, cancellation, partial launch, queue and payload limits, replay, per-process logs, cleanup, and leaked-process reporting.
-- Run two-player listen-server and dedicated-server plus two-client sessions in multi-process mode on macOS and Windows. Verify actor inspection, properties, roles, test commands, waits, and attributed results across every process.
+- Run two-player listen-server and dedicated-server plus two-client sessions in multi-process mode on Windows. Verify actor inspection, properties, roles, test commands, waits, and attributed results across every process. Repeat on macOS when available as non-blocking follow-up.
 - Prove no child accepts arbitrary network clients, console commands, UObject calls, filesystem access, process control, supplied code, or commands outside the retained editor-owned session.
 
 ### Documentation and completion gate

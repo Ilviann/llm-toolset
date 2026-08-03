@@ -30,7 +30,7 @@ released_in: null
 - Test missing, disabled, unloaded, stale, or excluded project `PCG` configuration and prove every component inspection, edit, generation, and cleanup operation rejects before actor or asset mutation while the base level tools remain usable.
 - Test native, instance-added, Blueprint-provided, partitioned, and non-partitioned PCG Components; graph assignment; supported settings and parameter overrides; generation; cleanup; removal; save; restart; and exact read-back.
 - Test stale identities and snapshots, incompatible graphs and values, unsupported inherited structural edits, active-generation conflicts, limits, timeouts, replay, rollback, undo/redo, generation failure, cleanup failure, World Partition loading, external packages, and partial save failure.
-- Run a native macOS and Windows acceptance that configures a bounded PCG Component, generates representative managed output, saves and reloads it, verifies exact state, cleans it up, and proves unrelated actors and components remain unchanged.
+- Run a native Windows acceptance that configures a bounded PCG Component, generates representative managed output, saves and reloads it, verifies exact state, cleans it up, and proves unrelated actors and components remain unchanged. Repeat on macOS when available as non-blocking follow-up.
 
 ### Documentation and completion gate
 
