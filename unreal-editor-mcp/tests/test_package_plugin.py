@@ -103,6 +103,9 @@ class PackagePluginScriptTests(unittest.TestCase):
             ) as prepared:
                 descriptor = json.loads(prepared.descriptor.read_text(encoding="utf-8"))
                 descriptor["Installed"] = True
+                descriptor.pop("companion_api_version")
+                descriptor.pop("unreal_mcp_companion")
+                descriptor.pop("EnabledByDefault")
                 (output / package_plugin.GAS_DESCRIPTOR.name).write_text(
                     json.dumps(descriptor), encoding="utf-8"
                 )
@@ -126,12 +129,25 @@ class PackagePluginScriptTests(unittest.TestCase):
                 (source / "UnrealMCP.Build.cs").write_text("", encoding="utf-8")
 
                 package_plugin.finalize_dependency_package(output, prepared)
+                package_plugin.restore_source_descriptor_contract(
+                    output, package_plugin.GAS_DESCRIPTOR
+                )
 
             finalized = json.loads(
                 (output / package_plugin.GAS_DESCRIPTOR.name).read_text(encoding="utf-8")
             )
             self.assertEqual([module["Name"] for module in finalized["Modules"]], ["UnrealMCPGAS"])
+            self.assertEqual(finalized["Modules"][0]["LoadingPhase"], "None")
             self.assertIn("UnrealMCP", [plugin["Name"] for plugin in finalized["Plugins"]])
+            self.assertEqual(finalized["companion_api_version"], 1)
+            self.assertEqual(
+                finalized["unreal_mcp_companion"],
+                json.loads(
+                    package_plugin.GAS_DESCRIPTOR.read_text(encoding="utf-8")
+                )["unreal_mcp_companion"],
+            )
+            self.assertFalse(finalized["EnabledByDefault"])
+            self.assertTrue(finalized["Installed"])
             self.assertFalse((binaries / "UnrealEditor-UnrealMCP.dll").exists())
             self.assertTrue((binaries / "UnrealEditor-UnrealMCPGAS.dll").is_file())
             manifest = json.loads((binaries / "UnrealEditor.modules").read_text(encoding="utf-8"))
@@ -205,13 +221,37 @@ class PackagePluginScriptTests(unittest.TestCase):
     def test_package_verification_requires_installed_descriptor_and_binary(self):
         with tempfile.TemporaryDirectory() as temporary:
             output = Path(temporary)
+            descriptor = json.loads(
+                package_plugin.PLUGIN_DESCRIPTOR.read_text(encoding="utf-8")
+            )
+            descriptor["Installed"] = True
             (output / package_plugin.PLUGIN_DESCRIPTOR.name).write_text(
-                '{"Installed": true}', encoding="utf-8"
+                json.dumps(descriptor), encoding="utf-8"
             )
             binary = output / "Binaries" / "Mac" / "UnrealEditor-UnrealMCP.dylib"
             binary.parent.mkdir(parents=True)
             binary.write_bytes(b"binary")
             package_plugin.verify_package(output)
+
+    def test_package_verification_rejects_stripped_descriptor_contract(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary)
+            descriptor = json.loads(
+                package_plugin.GAS_DESCRIPTOR.read_text(encoding="utf-8")
+            )
+            descriptor["Installed"] = True
+            descriptor.pop("companion_api_version")
+            (output / package_plugin.GAS_DESCRIPTOR.name).write_text(
+                json.dumps(descriptor), encoding="utf-8"
+            )
+            binary = output / "Binaries" / "Win64" / "UnrealEditor-UnrealMCPGAS.dll"
+            binary.parent.mkdir(parents=True)
+            binary.write_bytes(b"binary")
+
+            with self.assertRaisesRegex(
+                package_plugin.PackagingError, "companion_api_version"
+            ):
+                package_plugin.verify_package(output, package_plugin.GAS_DESCRIPTOR)
 
     def test_package_verification_rejects_non_installed_or_binary_free_output(self):
         with tempfile.TemporaryDirectory() as temporary:

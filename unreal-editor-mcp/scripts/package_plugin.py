@@ -32,6 +32,7 @@ ENGINE_ROOT_ENV = "UE57"
 SUPPORTED_ENGINE_VERSION = (5, 7)
 MAX_ENGINE_VERSION_BYTES = 64 * 1024
 MAX_PLUGIN_DESCRIPTOR_BYTES = 1024 * 1024
+PACKAGING_OWNED_DESCRIPTOR_FIELDS = frozenset({"EngineVersion", "Installed"})
 _PLATFORM_NAME = re.compile(r"^[A-Za-z][A-Za-z0-9_]*$")
 _MODULE_NAME = re.compile(r"^[A-Za-z][A-Za-z0-9_]*$")
 
@@ -237,22 +238,9 @@ def prepare_plugin_build(
 
 
 def finalize_dependency_package(output: Path, prepared: PreparedPluginBuild) -> None:
-    """Restore the companion contract after UE 5.7's combined dependency build."""
+    """Remove staged dependency artifacts after UE 5.7's combined build."""
     if not prepared.dependency_modules:
         return
-
-    packaged_path = output / prepared.source_descriptor.name
-    packaged = read_plugin_descriptor(packaged_path)
-    source = read_plugin_descriptor(prepared.source_descriptor)
-    for field in ("Modules", "Plugins"):
-        if field in source:
-            packaged[field] = source[field]
-        else:
-            packaged.pop(field, None)
-    packaged_path.write_text(
-        json.dumps(packaged, indent=2, ensure_ascii=False) + "\n",
-        encoding="utf-8",
-    )
 
     removable_suffixes = {".dll", ".pdb", ".lib", ".exp", ".precompiled", ".obj"}
     for module in prepared.dependency_modules:
@@ -281,6 +269,20 @@ def finalize_dependency_package(output: Path, prepared: PreparedPluginBuild) -> 
                 json.dumps(manifest, indent=2, ensure_ascii=False) + "\n",
                 encoding="utf-8",
             )
+
+
+def restore_source_descriptor_contract(output: Path, source_descriptor: Path) -> None:
+    """Restore fields UAT may omit while retaining package-owned output metadata."""
+    packaged_path = output / source_descriptor.name
+    packaged = read_plugin_descriptor(packaged_path)
+    source = read_plugin_descriptor(source_descriptor)
+    for field, value in source.items():
+        if field not in PACKAGING_OWNED_DESCRIPTOR_FIELDS:
+            packaged[field] = value
+    packaged_path.write_text(
+        json.dumps(packaged, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
 
 
 def build_command(
@@ -349,6 +351,12 @@ def verify_package(output: Path, plugin_descriptor: Path = PLUGIN_DESCRIPTOR) ->
         raise PackagingError(f"packaged plugin descriptor is unreadable: {error}") from error
     if descriptor.get("Installed") is not True:
         raise PackagingError("packaged plugin descriptor is not marked Installed")
+    source = read_plugin_descriptor(plugin_descriptor)
+    for field, value in source.items():
+        if field not in PACKAGING_OWNED_DESCRIPTOR_FIELDS and descriptor.get(field) != value:
+            raise PackagingError(
+                f"packaged plugin descriptor changed source-owned field: {field}"
+            )
 
     binaries = output / "Binaries"
     if not binaries.is_dir() or not any(path.is_file() for path in binaries.rglob("*")):
@@ -463,6 +471,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             if result.returncode != 0:
                 return result.returncode
             finalize_dependency_package(output, prepared)
+            restore_source_descriptor_contract(output, plugin_descriptor)
         verify_package(output, plugin_descriptor)
     except PackagingError as error:
         print(f"Packaging verification failed: {error}", file=sys.stderr)

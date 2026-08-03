@@ -21,7 +21,7 @@ released_in: "0.32.0"
 - The base plugin is always built. The optional GAS checkbox adds one companion build with the fixed base descriptor as its UAT dependency.
 - Project mode installs selected plugins below the project `Plugins` directory and atomically adds or enables their exact `.uproject` references.
 - Engine modes install below the selected Engine's `Engine/Plugins/Marketplace` directory and set every installed descriptor's `EnabledByDefault` value to the selected Boolean state.
-- Every selected package builds and verifies before installation. Staging, replacement, final verification, and project enablement form one rollback-safe selected-plugin transaction; destination or project-descriptor changes during the build reject as stale.
+- Every selected package builds, restores all source-owned descriptor fields omitted by UAT, and verifies them before installation. Staging, replacement, final verification, and project enablement form one rollback-safe selected-plugin transaction; destination or project-descriptor changes during the build reject as stale.
 - Existing replacement, matching-PDB deployment, readonly/writable server access, and optional editor lifecycle remain explicit and independent.
 
 ### Verification

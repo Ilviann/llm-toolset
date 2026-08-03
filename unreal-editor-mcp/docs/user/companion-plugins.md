@@ -6,7 +6,7 @@ Companion plugins are optional trusted native editor plugins that extend existin
 
 Install the base plugin and companion as separate plugin directories, then enable both for the project. The companion descriptor must depend on `UnrealMCP`, declare exact `companion_api_version: 1`, and identify its extension under `unreal_mcp_companion`. Restart Unreal Editor after any enablement or binary change; live enablement and hot replacement are intentionally unsupported.
 
-Base and companion semantic versions are independent. Compatibility depends on exact agreement among the base descriptor/compiled API version and the companion descriptor/compiled API version, plus the supported extension-schema revision. Required Engine plugins and modules must already be installed, enabled, and loaded.
+Base and companion semantic versions are independent. Compatibility depends on exact agreement among the base descriptor/compiled API version and the companion descriptor/compiled API version, plus the supported extension-schema revision. Required Engine plugins must already be installed and enabled. A companion author must set its owning editor module to `LoadingPhase: None`; the base registry loads that module after `UnrealMCP` is ready.
 
 ## Detect availability
 

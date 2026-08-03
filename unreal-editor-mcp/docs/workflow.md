@@ -10,6 +10,7 @@ Use this workflow for every feature, fix, or refactor.
 
 ## Implementation rules
 
+- Before developing, building, packaging, or running native tests for `UnrealMCP` or a companion, inspect the selected Unreal Engine's `Engine/Plugins/` tree for installed copies of `UnrealMCP`, `UnrealMCPGAS`, `UnrealMCPTestCompanion`, and any other repository-owned companion involved in the work. If any are present, stop and ask the user to delete them first; do not rename, move, disable, or otherwise work around the installed copies. Continue only after verifying that they have been removed.
 - Use ignored `ue-test/ue57/` only as the disposable Unreal Engine 5.7 build and integration-test project; never treat its generated state as a committed contract.
 - Build changes from small typed mutations. Prevalidate targets, types, limits, and stale state; use editor transactions where supported; expose bounded compile, save, and read-back results; preserve unrelated Blueprint content.
 - Keep the C++ bridge localhost-only and authenticate every request with a durable, high-entropy per-project token. Fail closed on credential errors and never expose the token through discovery or heartbeat data.

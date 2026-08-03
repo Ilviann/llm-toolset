@@ -355,6 +355,7 @@ def run_packaging(
             if return_code != 0:
                 raise DeploymentError(f"Unreal AutomationTool failed with exit code {return_code}")
             package_plugin.finalize_dependency_package(output, prepared)
+            package_plugin.restore_source_descriptor_contract(output, plugin.descriptor)
     except OSError as error:
         raise DeploymentError(f"could not start Unreal AutomationTool: {error}") from error
     try:

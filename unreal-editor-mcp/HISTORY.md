@@ -4,6 +4,10 @@
 
 - Standardized Unreal Engine 5.8 development tooling on the `UE58` environment variable and moved the disposable integration project to `ue-test/ue58/`.
 
+## 0.32.1 — 2026-08-04
+
+- Fixed companion startup ordering by making the base registry the sole loader of companion modules, preventing `UnrealMCPGAS` or the test fixture from calling the unloaded `UnrealMCP` module. Binary packaging and the Windows deployment helper now restore and verify source-owned descriptor contracts that Unreal AutomationTool omits. Advanced `UnrealMCPGAS` to 0.2.1 and the fixture to 0.1.1 without changing companion API v1.
+
 ## 0.32.0 — 2026-08-03
 
 - Expanded the Windows graphical deployment helper with an optional `UnrealMCPGAS` companion build/install checkbox and exact project, Engine-enabled-by-default, and Engine-disabled-by-default installation modes.
