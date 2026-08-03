@@ -18,7 +18,7 @@ released_in: null
 
 ### Creation and update implementation
 
-- Reuse the optional `UnrealMCPGAS` companion, its exact base-plugin version requirement, narrow extension interface, shared authenticated bridge, Game-thread dispatch, operation ledger, errors, limits, packaging, and inspection capability established by `gas-ability-blueprints-inspect`. Do not add Gameplay Ability System dependencies to `UnrealMCP` or create another listener, credential, Python package, or release version.
+- Reuse the independently versioned optional `UnrealMCPGAS` companion, its strict companion API requirement, foundation registry, shared authenticated bridge, Game-thread dispatch, operation ledger, errors, limits, packaging, and inspection capability established by `gas-ability-blueprints-inspect`. Do not add Gameplay Ability System dependencies to `UnrealMCP` or create another listener, credential, Python package, or extension API.
 - Add the `gameplay_ability` mutation capability only when the companion and prerequisite inspection capability are verified live. Accept native or Blueprint-generated parents for creation and updates only when they resolve to usable `UGameplayAbility` subclasses and pass the established stale-class, compilation, package, mount, and mutation-target policies.
 - Reuse `blueprint_create`, `blueprint_default_edit`, `blueprint_member_edit`, `blueprint_action_catalog`, `blueprint_graph_edit`, `blueprint_compile`, and `blueprint_save`; use the prerequisite `blueprint_inspect` extension for stale-safe snapshots and read-back. Do not publish a separate model-facing GAS tool or a general UObject or reflection editor.
 - Mutate only a small explicit allowlist of Gameplay Ability configuration proven against Unreal Engine 5.8 public APIs, including supported activation, instancing, and network policies; Gameplay Tag and trigger containers; and compatible cost and cooldown Gameplay Effect class references. Require the authoritative inspection snapshot and stable nested identity for every update to existing data.
@@ -36,7 +36,7 @@ released_in: null
 ### Documentation and completion gate
 
 - Document the additional mutation capability, supported Gameplay Ability creation and update workflows, snapshot and nested-identity requirements, compilation and saving, limits, exclusions, recovery, and focused creation and update examples. Link to the prerequisite inspection guide instead of repeating its read contract.
-- Update companion installation, packaging, and lockstep release documentation only where mutation support changes them; retain one shared `UnrealMCPGAS` distribution and never download or enable dependencies at runtime.
+- Update companion installation, packaging, independent semantic-version, and companion API documentation only where mutation support changes them; retain one shared `UnrealMCPGAS` distribution and never download or enable dependencies at runtime.
 - Complete the feature only when representative Gameplay Ability Blueprints can be created, configured, graph-edited, compiled, saved, restarted, and read back without altering unrelated content, inspection-only or mismatched companions cannot expose or execute mutation operations, and the complete base and GAS suites pass on both native platforms.
 
 [Back to roadmap](../../../ROADMAP.md) · [Shared roadmap contracts](../index.md)

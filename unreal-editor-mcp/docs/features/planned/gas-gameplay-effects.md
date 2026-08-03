@@ -16,7 +16,7 @@ released_in: null
 
 ### Creation and update implementation
 
-- Reuse the optional `UnrealMCPGAS` companion, its exact base-plugin version requirement, narrow extension interface, shared authenticated bridge, Game-thread dispatch, operation ledger, errors, limits, packaging, and inspection capability established by `gas-gameplay-effects-inspect`. Do not add Gameplay Ability System dependencies to `UnrealMCP` or create another listener, credential, Python package, or release version.
+- Reuse the independently versioned optional `UnrealMCPGAS` companion, its strict companion API requirement, foundation registry, shared authenticated bridge, Game-thread dispatch, operation ledger, errors, limits, packaging, and inspection capability established by `gas-gameplay-effects-inspect`. Do not add Gameplay Ability System dependencies to `UnrealMCP` or create another listener, credential, Python package, or extension API.
 - Add the `gameplay_effect` mutation capability only when the companion and prerequisite inspection capability are verified live. Accept native or Blueprint-generated parents for creation and updates only when they resolve to usable `UGameplayEffect` subclasses and pass the established class, package, mount, stale-state, and mutation-target policies.
 - Reuse `blueprint_create`, `blueprint_default_edit`, `blueprint_compile`, and `blueprint_save`; use the prerequisite `blueprint_inspect` extension for stale-safe snapshots and read-back. Continue rejecting Actor components, variables, functions, macros, events, action cataloging, graph editing, and every supplied graph or member operation.
 - Add exact `blueprint_default_edit` Gameplay Effect operation discriminators for adding, updating, removing, and, where semantically meaningful, reordering one supported nested record. Require the current authoritative inspection snapshot plus stable record identity for existing entries; never retarget by array index after a stale change.
@@ -35,7 +35,7 @@ released_in: null
 ### Documentation and completion gate
 
 - Document supported Gameplay Effect creation and update forms, typed reference and nested-identity requirements, cross-field validation, compilation and saving, limits, exclusions, recovery, and complete update examples. Link to the prerequisite inspection guide instead of repeating its read contract.
-- Update companion capability, packaging, and lockstep release documentation only where mutation support changes them; retain one shared `UnrealMCPGAS` distribution.
+- Update companion capability, packaging, independent semantic-version, and companion API documentation only where mutation support changes them; retain one shared `UnrealMCPGAS` distribution.
 - Complete the feature only when representative Gameplay Effects can be created, typed-updated, compiled, saved, restarted, and read back without graphs or unrelated-content changes, inspection-only or mismatched companions cannot expose or execute mutation operations, and the complete base and GAS suites pass on both native platforms.
 
 [Back to roadmap](../../../ROADMAP.md) · [Shared roadmap contracts](../index.md)

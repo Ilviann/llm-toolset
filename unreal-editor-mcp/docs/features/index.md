@@ -43,10 +43,19 @@ Keep the authoritative checklist in [`ROADMAP.md`](../../ROADMAP.md) synchronize
 - [`umg-authoring` — UMG layout, styling, bindings, and UI logic](completed/umg-authoring.md) — Complete practical HUD and menu authoring on the Widget Blueprint family.
   - Depends on:
     - `widget-tree`
-- [`umg-mvvm` — UMG ViewModels and View Bindings](planned/umg-mvvm.md) — Add typed MVVM ViewModel and Widget View Binding authoring through an optional lockstep-versioned companion plugin.
+- [`companion-plugins` — Companion plugin extension foundation](planned/companion-plugins.md) — Discover API-compatible independently versioned companion plugins and safely register bounded support for additional asset types, component types, and operations on existing assets.
+  - Depends on:
+    - `readonly-mode`
+- [`umg-mvvm-inspect` — UMG ViewModel and View Binding inspection](planned/umg-mvvm-inspect.md) — Add bounded typed inspection of existing MVVM ViewModel Blueprints and Widget View Bindings through an optional API-compatible companion plugin.
   - Depends on:
     - `umg-authoring`
-- [`gas-ability-blueprints-inspect` — Gameplay Ability Blueprint inspection](planned/gas-ability-blueprints-inspect.md) — Add bounded typed inspection of existing Gameplay Ability Blueprint assets through an optional lockstep-versioned companion plugin.
+    - `companion-plugins`
+- [`umg-mvvm` — UMG ViewModel and View Binding authoring](planned/umg-mvvm.md) — Add typed MVVM ViewModel creation and Widget View Binding authoring through the MVVM companion.
+  - Depends on:
+    - `umg-mvvm-inspect`
+- [`gas-ability-blueprints-inspect` — Gameplay Ability Blueprint inspection](planned/gas-ability-blueprints-inspect.md) — Add bounded typed inspection of existing Gameplay Ability Blueprint assets through an optional API-compatible companion plugin.
+  - Depends on:
+    - `companion-plugins`
 - [`gas-ability-blueprints` — Gameplay Ability Blueprint creation and updating](planned/gas-ability-blueprints.md) — Add typed Gameplay Ability Blueprint creation and authoring through the GAS companion.
   - Depends on:
     - `phase-13`
@@ -64,7 +73,12 @@ Keep the authoritative checklist in [`ROADMAP.md`](../../ROADMAP.md) synchronize
 - [`node-layout` — Deterministic changed-node layout](planned/node-layout.md) — Add deterministic layout for changed nodes.
   - Depends on:
     - `event-macro-replace`
-- [`pcg-graph-authoring` — Procedural Content Generation graph authoring](planned/pcg-graph-authoring.md) — Discover, inspect, create, and transactionally edit bounded PCG Graph assets.
+- [`pcg-graph-inspect` — Procedural Content Generation graph inspection](planned/pcg-graph-inspect.md) — Discover and inspect bounded PCG Graph assets only when Unreal reports PCG effectively enabled for the configured project.
+  - Depends on:
+    - `companion-plugins`
+- [`pcg-graph-authoring` — Procedural Content Generation graph authoring](planned/pcg-graph-authoring.md) — Create and transactionally edit bounded PCG Graph assets through the PCG companion.
+  - Depends on:
+    - `pcg-graph-inspect`
 - [`editor-launch` — Optional configured editor launch](completed/editor-launch.md) — Add optional configured editor launch.
 - [`editor-shutdown` — Optional graceful editor shutdown](completed/editor-shutdown.md) — Add optional graceful editor shutdown.
   - Depends on:
@@ -96,7 +110,7 @@ Keep the authoritative checklist in [`ROADMAP.md`](../../ROADMAP.md) synchronize
 - [`level-edit` — Transactional level actor editing and verified saving](completed/level-edit.md) — Add stale-safe actor batches and honest per-package World Partition save verification.
   - Depends on:
     - `level-inspect`
-- [`pcg-component-edit` — Level actor PCG Component editing](planned/pcg-component-edit.md) — Inspect, configure, generate, clean up, and persist PCG Components on exact level actors.
+- [`pcg-component-edit` — Level actor PCG Component editing](planned/pcg-component-edit.md) — Inspect, configure, generate, clean up, and persist PCG Components on exact level actors when Unreal reports PCG effectively enabled for the configured project.
   - Depends on:
     - `pcg-graph-authoring`
     - `level-edit`
@@ -126,15 +140,19 @@ The default installation remains an exact-version pair:
 1. A dependency-free Python 3.10+ MCP server using stdio JSON-RPC.
 2. An Unreal Editor C++ plugin using public editor APIs and a bounded authenticated localhost HTTP bridge.
 
-`gas-ability-blueprints-inspect` adds an optional editor-only `UnrealMCPGAS` companion plugin. It owns every direct Gameplay Ability System module dependency, reuses the base plugin's listener, credential, dispatch, ledger, and capability contracts, and ships in the same release bundle as the exact matching `UnrealMCP` version. The base plugin must continue to build, package, load, and expose its complete non-GAS contract when the companion or Gameplay Ability System plugin is absent.
+`companion-plugins` adds the base-owned extension registry and discovery contract used by every optional editor companion. Companions extend existing bounded tool families through exact allowlisted extension IDs; they do not add listeners, credentials, HTTP routes, arbitrary MCP tools, runtime-provided schemas, or unrestricted reflection. The Python package and base plugin remain authoritative for model-facing schemas, access classification, authentication, dispatch, limits, errors, capability composition, and extension admission.
 
-`umg-mvvm` adds an independent optional editor-only `UnrealMCPMVVM` companion plugin. It owns every direct `ModelViewViewModel` plugin and module dependency, reuses the same base extension and bridge contracts, and ships in the same release bundle as the exact matching `UnrealMCP` version. The base plugin must retain its complete Widget Blueprint, legacy property-binding, and Designer-event contract when the companion or Engine UMG Viewmodel plugin is absent.
+`gas-ability-blueprints-inspect` adds an optional editor-only `UnrealMCPGAS` companion plugin. It owns every direct Gameplay Ability System module dependency, reuses the base plugin's listener, credential, dispatch, ledger, and capability contracts, and has an independent semantic version while requiring the same `companion_api_version` as `UnrealMCP`. The base plugin must continue to build, package, load, and expose its complete non-GAS contract when the companion or Gameplay Ability System plugin is absent.
+
+`umg-mvvm-inspect` adds an independent optional editor-only `UnrealMCPMVVM` companion plugin. It owns every direct `ModelViewViewModel` plugin and module dependency, reuses the same base extension and bridge contracts, and has an independent semantic version while requiring the same `companion_api_version` as `UnrealMCP`. The base plugin must retain its complete Widget Blueprint, legacy property-binding, and Designer-event contract when the companion or Engine UMG Viewmodel plugin is absent.
+
+`pcg-graph-inspect` adds an independent optional editor-only `UnrealMCPPCG` companion plugin. It owns every direct PCG plugin and module dependency, reuses the same base extension and bridge contracts, and has an independent semantic version while requiring the same `companion_api_version` as `UnrealMCP`. PCG capabilities remain unavailable unless Unreal reports its `PCG` plugin effectively enabled for the configured project and the editor loads it successfully; an Engine-default enablement is valid, while an explicit project disablement wins. The base plugin must retain its complete non-PCG contract when the companion is absent or the Engine plugin is missing, disabled, or unloaded.
 
 `pie-multiprocess` adds a minimal exact-version runtime companion module to the same plugin distribution for editor-owned multi-process PIE children. It connects outward to editor-owned authenticated IPC and does not expose a model-facing game listener.
 
 Python owns MCP framing, published schemas, exact argument validation, readonly/writable access filtering, project configuration, discovery, authenticated HTTP calls, timeouts, process orchestration, and stable error presentation. The C++ plugin owns credentials, listener lifecycle, authentication, Game-thread dispatch, Unreal object access, Blueprint operations, compiler diagnostics, transactions, package saving, mutation-result retention, and authoritative native capabilities.
 
-Deploy the Python package and base C++ plugin as an exact-version pair. Report both versions and the installed Unreal version through `capabilities`; reject a mismatched pair before mutation. For every optional editor companion, require its descriptor `Version` and `VersionName` to match the base plugin exactly, set its `UnrealMCP` plugin reference `RequestedVersion` to the base numeric `Version`, report its version and readiness through `capabilities`, and reject its operations unless the complete enabled set matches. Engine-plugin dependencies such as Gameplay Ability System and UMG Viewmodel remain tied to the exact supported Unreal build rather than receiving an `UnrealMCP` version pin. Support for later Unreal releases must be proven through compilation and behavioral tests, not inferred from version numbers.
+Deploy the Python package and base C++ plugin as an exact-version pair. Report both versions and the installed Unreal version through `capabilities`; reject a mismatched pair before mutation. Version every optional editor companion independently. Require its descriptor and compiled `companion_api_version` to match each other and the base descriptor and compiled value exactly, report its semantic version, API version, and readiness through `capabilities`, and reject all of its operations on any disagreement. Engine-plugin dependencies such as Gameplay Ability System, UMG Viewmodel, and PCG remain tied to the exact supported Unreal build rather than receiving an `UnrealMCP` semantic-version pin. Support for later Unreal releases must be proven through compilation and behavioral tests, not inferred from version numbers.
 
 ### Remaining model-facing tool surface
 
@@ -172,7 +190,9 @@ Lifecycle and future build tools remain absent unless independently configured. 
 
 The GAS features extend the existing Blueprint tools when the companion capability is live and do not add a separate model-facing GAS tool. `gas-ability-blueprints-inspect` adds bounded typed inspection for its graph-capable family; `gas-ability-blueprints` then adds creation, default/member editing, action cataloging, graph editing, compilation, and saving. `gas-gameplay-effects-inspect` adds bounded typed inspection for its data-only family while explicitly rejecting graph and member surfaces; `gas-gameplay-effects` then adds creation, default editing, compilation, and saving. Capabilities distinguish read support from mutation support so an inspection-only release cannot advertise or execute create/update operations.
 
-`umg-mvvm` extends the existing Blueprint tools for ViewModel Blueprint authoring and adds typed MVVM operations to `widget_tree_edit` for Widget Blueprint ViewModel contexts and View Bindings. It does not add a separate model-facing MVVM tool, and its records remain explicitly distinct from legacy property bindings and Designer events.
+The MVVM features extend existing Blueprint and Widget tools rather than adding a separate model-facing MVVM tool. `umg-mvvm-inspect` adds bounded typed inspection for ViewModel Blueprints, Widget Blueprint ViewModel contexts, and View Bindings while keeping those records distinct from legacy property bindings and Designer events. `umg-mvvm` then adds ViewModel Blueprint creation and editing plus typed `widget_tree_edit` mutations for contexts and bindings. Capabilities distinguish read support from mutation support so an inspection-only release cannot advertise or execute create/update operations.
+
+The PCG graph features extend compact asset inspection and mutation families rather than adding unrestricted reflection or execution. `pcg-graph-inspect` adds bounded typed discovery and inspection; `pcg-graph-authoring` then adds creation, settings and parameter mutation, node and edge editing, compilation where required by public PCG APIs, and saving. Capabilities distinguish project enablement, read support, and mutation support so an installed but project-disabled PCG plugin exposes no PCG operations and an inspection-only release cannot advertise or execute graph mutation.
 
 ### Mutation delivery and concurrency contracts
 

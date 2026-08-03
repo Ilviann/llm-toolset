@@ -1,12 +1,15 @@
 # Planned features
 
-- [`umg-mvvm` — UMG ViewModels and View Bindings](umg-mvvm.md).
+- [`companion-plugins` — Companion plugin extension foundation](companion-plugins.md).
+- [`umg-mvvm-inspect` — UMG ViewModel and View Binding inspection](umg-mvvm-inspect.md).
+- [`umg-mvvm` — UMG ViewModel and View Binding authoring](umg-mvvm.md).
 - [`gas-ability-blueprints-inspect` — Gameplay Ability Blueprint inspection](gas-ability-blueprints-inspect.md).
 - [`gas-ability-blueprints` — Gameplay Ability Blueprint creation and updating](gas-ability-blueprints.md).
 - [`gas-gameplay-effects-inspect` — Gameplay Effect inspection](gas-gameplay-effects-inspect.md).
 - [`gas-gameplay-effects` — Gameplay Effect creation and updating](gas-gameplay-effects.md).
 - [`event-macro-replace` — Event, custom-event, and macro replacement](event-macro-replace.md).
 - [`node-layout` — Deterministic changed-node layout](node-layout.md).
+- [`pcg-graph-inspect` — Procedural Content Generation graph inspection](pcg-graph-inspect.md).
 - [`pcg-graph-authoring` — Procedural Content Generation graph authoring](pcg-graph-authoring.md).
 - [`project-files` — Optional editor-offline project-file generation](project-files.md).
 - [`editor-build` — Optional editor-target builds](editor-build.md).

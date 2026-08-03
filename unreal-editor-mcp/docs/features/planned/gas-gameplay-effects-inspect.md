@@ -8,7 +8,7 @@ released_in: null
 
 # `gas-gameplay-effects-inspect` — Gameplay Effect inspection
 
-**Outcome:** Agents can discover and inspect existing `UGameplayEffect`-derived data-only Blueprint assets through the lockstep-versioned `UnrealMCPGAS` companion without changing the asset or its package.
+**Outcome:** Agents can discover and inspect existing `UGameplayEffect`-derived data-only Blueprint assets through the independently versioned, API-compatible `UnrealMCPGAS` companion without changing the asset or its package.
 
 **Depends on:**
 
@@ -16,7 +16,7 @@ released_in: null
 
 ### Read and inspection implementation
 
-- Reuse the optional `UnrealMCPGAS` companion, exact base-plugin version requirement, narrow extension interface, shared authenticated bridge, Game-thread dispatch, errors, limits, packaging, and capability registration established by `gas-ability-blueprints-inspect`. Do not add Gameplay Ability System dependencies to `UnrealMCP` or create another listener, credential, Python package, or release version.
+- Reuse the optional `UnrealMCPGAS` companion, strict companion API requirement, foundation registry, shared authenticated bridge, Game-thread dispatch, errors, limits, packaging, and capability registration established by `gas-ability-blueprints-inspect`. Do not add Gameplay Ability System dependencies to `UnrealMCP` or create another listener, credential, Python package, or extension API.
 - Add an explicit inspection-only `gameplay_effect` data-only Blueprint family while the verified companion capability is live. Accept native or Blueprint-generated parents only when they resolve to usable `UGameplayEffect` subclasses and pass the established class, package, mount, stale-class, and asset-access policies.
 - Reuse `blueprint_inspect` and publish exact family capabilities that reject Actor components, variables, functions, macros, events, action cataloging, graph editing, and every supplied graph or member operation. Do not create, compile, save, or default-edit assets in this feature; Gameplay Effects are configuration assets and must not acquire Blueprint logic graphs.
 - Add bounded typed inspection sections for supported duration and period policies, modifiers and magnitudes, executions, stacking and overflow behavior, Gameplay Cues, granted abilities, tag requirements, additional-effect references, and instanced Gameplay Effect Components. Report inherited versus locally declared data, compatible class, attribute, tag, curve, and asset references, stable nested identities, truncation, and one authoritative asset snapshot.

@@ -6,10 +6,19 @@ Feature identifiers are stable names, not execution indexes. Unfinished features
 - [x] [`umg-authoring` — UMG layout, styling, bindings, and UI logic](docs/features/completed/umg-authoring.md) — Complete practical HUD and menu authoring on the Widget Blueprint family.
   - Depends on:
     - `widget-tree`
-- [ ] [`umg-mvvm` — UMG ViewModels and View Bindings](docs/features/planned/umg-mvvm.md) — Add typed MVVM ViewModel and Widget View Binding authoring through an optional lockstep-versioned companion plugin.
+- [ ] [`companion-plugins` — Companion plugin extension foundation](docs/features/planned/companion-plugins.md) — Discover API-compatible independently versioned companion plugins and safely register bounded support for additional asset types, component types, and operations on existing assets.
+  - Depends on:
+    - `readonly-mode`
+- [ ] [`umg-mvvm-inspect` — UMG ViewModel and View Binding inspection](docs/features/planned/umg-mvvm-inspect.md) — Add bounded typed inspection of existing MVVM ViewModel Blueprints and Widget View Bindings through an optional API-compatible companion plugin.
   - Depends on:
     - `umg-authoring`
-- [ ] [`gas-ability-blueprints-inspect` — Gameplay Ability Blueprint inspection](docs/features/planned/gas-ability-blueprints-inspect.md) — Add bounded typed inspection of existing Gameplay Ability Blueprint assets through an optional lockstep-versioned companion plugin.
+    - `companion-plugins`
+- [ ] [`umg-mvvm` — UMG ViewModel and View Binding authoring](docs/features/planned/umg-mvvm.md) — Add typed MVVM ViewModel creation and Widget View Binding authoring through the MVVM companion.
+  - Depends on:
+    - `umg-mvvm-inspect`
+- [ ] [`gas-ability-blueprints-inspect` — Gameplay Ability Blueprint inspection](docs/features/planned/gas-ability-blueprints-inspect.md) — Add bounded typed inspection of existing Gameplay Ability Blueprint assets through an optional API-compatible companion plugin.
+  - Depends on:
+    - `companion-plugins`
 - [ ] [`gas-ability-blueprints` — Gameplay Ability Blueprint creation and updating](docs/features/planned/gas-ability-blueprints.md) — Add typed Gameplay Ability Blueprint creation and authoring through the GAS companion.
   - Depends on:
     - `phase-13`
@@ -27,7 +36,12 @@ Feature identifiers are stable names, not execution indexes. Unfinished features
 - [ ] [`node-layout` — Deterministic changed-node layout](docs/features/planned/node-layout.md) — Add deterministic layout for changed nodes.
   - Depends on:
     - `event-macro-replace`
-- [ ] [`pcg-graph-authoring` — Procedural Content Generation graph authoring](docs/features/planned/pcg-graph-authoring.md) — Discover, inspect, create, and transactionally edit bounded PCG Graph assets.
+- [ ] [`pcg-graph-inspect` — Procedural Content Generation graph inspection](docs/features/planned/pcg-graph-inspect.md) — Discover and inspect bounded PCG Graph assets only when Unreal reports PCG effectively enabled for the configured project.
+  - Depends on:
+    - `companion-plugins`
+- [ ] [`pcg-graph-authoring` — Procedural Content Generation graph authoring](docs/features/planned/pcg-graph-authoring.md) — Create and transactionally edit bounded PCG Graph assets through the PCG companion.
+  - Depends on:
+    - `pcg-graph-inspect`
 - [x] [`editor-restart` — Optional durable editor restart](docs/features/completed/editor-restart.md) — Add optional durable editor restart.
   - Depends on:
     - `editor-launch`
@@ -50,7 +64,7 @@ Feature identifiers are stable names, not execution indexes. Unfinished features
 - [x] [`level-edit` — Transactional level actor editing and verified saving](docs/features/completed/level-edit.md) — Add stale-safe actor batches and honest per-package World Partition save verification.
   - Depends on:
     - `level-inspect`
-- [ ] [`pcg-component-edit` — Level actor PCG Component editing](docs/features/planned/pcg-component-edit.md) — Inspect, configure, generate, clean up, and persist PCG Components on exact level actors.
+- [ ] [`pcg-component-edit` — Level actor PCG Component editing](docs/features/planned/pcg-component-edit.md) — Inspect, configure, generate, clean up, and persist PCG Components on exact level actors when Unreal reports PCG effectively enabled for the configured project.
   - Depends on:
     - `pcg-graph-authoring`
     - `level-edit`
