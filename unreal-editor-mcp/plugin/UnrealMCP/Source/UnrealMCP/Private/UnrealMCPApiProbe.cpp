@@ -53,7 +53,7 @@
 #include "UObject/UObjectGlobals.h"
 #include "UObject/UObjectIterator.h"
 #include "WidgetBlueprint.h"
-#include "WidgetBlueprintOperationUtils.h"
+#include "UnrealMCPWidgetCompatibility.h"
 #include "WorldPartition/WorldPartition.h"
 #include "WorldPartition/WorldPartitionActorDescInstance.h"
 #include "WorldPartition/WorldPartitionHandle.h"
@@ -114,12 +114,12 @@ void RequirePublicTypes()
     using FFindWidgetByName = UWidget* (UWidgetTree::*)(const FName&) const;
     (void)static_cast<FFindWidgetByName>(&UWidgetTree::FindWidget);
     (void)&UWidgetTree::RemoveWidget;
-    (void)&FWidgetBlueprintOperationUtils::CreateWidgetBlueprint;
-    (void)&FWidgetBlueprintOperationUtils::AddWidget;
-    (void)&FWidgetBlueprintOperationUtils::MoveWidget;
-    (void)&FWidgetBlueprintOperationUtils::RemoveWidget;
-    (void)&FWidgetBlueprintOperationUtils::RenameWidget;
-    (void)&FWidgetBlueprintOperationUtils::ToggleWidgetAsVariable;
+    (void)&FUnrealMCPWidgetCompatibility::CreateWidgetBlueprint;
+    (void)&FUnrealMCPWidgetCompatibility::AddWidget;
+    (void)&FUnrealMCPWidgetCompatibility::MoveWidget;
+    (void)&FUnrealMCPWidgetCompatibility::RemoveWidget;
+    (void)&FUnrealMCPWidgetCompatibility::RenameWidget;
+    (void)&FUnrealMCPWidgetCompatibility::ToggleWidgetAsVariable;
     (void)&FHttpServerModule::IsAvailable;
     (void)&FAssetRegistryModule::GetRegistry;
     using FEnumerateWorldAssets = bool (IAssetRegistry::*)(

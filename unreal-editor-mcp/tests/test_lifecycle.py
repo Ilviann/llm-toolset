@@ -76,7 +76,7 @@ class LifecycleTests(unittest.TestCase):
             "process_id": pid,
             "port": 15485,
             "bridge_version": version or unreal_editor_mcp.__version__,
-            "unreal_version": "5.8.0",
+            "unreal_version": "5.7.4",
             "updated_at_ms": updated_at_ms or __import__("time").time_ns() // 1_000_000,
         }
         self.layout.discovery_file.write_text(json.dumps(value), encoding="utf-8")
@@ -135,6 +135,33 @@ class LifecycleTests(unittest.TestCase):
         self.assertFalse(captured["options"]["shell"])
         self.assertEqual(captured["options"]["creationflags"], 0x208)
 
+    def test_launch_retries_transient_bridge_timeout_after_discovery_publish(self):
+        original_call = self.bridge.call
+        capability_attempts = 0
+
+        def transient_call(command, arguments=None):
+            nonlocal capability_attempts
+            if command == "capabilities":
+                capability_attempts += 1
+                if capability_attempts == 1:
+                    raise BridgeError(
+                        "Bridge is still loading",
+                        code=ErrorCode.TIMEOUT,
+                        retryable=True,
+                    )
+            return original_call(command, arguments)
+
+        self.bridge.call = transient_call
+        manager = self._manager(
+            process_factory=lambda *_args, **_kwargs: FakeProcess(
+                20,
+                on_poll=lambda: self._publish_started_bridge(20, "2" * 32),
+            )
+        )
+        result = manager.execute({"operation_id": "a" * 32, "operation": "launch"})
+        self.assertEqual(result["state"], "ready")
+        self.assertEqual(capability_attempts, 2)
+
     def _publish_started_bridge(self, pid, instance_id):
         self.bridge.instance_id = instance_id
         self._write_discovery(pid)
@@ -148,7 +175,7 @@ class LifecycleTests(unittest.TestCase):
             "process_id": 10,
             "port": 15485,
             "bridge_version": unreal_editor_mcp.__version__,
-            "unreal_version": "5.8.0",
+            "unreal_version": "5.7.4",
             "updated_at_ms": 1,
         }), encoding="utf-8")
         with self.assertRaises(BridgeError) as caught:

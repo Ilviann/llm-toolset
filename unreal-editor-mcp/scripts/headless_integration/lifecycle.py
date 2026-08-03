@@ -46,7 +46,7 @@ from .widgets import author_widget_scenario, verify_restarted_widgets
 from .companions import verify_companion_scenario
 
 
-ENGINE_ROOT_ENV = "UE58"
+ENGINE_ROOT_ENV = "UE57"
 TEST_PROJECT_ENV = "UNREAL_MCP_TEST_UPROJECT"
 
 

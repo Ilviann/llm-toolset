@@ -4,13 +4,13 @@
 
 `plugin/UnrealMCPGAS/` owns the read-only `gameplay_effect` Blueprint asset-family contribution and every direct dependency on the Engine Gameplay Ability System modules. It registers through companion API v1 beside the existing `gameplay_ability` contribution. The base plugin remains GAS-free and continues to own discovery, authentication, Game-thread dispatch, Blueprint inspection, pagination, snapshots, limits, and capability composition.
 
-The companion reads only verified `UGameplayEffect` class default objects. It uses public Unreal Engine 5.8 members plus exact reflected names for documented public fields whose containers need typed access. It never accepts caller-supplied property paths, walks project-defined object layouts, creates tags, evaluates magnitudes, builds specs, or mutates an Ability System Component.
+The companion reads only verified `UGameplayEffect` class default objects. It uses public Unreal Engine 5.7 members plus exact reflected names for documented public fields whose containers need typed access. It never accepts caller-supplied property paths, walks project-defined object layouts, creates tags, evaluates magnitudes, builds specs, or mutates an Ability System Component.
 
 ## Inspection flow
 
 The frozen extension registry classifies usable native and Blueprint-generated `UGameplayEffect` descendants as `gameplay_effect`. Ordinary `blueprint_inspect` supplies the summary and one authoritative snapshot; selecting `gameplay_effect` adds eleven fixed records for duration and period, modifiers, executions, stacking, cues, tags, granted abilities, additional-effect references, requirements, components, and cross-field relationships.
 
-Magnitudes are decoded only as scalable float, attribute based, custom calculation class, or set by caller. Components are accepted through an explicit public-class allowlist; unknown classes become typed unsupported records. Class, attribute, tag, curve, and asset references report resolution and compatibility without loading unrelated assets. Local/inherited ownership, stable nested identities, sorted values, duplicate detection, scan/output bounds, and bounded chained-effect traversal feed the same snapshot fingerprint even when output is paged or omitted.
+Magnitudes are decoded only as scalable float, attribute based, custom calculation class, or set by caller. UE 5.7 execution-conditional effects expose only the effect class and required source tags; the companion does not infer later-engine removal or stack-removal fields. Components are accepted through an explicit public-class allowlist; unknown classes become typed unsupported records. Class, attribute, tag, curve, and asset references report resolution and compatibility without loading unrelated assets. Local/inherited ownership, stable nested identities, sorted values, duplicate detection, scan/output bounds, and bounded chained-effect traversal feed the same snapshot fingerprint even when output is paged or omitted.
 
 ## Capability and mutation policy
 

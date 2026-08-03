@@ -29,7 +29,7 @@ class ProjectDiscoveryTests(unittest.TestCase):
             "process_id": 123,
             "port": 15485,
             "bridge_version": "0.28.0",
-            "unreal_version": "5.8.0-55116800",
+            "unreal_version": "5.7.4-51494982",
             "updated_at_ms": 1_000_000,
         }
         value.update(updates)

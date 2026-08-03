@@ -16,7 +16,7 @@ Readonly mode exposes admitted read contributions only. Start the Python server 
 
 ## Packaging and troubleshooting
 
-With `UE58` set to the Unreal Engine 5.8 installation root, authors can package the repository fixture independently with:
+With `UE57` set to the Unreal Engine 5.7 installation root, authors can package the repository fixture independently with:
 
 ```powershell
 python scripts/package_plugin.py --target-platforms Win64 --companion-fixture

@@ -1,6 +1,7 @@
 import contextlib
 import importlib.util
 import io
+import json
 import os
 import tempfile
 import unittest
@@ -17,26 +18,34 @@ SPEC.loader.exec_module(package_plugin)
 
 
 class PackagePluginScriptTests(unittest.TestCase):
-    def test_main_uses_ue58_environment_default(self):
+    def write_engine_version(self, engine_root: Path, minor: int = 7) -> None:
+        version_file = engine_root / "Engine" / "Build" / "Build.version"
+        version_file.parent.mkdir(parents=True, exist_ok=True)
+        version_file.write_text(
+            f'{{"MajorVersion": 5, "MinorVersion": {minor}}}', encoding="utf-8"
+        )
+
+    def test_main_uses_ue57_environment_default(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            engine_root = root / "UE_5.8"
+            engine_root = root / "UE_5.7"
             run_uat = engine_root / "Engine" / "Build" / "BatchFiles" / "RunUAT.bat"
             run_uat.parent.mkdir(parents=True)
             run_uat.write_text("@echo off\r\n", encoding="utf-8")
+            self.write_engine_version(engine_root)
             output = root / "Package"
             stdout = io.StringIO()
 
             with (
                 mock.patch.object(package_plugin.platform, "system", return_value="Windows"),
-                mock.patch.dict(os.environ, {"UE58": str(engine_root)}),
+                mock.patch.dict(os.environ, {"UE57": str(engine_root)}),
                 contextlib.redirect_stdout(stdout),
             ):
                 result = package_plugin.main(["--output", str(output), "--dry-run"])
 
             self.assertEqual(result, 0)
             self.assertIn(str(run_uat.resolve()), stdout.getvalue())
-            self.assertIn("defaults to UE58", package_plugin.create_parser().format_help())
+            self.assertIn("defaults to UE57", package_plugin.create_parser().format_help())
 
     def test_build_command_uses_fixed_plugin_and_output_arguments(self):
         run_uat = Path("/Engine/RunUAT.sh")
@@ -61,32 +70,73 @@ class PackagePluginScriptTests(unittest.TestCase):
             package_plugin.WORKSPACE_ROOT / "build" / "unreal-editor-mcp",
         )
 
-    def test_fixture_build_uses_its_independent_descriptor(self):
-        command = package_plugin.build_command(
-            Path("/Engine/RunUAT.sh"),
-            Path("/Workspace/build/unreal-mcp-test-companion"),
-            "Win64",
-            strict_includes=False,
-            unversioned=False,
-            plugin_descriptor=package_plugin.FIXTURE_DESCRIPTOR,
-            dependency_plugins=(package_plugin.PLUGIN_DESCRIPTOR,),
-        )
-        self.assertIn(f"-Plugin={package_plugin.FIXTURE_DESCRIPTOR}", command)
-        self.assertIn(f"-Dependencies={package_plugin.PLUGIN_DESCRIPTOR}", command)
+    def test_ue57_dependency_staging_combines_modules_without_dependencies_argument(self):
+        with package_plugin.prepare_plugin_build(
+            package_plugin.GAS_DESCRIPTOR,
+            (package_plugin.PLUGIN_DESCRIPTOR,),
+        ) as prepared:
+            descriptor = json.loads(prepared.descriptor.read_text(encoding="utf-8"))
+            command = package_plugin.build_command(
+                Path("/Engine/RunUAT.sh"),
+                Path("/Workspace/build/unreal-mcp-gas"),
+                "Win64",
+                strict_includes=True,
+                unversioned=False,
+                plugin_descriptor=prepared.descriptor,
+            )
+            self.assertEqual(
+                [module["Name"] for module in descriptor["Modules"]],
+                ["UnrealMCPGAS", "UnrealMCP"],
+            )
+            self.assertNotIn("UnrealMCP", [plugin["Name"] for plugin in descriptor["Plugins"]])
+            self.assertTrue((prepared.descriptor.parent / "Source/UnrealMCP").is_dir())
+            self.assertIn(f"-Plugin={prepared.descriptor}", command)
+            self.assertFalse(any(value.startswith("-Dependencies=") for value in command))
+            self.assertIn("-StrictIncludes", command)
 
-    def test_gas_build_uses_its_independent_descriptor_and_base_dependency(self):
-        command = package_plugin.build_command(
-            Path("/Engine/RunUAT.sh"),
-            Path("/Workspace/build/unreal-mcp-gas"),
-            "Win64",
-            strict_includes=True,
-            unversioned=False,
-            plugin_descriptor=package_plugin.GAS_DESCRIPTOR,
-            dependency_plugins=(package_plugin.PLUGIN_DESCRIPTOR,),
-        )
-        self.assertIn(f"-Plugin={package_plugin.GAS_DESCRIPTOR}", command)
-        self.assertIn(f"-Dependencies={package_plugin.PLUGIN_DESCRIPTOR}", command)
-        self.assertIn("-StrictIncludes", command)
+    def test_dependency_package_finalization_restores_companion_boundary(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary)
+            with package_plugin.prepare_plugin_build(
+                package_plugin.GAS_DESCRIPTOR,
+                (package_plugin.PLUGIN_DESCRIPTOR,),
+            ) as prepared:
+                descriptor = json.loads(prepared.descriptor.read_text(encoding="utf-8"))
+                descriptor["Installed"] = True
+                (output / package_plugin.GAS_DESCRIPTOR.name).write_text(
+                    json.dumps(descriptor), encoding="utf-8"
+                )
+                binaries = output / "Binaries" / "Win64"
+                binaries.mkdir(parents=True)
+                (binaries / "UnrealEditor-UnrealMCP.dll").write_bytes(b"base")
+                (binaries / "UnrealEditor-UnrealMCPGAS.dll").write_bytes(b"gas")
+                (binaries / "UnrealEditor.modules").write_text(
+                    json.dumps(
+                        {
+                            "Modules": {
+                                "UnrealMCP": "UnrealEditor-UnrealMCP.dll",
+                                "UnrealMCPGAS": "UnrealEditor-UnrealMCPGAS.dll",
+                            }
+                        }
+                    ),
+                    encoding="utf-8",
+                )
+                source = output / "Source" / "UnrealMCP"
+                source.mkdir(parents=True)
+                (source / "UnrealMCP.Build.cs").write_text("", encoding="utf-8")
+
+                package_plugin.finalize_dependency_package(output, prepared)
+
+            finalized = json.loads(
+                (output / package_plugin.GAS_DESCRIPTOR.name).read_text(encoding="utf-8")
+            )
+            self.assertEqual([module["Name"] for module in finalized["Modules"]], ["UnrealMCPGAS"])
+            self.assertIn("UnrealMCP", [plugin["Name"] for plugin in finalized["Plugins"]])
+            self.assertFalse((binaries / "UnrealEditor-UnrealMCP.dll").exists())
+            self.assertTrue((binaries / "UnrealEditor-UnrealMCPGAS.dll").is_file())
+            manifest = json.loads((binaries / "UnrealEditor.modules").read_text(encoding="utf-8"))
+            self.assertEqual(list(manifest["Modules"]), ["UnrealMCPGAS"])
+            self.assertFalse(source.exists())
 
     def test_engine_validation_selects_the_platform_launcher(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -109,6 +159,19 @@ class PackagePluginScriptTests(unittest.TestCase):
                 package_plugin.validate_engine_root(engine_root, "Windows"), batch_launcher.resolve()
             )
 
+    def test_engine_version_validation_accepts_only_5_7(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            engine_root = Path(temporary)
+            self.write_engine_version(engine_root)
+            self.assertEqual(
+                package_plugin.validate_supported_engine_version(engine_root), (5, 7)
+            )
+            for minor in (6, 8):
+                with self.subTest(minor=minor):
+                    self.write_engine_version(engine_root, minor)
+                    with self.assertRaisesRegex(package_plugin.PackagingError, "5.7.x"):
+                        package_plugin.validate_supported_engine_version(engine_root)
+
     def test_environment_validates_macos_xcode_and_skips_it_elsewhere(self):
         with tempfile.TemporaryDirectory() as temporary:
             developer_dir = Path(temporary) / "Xcode.app" / "Contents" / "Developer"
@@ -128,7 +191,7 @@ class PackagePluginScriptTests(unittest.TestCase):
 
     def test_output_validation_rejects_protected_and_overlapping_directories(self):
         with tempfile.TemporaryDirectory() as temporary:
-            engine_root = Path(temporary) / "UE_5.8"
+            engine_root = Path(temporary) / "UE_5.7"
             engine_root.mkdir()
             with self.assertRaises(package_plugin.PackagingError):
                 package_plugin.validate_output(package_plugin.WORKSPACE_ROOT, engine_root)

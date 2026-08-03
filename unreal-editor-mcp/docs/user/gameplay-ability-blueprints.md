@@ -24,7 +24,7 @@ Inspect ordinary Blueprint structure plus the typed GAS section:
 
 The typed records cover policies, all supported tag containers, triggers, and cost/cooldown Gameplay Effect class references. Fields identify local versus inherited values; nested triggers have stable identities; bounded collections report total counts and truncation. All records share the ordinary authoritative `snapshot_id` and cursor contract.
 
-With `UE58` set to the Unreal Engine 5.8 installation root, package the companion offline from the same release state as the base:
+With `UE57` set to the Unreal Engine 5.7 installation root, package the companion offline from the same release state as the base:
 
 ```powershell
 python scripts/package_plugin.py --target-platforms Win64 --gas-companion

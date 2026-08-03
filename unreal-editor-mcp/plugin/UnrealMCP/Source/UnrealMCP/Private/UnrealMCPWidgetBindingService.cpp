@@ -13,7 +13,7 @@
 #include "UnrealMCPWidgetTreeSupport.h"
 #include "UObject/UnrealType.h"
 #include "WidgetBlueprint.h"
-#include "WidgetBlueprintOperationUtils.h"
+#include "UnrealMCPWidgetCompatibility.h"
 
 namespace
 {
@@ -496,7 +496,7 @@ bool FUnrealMCPWidgetBindingService::Execute(
                 const FScopedTransaction Transaction(
                     FText::FromString(TEXT("Unreal MCP bind widget event")));
                 Blueprint->Modify();
-                if (!FWidgetBlueprintOperationUtils::BindToEventProperty(
+                if (!FUnrealMCPWidgetCompatibility::BindToEventProperty(
                         Blueprint, Delegate->GetFName(), Widget->GetFName(),
                         Widget->GetClass(), false, NativeError))
                 {

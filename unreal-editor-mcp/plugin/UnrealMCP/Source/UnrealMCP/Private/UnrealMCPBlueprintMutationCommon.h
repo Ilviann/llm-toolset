@@ -479,7 +479,7 @@ static void CleanupFailedCreation(UPackage* Package, UBlueprint* Blueprint, cons
         Object->ClearFlags(RF_Public | RF_Standalone);
         Object->MarkAsGarbage();
         return true;
-    }, EGetObjectsFlags::IncludeNestedObjects);
+    }, true);
     Package->MarkAsGarbage();
 }
 

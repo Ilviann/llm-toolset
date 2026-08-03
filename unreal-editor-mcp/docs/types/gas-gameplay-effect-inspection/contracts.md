@@ -20,6 +20,8 @@ One successful typed inspection contributes exactly these section records:
 - `gameplay_effect_components` — component class, stable component ID, allowlisted type, ownership, support state, and owning data section.
 - `gameplay_effect_relationships` — duration/period, stacking/overflow, ability, component, and chained-effect consistency findings.
 
+On UE 5.7, an execution-conditional effect reference contains its effect class and required source tags. Later-engine removal-policy and stack-removal fields do not exist on `FConditionalGameplayEffect` and are therefore not published or inferred on this branch.
+
 Magnitude records support only `scalable_float`, `attribute_based`, `custom_calculation_class`, and `set_by_caller`. Modifier operations are returned as their stable Unreal enum names. Unknown magnitude layouts or component classes remain explicit with `supported: false`; unresolved references keep empty paths plus `resolved: false` and compatibility state.
 
 ## Identity, inheritance, and snapshots

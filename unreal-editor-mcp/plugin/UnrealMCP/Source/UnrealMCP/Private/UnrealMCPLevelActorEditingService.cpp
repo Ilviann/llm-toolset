@@ -264,7 +264,7 @@ TArray<FString> EditDataLayerNames(const TArray<UDataLayerInstance*>& Instances)
     Result.Reserve(Instances.Num());
     for (const UDataLayerInstance* Instance : Instances)
     {
-        if (Instance != nullptr) Result.Add(Instance->GetFName().ToString());
+        if (Instance != nullptr) Result.Add(Instance->GetDataLayerFName().ToString());
     }
     Result.Sort();
     return Result;

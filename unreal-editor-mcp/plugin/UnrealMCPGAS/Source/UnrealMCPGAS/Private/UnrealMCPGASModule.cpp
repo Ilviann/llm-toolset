@@ -3,7 +3,7 @@
 #include "UnrealMCPGASVersion.h"
 
 #include "Abilities/GameplayAbility.h"
-#include "Abilities/GameplayAbilityTriggerType.h"
+#include "Abilities/GameplayAbilityTypes.h"
 #include "Dom/JsonObject.h"
 #include "Engine/Blueprint.h"
 #include "GameplayEffect.h"

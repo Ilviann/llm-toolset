@@ -77,6 +77,18 @@ FString StableEnumName(const UEnum* Enum, int64 Value)
     return Result;
 }
 
+EGameplayEffectStackingType EffectiveStackingType(const UGameplayEffect& Effect)
+{
+    if (Effect.DurationPolicy == EGameplayEffectDurationType::Instant)
+    {
+        return EGameplayEffectStackingType::None;
+    }
+    PRAGMA_DISABLE_DEPRECATION_WARNINGS
+    const EGameplayEffectStackingType StackingType = Effect.StackingType;
+    PRAGMA_ENABLE_DEPRECATION_WARNINGS
+    return StackingType;
+}
+
 const UGameplayEffect* ParentEffectDefaults(const UGameplayEffect& Effect)
 {
     const UClass* SuperClass = Effect.GetClass()->GetSuperClass();
@@ -634,10 +646,6 @@ bool AppendConditionalEffects(
             return false;
         }
         Record->SetObjectField(TEXT("required_source_tags"), RequiredTags);
-        Record->SetStringField(TEXT("removal_policy"), StableEnumName(
-            StaticEnum<EGameplayEffectGrantedEffectRemovalPolicy>(),
-            static_cast<int64>(Effect.RemovalPolicy)));
-        Record->SetNumberField(TEXT("stack_count_to_remove"), Effect.StackCountToRemove);
         OutReferences.Add(MakeShared<FJsonValueObject>(Record));
     }
     return true;
@@ -1018,7 +1026,7 @@ bool BuildGameplayEffectPayload(
     const TSharedRef<FJsonObject> Stacking = MakeShared<FJsonObject>();
     Stacking->SetStringField(TEXT("section"), TEXT("gameplay_effect_stacking"));
     Stacking->SetObjectField(TEXT("type"), StringValue(StableEnumName(
-        StaticEnum<EGameplayEffectStackingType>(), static_cast<int64>(Effect.GetStackingType())),
+        StaticEnum<EGameplayEffectStackingType>(), static_cast<int64>(EffectiveStackingType(Effect))),
         EffectPropertySource(Effect, ExactEffectProperty(Effect, TEXT("StackingType")))));
     Stacking->SetObjectField(TEXT("stack_limit"), NumberValue(Effect.GetStackLimitCount(),
         EffectPropertySource(Effect, ExactEffectProperty(Effect, TEXT("StackLimitCount")))));
@@ -1401,10 +1409,10 @@ bool BuildGameplayEffectPayload(
         AddRelationship(Relationships, TEXT("periodic_on_application_without_period"), TEXT("warning"),
             TEXT("Periodic-on-application is enabled while the period is zero"));
     if (Effect.DurationPolicy == EGameplayEffectDurationType::Instant
-        && Effect.GetStackingType() != EGameplayEffectStackingType::None)
+        && EffectiveStackingType(Effect) != EGameplayEffectStackingType::None)
         AddRelationship(Relationships, TEXT("instant_effect_stacking"), TEXT("error"),
             TEXT("Instant Gameplay Effects cannot retain stacks"));
-    if (Effect.GetStackingType() == EGameplayEffectStackingType::None
+    if (EffectiveStackingType(Effect) == EGameplayEffectStackingType::None
         && Effect.OverflowEffects.Num() > 0)
         AddRelationship(Relationships, TEXT("overflow_without_stacking"), TEXT("error"),
             TEXT("Overflow effects require an enabled stacking policy"));

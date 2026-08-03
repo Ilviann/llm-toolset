@@ -4,15 +4,18 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import os
 import platform
 import re
 import shlex
+import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
-from typing import Sequence
+from typing import Iterator, NamedTuple, Sequence
 
 
 APPLICATION_ROOT = Path(__file__).resolve().parents[1]
@@ -25,12 +28,22 @@ GAS_DESCRIPTOR = APPLICATION_ROOT / "plugin" / "UnrealMCPGAS" / "UnrealMCPGAS.up
 DEFAULT_OUTPUT = WORKSPACE_ROOT / "build" / "unreal-editor-mcp"
 DEFAULT_FIXTURE_OUTPUT = WORKSPACE_ROOT / "build" / "unreal-mcp-test-companion"
 DEFAULT_GAS_OUTPUT = WORKSPACE_ROOT / "build" / "unreal-mcp-gas"
-ENGINE_ROOT_ENV = "UE58"
+ENGINE_ROOT_ENV = "UE57"
+SUPPORTED_ENGINE_VERSION = (5, 7)
+MAX_ENGINE_VERSION_BYTES = 64 * 1024
+MAX_PLUGIN_DESCRIPTOR_BYTES = 1024 * 1024
 _PLATFORM_NAME = re.compile(r"^[A-Za-z][A-Za-z0-9_]*$")
+_MODULE_NAME = re.compile(r"^[A-Za-z][A-Za-z0-9_]*$")
 
 
 class PackagingError(RuntimeError):
     """Raised when packaging inputs or output do not satisfy the local contract."""
+
+
+class PreparedPluginBuild(NamedTuple):
+    descriptor: Path
+    source_descriptor: Path
+    dependency_modules: tuple[str, ...] = ()
 
 
 def resolved(path: Path) -> Path:
@@ -57,6 +70,33 @@ def validate_engine_root(engine_root: Path, host_system: str) -> Path:
     if host_system != "Windows" and not os.access(run_uat, os.X_OK):
         raise PackagingError(f"Unreal AutomationTool launcher is not executable: {run_uat}")
     return run_uat
+
+
+def validate_supported_engine_version(engine_root: Path) -> tuple[int, int]:
+    version_file = resolved(engine_root) / "Engine" / "Build" / "Build.version"
+    try:
+        size = version_file.stat().st_size
+    except OSError as error:
+        raise PackagingError(f"Unreal Engine build version is unavailable: {version_file}") from error
+    if size > MAX_ENGINE_VERSION_BYTES:
+        raise PackagingError(f"Unreal Engine build version is too large: {version_file}")
+    try:
+        version = json.loads(version_file.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        raise PackagingError(f"Unreal Engine build version is unreadable: {version_file}") from error
+    if not isinstance(version, dict):
+        raise PackagingError(f"Unreal Engine build version must be an object: {version_file}")
+    major = version.get("MajorVersion")
+    minor = version.get("MinorVersion")
+    if type(major) is not int or type(minor) is not int:
+        raise PackagingError(
+            f"Unreal Engine build version has invalid major/minor fields: {version_file}"
+        )
+    if (major, minor) != SUPPORTED_ENGINE_VERSION:
+        raise PackagingError(
+            f"Unreal MCP requires Unreal Engine 5.7.x; selected Engine is {major}.{minor}"
+        )
+    return major, minor
 
 
 def validate_output(
@@ -102,6 +142,147 @@ def normalize_target_platforms(value: str | None) -> str | None:
     return "+".join(names)
 
 
+def read_plugin_descriptor(path: Path) -> dict[str, object]:
+    try:
+        size = path.stat().st_size
+    except OSError as error:
+        raise PackagingError(f"plugin descriptor is unavailable: {path}") from error
+    if size > MAX_PLUGIN_DESCRIPTOR_BYTES:
+        raise PackagingError(f"plugin descriptor is larger than 1 MiB: {path}")
+    try:
+        value = json.loads(path.read_text(encoding="utf-8-sig"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        raise PackagingError(f"plugin descriptor is unreadable JSON: {path}: {error}") from error
+    if not isinstance(value, dict):
+        raise PackagingError(f"plugin descriptor must contain one JSON object: {path}")
+    return value
+
+
+def descriptor_modules(descriptor: dict[str, object], path: Path) -> list[dict[str, object]]:
+    value = descriptor.get("Modules")
+    if not isinstance(value, list) or not value:
+        raise PackagingError(f"plugin descriptor has no module records: {path}")
+    modules: list[dict[str, object]] = []
+    for record in value:
+        if not isinstance(record, dict):
+            raise PackagingError(f"plugin descriptor contains an invalid module record: {path}")
+        name = record.get("Name")
+        if not isinstance(name, str) or not _MODULE_NAME.fullmatch(name):
+            raise PackagingError(f"plugin descriptor contains an invalid module name: {path}")
+        modules.append(record.copy())
+    return modules
+
+
+@contextlib.contextmanager
+def prepare_plugin_build(
+    plugin_descriptor: Path,
+    dependency_plugins: Sequence[Path] = (),
+) -> Iterator[PreparedPluginBuild]:
+    """Stage dependencies inside one temporary plugin for UE 5.7 BuildPlugin."""
+    plugin_descriptor = resolved(plugin_descriptor)
+    if not dependency_plugins:
+        yield PreparedPluginBuild(plugin_descriptor, plugin_descriptor)
+        return
+
+    primary = read_plugin_descriptor(plugin_descriptor)
+    primary_modules = descriptor_modules(primary, plugin_descriptor)
+    primary_names = {str(module["Name"]) for module in primary_modules}
+    dependency_names: list[str] = []
+
+    with tempfile.TemporaryDirectory(prefix="unreal-mcp-ue57-package-") as temporary:
+        staged_root = Path(temporary) / plugin_descriptor.parent.name
+        shutil.copytree(plugin_descriptor.parent, staged_root)
+        staged_descriptor = staged_root / plugin_descriptor.name
+
+        for dependency_path in dependency_plugins:
+            dependency_path = resolved(dependency_path)
+            dependency = read_plugin_descriptor(dependency_path)
+            modules = descriptor_modules(dependency, dependency_path)
+            for module in modules:
+                name = str(module["Name"])
+                if name in primary_names:
+                    raise PackagingError(f"duplicate staged plugin module: {name}")
+                source = dependency_path.parent / "Source" / name
+                destination = staged_root / "Source" / name
+                if not source.is_dir():
+                    raise PackagingError(f"dependency module source is unavailable: {source}")
+                if destination.exists():
+                    raise PackagingError(f"dependency module staging destination exists: {destination}")
+                shutil.copytree(source, destination)
+                primary_modules.append(module)
+                primary_names.add(name)
+                dependency_names.append(name)
+
+            plugins = primary.get("Plugins")
+            if isinstance(plugins, list):
+                primary["Plugins"] = [
+                    record
+                    for record in plugins
+                    if not (
+                        isinstance(record, dict)
+                        and record.get("Name") == dependency_path.stem
+                    )
+                ]
+
+        primary["Modules"] = primary_modules
+        staged_descriptor.write_text(
+            json.dumps(primary, indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+        yield PreparedPluginBuild(
+            staged_descriptor,
+            plugin_descriptor,
+            tuple(dependency_names),
+        )
+
+
+def finalize_dependency_package(output: Path, prepared: PreparedPluginBuild) -> None:
+    """Restore the companion contract after UE 5.7's combined dependency build."""
+    if not prepared.dependency_modules:
+        return
+
+    packaged_path = output / prepared.source_descriptor.name
+    packaged = read_plugin_descriptor(packaged_path)
+    source = read_plugin_descriptor(prepared.source_descriptor)
+    for field in ("Modules", "Plugins"):
+        if field in source:
+            packaged[field] = source[field]
+        else:
+            packaged.pop(field, None)
+    packaged_path.write_text(
+        json.dumps(packaged, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+
+    removable_suffixes = {".dll", ".pdb", ".lib", ".exp", ".precompiled", ".obj"}
+    for module in prepared.dependency_modules:
+        for directory in sorted(
+            (path for path in output.rglob(module) if path.is_dir()),
+            key=lambda path: len(path.parts),
+            reverse=True,
+        ):
+            shutil.rmtree(directory)
+        for path in list(output.rglob("*")):
+            if not path.is_file() or path.suffix.casefold() not in removable_suffixes:
+                continue
+            if path.stem.casefold() in {
+                module.casefold(),
+                f"unrealeditor-{module}".casefold(),
+            }:
+                path.unlink()
+
+    for manifest_path in output.rglob("*.modules"):
+        manifest = read_plugin_descriptor(manifest_path)
+        modules = manifest.get("Modules")
+        if isinstance(modules, dict):
+            for module in prepared.dependency_modules:
+                modules.pop(module, None)
+            manifest_path.write_text(
+                json.dumps(manifest, indent=2, ensure_ascii=False) + "\n",
+                encoding="utf-8",
+            )
+
+
 def build_command(
     run_uat: Path,
     output: Path,
@@ -110,7 +291,6 @@ def build_command(
     strict_includes: bool,
     unversioned: bool,
     plugin_descriptor: Path = PLUGIN_DESCRIPTOR,
-    dependency_plugins: Sequence[Path] = (),
 ) -> list[str]:
     command = [
         str(run_uat),
@@ -121,7 +301,6 @@ def build_command(
         "-NoP4",
         "-UTF8Output",
     ]
-    command.extend(f"-Dependencies={dependency}" for dependency in dependency_plugins)
     if target_platforms is not None:
         command.append(f"-TargetPlatforms={target_platforms}")
     if strict_includes:
@@ -245,6 +424,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
         engine_root = resolved(configured_engine)
         run_uat = validate_engine_root(engine_root, host_system)
+        validate_supported_engine_version(engine_root)
         plugin_descriptor = (
             FIXTURE_DESCRIPTOR if arguments.companion_fixture
             else GAS_DESCRIPTOR if arguments.gas_companion
@@ -257,30 +437,32 @@ def main(argv: Sequence[str] | None = None) -> int:
         output = validate_output(arguments.output, engine_root, plugin_descriptor)
         target_platforms = normalize_target_platforms(arguments.target_platforms)
         environment = configure_environment(host_system, arguments.developer_dir)
-        command = build_command(
-            run_uat,
-            output,
-            target_platforms,
-            strict_includes=arguments.strict_includes,
-            unversioned=arguments.unversioned,
-            plugin_descriptor=plugin_descriptor,
-            dependency_plugins=(PLUGIN_DESCRIPTOR,) if (
-                arguments.companion_fixture or arguments.gas_companion
-            ) else (),
-        )
+        dependency_plugins = (PLUGIN_DESCRIPTOR,) if (
+            arguments.companion_fixture or arguments.gas_companion
+        ) else ()
     except PackagingError as error:
         parser.error(str(error))
 
-    print(f"Plugin: {plugin_descriptor}")
-    print(f"Output: {output}")
-    print(f"Command: {display_command(command, host_system)}")
-    if arguments.dry_run:
-        return 0
-
-    result = subprocess.run(command, cwd=WORKSPACE_ROOT, env=environment, check=False)
-    if result.returncode != 0:
-        return result.returncode
     try:
+        with prepare_plugin_build(plugin_descriptor, dependency_plugins) as prepared:
+            command = build_command(
+                run_uat,
+                output,
+                target_platforms,
+                strict_includes=arguments.strict_includes,
+                unversioned=arguments.unversioned,
+                plugin_descriptor=prepared.descriptor,
+            )
+            print(f"Plugin: {plugin_descriptor}")
+            print(f"Output: {output}")
+            print(f"Command: {display_command(command, host_system)}")
+            if arguments.dry_run:
+                return 0
+
+            result = subprocess.run(command, cwd=WORKSPACE_ROOT, env=environment, check=False)
+            if result.returncode != 0:
+                return result.returncode
+            finalize_dependency_package(output, prepared)
         verify_package(output, plugin_descriptor)
     except PackagingError as error:
         print(f"Packaging verification failed: {error}", file=sys.stderr)

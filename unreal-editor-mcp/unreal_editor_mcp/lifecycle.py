@@ -202,7 +202,13 @@ class EditorLifecycle:
                         "A different process published the configured project bridge",
                         code=ErrorCode.INVALID_RESPONSE,
                     )
-                capabilities = self._verify_bridge(active)
+                try:
+                    capabilities = self._verify_bridge(active)
+                except BridgeError as exc:
+                    if exc.code not in {ErrorCode.TIMEOUT, ErrorCode.EDITOR_UNAVAILABLE}:
+                        raise
+                    event.wait(POLL_SECONDS)
+                    continue
                 return self._finish(
                     record,
                     "ready",

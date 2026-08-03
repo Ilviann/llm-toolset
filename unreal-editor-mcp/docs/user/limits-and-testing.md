@@ -6,7 +6,7 @@ The plugin publishes these authoritative defaults through `capabilities`: 64 KiB
 
 ## Offline development and tests
 
-Configure `UE58` and point `UNREAL_MCP_TEST_UPROJECT` at `ue-test/ue58/UnrealMCPTest.uproject` as described in [`docs/development-environment.md`](../development-environment.md). macOS additionally requires `UNREAL_MCP_DEVELOPER_DIR`; Windows uses the configured engine's Win64 editor and installed Visual Studio toolchain. The parent `ue-test/` directory is disposable and entirely ignored.
+Configure `UE57` and point `UNREAL_MCP_TEST_UPROJECT` at `ue-test/ue57/UnrealMCPTest.uproject` as described in [`docs/development-environment.md`](../development-environment.md). macOS additionally requires `UNREAL_MCP_DEVELOPER_DIR`; Windows uses the configured engine's Win64 editor and installed Visual Studio toolchain. The parent `ue-test/` directory is disposable and entirely ignored.
 
 Run the dependency-free Python suite:
 
@@ -20,7 +20,7 @@ macOS:
 
 ```sh
 env DEVELOPER_DIR="$UNREAL_MCP_DEVELOPER_DIR" \
-  "$UE58/Engine/Build/BatchFiles/Mac/Build.sh" \
+  "$UE57/Engine/Build/BatchFiles/Mac/Build.sh" \
   UnrealMCPTestEditor Mac Development \
   -Project="$UNREAL_MCP_TEST_UPROJECT" -WaitMutex -NoHotReloadFromIDE
 ```
@@ -28,7 +28,7 @@ env DEVELOPER_DIR="$UNREAL_MCP_DEVELOPER_DIR" \
 Windows PowerShell:
 
 ```powershell
-& "$env:UE58\Engine\Build\BatchFiles\Build.bat" `
+& "$env:UE57\Engine\Build\BatchFiles\Build.bat" `
   UnrealMCPTestEditor Win64 Development `
   "-Project=$env:UNREAL_MCP_TEST_UPROJECT" -WaitMutex -NoHotReloadFromIDE
 ```
@@ -52,4 +52,4 @@ scripts\run_headless_integration.cmd --automation-only
 scripts\run_headless_integration.cmd
 ```
 
-The headless runner selects `UnrealEditor` on macOS and Linux and `UnrealEditor-Cmd.exe` on Windows. The prior 0.16.0 native baseline was Unreal 5.8.0 on Apple Silicon macOS 26.5.2 with Xcode 26.1.1. Platform selection and environment requirements are unit-tested without requiring every host.
+The headless runner selects `UnrealEditor` on macOS and Linux and `UnrealEditor-Cmd.exe` on Windows. This branch's Windows baseline is Unreal 5.7.4; the earlier 0.16.0 release baseline used Unreal 5.8.0 on Apple Silicon macOS. Platform selection and environment requirements are unit-tested without requiring every host.

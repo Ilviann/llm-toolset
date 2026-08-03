@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import platform
@@ -15,7 +16,7 @@ import threading
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Mapping, Sequence
+from typing import Callable, Iterator, Mapping, Sequence
 
 try:
     from scripts import package_plugin
@@ -261,17 +262,11 @@ def resolve_engine_root(project: ProjectInfo, configured: Path | None = None) ->
 
 
 def validate_supported_engine_root(engine_root: Path) -> Path:
-    run_uat = package_plugin.validate_engine_root(engine_root, "Windows")
-    version_file = resolved(engine_root) / "Engine" / "Build" / "Build.version"
-    version = read_json_object(version_file, "Unreal Engine build version")
-    major = version.get("MajorVersion")
-    minor = version.get("MinorVersion")
-    if type(major) is not int or type(minor) is not int:
-        raise DeploymentError(f"Unreal Engine build version has invalid major/minor fields: {version_file}")
-    if (major, minor) < (5, 8):
-        raise DeploymentError(
-            f"Unreal MCP requires Unreal Engine 5.8 or newer; selected Engine is {major}.{minor}"
-        )
+    try:
+        run_uat = package_plugin.validate_engine_root(engine_root, "Windows")
+        package_plugin.validate_supported_engine_version(engine_root)
+    except package_plugin.PackagingError as error:
+        raise DeploymentError(str(error)) from error
     return run_uat
 
 
@@ -298,20 +293,38 @@ def build_command(
     output: Path,
     plugin: PluginBuild = BASE_PLUGIN,
 ) -> list[str]:
+    if plugin.dependency_plugins:
+        raise DeploymentError("dependency plugin builds require prepared_build_command()")
+    with prepared_build_command(engine_root, output, plugin) as (command, _prepared):
+        return command
+
+
+@contextlib.contextmanager
+def prepared_build_command(
+    engine_root: Path,
+    output: Path,
+    plugin: PluginBuild = BASE_PLUGIN,
+) -> Iterator[tuple[list[str], package_plugin.PreparedPluginBuild]]:
     try:
         run_uat = validate_supported_engine_root(engine_root)
         output = package_plugin.validate_output(output, engine_root, plugin.descriptor)
+        with package_plugin.prepare_plugin_build(
+            plugin.descriptor,
+            plugin.dependency_plugins,
+        ) as prepared:
+            yield (
+                package_plugin.build_command(
+                    run_uat,
+                    output,
+                    "Win64",
+                    strict_includes=False,
+                    unversioned=False,
+                    plugin_descriptor=prepared.descriptor,
+                ),
+                prepared,
+            )
     except (package_plugin.PackagingError, DeploymentError) as error:
         raise DeploymentError(str(error)) from error
-    return package_plugin.build_command(
-        run_uat,
-        output,
-        "Win64",
-        strict_includes=False,
-        unversioned=False,
-        plugin_descriptor=plugin.descriptor,
-        dependency_plugins=plugin.dependency_plugins,
-    )
 
 
 def run_packaging(
@@ -320,29 +333,30 @@ def run_packaging(
     log: Callable[[str], None],
     plugin: PluginBuild = BASE_PLUGIN,
 ) -> None:
-    command = build_command(engine_root, output, plugin)
     log(f"Building installed Win64 {plugin.name} plugin with {engine_root}")
     creation_flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
     try:
-        process = subprocess.Popen(
-            command,
-            cwd=package_plugin.WORKSPACE_ROOT,
-            env=os.environ.copy(),
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            creationflags=creation_flags,
-        )
+        with prepared_build_command(engine_root, output, plugin) as (command, prepared):
+            process = subprocess.Popen(
+                command,
+                cwd=package_plugin.WORKSPACE_ROOT,
+                env=os.environ.copy(),
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                creationflags=creation_flags,
+            )
+            assert process.stdout is not None
+            for line in process.stdout:
+                log(line.rstrip())
+            return_code = process.wait()
+            if return_code != 0:
+                raise DeploymentError(f"Unreal AutomationTool failed with exit code {return_code}")
+            package_plugin.finalize_dependency_package(output, prepared)
     except OSError as error:
         raise DeploymentError(f"could not start Unreal AutomationTool: {error}") from error
-    assert process.stdout is not None
-    for line in process.stdout:
-        log(line.rstrip())
-    return_code = process.wait()
-    if return_code != 0:
-        raise DeploymentError(f"Unreal AutomationTool failed with exit code {return_code}")
     try:
         package_plugin.verify_package(output, plugin.descriptor)
     except package_plugin.PackagingError as error:

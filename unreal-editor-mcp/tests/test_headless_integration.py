@@ -50,7 +50,7 @@ class HeadlessIntegrationScriptTests(unittest.TestCase):
         self.assertTrue(callable(game_data_levels.open_acceptance_level))
         self.assertTrue(callable(widgets.author_widget_scenario))
 
-    def test_runner_requests_ue58_and_disposable_project_environment_paths(self):
+    def test_runner_requests_ue57_and_disposable_project_environment_paths(self):
         from headless_integration import lifecycle
 
         with (
@@ -71,7 +71,7 @@ class HeadlessIntegrationScriptTests(unittest.TestCase):
         self.assertEqual(
             required_path.call_args_list,
             [
-                unittest.mock.call("UE58"),
+                unittest.mock.call("UE57"),
                 unittest.mock.call("UNREAL_MCP_TEST_UPROJECT"),
             ],
         )

@@ -20,7 +20,7 @@ released_in: null
 - Extend `level_actor_edit` with exact spline operations for closed-loop state, add, update, reorder, and remove. Require actor and component identities plus the latest map snapshot.
 - Bound spline components, point counts, batch operations, coordinates, rotations, scales, tangents, and response size. Reject non-finite values and invalid point indices or identities.
 - Prevalidate the complete spline batch, modify once inside the owning actor transaction, update the spline once after the batch, and verify exact point order and values before commit.
-- Preserve supported spline metadata during point insertion, removal, and reorder. Reject metadata-bearing spline subclasses when their metadata cannot be preserved through public Unreal 5.8 APIs; never silently discard custom metadata.
+- Preserve supported spline metadata during point insertion, removal, and reorder. Reject metadata-bearing spline subclasses when their metadata cannot be preserved through public Unreal 5.7 APIs; never silently discard custom metadata.
 - Integrate spline changes with World Partition targeted loading, external-package tracking, `level_save`, operation replay, stale snapshots, rollback, undo/redo, and reload verification.
 
 ### Verification

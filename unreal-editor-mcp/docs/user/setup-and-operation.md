@@ -22,7 +22,7 @@ Close Unreal Editor, then double-click:
 scripts\deploy_plugin_windows.cmd
 ```
 
-Select the folder that directly contains your game's `.uproject` file. When `UE58` is set, its value is already shown in the Unreal Engine field and is preserved after project selection when valid. Otherwise, the helper detects a matching Unreal Engine 5.8+ installation from `EngineAssociation` and standard Epic/user-build registry records; use the second Browse button if manual selection is needed. For readable plugin frames in Windows crash reports, enable **Include matching PDB crash symbols (larger installation)**. The generated LM Studio entry is readonly by default. Enable **writable MCP tools** only for a dedicated trusted project, and enable **editor lifecycle control** independently to add the selected Engine's validated `UnrealEditor.exe`. Click **Build and install plugin**.
+Select the folder that directly contains your game's `.uproject` file. When `UE57` is set, its value is already shown in the Unreal Engine field and is preserved after project selection when valid. Otherwise, the helper detects a matching Unreal Engine 5.7.x installation from `EngineAssociation` and standard Epic/user-build registry records; use the second Browse button if manual selection is needed. For readable plugin frames in Windows crash reports, enable **Include matching PDB crash symbols (larger installation)**. The generated LM Studio entry is readonly by default. Enable **writable MCP tools** only for a dedicated trusted project, and enable **editor lifecycle control** independently to add the selected Engine's validated `UnrealEditor.exe`. Click **Build and install plugin**.
 
 The helper uses the installed Engine and Visual Studio toolchain to package `Win64`. It can also package `UnrealMCPGAS` with the base dependency when the companion checkbox is selected. Choose project installation to deploy under `<YourProject>\Plugins` and enable the selected plugins in the `.uproject`, or choose either Engine mode to deploy under `<Engine>\Engine\Plugins\Marketplace` with `EnabledByDefault` set to the selected state. All selected packages build and verify before installation; replacement and project enablement roll back as one operation on failure.
 
@@ -35,7 +35,7 @@ Python 3.10 or newer with tkinter is required. Official Windows Python installer
 ### Manual/source installation
 
 1. Copy [`plugin/UnrealMCP`](../../plugin/UnrealMCP) to `<YourProject>/Plugins/UnrealMCP` or add this repository's `plugin/` folder as an `AdditionalPluginDirectories` entry in a disposable development `.uproject`.
-2. Enable the `UnrealMCP` plugin and compile the project's Editor target with Unreal 5.8 or a newer version that passes the included public-API probes.
+2. Enable the `UnrealMCP` plugin and compile the project's Editor target with Unreal 5.7 or a newer version that passes the included public-API probes.
 3. Open the project. Look for `Unreal MCP 0.32.0 ready on 127.0.0.1:15485` in the editor log.
 4. Install the Python package offline from this folder:
 
@@ -46,7 +46,7 @@ Python 3.10 or newer with tkinter is required. Official Windows Python installer
 
 ### Package the binary plugin
 
-Set `UE58` to the Unreal Engine 5.8 installation root, then run the standard Unreal AutomationTool `BuildPlugin` workflow through the repository script:
+Set `UE57` to the Unreal Engine 5.7 installation root, then run the standard Unreal AutomationTool `BuildPlugin` workflow through the repository script:
 
 ```sh
 python3 scripts/package_plugin.py
@@ -113,8 +113,8 @@ The upcoming readonly-mode release removes `--tool-mode` and `--editor`; configu
 `editor_lifecycle` is absent unless separately configured. Enable it for one fixed project by adding `--editor-lifecycle` and an absolute editor executable. Windows requires `UnrealEditor.exe`; macOS requires the executable inside `UnrealEditor.app`. For example, the configured argument arrays end with:
 
 ```text
-Windows: C:\absolute\Project.uproject --editor-lifecycle C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe
-macOS:   /absolute/Project.uproject --editor-lifecycle /Users/Shared/Epic Games/UE_5.8/Engine/Binaries/Mac/UnrealEditor.app/Contents/MacOS/UnrealEditor
+Windows: C:\absolute\Project.uproject --editor-lifecycle C:\Program Files\Epic Games\UE_5.7\Engine\Binaries\Win64\UnrealEditor.exe
+macOS:   /absolute/Project.uproject --editor-lifecycle /Users/Shared/Epic Games/UE_5.7/Engine/Binaries/Mac/UnrealEditor.app/Contents/MacOS/UnrealEditor
 ```
 
 Pass each shown value as a separate MCP `args` element; spaces are part of a path, not shell quoting. Lifecycle configuration does not imply `--writable`; combine the flags only when both permissions are intended. `--lifecycle-timeout` configures one 5–900 second bound and defaults to 120 seconds. Linux rejects launch/restart; its command construction remains unit-tested without a native-support claim.

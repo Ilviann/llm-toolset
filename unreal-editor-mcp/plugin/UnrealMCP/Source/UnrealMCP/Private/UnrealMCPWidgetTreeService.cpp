@@ -12,7 +12,7 @@
 #include "UnrealMCPWidgetLayoutService.h"
 #include "UnrealMCPWidgetStyleService.h"
 #include "UnrealMCPWidgetTreeSupport.h"
-#include "WidgetBlueprintOperationUtils.h"
+#include "UnrealMCPWidgetCompatibility.h"
 
 namespace
 {
@@ -165,7 +165,7 @@ UWidget* ConstructWidget(
     {
         if (Widget != nullptr)
         {
-            FWidgetBlueprintOperationUtils::RemoveTransientWidgetFromTree(Blueprint, Widget);
+            FUnrealMCPWidgetCompatibility::RemoveTransientWidgetFromTree(Blueprint, Widget);
         }
         OutError = {TEXT("invalid_widget_class"), TEXT("Unreal could not construct the requested widget class with the exact name")};
         return nullptr;
@@ -173,7 +173,7 @@ UWidget* ConstructWidget(
     if (UUserWidget* UserWidget = Cast<UUserWidget>(Widget);
         UserWidget != nullptr && !Blueprint->IsWidgetFreeFromCircularReferences(UserWidget))
     {
-        FWidgetBlueprintOperationUtils::RemoveTransientWidgetFromTree(Blueprint, Widget);
+        FUnrealMCPWidgetCompatibility::RemoveTransientWidgetFromTree(Blueprint, Widget);
         OutError = {TEXT("invalid_widget_tree"), TEXT("The user-widget composition would create a circular dependency")};
         return nullptr;
     }
@@ -277,7 +277,7 @@ bool ValidateNamedSlotContent(
     if (!Slot.bTreeHost)
     {
         UWidget* HostWidget = Cast<UWidget>(Slot.Host);
-        if (HostWidget == nullptr || !FWidgetBlueprintOperationUtils::IsParentChildCycleFree(Blueprint, Widget, HostWidget))
+        if (HostWidget == nullptr || !FUnrealMCPWidgetCompatibility::IsParentChildCycleFree(Blueprint, Widget, HostWidget))
         {
             OutError = {TEXT("invalid_widget_tree"), TEXT("The named-slot move would create a widget-tree cycle")};
             return false;
@@ -516,7 +516,7 @@ bool FUnrealMCPWidgetTreeService::Execute(
             Blueprint->SetFlags(RF_Transactional);
             Blueprint->Modify();
             FText ErrorMessage;
-            if (!FWidgetBlueprintOperationUtils::AddWidget(
+            if (!FUnrealMCPWidgetCompatibility::AddWidget(
                     Blueprint, AffectedWidget, bRoot ? nullptr : Panel, Index, ErrorMessage))
             {
                 Transaction.Cancel();
@@ -529,7 +529,7 @@ bool FUnrealMCPWidgetTreeService::Execute(
             const FScopedTransaction Transaction(FText::FromString(TEXT("Unreal MCP add widget to named slot")));
             if (!SetNamedSlotContent(Blueprint, NamedSlot, AffectedWidget, OutError))
             {
-                FWidgetBlueprintOperationUtils::RemoveTransientWidgetFromTree(Blueprint, AffectedWidget);
+                FUnrealMCPWidgetCompatibility::RemoveTransientWidgetFromTree(Blueprint, AffectedWidget);
                 return false;
             }
             Blueprint->Modify();
@@ -569,7 +569,7 @@ bool FUnrealMCPWidgetTreeService::Execute(
         }
         const FString RemovedId = WidgetId(Blueprint, AffectedWidget);
         FText ErrorMessage;
-        if (!FWidgetBlueprintOperationUtils::RemoveWidget(Blueprint, AffectedWidget, ErrorMessage))
+        if (!FUnrealMCPWidgetCompatibility::RemoveWidget(Blueprint, AffectedWidget, ErrorMessage))
         {
             OutError = {TEXT("invalid_widget_tree"), ErrorMessage.ToString().Left(512)};
             return false;
@@ -604,9 +604,9 @@ bool FUnrealMCPWidgetTreeService::Execute(
             return false;
         }
         FText RenameError;
-        if (!FWidgetBlueprintOperationUtils::VerifyWidgetRename(
+        if (!FUnrealMCPWidgetCompatibility::VerifyWidgetRename(
                 Blueprint, AffectedWidget, FText::FromString(NewName), RenameError)
-            || !FWidgetBlueprintOperationUtils::RenameWidget(Blueprint, AffectedWidget, NewName))
+            || !FUnrealMCPWidgetCompatibility::RenameWidget(Blueprint, AffectedWidget, NewName))
         {
             OutError = {TEXT("write_conflict"), RenameError.ToString().Left(512)};
             return false;
@@ -642,7 +642,7 @@ bool FUnrealMCPWidgetTreeService::Execute(
             const FScopedTransaction Transaction(
                 FText::FromString(TEXT("Unreal MCP reparent widget")));
             FText ErrorMessage;
-            if (!FWidgetBlueprintOperationUtils::MoveWidget(
+            if (!FUnrealMCPWidgetCompatibility::MoveWidget(
                     Blueprint, AffectedWidget, Panel, Index, ErrorMessage))
             {
                 OutError = {TEXT("invalid_widget_tree"), ErrorMessage.ToString().Left(512)};
@@ -706,7 +706,7 @@ bool FUnrealMCPWidgetTreeService::Execute(
         const FScopedTransaction Transaction(FText::FromString(TEXT("Unreal MCP set widget variable exposure")));
         AffectedWidget->SetFlags(RF_Transactional);
         AffectedWidget->Modify();
-        FWidgetBlueprintOperationUtils::ToggleWidgetAsVariable(
+        FUnrealMCPWidgetCompatibility::ToggleWidgetAsVariable(
             Blueprint, AffectedWidget, bIsVariable, true);
     }
     else if (Operation == TEXT("set_property"))

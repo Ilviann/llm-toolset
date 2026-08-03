@@ -14,7 +14,7 @@ The CLI validates the optional absolute editor executable and injects one `Edito
 - No tool argument can select an executable, project, environment value, process, port, shell fragment, forced exit, or arbitrary argument.
 - Windows launches only an absolute `UnrealEditor.exe`; macOS launches only an executable `UnrealEditor` app binary. Linux command construction rejects without claiming native launch support.
 - Only one lifecycle operation runs at a time. Launch and shutdown waits are bounded to 5–900 configured seconds; cancellation stops waiting but never force-terminates an editor.
-- Readiness requires the configured project hash, launched process ID, exact Python/plugin version, authenticated bridge, and a new bridge instance after restart.
+- Readiness requires the configured project hash, launched process ID, exact Python/plugin version, authenticated bridge, and a new bridge instance after restart. A newly published bridge may still be blocked by editor startup work, so transient connection and request timeouts are retried within the configured startup deadline; identity, version, and response mismatches fail immediately.
 - Native shutdown refuses PIE/simulation, saving, garbage collection, transactions, compiling assets, and any dirty package. It never saves, discards, prompts, or force-kills.
 - `Saved/UnrealMCP/lifecycle.json` retains at most 16 records for 24 hours using bounded atomic writes. Nonterminal records loaded by a new server become `outcome_unknown`.
 

@@ -15,7 +15,7 @@ from .stdio import serve
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Blueprint-family MCP bridge for Unreal Editor 5.8+",
+        description="Blueprint-family MCP bridge for Unreal Editor 5.7.x",
         allow_abbrev=False,
     )
     parser.add_argument("project", help="Unreal .uproject file or its containing folder")

@@ -1,6 +1,6 @@
 # Unreal Editor MCP
 
-Unreal Editor MCP 0.32.0 is an offline-first MCP bridge for Unreal Engine 5.8+. It pairs a dependency-free Python 3.10+ stdio server with an editor-only C++ plugin.
+Unreal Editor MCP 0.32.0 is an offline-first MCP bridge for Unreal Engine 5.7.x. It pairs a dependency-free Python 3.10+ stdio server with an editor-only C++ plugin.
 
 Readonly access is the released default. Project-content mutation requires the explicit `--writable` trust decision; optional editor lifecycle control remains independent.
 
@@ -18,14 +18,14 @@ Close Unreal Editor, then double-click:
 scripts\deploy_plugin_windows.cmd
 ```
 
-Select the folder containing the game's `.uproject` and the matching Unreal Engine 5.8+ installation. Optionally select **Build and install Unreal MCP GAS companion plugin**, then choose project installation with explicit `.uproject` enablement, Engine installation enabled by default, or Engine installation without default enablement. Engine plugins are installed under `<Engine>\Engine\Plugins\Marketplace`; project plugins are installed under `<YourProject>\Plugins`. Existing selected-plugin installations require approval before replacement. Matching Win64 PDB deployment, writable MCP tools, and editor lifecycle control remain independent options.
+Select the folder containing the game's `.uproject` and the matching Unreal Engine 5.7.x installation. Optionally select **Build and install Unreal MCP GAS companion plugin**, then choose project installation with explicit `.uproject` enablement, Engine installation enabled by default, or Engine installation without default enablement. Engine plugins are installed under `<Engine>\Engine\Plugins\Marketplace`; project plugins are installed under `<YourProject>\Plugins`. Existing selected-plugin installations require approval before replacement. Matching Win64 PDB deployment, writable MCP tools, and editor lifecycle control remain independent options.
 
 Python 3.10 or newer with tkinter is required. The build and installation are offline.
 
 ### Manual/source installation
 
 1. Copy [`plugin/UnrealMCP`](plugin/UnrealMCP) to `<YourProject>/Plugins/UnrealMCP`, or add this repository's `plugin/` directory to `AdditionalPluginDirectories` in a disposable development `.uproject`.
-2. Enable `UnrealMCP` and compile the project's Editor target with Unreal Engine 5.8 or newer.
+2. Enable `UnrealMCP` and compile the project's Editor target with Unreal Engine 5.7.x.
 3. Open the project and wait for `Unreal MCP 0.32.0 ready on 127.0.0.1:15485` in the editor log.
 4. Create a virtual environment and install the Python package offline:
 
@@ -34,7 +34,7 @@ Python 3.10 or newer with tkinter is required. The build and installation are of
    .venv/bin/python -m pip install --no-build-isolation --no-deps .
    ```
 
-To build a deployable binary plugin with the configured Unreal Engine 5.8 toolchain, set `UE58` to the Engine installation root and run:
+To build a deployable binary plugin with the configured Unreal Engine 5.7 toolchain, set `UE57` to the Engine installation root and run:
 
 ```sh
 python3 scripts/package_plugin.py
@@ -54,7 +54,7 @@ For example, add the following arguments to an LM Studio MCP entry on macOS:
 "args": [
   "/absolute/path/to/Project.uproject",
   "--editor-lifecycle",
-  "/Users/Shared/Epic Games/UE_5.8/Engine/Binaries/Mac/UnrealEditor.app/Contents/MacOS/UnrealEditor"
+  "/Users/Shared/Epic Games/UE_5.7/Engine/Binaries/Mac/UnrealEditor.app/Contents/MacOS/UnrealEditor"
 ]
 ```
 
@@ -64,7 +64,7 @@ On Windows:
 "args": [
   "C:\\absolute\\path\\to\\Project.uproject",
   "--editor-lifecycle",
-  "C:\\Program Files\\Epic Games\\UE_5.8\\Engine\\Binaries\\Win64\\UnrealEditor.exe"
+  "C:\\Program Files\\Epic Games\\UE_5.7\\Engine\\Binaries\\Win64\\UnrealEditor.exe"
 ]
 ```
 

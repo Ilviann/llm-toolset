@@ -4,11 +4,11 @@ This page records the local build and integration-test requirements for Unreal E
 
 ## Required software
 
-- Unreal Engine 5.8 or newer with the host editor executable, public C++ headers, UnrealBuildTool, bundled .NET SDK, and platform build scripts installed. Support for a newer Unreal release must be demonstrated by the Phase 1 compilation probes and integration suite.
+- Unreal Engine 5.7.x with the host editor executable, public C++ headers, UnrealBuildTool, bundled .NET SDK, and platform build scripts installed. This branch rejects older and newer API lines; another release requires its own compatibility branch, compilation probes, and integration suite.
 - Visual Studio with the Desktop development with C++ workload and an Unreal-supported MSVC and Windows SDK for mandatory native Windows validation. Confirm the exact installed SDK with AutomationTool Turnkey before compiling.
-- Xcode 26.1.1 when performing preferred Unreal Engine 5.8 macOS follow-up validation. Xcode must have completed first-launch setup and license acceptance. Select this version per build rather than assuming the globally selected or newest Xcode is compatible. See Epic's [macOS development requirements](https://dev.epicgames.com/documentation/unreal-engine/macos-development-requirements-for-unreal-engine?lang=en-US).
+- An Unreal Engine 5.7-supported Xcode installation when performing preferred macOS follow-up validation. Xcode must have completed first-launch setup and license acceptance. Select it per build rather than assuming the globally selected or newest Xcode is compatible. See Epic's [macOS development requirements](https://dev.epicgames.com/documentation/unreal-engine/macos-development-requirements-for-unreal-engine?lang=en-US).
 - Python 3.10 or newer. Production code and tests use the standard library unless a later roadmap change explicitly authorizes and pins a dependency.
-- A Windows host capable of running Unreal Engine 5.8 is required for release qualification. A macOS host is optional for preferred follow-up validation. Development and tests must remain usable on the repository's 16 GB reference machine.
+- A Windows host capable of running Unreal Engine 5.7 is required for release qualification. A macOS host is optional for preferred follow-up validation. Development and tests must remain usable on the repository's 16 GB reference machine.
 - Enough local storage for Unreal-generated `Binaries`, `Build`, `Intermediate`, `Saved`, workspace, compiler, and Derived Data Cache output. Native build and test workflows must not require network downloads.
 
 Native Windows qualification is the release gate. macOS validation is preferred but may occur after release. Linux is outside the current support and verification scope.
@@ -19,11 +19,11 @@ Configure these project-specific environment variables with absolute paths. Do n
 
 | Variable | Required value |
 | --- | --- |
-| `UE58` | Installed Unreal Engine 5.8 root containing `Engine/`. |
-| `UNREAL_MCP_TEST_UPROJECT` | Disposable test descriptor at `ue-test/ue58/UnrealMCPTest.uproject`. |
-| `UNREAL_MCP_DEVELOPER_DIR` | macOS only: Xcode 26.1.1 `Contents/Developer` directory used for builds and headless tests. |
+| `UE57` | Installed Unreal Engine 5.7 root containing `Engine/`. |
+| `UNREAL_MCP_TEST_UPROJECT` | Disposable test descriptor at `ue-test/ue57/UnrealMCPTest.uproject`. |
+| `UNREAL_MCP_DEVELOPER_DIR` | macOS only: selected Unreal Engine 5.7-supported Xcode `Contents/Developer` directory used for builds and headless tests. |
 
-Derive the Unreal tools from `UE58`; do not configure separate paths for each executable:
+Derive the Unreal tools from `UE57`; do not configure separate paths for each executable:
 
 - `Engine/Binaries/Mac/UnrealEditor.app/Contents/MacOS/UnrealEditor`
 - `Engine/Binaries/Win64/UnrealEditor-Cmd.exe`
@@ -39,13 +39,13 @@ The authenticated bridge token is not an environment variable. The Unreal plugin
 
 ## Disposable Unreal project
 
-Use `ue-test/ue58/` as the local Unreal Engine 5.8 project for plugin compilation, Unreal Automation Tests, command-line editor checks, and cross-process bridge integration. The parent `ue-test/` directory is ignored because Unreal regenerates substantial machine-specific state and can hold separate engine-version subfolders.
+Use `ue-test/ue57/` as the local Unreal Engine 5.7 project for plugin compilation, Unreal Automation Tests, command-line editor checks, and cross-process bridge integration. The parent `ue-test/` directory is ignored because Unreal regenerates substantial machine-specific state and can hold separate engine-version subfolders.
 
 The test project must:
 
-- use `EngineAssociation` 5.8;
+- use `EngineAssociation` 5.7;
 - contain minimal C++ Game and Editor targets;
-- use `BuildSettingsVersion.V7` and `EngineIncludeOrderVersion.Unreal5_8`;
+- use `BuildSettingsVersion.V6` and `EngineIncludeOrderVersion.Unreal5_7`;
 - compile the `UnrealMCPTestEditor` target with the configured Launcher engine;
 - remain disposable and contain no personal game content;
 - create behavioral test assets at runtime rather than treating generated project state or prose documentation as fixtures.
@@ -58,10 +58,10 @@ On macOS, run these checks from the repository root after configuring all three 
 
 ```sh
 python3 --version
-test -d "$UE58/Engine"
+test -d "$UE57/Engine"
 test -f "$UNREAL_MCP_TEST_UPROJECT"
-test -x "$UE58/Engine/Build/BatchFiles/Mac/GenerateProjectFiles.sh"
-test -x "$UE58/Engine/Build/BatchFiles/Mac/Build.sh"
+test -x "$UE57/Engine/Build/BatchFiles/Mac/GenerateProjectFiles.sh"
+test -x "$UE57/Engine/Build/BatchFiles/Mac/Build.sh"
 test -x "$UNREAL_MCP_DEVELOPER_DIR/usr/bin/xcodebuild"
 env DEVELOPER_DIR="$UNREAL_MCP_DEVELOPER_DIR" xcodebuild -version
 env DEVELOPER_DIR="$UNREAL_MCP_DEVELOPER_DIR" xcodebuild -checkFirstLaunchStatus
@@ -71,10 +71,10 @@ On Windows PowerShell, configure the two common variables and verify the engine,
 
 ```powershell
 python --version
-Test-Path "$env:UE58\Engine"
+Test-Path "$env:UE57\Engine"
 Test-Path $env:UNREAL_MCP_TEST_UPROJECT
-Test-Path "$env:UE58\Engine\Build\BatchFiles\Build.bat"
-& "$env:UE58\Engine\Build\BatchFiles\RunUAT.bat" `
+Test-Path "$env:UE57\Engine\Build\BatchFiles\Build.bat"
+& "$env:UE57\Engine\Build\BatchFiles\RunUAT.bat" `
   Turnkey -command=VerifySdk -platform=Win64 -utf8output
 ```
 
@@ -82,12 +82,12 @@ Generate project files and compile the editor target before beginning or upgradi
 
 ```sh
 env DEVELOPER_DIR="$UNREAL_MCP_DEVELOPER_DIR" \
-  "$UE58/Engine/Build/BatchFiles/Mac/GenerateProjectFiles.sh" \
+  "$UE57/Engine/Build/BatchFiles/Mac/GenerateProjectFiles.sh" \
   -project="$UNREAL_MCP_TEST_UPROJECT" \
   -game
 
 env DEVELOPER_DIR="$UNREAL_MCP_DEVELOPER_DIR" \
-  "$UE58/Engine/Build/BatchFiles/Mac/Build.sh" \
+  "$UE57/Engine/Build/BatchFiles/Mac/Build.sh" \
   UnrealMCPTestEditor Mac Development \
   -Project="$UNREAL_MCP_TEST_UPROJECT" \
   -WaitMutex \
@@ -97,7 +97,7 @@ env DEVELOPER_DIR="$UNREAL_MCP_DEVELOPER_DIR" \
 On Windows PowerShell:
 
 ```powershell
-& "$env:UE58\Engine\Build\BatchFiles\Build.bat" `
+& "$env:UE57\Engine\Build\BatchFiles\Build.bat" `
   UnrealMCPTestEditor Win64 Development `
   "-Project=$env:UNREAL_MCP_TEST_UPROJECT" `
   -WaitMutex `
@@ -112,7 +112,7 @@ On Windows, run `python scripts/run_headless_integration.py --readonly-lifecycle
 
 ## Binary plugin packaging
 
-`scripts/package_plugin.py` invokes the configured engine's platform-appropriate `RunUAT` launcher with the standard `BuildPlugin` command. It accepts the engine only through `UE58` or the explicit `--engine-root` override, keeps the plugin descriptor fixed to `plugin/UnrealMCP/UnrealMCP.uplugin`, and passes every UAT argument as a subprocess array. On macOS it also requires `UNREAL_MCP_DEVELOPER_DIR`, `DEVELOPER_DIR`, or `--developer-dir` and exports the resolved value as `DEVELOPER_DIR` for the child build.
+`scripts/package_plugin.py` invokes the configured engine's platform-appropriate `RunUAT` launcher with the standard `BuildPlugin` command. It accepts the engine only through `UE57` or the explicit `--engine-root` override, keeps plugin descriptors fixed to repository-owned paths, and passes every UAT argument as a subprocess array. Unreal Engine 5.7 lacks dependency staging in `BuildPlugin`, so companion packaging temporarily combines the fixed base source module with the companion build input, then restores the independent companion descriptor and removes base-module artifacts from the package. On macOS the script also requires `UNREAL_MCP_DEVELOPER_DIR`, `DEVELOPER_DIR`, or `--developer-dir` and exports the resolved value as `DEVELOPER_DIR` for the child build.
 
 From the application directory, package for the host's installed platforms with:
 
@@ -126,14 +126,13 @@ Use `--target-platforms` with Unreal's `+`-separated platform names when the ins
 
 ## Initial verified baseline
 
-The following combination generated project files and compiled the empty `UnrealMCPTestEditor` target successfully on 2026-07-21:
+The current Windows baseline compiled the base and GAS modules successfully on 2026-08-03:
 
 | Component | Verified value |
 | --- | --- |
-| Host | Apple Silicon, macOS 26.5.2, 16 GB memory |
-| Unreal Engine | 5.8.0, changelist 55116800, Epic Games Launcher build |
-| Xcode | 26.1.1, build 17B100 |
-| Compiler and SDK | Apple clang 17.0.0, macOS SDK 26.1 |
-| Python | CPython 3.14.6 |
+| Host | Windows, x64 |
+| Unreal Engine | 5.7.4, changelist 51494982, Epic Games Launcher build |
+| Toolchain | Visual Studio 2026 MSVC 14.50.35737, Windows SDK 10.0.28000.0 |
+| Python | CPython 3.14 |
 
 This baseline is evidence for the current development host, not a compatibility promise. Re-run the public-API compilation probes and behavioral tests for every supported Unreal, Xcode, SDK, architecture, and platform combination.

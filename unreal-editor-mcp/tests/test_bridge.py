@@ -12,7 +12,7 @@ from unreal_editor_mcp.errors import BridgeError, ErrorCode
 from unreal_editor_mcp.project import ProjectLayout
 
 
-RECORD = DiscoveryRecord("a" * 40, 123, 15485, unreal_editor_mcp.__version__, "5.8.0", 1)
+RECORD = DiscoveryRecord("a" * 40, 123, 15485, unreal_editor_mcp.__version__, "5.7.4", 1)
 
 
 class FakeResponse:
@@ -135,7 +135,7 @@ class BridgeTests(unittest.TestCase):
             self.assertEqual(body, {"command": command, "arguments": arguments})
 
     @patch("unreal_editor_mcp.bridge.read_token", return_value="b" * 64)
-    @patch("unreal_editor_mcp.bridge.read_discovery", return_value=DiscoveryRecord("a" * 40, 1, 15485, "9.0.0", "5.8", 1))
+    @patch("unreal_editor_mcp.bridge.read_discovery", return_value=DiscoveryRecord("a" * 40, 1, 15485, "9.0.0", "5.7", 1))
     def test_version_mismatch_allows_capabilities_but_rejects_state(self, _discovery, _token):
         self._bridge().call("capabilities")
         with self.assertRaises(BridgeError) as caught:

@@ -8,7 +8,7 @@ from scripts import deploy_plugin_windows as deploy
 
 
 class WindowsDeploymentScriptTests(unittest.TestCase):
-    def write_project(self, folder: Path, association: object = "5.8") -> deploy.ProjectInfo:
+    def write_project(self, folder: Path, association: object = "5.7") -> deploy.ProjectInfo:
         descriptor = folder / "Shooter.uproject"
         descriptor.write_text(
             json.dumps({"FileVersion": 3, "EngineAssociation": association}),
@@ -47,7 +47,7 @@ class WindowsDeploymentScriptTests(unittest.TestCase):
         manifest.write_text("manifest", encoding="utf-8")
         manifest.with_name(f"UnrealEditor-{plugin_name}.lib").write_bytes(b"import library")
 
-    def write_engine(self, folder: Path, major: int = 5, minor: int = 8) -> None:
+    def write_engine(self, folder: Path, major: int = 5, minor: int = 7) -> None:
         launcher = folder / "Engine" / "Build" / "BatchFiles" / "RunUAT.bat"
         launcher.parent.mkdir(parents=True)
         launcher.write_text("@echo off\r\n", encoding="utf-8")
@@ -63,7 +63,7 @@ class WindowsDeploymentScriptTests(unittest.TestCase):
                 deploy.locate_project(folder)
             project = self.write_project(folder)
             self.assertEqual(project.descriptor.name, "Shooter.uproject")
-            self.assertEqual(project.engine_association, "5.8")
+            self.assertEqual(project.engine_association, "5.7")
             (folder / "Other.UPROJECT").write_text("{}", encoding="utf-8")
             with self.assertRaises(deploy.DeploymentError):
                 deploy.locate_project(folder)
@@ -93,14 +93,15 @@ class WindowsDeploymentScriptTests(unittest.TestCase):
                     deploy.locate_project(folder)
 
     def test_engine_candidates_prefer_exact_association_then_configuration(self):
-        project = deploy.ProjectInfo(Path("D:/Game"), Path("D:/Game/Game.uproject"), "5.8")
+        project = deploy.ProjectInfo(Path("D:/Game"), Path("D:/Game/Game.uproject"), "5.7")
         candidates = deploy.engine_candidates(
             project,
             environment={
-                "UE58": "D:/Configured/UE",
+                "UE57": "D:/Configured/UE",
                 "ProgramFiles": "C:/Program Files",
             },
             installations=[
+                ("5.6", Path("D:/Epic/UE_5.6")),
                 ("5.7", Path("D:/Epic/UE_5.7")),
                 ("5.8", Path("D:/Epic/UE_5.8")),
                 ("{custom}", Path("D:/Source/UE")),
@@ -109,8 +110,8 @@ class WindowsDeploymentScriptTests(unittest.TestCase):
         self.assertEqual(
             candidates,
             [
-                Path("D:/Epic/UE_5.8"),
-                Path("C:/Program Files/Epic Games/UE_5.8"),
+                Path("D:/Epic/UE_5.7"),
+                Path("C:/Program Files/Epic Games/UE_5.7"),
                 Path("D:/Configured/UE"),
             ],
         )
@@ -118,16 +119,16 @@ class WindowsDeploymentScriptTests(unittest.TestCase):
     def test_default_engine_root_uses_trimmed_environment_value(self):
         self.assertEqual(
             deploy.default_engine_root(
-                {"UE58": "  C:/Program Files/Epic Games/UE_5.8  "}
+                {"UE57": "  C:/Program Files/Epic Games/UE_5.7  "}
             ),
-            "C:/Program Files/Epic Games/UE_5.8",
+            "C:/Program Files/Epic Games/UE_5.7",
         )
         self.assertEqual(deploy.default_engine_root({}), "")
 
     def test_build_command_is_fixed_to_installed_win64_package(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            engine = root / "UE_5.8"
+            engine = root / "UE_5.7"
             self.write_engine(engine)
             output = root / "Package"
             command = deploy.build_command(engine, output)
@@ -136,21 +137,27 @@ class WindowsDeploymentScriptTests(unittest.TestCase):
             self.assertIn("-Rocket", command)
             self.assertNotIn("-Unversioned", command)
 
-    def test_gas_build_command_uses_companion_descriptor_and_base_dependency(self):
+    def test_gas_build_command_uses_ue57_staged_dependency(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            engine = root / "UE_5.8"
+            engine = root / "UE_5.7"
             self.write_engine(engine)
-            command = deploy.build_command(engine, root / "Package", deploy.GAS_PLUGIN)
-            self.assertIn(f"-Plugin={deploy.package_plugin.GAS_DESCRIPTOR}", command)
-            self.assertIn(f"-Dependencies={deploy.package_plugin.PLUGIN_DESCRIPTOR}", command)
+            with deploy.prepared_build_command(
+                engine, root / "Package", deploy.GAS_PLUGIN
+            ) as (command, prepared):
+                self.assertIn(f"-Plugin={prepared.descriptor}", command)
+                self.assertNotEqual(prepared.descriptor, deploy.package_plugin.GAS_DESCRIPTOR)
+                self.assertEqual(prepared.dependency_modules, ("UnrealMCP",))
+                self.assertFalse(any(value.startswith("-Dependencies=") for value in command))
 
     def test_engine_validation_rejects_unsupported_version(self):
         with tempfile.TemporaryDirectory() as temporary:
-            engine = Path(temporary) / "UE_5.7"
-            self.write_engine(engine, minor=7)
-            with self.assertRaisesRegex(deploy.DeploymentError, "5.8 or newer"):
-                deploy.validate_supported_engine_root(engine)
+            for minor in (6, 8):
+                with self.subTest(minor=minor):
+                    engine = Path(temporary) / f"UE_5.{minor}"
+                    self.write_engine(engine, minor=minor)
+                    with self.assertRaisesRegex(deploy.DeploymentError, "5.7.x"):
+                        deploy.validate_supported_engine_root(engine)
 
     def test_install_removes_source_and_debug_files_but_keeps_precompiled_metadata(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -269,7 +276,7 @@ class WindowsDeploymentScriptTests(unittest.TestCase):
             ):
                 destinations = deploy.deploy(
                     project,
-                    root / "UE_5.8",
+                    root / "UE_5.7",
                     replace_existing=False,
                     include_pdb=True,
                     log=messages.append,
@@ -288,7 +295,7 @@ class WindowsDeploymentScriptTests(unittest.TestCase):
             project = self.write_project(project_folder)
             destinations = deploy.deployment_destinations(
                 project,
-                root / "UE_5.8",
+                root / "UE_5.7",
                 deploy.INSTALL_IN_PROJECT,
                 include_gas=True,
             )
@@ -317,7 +324,7 @@ class WindowsDeploymentScriptTests(unittest.TestCase):
             descriptor.write_text(
                 json.dumps(
                     {
-                        "EngineAssociation": "5.8",
+                        "EngineAssociation": "5.7",
                         "Plugins": [
                             {"Name": "UnrealMCP", "Enabled": False},
                             {"Name": "unrealmcp", "Enabled": True},
@@ -333,7 +340,7 @@ class WindowsDeploymentScriptTests(unittest.TestCase):
     def test_engine_install_sets_requested_default_for_both_plugins(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            engine = root / "UE_5.8"
+            engine = root / "UE_5.7"
             self.write_engine(engine)
             base_package = root / "BasePackage"
             gas_package = root / "GasPackage"
@@ -413,7 +420,7 @@ class WindowsDeploymentScriptTests(unittest.TestCase):
             with mock.patch.object(deploy, "run_packaging", side_effect=write_packaged_plugin):
                 installed = deploy.deploy(
                     project,
-                    root / "UE_5.8",
+                    root / "UE_5.7",
                     replace_existing=False,
                     include_gas=True,
                     install_method=deploy.INSTALL_IN_PROJECT,
@@ -438,7 +445,7 @@ class WindowsDeploymentScriptTests(unittest.TestCase):
             project_folder.mkdir()
             project = self.write_project(project_folder)
             original_project = project.descriptor.read_bytes()
-            engine = root / "UE_5.8"
+            engine = root / "UE_5.7"
             self.write_engine(engine)
 
             def write_packaged_plugin(
@@ -469,18 +476,18 @@ class WindowsDeploymentScriptTests(unittest.TestCase):
                 self.assertIs(descriptor["EnabledByDefault"], False)
 
     def test_install_method_and_companion_flag_are_exact(self):
-        project = deploy.ProjectInfo(Path("D:/Game"), Path("D:/Game/Game.uproject"), "5.8")
+        project = deploy.ProjectInfo(Path("D:/Game"), Path("D:/Game/Game.uproject"), "5.7")
         with self.assertRaisesRegex(deploy.DeploymentError, "unsupported install method"):
             deploy.deployment_destinations(
                 project,
-                Path("D:/UE_5.8"),
+                Path("D:/UE_5.7"),
                 "engine",
                 include_gas=False,
             )
         with self.assertRaisesRegex(deploy.DeploymentError, "include_gas must be Boolean"):
             deploy.deployment_destinations(
                 project,
-                Path("D:/UE_5.8"),
+                Path("D:/UE_5.7"),
                 deploy.INSTALL_IN_PROJECT,
                 include_gas=1,  # type: ignore[arg-type]
             )
@@ -501,7 +508,7 @@ class WindowsDeploymentScriptTests(unittest.TestCase):
                 package_root.mkdir()
                 self.write_package(package_root, plugin.name)
                 project.descriptor.write_text(
-                    json.dumps({"EngineAssociation": "5.8", "ExternalChange": True}),
+                    json.dumps({"EngineAssociation": "5.7", "ExternalChange": True}),
                     encoding="utf-8",
                 )
 
@@ -513,7 +520,7 @@ class WindowsDeploymentScriptTests(unittest.TestCase):
                 with self.assertRaisesRegex(deploy.DeploymentError, "changed while plugins were building"):
                     deploy.deploy(
                         project,
-                        root / "UE_5.8",
+                        root / "UE_5.7",
                         replace_existing=False,
                         install_method=deploy.INSTALL_IN_PROJECT,
                         log=lambda message: None,
@@ -552,7 +559,7 @@ class WindowsDeploymentScriptTests(unittest.TestCase):
                 with self.assertRaisesRegex(deploy.DeploymentError, "state changed"):
                     deploy.deploy(
                         project,
-                        root / "UE_5.8",
+                        root / "UE_5.7",
                         replace_existing=False,
                         install_method=deploy.INSTALL_IN_PROJECT,
                         log=lambda message: None,
@@ -684,7 +691,7 @@ class WindowsDeploymentScriptTests(unittest.TestCase):
     def test_lifecycle_executable_validation_is_fail_closed(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            engine = root / "UE_5.8"
+            engine = root / "UE_5.7"
             editor = engine / deploy.WINDOWS_EDITOR_RELATIVE
             editor.parent.mkdir(parents=True)
             editor.write_bytes(b"editor")
