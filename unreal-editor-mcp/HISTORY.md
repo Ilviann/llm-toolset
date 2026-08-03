@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 0.27.0 — 2026-08-03
+
+- Made `capabilities` return the configured `.uproject` name/hash and Python metadata even when Unreal is inactive, with explicit `bridge_ready: false` and `native_capabilities_available: false` markers and no fabricated native fields.
+- Preserved authentication, configuration, timeout, cancellation, version, and invalid-response failures; advanced the exact-version Python/plugin pair to 0.27.0.
+
 ## 0.26.0 — 2026-08-02
 
 - Added ledger-backed `level_actor_edit` with exact current-map snapshots, full bounded-batch prevalidation, mixed native/Blueprint spawning, Actor/component metadata and property operations, attachment safety, non-World-Partition level moves, deletion, scoped World Partition loading, one editor transaction, verified rollback, and exact operation/package read-back.

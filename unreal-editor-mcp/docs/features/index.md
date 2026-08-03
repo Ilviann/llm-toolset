@@ -68,6 +68,7 @@ Keep the authoritative checklist in [`ROADMAP.md`](../../ROADMAP.md) synchronize
   - Depends on:
     - `editor-launch`
     - `editor-shutdown`
+- [`offline-capabilities` — Offline project identity in capabilities](completed/offline-capabilities.md) — Return configured project identity and explicit native availability before Unreal starts.
 - [`project-files` — Optional editor-offline project-file generation](planned/project-files.md) — Add optional editor-offline project-file generation.
   - Depends on:
     - `editor-restart`

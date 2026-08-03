@@ -51,6 +51,11 @@ def main() -> None:
                 editor_executable=editor,
                 startup_timeout=args.lifecycle_timeout,
             )
-        serve(MCPServer(bridge, lifecycle=lifecycle, tool_mode=args.tool_mode))
+        serve(MCPServer(
+            bridge,
+            project_identity=layout.identity(),
+            lifecycle=lifecycle,
+            tool_mode=args.tool_mode,
+        ))
     except DomainError as exc:
         parser.error(str(exc))

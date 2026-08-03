@@ -1,6 +1,6 @@
 # Unreal Editor MCP
 
-Unreal Editor MCP 0.26.0 is an offline-first MCP bridge for Unreal Engine 5.8+. It pairs a dependency-free Python 3.10+ stdio server with an editor-only C++ plugin.
+Unreal Editor MCP 0.27.0 is an offline-first MCP bridge for Unreal Engine 5.8+. It pairs a dependency-free Python 3.10+ stdio server with an editor-only C++ plugin.
 
 ## Installation
 
@@ -20,7 +20,7 @@ Python 3.10 or newer with tkinter is required. The build and installation are of
 
 1. Copy [`plugin/UnrealMCP`](plugin/UnrealMCP) to `<YourProject>/Plugins/UnrealMCP`, or add this repository's `plugin/` directory to `AdditionalPluginDirectories` in a disposable development `.uproject`.
 2. Enable `UnrealMCP` and compile the project's Editor target with Unreal Engine 5.8 or newer.
-3. Open the project and wait for `Unreal MCP 0.26.0 ready on 127.0.0.1:15485` in the editor log.
+3. Open the project and wait for `Unreal MCP 0.27.0 ready on 127.0.0.1:15485` in the editor log.
 4. Create a virtual environment and install the Python package offline:
 
    ```sh
@@ -83,11 +83,11 @@ Each item must remain a separate `args` value; paths containing spaces do not ne
    ```
 
 3. Start or reload the MCP server.
-4. Call `capabilities` first. Confirm the Python/plugin/Unreal versions, listener readiness, effective limits, supported Blueprint families, and available commands.
+4. Call `capabilities` first. Confirm the configured project identity, Python/plugin/Unreal versions, listener readiness, effective limits, supported Blueprint families, and available commands.
 5. Use inspection before mutation. Preserve returned asset, graph, member, pin, project, and snapshot identities; supply the latest required preconditions and a fresh 32-hex `operation_id` for each new mutation.
 6. Call `blueprint_compile` and `blueprint_save` explicitly when authoring is complete. After a lost mutation response, reconcile the same operation through `operation_status` instead of retrying under a new ID.
 
-Start Unreal before calling normal tools. `capabilities` remains available for diagnosing exact-version mismatches. MCP protocol messages use stdout; diagnostics use stderr.
+Start Unreal before calling normal tools. When Unreal is unavailable, `capabilities` still returns the configured `.uproject` name and hash with `bridge_ready: false` and `native_capabilities_available: false`; native-only fields are absent. MCP protocol messages use stdout; diagnostics use stderr.
 
 ## Contract overview
 

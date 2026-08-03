@@ -11,6 +11,12 @@ from .platforms import DEFAULT_PLATFORM, PlatformAdapter
 
 
 @dataclass(frozen=True)
+class ProjectIdentity:
+    name: str
+    project_hash: str
+
+
+@dataclass(frozen=True)
 class ProjectLayout:
     root: Path
     descriptor: Path
@@ -50,3 +56,6 @@ class ProjectLayout:
     def project_hash(self, platform: PlatformAdapter = DEFAULT_PLATFORM) -> str:
         identity = platform.path_identity(str(self.descriptor))
         return hashlib.sha1(identity.encode("utf-8")).hexdigest()
+
+    def identity(self, platform: PlatformAdapter = DEFAULT_PLATFORM) -> ProjectIdentity:
+        return ProjectIdentity(name=self.descriptor.stem, project_hash=self.project_hash(platform))

@@ -3,6 +3,7 @@ import json
 import unittest
 
 from unreal_editor_mcp.errors import BridgeError, ErrorCode
+from unreal_editor_mcp.project import ProjectIdentity
 from unreal_editor_mcp.server import MCPServer
 from unreal_editor_mcp.stdio import MAX_MCP_MESSAGE_CHARS, serve
 
@@ -15,7 +16,7 @@ class FakeBridge:
     def call(self, command, arguments=None):
         self.calls.append((command, arguments))
         if command == "capabilities":
-            return {"bridge_version": "0.26.0", "commands": [
+            return {"bridge_version": "0.27.0", "commands": [
                 "capabilities", "editor_state", "operation_status", "asset_references", "asset_delete",
                 "level_inspect", "level_open", "level_manage", "level_actor_edit", "level_save",
                 "blueprint_inspect", "blueprint_action_catalog", "blueprint_graph_edit",
@@ -38,9 +39,9 @@ class FakeBridge:
 class ServerStdioTests(unittest.TestCase):
     def test_initialize_list_and_call(self):
         bridge = FakeBridge()
-        server = MCPServer(bridge)
+        server = MCPServer(bridge, project_identity=ProjectIdentity("Example Project", "a" * 40))
         initialized = server.handle({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2025-06-18"}})
-        self.assertEqual(initialized["result"]["serverInfo"]["version"], "0.26.0")
+        self.assertEqual(initialized["result"]["serverInfo"]["version"], "0.27.0")
         listed = server.handle({"jsonrpc": "2.0", "id": 2, "method": "tools/list"})
         self.assertEqual([tool["name"] for tool in listed["result"]["tools"]], [
             "capabilities", "editor_state", "operation_status", "asset_references", "asset_delete",
@@ -55,6 +56,9 @@ class ServerStdioTests(unittest.TestCase):
         called = server.handle({"jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": {"name": "capabilities", "arguments": {}}})
         payload = json.loads(called["result"]["content"][0]["text"])
         self.assertTrue(payload["version_match"])
+        self.assertTrue(payload["native_capabilities_available"])
+        self.assertEqual(payload["project_name"], "Example Project")
+        self.assertEqual(payload["project_hash"], "a" * 40)
         self.assertEqual(payload["mcp_protocol_version"], "2025-06-18")
 
     def test_level_inspect_and_open_schemas_are_exact_and_bounded(self):
@@ -737,6 +741,42 @@ class ServerStdioTests(unittest.TestCase):
         self.assertTrue(response["result"]["isError"])
         payload = json.loads(response["result"]["content"][0]["text"])
         self.assertEqual(payload["code"], "editor_unavailable")
+
+    def test_capabilities_returns_local_project_identity_while_editor_is_unavailable(self):
+        class OfflineBridge(FakeBridge):
+            def call(self, command, arguments=None):
+                raise BridgeError("offline", code=ErrorCode.EDITOR_UNAVAILABLE, retryable=True)
+
+        identity = ProjectIdentity("Space Project", "f" * 40)
+        response = MCPServer(OfflineBridge(), project_identity=identity).handle({
+            "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+            "params": {"name": "capabilities", "arguments": {}},
+        })
+        self.assertFalse(response["result"].get("isError", False))
+        payload = json.loads(response["result"]["content"][0]["text"])
+        self.assertEqual(payload["project_name"], "Space Project")
+        self.assertEqual(payload["project_hash"], "f" * 40)
+        self.assertFalse(payload["bridge_ready"])
+        self.assertFalse(payload["native_capabilities_available"])
+        self.assertNotIn("version_match", payload)
+        self.assertNotIn("bridge_version", payload)
+        self.assertNotIn("commands", payload)
+
+    def test_capabilities_preserves_non_availability_errors(self):
+        class InvalidBridge(FakeBridge):
+            def call(self, command, arguments=None):
+                raise BridgeError("bad configuration", code=ErrorCode.INVALID_CONFIGURATION)
+
+        response = MCPServer(
+            InvalidBridge(),
+            project_identity=ProjectIdentity("Example", "e" * 40),
+        ).handle({
+            "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+            "params": {"name": "capabilities", "arguments": {}},
+        })
+        self.assertTrue(response["result"]["isError"])
+        payload = json.loads(response["result"]["content"][0]["text"])
+        self.assertEqual(payload["code"], "invalid_configuration")
 
     def test_phase_seventeen_game_data_schemas_are_exact_and_bounded(self):
         server = MCPServer(FakeBridge())

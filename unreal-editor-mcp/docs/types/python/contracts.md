@@ -4,7 +4,9 @@ Use the index to retrieve only the contract section relevant to the task.
 
 ## Python wire contracts
 
-`ProjectLayout` resolves either one `.uproject` descriptor or a folder containing exactly one descriptor. Generated state is always `<Project>/Saved/UnrealMCP/`.
+`ProjectLayout` resolves either one `.uproject` descriptor or a folder containing exactly one descriptor. Generated state is always `<Project>/Saved/UnrealMCP/`. Its immutable `ProjectIdentity` contains the descriptor filename stem as `name` and the existing platform-normalized SHA-1 path identity as `project_hash`; it never exposes the absolute descriptor path.
+
+The Python-composed `capabilities` result always includes `project_name`, `project_hash`, `python_version`, `mcp_protocol_version`, `tool_mode`, `editor_lifecycle`, and `native_capabilities_available`. When the authenticated native call succeeds, the result also contains the native fields, `native_capabilities_available: true`, and Boolean `version_match`. An `editor_unavailable` failure instead returns `bridge_ready: false` and `native_capabilities_available: false`, omitting `version_match` and every native-only field. Authentication, configuration, timeout, cancellation, version, and invalid-response failures are not converted to offline capability responses.
 
 `DiscoveryRecord` has exactly `project_hash` (40 lowercase hex characters), `process_id` (positive integer), `port` (1–65535), `bridge_version` (1–32 characters), `unreal_version` (1–128 characters), and `updated_at_ms` (positive integer). Records older than ten seconds, more than two seconds in the future, or naming a dead process are unavailable.
 

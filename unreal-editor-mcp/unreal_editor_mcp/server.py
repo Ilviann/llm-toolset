@@ -6,6 +6,7 @@ from typing import Any, Protocol
 
 from . import __version__
 from .errors import DomainError, ErrorCode
+from .project import ProjectIdentity
 from .schema_validation import SchemaValidationError, validate_tool_arguments
 from .stdio import error, result, tool_result
 from .tool_catalog import LATEST_PROTOCOL, SUPPORTED_PROTOCOLS, tools_for_mode
@@ -27,10 +28,12 @@ class MCPServer:
         self,
         bridge: BridgeClient,
         *,
+        project_identity: ProjectIdentity | None = None,
         lifecycle: LifecycleClient | None = None,
         tool_mode: str = "default",
     ) -> None:
         self.bridge = bridge
+        self.project_identity = project_identity
         self.lifecycle = lifecycle
         self.tool_mode = tool_mode
         self.tools = tools_for_mode(tool_mode)
@@ -83,25 +86,47 @@ class MCPServer:
                         code=ErrorCode.INVALID_CONFIGURATION,
                     )
                 output = self.lifecycle.execute(arguments)
+            elif name == "capabilities":
+                output = self._capabilities(arguments)
             else:
                 output = self.bridge.call(name, arguments)
-            if name == "capabilities" and isinstance(output, dict):
-                bridge_version = output.get("bridge_version")
-                output = {
-                    **output,
-                    "python_version": __version__,
-                    "version_match": bridge_version == __version__,
-                    "mcp_protocol_version": self.negotiated_protocol_version,
-                    "tool_mode": self.tool_mode,
-                    "editor_lifecycle": (
-                        self.lifecycle.availability()
-                        if self.lifecycle is not None
-                        else {"enabled": False, "launch_configured": False}
-                    ),
-                }
             return result(request_id, tool_result(output))
         except DomainError as exc:
             return result(request_id, tool_result(exc.as_dict(), is_error=True))
+
+    def _capabilities(self, arguments: dict[str, Any]) -> Any:
+        native_available = True
+        try:
+            output = self.bridge.call("capabilities", arguments)
+        except DomainError as exc:
+            if exc.code != ErrorCode.EDITOR_UNAVAILABLE or self.project_identity is None:
+                raise
+            native_available = False
+            output = {}
+        if not isinstance(output, dict):
+            return output
+
+        local = {
+            "python_version": __version__,
+            "mcp_protocol_version": self.negotiated_protocol_version,
+            "tool_mode": self.tool_mode,
+            "native_capabilities_available": native_available,
+            "editor_lifecycle": (
+                self.lifecycle.availability()
+                if self.lifecycle is not None
+                else {"enabled": False, "launch_configured": False}
+            ),
+        }
+        if self.project_identity is not None:
+            local.update({
+                "project_name": self.project_identity.name,
+                "project_hash": self.project_identity.project_hash,
+            })
+        if native_available:
+            local["version_match"] = output.get("bridge_version") == __version__
+        else:
+            local["bridge_ready"] = False
+        return {**output, **local}
 
     def close(self) -> None:
         if self.lifecycle is not None:

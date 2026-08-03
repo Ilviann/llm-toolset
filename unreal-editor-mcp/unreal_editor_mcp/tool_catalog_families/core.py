@@ -9,7 +9,7 @@ from .schemas import _OPERATION_ID
 CORE_TOOLS: Final = (
     {
         "name": "capabilities",
-        "description": "Report exact bridge, Unreal, command, feature, identity, and limit capabilities.",
+        "description": "Report configured project identity and exact available bridge, Unreal, command, feature, and limit capabilities.",
         "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
     },
     {

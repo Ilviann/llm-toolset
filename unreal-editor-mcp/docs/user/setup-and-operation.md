@@ -32,7 +32,7 @@ Python 3.10 or newer with tkinter is required. Official Windows Python installer
 
 1. Copy [`plugin/UnrealMCP`](../../plugin/UnrealMCP) to `<YourProject>/Plugins/UnrealMCP` or add this repository's `plugin/` folder as an `AdditionalPluginDirectories` entry in a disposable development `.uproject`.
 2. Enable the `UnrealMCP` plugin and compile the project's Editor target with Unreal 5.8 or a newer version that passes the included public-API probes.
-3. Open the project. Look for `Unreal MCP 0.26.0 ready on 127.0.0.1:15485` in the editor log.
+3. Open the project. Look for `Unreal MCP 0.27.0 ready on 127.0.0.1:15485` in the editor log.
 4. Install the Python package offline from this folder:
 
    ```sh
@@ -82,7 +82,7 @@ Use an absolute `.uproject` path. The committed [`examples/lm-studio.json`](../.
 }
 ```
 
-Start the Unreal project before calling a tool. `capabilities` remains available to diagnose an exact-version mismatch; other operations reject the mismatch. MCP stdout contains protocol messages only, while diagnostics go to stderr.
+Start the Unreal project before calling editor-backed tools. `capabilities` remains available while Unreal is inactive and returns the configured project name/hash, Python metadata, `bridge_ready: false`, and `native_capabilities_available: false`; native-only fields are absent. With an active bridge it also diagnoses exact-version mismatches. MCP stdout contains protocol messages only, while diagnostics go to stderr.
 
 ## Optional editor lifecycle
 

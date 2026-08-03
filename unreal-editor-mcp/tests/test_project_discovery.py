@@ -14,7 +14,7 @@ class ProjectDiscoveryTests(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
         self.root = Path(self.temporary.name)
-        self.descriptor = self.root / "Example.uproject"
+        self.descriptor = self.root / "Example Project.uproject"
         self.descriptor.write_text("{}", encoding="utf-8")
         self.layout = ProjectLayout.resolve(self.descriptor)
         self.layout.state_dir.mkdir(parents=True)
@@ -28,7 +28,7 @@ class ProjectDiscoveryTests(unittest.TestCase):
             "project_hash": "a" * 40,
             "process_id": 123,
             "port": 15485,
-            "bridge_version": "0.26.0",
+            "bridge_version": "0.27.0",
             "unreal_version": "5.8.0-55116800",
             "updated_at_ms": 1_000_000,
         }
@@ -37,6 +37,9 @@ class ProjectDiscoveryTests(unittest.TestCase):
 
     def test_resolves_descriptor_and_unique_project_folder(self):
         self.assertEqual(ProjectLayout.resolve(self.root), self.layout)
+        identity = self.layout.identity(self.platform)
+        self.assertEqual(identity.name, "Example Project")
+        self.assertEqual(identity.project_hash, self.layout.project_hash(self.platform))
         (self.root / "Other.uproject").write_text("{}", encoding="utf-8")
         with self.assertRaises(Exception):
             ProjectLayout.resolve(self.root)
