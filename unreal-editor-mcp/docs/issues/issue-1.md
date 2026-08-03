@@ -12,7 +12,7 @@ This is not an editor-launch or Windows SDK failure. The Win64 SDK is valid, the
 
 ## Reproduction
 
-1. Configure `UNREAL_MCP_ENGINE_ROOT` for Unreal Engine 5.8 and `UNREAL_MCP_TEST_UPROJECT` for the disposable test project.
+1. Configure `UE58` for Unreal Engine 5.8 and point `UNREAL_MCP_TEST_UPROJECT` at `ue-test/ue58/UnrealMCPTest.uproject`.
 2. From the `unreal-editor-mcp` directory, run:
 
    ```powershell

@@ -1,4 +1,4 @@
-# Test UE Project for development
+# Versioned test UE projects for development
 /ue-test/*
 
 __pycache__/

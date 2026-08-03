@@ -19,11 +19,11 @@ Configure these project-specific environment variables with absolute paths. Do n
 
 | Variable | Required value |
 | --- | --- |
-| `UNREAL_MCP_ENGINE_ROOT` | Installed Unreal Engine root containing `Engine/`. |
-| `UNREAL_MCP_TEST_UPROJECT` | Disposable Unreal MCP test project's `.uproject` file under `ue-test/`. |
+| `UE58` | Installed Unreal Engine 5.8 root containing `Engine/`. |
+| `UNREAL_MCP_TEST_UPROJECT` | Disposable test descriptor at `ue-test/ue58/UnrealMCPTest.uproject`. |
 | `UNREAL_MCP_DEVELOPER_DIR` | macOS only: Xcode 26.1.1 `Contents/Developer` directory used for builds and headless tests. |
 
-Derive the Unreal tools from `UNREAL_MCP_ENGINE_ROOT`; do not configure separate paths for each executable:
+Derive the Unreal tools from `UE58`; do not configure separate paths for each executable:
 
 - `Engine/Binaries/Mac/UnrealEditor.app/Contents/MacOS/UnrealEditor`
 - `Engine/Binaries/Win64/UnrealEditor-Cmd.exe`
@@ -39,7 +39,7 @@ The authenticated bridge token is not an environment variable. The Unreal plugin
 
 ## Disposable Unreal project
 
-Use `ue-test/` as the local project for plugin compilation, Unreal Automation Tests, command-line editor checks, and cross-process bridge integration. The entire directory is ignored because Unreal regenerates substantial machine-specific state.
+Use `ue-test/ue58/` as the local Unreal Engine 5.8 project for plugin compilation, Unreal Automation Tests, command-line editor checks, and cross-process bridge integration. The parent `ue-test/` directory is ignored because Unreal regenerates substantial machine-specific state and can hold separate engine-version subfolders.
 
 The test project must:
 
@@ -58,10 +58,10 @@ On macOS, run these checks from the repository root after configuring all three 
 
 ```sh
 python3 --version
-test -d "$UNREAL_MCP_ENGINE_ROOT/Engine"
+test -d "$UE58/Engine"
 test -f "$UNREAL_MCP_TEST_UPROJECT"
-test -x "$UNREAL_MCP_ENGINE_ROOT/Engine/Build/BatchFiles/Mac/GenerateProjectFiles.sh"
-test -x "$UNREAL_MCP_ENGINE_ROOT/Engine/Build/BatchFiles/Mac/Build.sh"
+test -x "$UE58/Engine/Build/BatchFiles/Mac/GenerateProjectFiles.sh"
+test -x "$UE58/Engine/Build/BatchFiles/Mac/Build.sh"
 test -x "$UNREAL_MCP_DEVELOPER_DIR/usr/bin/xcodebuild"
 env DEVELOPER_DIR="$UNREAL_MCP_DEVELOPER_DIR" xcodebuild -version
 env DEVELOPER_DIR="$UNREAL_MCP_DEVELOPER_DIR" xcodebuild -checkFirstLaunchStatus
@@ -71,10 +71,10 @@ On Windows PowerShell, configure the two common variables and verify the engine,
 
 ```powershell
 python --version
-Test-Path "$env:UNREAL_MCP_ENGINE_ROOT\Engine"
+Test-Path "$env:UE58\Engine"
 Test-Path $env:UNREAL_MCP_TEST_UPROJECT
-Test-Path "$env:UNREAL_MCP_ENGINE_ROOT\Engine\Build\BatchFiles\Build.bat"
-& "$env:UNREAL_MCP_ENGINE_ROOT\Engine\Build\BatchFiles\RunUAT.bat" `
+Test-Path "$env:UE58\Engine\Build\BatchFiles\Build.bat"
+& "$env:UE58\Engine\Build\BatchFiles\RunUAT.bat" `
   Turnkey -command=VerifySdk -platform=Win64 -utf8output
 ```
 
@@ -82,12 +82,12 @@ Generate project files and compile the editor target before beginning or upgradi
 
 ```sh
 env DEVELOPER_DIR="$UNREAL_MCP_DEVELOPER_DIR" \
-  "$UNREAL_MCP_ENGINE_ROOT/Engine/Build/BatchFiles/Mac/GenerateProjectFiles.sh" \
+  "$UE58/Engine/Build/BatchFiles/Mac/GenerateProjectFiles.sh" \
   -project="$UNREAL_MCP_TEST_UPROJECT" \
   -game
 
 env DEVELOPER_DIR="$UNREAL_MCP_DEVELOPER_DIR" \
-  "$UNREAL_MCP_ENGINE_ROOT/Engine/Build/BatchFiles/Mac/Build.sh" \
+  "$UE58/Engine/Build/BatchFiles/Mac/Build.sh" \
   UnrealMCPTestEditor Mac Development \
   -Project="$UNREAL_MCP_TEST_UPROJECT" \
   -WaitMutex \
@@ -97,7 +97,7 @@ env DEVELOPER_DIR="$UNREAL_MCP_DEVELOPER_DIR" \
 On Windows PowerShell:
 
 ```powershell
-& "$env:UNREAL_MCP_ENGINE_ROOT\Engine\Build\BatchFiles\Build.bat" `
+& "$env:UE58\Engine\Build\BatchFiles\Build.bat" `
   UnrealMCPTestEditor Win64 Development `
   "-Project=$env:UNREAL_MCP_TEST_UPROJECT" `
   -WaitMutex `
@@ -112,7 +112,7 @@ On Windows, run `python scripts/run_headless_integration.py --readonly-lifecycle
 
 ## Binary plugin packaging
 
-`scripts/package_plugin.py` invokes the configured engine's platform-appropriate `RunUAT` launcher with the standard `BuildPlugin` command. It accepts the engine only through `UNREAL_MCP_ENGINE_ROOT` or `--engine-root`, keeps the plugin descriptor fixed to `plugin/UnrealMCP/UnrealMCP.uplugin`, and passes every UAT argument as a subprocess array. On macOS it also requires `UNREAL_MCP_DEVELOPER_DIR`, `DEVELOPER_DIR`, or `--developer-dir` and exports the resolved value as `DEVELOPER_DIR` for the child build.
+`scripts/package_plugin.py` invokes the configured engine's platform-appropriate `RunUAT` launcher with the standard `BuildPlugin` command. It accepts the engine only through `UE58` or the explicit `--engine-root` override, keeps the plugin descriptor fixed to `plugin/UnrealMCP/UnrealMCP.uplugin`, and passes every UAT argument as a subprocess array. On macOS it also requires `UNREAL_MCP_DEVELOPER_DIR`, `DEVELOPER_DIR`, or `--developer-dir` and exports the resolved value as `DEVELOPER_DIR` for the child build.
 
 From the application directory, package for the host's installed platforms with:
 

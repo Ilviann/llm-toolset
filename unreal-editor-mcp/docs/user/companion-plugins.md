@@ -16,10 +16,10 @@ Readonly mode exposes admitted read contributions only. Start the Python server 
 
 ## Packaging and troubleshooting
 
-Authors can package the repository fixture independently with:
+With `UE58` set to the Unreal Engine 5.8 installation root, authors can package the repository fixture independently with:
 
 ```powershell
-python scripts/package_plugin.py --engine-root "C:\Program Files\Epic Games\UE_5.8" --target-platforms Win64 --companion-fixture
+python scripts/package_plugin.py --target-platforms Win64 --companion-fixture
 ```
 
 Package the released `UnrealMCPGAS` 0.2.0 Gameplay Ability and Gameplay Effect inspection companion with `--gas-companion`; it requires a compatible base package. On Windows, select the GAS checkbox in the graphical deployment helper to build, verify, and install both packages in one transaction.

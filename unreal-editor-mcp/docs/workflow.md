@@ -10,7 +10,7 @@ Use this workflow for every feature, fix, or refactor.
 
 ## Implementation rules
 
-- Use ignored `ue-test/` only as a disposable build and integration-test project; never treat its generated state as a committed contract.
+- Use ignored `ue-test/ue58/` only as the disposable Unreal Engine 5.8 build and integration-test project; never treat its generated state as a committed contract.
 - Build changes from small typed mutations. Prevalidate targets, types, limits, and stale state; use editor transactions where supported; expose bounded compile, save, and read-back results; preserve unrelated Blueprint content.
 - Keep the C++ bridge localhost-only and authenticate every request with a durable, high-entropy per-project token. Fail closed on credential errors and never expose the token through discovery or heartbeat data.
 - Isolate and test platform-specific discovery, paths, plugin loading, and process behavior. Validate editor changes with Unreal Automation, headless/command-line, and cross-process tests as applicable.

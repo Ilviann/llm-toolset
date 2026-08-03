@@ -50,6 +50,32 @@ class HeadlessIntegrationScriptTests(unittest.TestCase):
         self.assertTrue(callable(game_data_levels.open_acceptance_level))
         self.assertTrue(callable(widgets.author_widget_scenario))
 
+    def test_runner_requests_ue58_and_disposable_project_environment_paths(self):
+        from headless_integration import lifecycle
+
+        with (
+            patch.object(
+                lifecycle,
+                "required_path",
+                side_effect=[Path("engine"), Path("project")],
+            ) as required_path,
+            patch.object(
+                lifecycle,
+                "resolve_editor_executable",
+                side_effect=RuntimeError("stop after environment lookup"),
+            ),
+            self.assertRaisesRegex(RuntimeError, "stop after environment lookup"),
+        ):
+            lifecycle.main()
+
+        self.assertEqual(
+            required_path.call_args_list,
+            [
+                unittest.mock.call("UE58"),
+                unittest.mock.call("UNREAL_MCP_TEST_UPROJECT"),
+            ],
+        )
+
     def test_editor_executable_is_selected_for_each_supported_host(self):
         expected_paths = {
             "Darwin": Path("Engine/Binaries/Mac/UnrealEditor.app/Contents/MacOS/UnrealEditor"),

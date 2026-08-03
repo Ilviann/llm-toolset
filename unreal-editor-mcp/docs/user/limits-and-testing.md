@@ -6,7 +6,7 @@ The plugin publishes these authoritative defaults through `capabilities`: 64 KiB
 
 ## Offline development and tests
 
-Configure `UNREAL_MCP_ENGINE_ROOT` and `UNREAL_MCP_TEST_UPROJECT` as described in [`docs/development-environment.md`](../development-environment.md). macOS additionally requires `UNREAL_MCP_DEVELOPER_DIR`; Windows uses the configured engine's Win64 editor and installed Visual Studio toolchain. The `ue-test/` directory is disposable and entirely ignored.
+Configure `UE58` and point `UNREAL_MCP_TEST_UPROJECT` at `ue-test/ue58/UnrealMCPTest.uproject` as described in [`docs/development-environment.md`](../development-environment.md). macOS additionally requires `UNREAL_MCP_DEVELOPER_DIR`; Windows uses the configured engine's Win64 editor and installed Visual Studio toolchain. The parent `ue-test/` directory is disposable and entirely ignored.
 
 Run the dependency-free Python suite:
 
@@ -20,7 +20,7 @@ macOS:
 
 ```sh
 env DEVELOPER_DIR="$UNREAL_MCP_DEVELOPER_DIR" \
-  "$UNREAL_MCP_ENGINE_ROOT/Engine/Build/BatchFiles/Mac/Build.sh" \
+  "$UE58/Engine/Build/BatchFiles/Mac/Build.sh" \
   UnrealMCPTestEditor Mac Development \
   -Project="$UNREAL_MCP_TEST_UPROJECT" -WaitMutex -NoHotReloadFromIDE
 ```
@@ -28,7 +28,7 @@ env DEVELOPER_DIR="$UNREAL_MCP_DEVELOPER_DIR" \
 Windows PowerShell:
 
 ```powershell
-& "$env:UNREAL_MCP_ENGINE_ROOT\Engine\Build\BatchFiles\Build.bat" `
+& "$env:UE58\Engine\Build\BatchFiles\Build.bat" `
   UnrealMCPTestEditor Win64 Development `
   "-Project=$env:UNREAL_MCP_TEST_UPROJECT" -WaitMutex -NoHotReloadFromIDE
 ```

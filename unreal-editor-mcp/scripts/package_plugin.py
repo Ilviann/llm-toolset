@@ -25,6 +25,7 @@ GAS_DESCRIPTOR = APPLICATION_ROOT / "plugin" / "UnrealMCPGAS" / "UnrealMCPGAS.up
 DEFAULT_OUTPUT = WORKSPACE_ROOT / "build" / "unreal-editor-mcp"
 DEFAULT_FIXTURE_OUTPUT = WORKSPACE_ROOT / "build" / "unreal-mcp-test-companion"
 DEFAULT_GAS_OUTPUT = WORKSPACE_ROOT / "build" / "unreal-mcp-gas"
+ENGINE_ROOT_ENV = "UE58"
 _PLATFORM_NAME = re.compile(r"^[A-Za-z][A-Za-z0-9_]*$")
 
 
@@ -193,7 +194,7 @@ def create_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--engine-root",
         type=Path,
-        help="Unreal Engine installation root; defaults to UNREAL_MCP_ENGINE_ROOT.",
+        help=f"Unreal Engine installation root; defaults to {ENGINE_ROOT_ENV}.",
     )
     parser.add_argument(
         "--output",
@@ -237,10 +238,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         configured_engine = arguments.engine_root
         if configured_engine is None:
-            value = os.environ.get("UNREAL_MCP_ENGINE_ROOT")
+            value = os.environ.get(ENGINE_ROOT_ENV)
             configured_engine = Path(value) if value else None
         if configured_engine is None:
-            raise PackagingError("UNREAL_MCP_ENGINE_ROOT or --engine-root is required")
+            raise PackagingError(f"{ENGINE_ROOT_ENV} or --engine-root is required")
 
         engine_root = resolved(configured_engine)
         run_uat = validate_engine_root(engine_root, host_system)

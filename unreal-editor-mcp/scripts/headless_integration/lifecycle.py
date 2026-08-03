@@ -46,6 +46,10 @@ from .widgets import author_widget_scenario, verify_restarted_widgets
 from .companions import verify_companion_scenario
 
 
+ENGINE_ROOT_ENV = "UE58"
+TEST_PROJECT_ENV = "UNREAL_MCP_TEST_UPROJECT"
+
+
 def required_path(name: str) -> Path:
     value = os.environ.get(name)
     if not value:
@@ -441,8 +445,8 @@ def prepare_gas_effect_fixture(executable: Path, project: Path, environment: dic
 
 
 def main() -> int:
-    engine = required_path("UNREAL_MCP_ENGINE_ROOT")
-    project = required_path("UNREAL_MCP_TEST_UPROJECT")
+    engine = required_path(ENGINE_ROOT_ENV)
+    project = required_path(TEST_PROJECT_ENV)
     host_system = platform.system()
     executable = resolve_editor_executable(engine, host_system)
     environment = configure_editor_environment(host_system)

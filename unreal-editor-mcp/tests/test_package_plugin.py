@@ -1,7 +1,11 @@
+import contextlib
 import importlib.util
+import io
+import os
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -13,6 +17,27 @@ SPEC.loader.exec_module(package_plugin)
 
 
 class PackagePluginScriptTests(unittest.TestCase):
+    def test_main_uses_ue58_environment_default(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            engine_root = root / "UE_5.8"
+            run_uat = engine_root / "Engine" / "Build" / "BatchFiles" / "RunUAT.bat"
+            run_uat.parent.mkdir(parents=True)
+            run_uat.write_text("@echo off\r\n", encoding="utf-8")
+            output = root / "Package"
+            stdout = io.StringIO()
+
+            with (
+                mock.patch.object(package_plugin.platform, "system", return_value="Windows"),
+                mock.patch.dict(os.environ, {"UE58": str(engine_root)}),
+                contextlib.redirect_stdout(stdout),
+            ):
+                result = package_plugin.main(["--output", str(output), "--dry-run"])
+
+            self.assertEqual(result, 0)
+            self.assertIn(str(run_uat.resolve()), stdout.getvalue())
+            self.assertIn("defaults to UE58", package_plugin.create_parser().format_help())
+
     def test_build_command_uses_fixed_plugin_and_output_arguments(self):
         run_uat = Path("/Engine/RunUAT.sh")
         output = Path("/Workspace With Spaces/build/unreal-editor-mcp")

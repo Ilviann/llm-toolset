@@ -24,10 +24,10 @@ Inspect ordinary Blueprint structure plus the typed GAS section:
 
 The typed records cover policies, all supported tag containers, triggers, and cost/cooldown Gameplay Effect class references. Fields identify local versus inherited values; nested triggers have stable identities; bounded collections report total counts and truncation. All records share the ordinary authoritative `snapshot_id` and cursor contract.
 
-Package the companion offline from the same release state as the base:
+With `UE58` set to the Unreal Engine 5.8 installation root, package the companion offline from the same release state as the base:
 
 ```powershell
-python scripts/package_plugin.py --engine-root "C:\Program Files\Epic Games\UE_5.8" --target-platforms Win64 --gas-companion
+python scripts/package_plugin.py --target-platforms Win64 --gas-companion
 ```
 
 Install the resulting base and companion packages together. On Windows, the graphical deployment helper can build and install both when its GAS checkbox is selected. Unreal MCP never downloads or enables GAS at runtime.

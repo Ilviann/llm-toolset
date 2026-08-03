@@ -34,7 +34,7 @@ Python 3.10 or newer with tkinter is required. The build and installation are of
    .venv/bin/python -m pip install --no-build-isolation --no-deps .
    ```
 
-To build a deployable binary plugin with the configured local Unreal toolchain, set `UNREAL_MCP_ENGINE_ROOT` and run:
+To build a deployable binary plugin with the configured Unreal Engine 5.8 toolchain, set `UE58` to the Engine installation root and run:
 
 ```sh
 python3 scripts/package_plugin.py

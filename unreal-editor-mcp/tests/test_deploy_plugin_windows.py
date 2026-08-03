@@ -97,7 +97,7 @@ class WindowsDeploymentScriptTests(unittest.TestCase):
         candidates = deploy.engine_candidates(
             project,
             environment={
-                "UNREAL_MCP_ENGINE_ROOT": "D:/Configured/UE",
+                "UE58": "D:/Configured/UE",
                 "ProgramFiles": "C:/Program Files",
             },
             installations=[
@@ -118,7 +118,7 @@ class WindowsDeploymentScriptTests(unittest.TestCase):
     def test_default_engine_root_uses_trimmed_environment_value(self):
         self.assertEqual(
             deploy.default_engine_root(
-                {"UNREAL_MCP_ENGINE_ROOT": "  C:/Program Files/Epic Games/UE_5.8  "}
+                {"UE58": "  C:/Program Files/Epic Games/UE_5.8  "}
             ),
             "C:/Program Files/Epic Games/UE_5.8",
         )

@@ -22,7 +22,7 @@ Close Unreal Editor, then double-click:
 scripts\deploy_plugin_windows.cmd
 ```
 
-Select the folder that directly contains your game's `.uproject` file. When `UNREAL_MCP_ENGINE_ROOT` is set, its value is already shown in the Unreal Engine field and is preserved after project selection when valid. Otherwise, the helper detects a matching Unreal Engine 5.8+ installation from `EngineAssociation` and standard Epic/user-build registry records; use the second Browse button if manual selection is needed. For readable plugin frames in Windows crash reports, enable **Include matching PDB crash symbols (larger installation)**. The generated LM Studio entry is readonly by default. Enable **writable MCP tools** only for a dedicated trusted project, and enable **editor lifecycle control** independently to add the selected Engine's validated `UnrealEditor.exe`. Click **Build and install plugin**.
+Select the folder that directly contains your game's `.uproject` file. When `UE58` is set, its value is already shown in the Unreal Engine field and is preserved after project selection when valid. Otherwise, the helper detects a matching Unreal Engine 5.8+ installation from `EngineAssociation` and standard Epic/user-build registry records; use the second Browse button if manual selection is needed. For readable plugin frames in Windows crash reports, enable **Include matching PDB crash symbols (larger installation)**. The generated LM Studio entry is readonly by default. Enable **writable MCP tools** only for a dedicated trusted project, and enable **editor lifecycle control** independently to add the selected Engine's validated `UnrealEditor.exe`. Click **Build and install plugin**.
 
 The helper uses the installed Engine and Visual Studio toolchain to package `Win64`. It can also package `UnrealMCPGAS` with the base dependency when the companion checkbox is selected. Choose project installation to deploy under `<YourProject>\Plugins` and enable the selected plugins in the `.uproject`, or choose either Engine mode to deploy under `<Engine>\Engine\Plugins\Marketplace` with `EnabledByDefault` set to the selected state. All selected packages build and verify before installation; replacement and project enablement roll back as one operation on failure.
 
@@ -46,7 +46,7 @@ Python 3.10 or newer with tkinter is required. Official Windows Python installer
 
 ### Package the binary plugin
 
-Set `UNREAL_MCP_ENGINE_ROOT` to the Unreal installation root, then run the standard Unreal AutomationTool `BuildPlugin` workflow through the repository script:
+Set `UE58` to the Unreal Engine 5.8 installation root, then run the standard Unreal AutomationTool `BuildPlugin` workflow through the repository script:
 
 ```sh
 python3 scripts/package_plugin.py

@@ -206,7 +206,7 @@ def engine_candidates(
     installations = registry_installations() if installations is None else installations
     candidates: list[Path] = []
 
-    configured = environment.get("UNREAL_MCP_ENGINE_ROOT")
+    configured = environment.get(package_plugin.ENGINE_ROOT_ENV)
     association = project.engine_association
     if association:
         for name, directory in installations:
@@ -235,7 +235,7 @@ def engine_candidates(
 
 def default_engine_root(environment: Mapping[str, str] | None = None) -> str:
     environment = os.environ if environment is None else environment
-    return environment.get("UNREAL_MCP_ENGINE_ROOT", "").strip()
+    return environment.get(package_plugin.ENGINE_ROOT_ENV, "").strip()
 
 
 def resolve_engine_root(project: ProjectInfo, configured: Path | None = None) -> Path:
