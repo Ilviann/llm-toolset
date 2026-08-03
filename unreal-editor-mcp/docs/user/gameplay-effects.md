@@ -30,6 +30,6 @@ Existing Gameplay Ability records link cost and cooldown fields back through `cl
 
 This release cannot create, edit, compile, or save Gameplay Effects. It also does not create tags, author Attribute Sets or Gameplay Cues, evaluate custom calculations, construct runtime specs, or touch Ability System Components. Those operations reject without modifying the package.
 
-Package the companion offline with `python scripts/package_plugin.py --gas-companion`; install base and companion packages separately. The Windows graphical deployment helper does not deploy companions.
+Package the companion offline with `python scripts/package_plugin.py --gas-companion`; install it with a compatible base package. On Windows, the graphical deployment helper can build, verify, and install both when its GAS checkbox is selected.
 
 [Gameplay Ability inspection](gameplay-ability-blueprints.md) · [Companion setup](companion-plugins.md) · [Blueprint inspection](blueprint-inspection.md) · [Limits](limits-and-testing.md)

@@ -16,20 +16,20 @@ class WindowsDeploymentScriptTests(unittest.TestCase):
         )
         return deploy.locate_project(folder)
 
-    def write_package(self, folder: Path) -> None:
-        (folder / "UnrealMCP.uplugin").write_text(
+    def write_package(self, folder: Path, plugin_name: str = "UnrealMCP") -> None:
+        (folder / f"{plugin_name}.uplugin").write_text(
             json.dumps({"Installed": True}),
             encoding="utf-8",
         )
-        binary = folder / "Binaries" / "Win64" / "UnrealEditor-UnrealMCP.dll"
+        binary = folder / "Binaries" / "Win64" / f"UnrealEditor-{plugin_name}.dll"
         binary.parent.mkdir(parents=True)
         binary.write_bytes(b"binary")
         binary.with_suffix(".pdb").write_bytes(b"symbols")
-        source = folder / "Source" / "UnrealMCP" / "Private" / "Module.cpp"
+        source = folder / "Source" / plugin_name / "Private" / "Module.cpp"
         source.parent.mkdir(parents=True)
         source.write_text("// source", encoding="utf-8")
-        (folder / "Source" / "UnrealMCP" / "UnrealMCP.Build.cs").write_text(
-            "public class UnrealMCP\n{\n    public UnrealMCP()\n    {\n"
+        (folder / "Source" / plugin_name / f"{plugin_name}.Build.cs").write_text(
+            f"public class {plugin_name}\n{{\n    public {plugin_name}()\n    {{\n"
             "        PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;\n    }\n}\n",
             encoding="utf-8",
         )
@@ -40,12 +40,12 @@ class WindowsDeploymentScriptTests(unittest.TestCase):
             / "Win64"
             / "UnrealEditor"
             / "Development"
-            / "UnrealMCP"
-            / "UnrealMCP.precompiled"
+            / plugin_name
+            / f"{plugin_name}.precompiled"
         )
         manifest.parent.mkdir(parents=True)
         manifest.write_text("manifest", encoding="utf-8")
-        manifest.with_name("UnrealEditor-UnrealMCP.lib").write_bytes(b"import library")
+        manifest.with_name(f"UnrealEditor-{plugin_name}.lib").write_bytes(b"import library")
 
     def write_engine(self, folder: Path, major: int = 5, minor: int = 8) -> None:
         launcher = folder / "Engine" / "Build" / "BatchFiles" / "RunUAT.bat"
@@ -135,6 +135,15 @@ class WindowsDeploymentScriptTests(unittest.TestCase):
             self.assertIn("-TargetPlatforms=Win64", command)
             self.assertIn("-Rocket", command)
             self.assertNotIn("-Unversioned", command)
+
+    def test_gas_build_command_uses_companion_descriptor_and_base_dependency(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            engine = root / "UE_5.8"
+            self.write_engine(engine)
+            command = deploy.build_command(engine, root / "Package", deploy.GAS_PLUGIN)
+            self.assertIn(f"-Plugin={deploy.package_plugin.GAS_DESCRIPTOR}", command)
+            self.assertIn(f"-Dependencies={deploy.package_plugin.PLUGIN_DESCRIPTOR}", command)
 
     def test_engine_validation_rejects_unsupported_version(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -248,16 +257,17 @@ class WindowsDeploymentScriptTests(unittest.TestCase):
                 engine_root: Path,
                 package_root: Path,
                 log: object,
+                plugin: deploy.PluginBuild,
             ) -> None:
                 package_root.mkdir()
-                self.write_package(package_root)
+                self.write_package(package_root, plugin.name)
 
             with mock.patch.object(
                 deploy,
                 "run_packaging",
                 side_effect=write_packaged_plugin,
             ):
-                destination = deploy.deploy(
+                destinations = deploy.deploy(
                     project,
                     root / "UE_5.8",
                     replace_existing=False,
@@ -266,9 +276,289 @@ class WindowsDeploymentScriptTests(unittest.TestCase):
                 )
 
             self.assertTrue(
-                (destination / "Binaries" / "Win64" / "UnrealEditor-UnrealMCP.pdb").is_file()
+                (destinations[0] / "Binaries" / "Win64" / "UnrealEditor-UnrealMCP.pdb").is_file()
             )
             self.assertTrue(any("except matching Win64 PDBs" in message for message in messages))
+
+    def test_project_install_destinations_and_descriptor_enable_both_plugins(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            project_folder = root / "Game"
+            project_folder.mkdir()
+            project = self.write_project(project_folder)
+            destinations = deploy.deployment_destinations(
+                project,
+                root / "UE_5.8",
+                deploy.INSTALL_IN_PROJECT,
+                include_gas=True,
+            )
+            self.assertEqual(
+                destinations,
+                (
+                    project_folder / "Plugins" / "UnrealMCP",
+                    project_folder / "Plugins" / "UnrealMCPGAS",
+                ),
+            )
+            encoded = deploy.configured_project_descriptor(
+                project,
+                ("UnrealMCP", "UnrealMCPGAS"),
+            )
+            deploy.write_project_descriptor(project, encoded)
+            references = {
+                reference["Name"]: reference["Enabled"]
+                for reference in json.loads(project.descriptor.read_text(encoding="utf-8"))["Plugins"]
+            }
+            self.assertEqual(references, {"UnrealMCP": True, "UnrealMCPGAS": True})
+
+    def test_project_descriptor_enable_rejects_duplicate_owned_reference(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            folder = Path(temporary)
+            descriptor = folder / "Shooter.uproject"
+            descriptor.write_text(
+                json.dumps(
+                    {
+                        "EngineAssociation": "5.8",
+                        "Plugins": [
+                            {"Name": "UnrealMCP", "Enabled": False},
+                            {"Name": "unrealmcp", "Enabled": True},
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            project = deploy.locate_project(folder)
+            with self.assertRaisesRegex(deploy.DeploymentError, "duplicate UnrealMCP"):
+                deploy.configured_project_descriptor(project, ("UnrealMCP",))
+
+    def test_engine_install_sets_requested_default_for_both_plugins(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            engine = root / "UE_5.8"
+            self.write_engine(engine)
+            base_package = root / "BasePackage"
+            gas_package = root / "GasPackage"
+            base_package.mkdir()
+            gas_package.mkdir()
+            self.write_package(base_package)
+            self.write_package(gas_package, "UnrealMCPGAS")
+            destinations = (
+                deploy.engine_plugin_destination(engine),
+                deploy.engine_plugin_destination(engine, "UnrealMCPGAS"),
+            )
+
+            installed = deploy.install_binary_plugins(
+                (
+                    (deploy.BASE_PLUGIN, base_package, destinations[0]),
+                    (deploy.GAS_PLUGIN, gas_package, destinations[1]),
+                ),
+                replace_existing=False,
+                enabled_by_default=True,
+            )
+
+            self.assertEqual(installed, destinations)
+            for plugin_name, destination in zip(("UnrealMCP", "UnrealMCPGAS"), installed):
+                descriptor = json.loads(
+                    (destination / f"{plugin_name}.uplugin").read_text(encoding="utf-8")
+                )
+                self.assertIs(descriptor["EnabledByDefault"], True)
+
+    def test_two_plugin_install_rolls_back_when_project_enable_fails(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            destination_root = root / "Plugins"
+            packages = []
+            for plugin in (deploy.BASE_PLUGIN, deploy.GAS_PLUGIN):
+                package = root / f"{plugin.name}Package"
+                package.mkdir()
+                self.write_package(package, plugin.name)
+                destination = destination_root / plugin.name
+                destination.mkdir(parents=True)
+                (destination / "old.txt").write_text(plugin.name, encoding="utf-8")
+                packages.append((plugin, package, destination))
+
+            with self.assertRaisesRegex(deploy.DeploymentError, "enable failed"):
+                deploy.install_binary_plugins(
+                    packages,
+                    replace_existing=True,
+                    after_install=lambda: (_ for _ in ()).throw(
+                        deploy.DeploymentError("enable failed")
+                    ),
+                )
+
+            for plugin in (deploy.BASE_PLUGIN, deploy.GAS_PLUGIN):
+                self.assertEqual(
+                    (destination_root / plugin.name / "old.txt").read_text(encoding="utf-8"),
+                    plugin.name,
+                )
+            self.assertEqual(list(destination_root.glob(".*.backup-*")), [])
+
+    def test_deploy_builds_and_enables_gas_with_base_for_project_install(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            project_folder = root / "Game"
+            project_folder.mkdir()
+            project = self.write_project(project_folder)
+            built: list[str] = []
+
+            def write_packaged_plugin(
+                engine_root: Path,
+                package_root: Path,
+                log: object,
+                plugin: deploy.PluginBuild,
+            ) -> None:
+                built.append(plugin.name)
+                package_root.mkdir()
+                self.write_package(package_root, plugin.name)
+
+            with mock.patch.object(deploy, "run_packaging", side_effect=write_packaged_plugin):
+                installed = deploy.deploy(
+                    project,
+                    root / "UE_5.8",
+                    replace_existing=False,
+                    include_gas=True,
+                    install_method=deploy.INSTALL_IN_PROJECT,
+                    log=lambda message: None,
+                )
+
+            self.assertEqual(built, ["UnrealMCP", "UnrealMCPGAS"])
+            self.assertEqual([path.name for path in installed], ["UnrealMCP", "UnrealMCPGAS"])
+            references = json.loads(project.descriptor.read_text(encoding="utf-8"))["Plugins"]
+            self.assertEqual(
+                references,
+                [
+                    {"Name": "UnrealMCP", "Enabled": True},
+                    {"Name": "UnrealMCPGAS", "Enabled": True},
+                ],
+            )
+
+    def test_engine_install_without_default_enablement_sets_false_and_leaves_project_unchanged(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            project_folder = root / "Game"
+            project_folder.mkdir()
+            project = self.write_project(project_folder)
+            original_project = project.descriptor.read_bytes()
+            engine = root / "UE_5.8"
+            self.write_engine(engine)
+
+            def write_packaged_plugin(
+                engine_root: Path,
+                package_root: Path,
+                log: object,
+                plugin: deploy.PluginBuild,
+            ) -> None:
+                package_root.mkdir()
+                self.write_package(package_root, plugin.name)
+
+            with mock.patch.object(deploy, "run_packaging", side_effect=write_packaged_plugin):
+                installed = deploy.deploy(
+                    project,
+                    engine,
+                    replace_existing=False,
+                    include_gas=True,
+                    install_method=deploy.INSTALL_IN_ENGINE_DISABLED,
+                    log=lambda message: None,
+                )
+
+            self.assertEqual(project.descriptor.read_bytes(), original_project)
+            self.assertTrue(all("Marketplace" in destination.parts for destination in installed))
+            for plugin_name, destination in zip(("UnrealMCP", "UnrealMCPGAS"), installed):
+                descriptor = json.loads(
+                    (destination / f"{plugin_name}.uplugin").read_text(encoding="utf-8")
+                )
+                self.assertIs(descriptor["EnabledByDefault"], False)
+
+    def test_install_method_and_companion_flag_are_exact(self):
+        project = deploy.ProjectInfo(Path("D:/Game"), Path("D:/Game/Game.uproject"), "5.8")
+        with self.assertRaisesRegex(deploy.DeploymentError, "unsupported install method"):
+            deploy.deployment_destinations(
+                project,
+                Path("D:/UE_5.8"),
+                "engine",
+                include_gas=False,
+            )
+        with self.assertRaisesRegex(deploy.DeploymentError, "include_gas must be Boolean"):
+            deploy.deployment_destinations(
+                project,
+                Path("D:/UE_5.8"),
+                deploy.INSTALL_IN_PROJECT,
+                include_gas=1,  # type: ignore[arg-type]
+            )
+
+    def test_project_install_rolls_back_if_descriptor_changes_during_build(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            project_folder = root / "Game"
+            project_folder.mkdir()
+            project = self.write_project(project_folder)
+
+            def write_package_and_change_project(
+                engine_root: Path,
+                package_root: Path,
+                log: object,
+                plugin: deploy.PluginBuild,
+            ) -> None:
+                package_root.mkdir()
+                self.write_package(package_root, plugin.name)
+                project.descriptor.write_text(
+                    json.dumps({"EngineAssociation": "5.8", "ExternalChange": True}),
+                    encoding="utf-8",
+                )
+
+            with mock.patch.object(
+                deploy,
+                "run_packaging",
+                side_effect=write_package_and_change_project,
+            ):
+                with self.assertRaisesRegex(deploy.DeploymentError, "changed while plugins were building"):
+                    deploy.deploy(
+                        project,
+                        root / "UE_5.8",
+                        replace_existing=False,
+                        install_method=deploy.INSTALL_IN_PROJECT,
+                        log=lambda message: None,
+                    )
+
+            self.assertFalse((project_folder / "Plugins" / "UnrealMCP").exists())
+            self.assertIs(
+                json.loads(project.descriptor.read_text(encoding="utf-8"))["ExternalChange"],
+                True,
+            )
+
+    def test_deploy_rejects_plugin_destination_state_change_during_build(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            project_folder = root / "Game"
+            project_folder.mkdir()
+            project = self.write_project(project_folder)
+            destination = project_folder / "Plugins" / "UnrealMCP"
+
+            def write_package_and_create_destination(
+                engine_root: Path,
+                package_root: Path,
+                log: object,
+                plugin: deploy.PluginBuild,
+            ) -> None:
+                package_root.mkdir()
+                self.write_package(package_root, plugin.name)
+                destination.mkdir(parents=True)
+                (destination / "external.txt").write_text("external", encoding="utf-8")
+
+            with mock.patch.object(
+                deploy,
+                "run_packaging",
+                side_effect=write_package_and_create_destination,
+            ):
+                with self.assertRaisesRegex(deploy.DeploymentError, "state changed"):
+                    deploy.deploy(
+                        project,
+                        root / "UE_5.8",
+                        replace_existing=False,
+                        install_method=deploy.INSTALL_IN_PROJECT,
+                        log=lambda message: None,
+                    )
+
+            self.assertEqual((destination / "external.txt").read_text(encoding="utf-8"), "external")
 
     def test_replace_existing_plugin_does_not_mix_old_files(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -320,10 +610,17 @@ class WindowsDeploymentScriptTests(unittest.TestCase):
                 plugin_root: Path,
                 *,
                 include_pdb: bool = False,
+                plugin_name: str = "UnrealMCP",
+                enabled_by_default: bool | None = None,
             ) -> None:
                 nonlocal calls
                 calls += 1
-                real_verify(plugin_root, include_pdb=include_pdb)
+                real_verify(
+                    plugin_root,
+                    include_pdb=include_pdb,
+                    plugin_name=plugin_name,
+                    enabled_by_default=enabled_by_default,
+                )
                 if calls == 2:
                     raise deploy.DeploymentError("injected post-install failure")
 

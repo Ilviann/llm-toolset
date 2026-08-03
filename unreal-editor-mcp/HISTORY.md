@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 0.32.0 — 2026-08-03
+
+- Expanded the Windows graphical deployment helper with an optional `UnrealMCPGAS` companion build/install checkbox and exact project, Engine-enabled-by-default, and Engine-disabled-by-default installation modes.
+- Added bounded atomic `.uproject` enablement, explicit installed-descriptor default state, and transactional base/companion replacement with rollback.
+
 ## 0.31.0 — 2026-08-03
 
 - Added inspection-only `gameplay_effect` discovery to `UnrealMCPGAS` 0.2.0 and ordinary `blueprint_inspect` integration with eleven bounded typed sections covering duration/period, modifiers and magnitude forms, executions, stacking/overflow, cues, tags, granted abilities, additional effects, requirements, public Gameplay Effect Components, and cross-field relationships.

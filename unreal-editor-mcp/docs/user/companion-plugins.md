@@ -1,6 +1,6 @@
 # Companion plugins
 
-Companion plugins are optional trusted native editor plugins that extend existing Unreal MCP tool families for explicitly supported asset or component types. Unreal MCP never downloads, installs, enables, or hot-loads a companion or its Engine dependencies.
+Companion plugins are optional trusted native editor plugins that extend existing Unreal MCP tool families for explicitly supported asset or component types. The runtime never downloads, installs, enables, or hot-loads a companion or its Engine dependencies; the local Windows deployment helper can perform an explicit user-selected offline installation.
 
 ## Install and enable
 
@@ -22,7 +22,7 @@ Authors can package the repository fixture independently with:
 python scripts/package_plugin.py --engine-root "C:\Program Files\Epic Games\UE_5.8" --target-platforms Win64 --companion-fixture
 ```
 
-Package the released `UnrealMCPGAS` 0.2.0 Gameplay Ability and Gameplay Effect inspection companion with `--gas-companion`; it still requires a separately installed compatible base package. The Windows graphical deployment helper does not deploy companions yet.
+Package the released `UnrealMCPGAS` 0.2.0 Gameplay Ability and Gameplay Effect inspection companion with `--gas-companion`; it requires a compatible base package. On Windows, select the GAS checkbox in the graphical deployment helper to build, verify, and install both packages in one transaction.
 
 Released companions use the same UAT `BuildPlugin` contract with their own descriptor, and install their compatible base package separately. If a companion is unavailable, check enablement and restart state, exact descriptor/compiled API/schema values, owning module identity, and required Engine plugin/module state. A companion must not expose runtime schemas, arbitrary property paths, listener settings, or credentials.
 

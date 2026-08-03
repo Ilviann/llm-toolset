@@ -30,6 +30,6 @@ Package the companion offline from the same release state as the base:
 python scripts/package_plugin.py --engine-root "C:\Program Files\Epic Games\UE_5.8" --target-platforms Win64 --gas-companion
 ```
 
-Install the resulting base and companion packages separately. Unreal MCP never downloads or enables GAS at runtime. The Windows graphical deployment helper does not deploy this companion yet.
+Install the resulting base and companion packages together. On Windows, the graphical deployment helper can build and install both when its GAS checkbox is selected. Unreal MCP never downloads or enables GAS at runtime.
 
 [Gameplay Effect inspection](gameplay-effects.md) · [Companion setup](companion-plugins.md) · [Blueprint inspection](blueprint-inspection.md) · [Limits](limits-and-testing.md)
