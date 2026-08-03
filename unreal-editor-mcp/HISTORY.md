@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.30.0 — 2026-08-03
+
+- Added the independently versioned optional `UnrealMCPGAS` 0.1.0 editor companion with all GAS dependencies isolated from the base plugin and exact companion API v1/schema admission.
+- Added inspection-only `gameplay_ability` discovery and ordinary `blueprint_inspect` integration with typed policy, tag, trigger, and cost/cooldown reference records, inheritance sources, stable nested identities, truncation, and one combined non-mutating snapshot.
+- Added separate read/mutation capabilities, dynamic Python section exposure, focused generic-family and GAS native Automation, headless registration checks, release/package contracts, offline GAS packaging, and complete user/architecture/type documentation. The Windows deployment helper remains unchanged; macOS verification is tracked as preferred follow-up work.
+
 ## 0.29.0 — 2026-08-03
 
 - Added companion API v1 with bounded plugin discovery, exact descriptor/compiled admission, frozen base-owned registration, deterministic capabilities, three typed contribution categories, authenticated Game-thread dispatch, stale-safe transactional mutation, postcondition read-back, and shutdown ordering.

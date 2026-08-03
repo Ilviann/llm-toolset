@@ -14,7 +14,7 @@ released_in: null
 **Depends on:**
 
 - [`phase-13`](../completed/phase-13.md)
-- [`gas-ability-blueprints-inspect`](gas-ability-blueprints-inspect.md)
+- [`gas-ability-blueprints-inspect`](../completed/gas-ability-blueprints-inspect.md)
 
 ### Creation and update implementation
 

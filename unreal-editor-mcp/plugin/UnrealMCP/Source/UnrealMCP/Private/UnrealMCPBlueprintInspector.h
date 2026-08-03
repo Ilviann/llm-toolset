@@ -8,6 +8,9 @@ class FUnrealMCPBlueprintInspector
 {
 public:
     explicit FUnrealMCPBlueprintInspector(TFunction<double()> InNow = [] { return FPlatformTime::Seconds(); });
+    FUnrealMCPBlueprintInspector(
+        const class FUnrealMCPExtensionRegistry& InExtensionRegistry,
+        TFunction<double()> InNow = [] { return FPlatformTime::Seconds(); });
 
     bool Execute(
         const TSharedPtr<FJsonObject>& Arguments,
@@ -33,5 +36,6 @@ private:
     void RemoveExpiredCursors(double CurrentTime);
 
     TFunction<double()> Now;
+    const class FUnrealMCPExtensionRegistry* ExtensionRegistry = nullptr;
     TMap<FString, FCursorState> Cursors;
 };

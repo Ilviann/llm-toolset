@@ -474,7 +474,7 @@ bool FUnrealMCPBridge::Execute(const FString& Command, const TSharedPtr<FJsonObj
     }
     if (!BlueprintInspector)
     {
-        BlueprintInspector = MakeUnique<FUnrealMCPBlueprintInspector>();
+        BlueprintInspector = MakeUnique<FUnrealMCPBlueprintInspector>(*ExtensionRegistry);
     }
     if (Command == TEXT("blueprint_inspect"))
     {
@@ -614,8 +614,17 @@ TSharedPtr<FJsonObject> FUnrealMCPBridge::Capabilities() const
     Features->SetBoolField(TEXT("graceful_editor_shutdown"), true);
     Features->SetBoolField(TEXT("project_build"), false);
     Features->SetBoolField(TEXT("companion_plugins"), true);
+    Features->SetBoolField(TEXT("gas_ability_blueprints_inspection"),
+        ExtensionRegistry->HasReadyFamilyCapability(
+            TEXT("gameplay_ability"), EUnrealMCPExtensionAccess::Read));
+    Features->SetBoolField(TEXT("gas_ability_blueprints_mutation"),
+        ExtensionRegistry->HasReadyFamilyCapability(
+            TEXT("gameplay_ability"), EUnrealMCPExtensionAccess::Mutation));
     Result->SetObjectField(TEXT("features"), Features);
-    Result->SetArrayField(TEXT("blueprint_families"), UnrealMCP::BlueprintFamilyPolicy::BuildPublishedMatrix());
+    TArray<TSharedPtr<FJsonValue>> BlueprintFamilies =
+        UnrealMCP::BlueprintFamilyPolicy::BuildPublishedMatrix();
+    BlueprintFamilies.Append(ExtensionRegistry->BuildBlueprintFamilyCapabilities());
+    Result->SetArrayField(TEXT("blueprint_families"), BlueprintFamilies);
     const TSharedPtr<FJsonObject> CompanionCapabilities = ExtensionRegistry->BuildCapabilities();
     Result->SetNumberField(TEXT("companion_api_version"), CompanionCapabilities->GetNumberField(TEXT("companion_api_version")));
     Result->SetNumberField(TEXT("extension_schema_revision"), CompanionCapabilities->GetNumberField(TEXT("extension_schema_revision")));

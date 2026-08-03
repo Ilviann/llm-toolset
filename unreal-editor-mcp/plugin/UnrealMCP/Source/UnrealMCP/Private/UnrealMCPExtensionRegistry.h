@@ -5,6 +5,8 @@
 
 class FJsonObject;
 class IModuleInterface;
+class UBlueprint;
+class UClass;
 struct FUnrealMCPError;
 
 class FUnrealMCPExtensionRegistry
@@ -27,6 +29,21 @@ public:
     bool HasExtensionRequest(const TSharedPtr<FJsonObject>& Arguments) const;
     TSharedPtr<FJsonObject> BuildCapabilities() const;
     FString RegistrySignature() const;
+    bool ClassifyBlueprintClass(
+        const UClass* Class,
+        FString& OutFamily,
+        FString& OutNativeBaseClass) const;
+    bool AppendBlueprintInspection(
+        const UBlueprint& Blueprint,
+        const TSharedPtr<FJsonObject>& Arguments,
+        TArray<TSharedPtr<FJsonValue>>& OutRecords,
+        TArray<FString>& OutFingerprint,
+        TSharedPtr<FJsonObject>& InOutFamilyCapabilities,
+        FUnrealMCPError& OutError) const;
+    TArray<TSharedPtr<FJsonValue>> BuildBlueprintFamilyCapabilities() const;
+    bool HasReadyFamilyCapability(
+        const FString& TargetFamily,
+        EUnrealMCPExtensionAccess Access) const;
 
 #if WITH_DEV_AUTOMATION_TESTS
     void AddDescriptorForTesting(
@@ -77,6 +94,9 @@ private:
         const FString& ExtensionId,
         const FString& ToolFamily,
         const FString& Operation,
+        const FAcceptedRecord*& OutOwner) const;
+    const FUnrealMCPExtensionContribution* FindBlueprintFamilyContribution(
+        const UClass* Class,
         const FAcceptedRecord*& OutOwner) const;
 
     TArray<FDescriptorRecord> Descriptors;

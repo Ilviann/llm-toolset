@@ -568,12 +568,15 @@ def main() -> int:
                     or capabilities.get("features", {}).get("asset_delete_undo") is not False:
                 raise AssertionError("asset-delete capability contract mismatch")
             family_matrix = capabilities.get("blueprint_families", [])
-            if [record.get("family") for record in family_matrix] != [
+            base_families = [
                 "actor", "game_mode_base", "game_mode", "game_state_base", "game_state", "game_instance",
                 "widget",
-            ]:
+            ]
+            family_names = [record.get("family") for record in family_matrix]
+            if family_names[:len(base_families)] != base_families \
+                    or len(family_names) != len(set(family_names)):
                 raise AssertionError(f"Phase 15 family matrix mismatch: {family_matrix!r}")
-            for record in family_matrix:
+            for record in family_matrix[:len(base_families)]:
                 operations = record.get("operations", {})
                 assignable = record.get("family") in {"game_mode_base", "game_mode", "game_instance"}
                 if operations.get("graph_edit") is not True or operations.get("parent_change") is not False \
@@ -585,6 +588,19 @@ def main() -> int:
                 if operations.get("components") != (family not in {"game_instance", "widget"}) \
                         or operations.get("widget_tree") != (family == "widget"):
                     raise AssertionError(f"Blueprint family operation matrix mismatch: {record!r}")
+            for record in family_matrix[len(base_families):]:
+                operations = record.get("operations", {})
+                if not isinstance(record.get("extension_id"), str) \
+                        or operations.get("discover") is not True \
+                        or operations.get("inspect") is not True \
+                        or any(operations.get(name) is not False for name in (
+                            "create", "compile", "save", "class_defaults", "components", "widget_tree",
+                            "member_variables", "functions", "local_variables", "macros", "custom_events",
+                            "action_catalog", "graph_edit", "parent_change", "project_settings_assignment",
+                        )):
+                    raise AssertionError(f"Companion family operation matrix mismatch: {record!r}")
+                if not isinstance(record.get("multiplayer", {}).get("rpc_modes"), list):
+                    raise AssertionError(f"Companion family multiplayer matrix mismatch: {record!r}")
             expected_graph_limits = {
                 "graph_nodes": 2048, "graph_pins_per_node": 256, "graph_coordinate": 1000000,
                 "graph_links_per_pin": 64, "graph_automatic_conversion_nodes": 1, "pin_default_chars": 512,

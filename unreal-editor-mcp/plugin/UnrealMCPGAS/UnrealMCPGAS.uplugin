@@ -1,0 +1,38 @@
+{
+  "FileVersion": 3,
+  "Version": 10000,
+  "VersionName": "0.1.0",
+  "companion_api_version": 1,
+  "FriendlyName": "Unreal MCP Gameplay Ability System",
+  "Description": "Optional read-only Gameplay Ability Blueprint inspection companion for Unreal MCP.",
+  "Category": "Editor",
+  "CreatedBy": "Ilviann Zed",
+  "CreatedByURL": "https://github.com/Ilviann/llm-toolset",
+  "SupportURL": "ilviann.zed@gmail.com",
+  "CanContainContent": false,
+  "EnabledByDefault": false,
+  "Installed": false,
+  "unreal_mcp_companion": {
+    "extension_id": "unreal-mcp-gas",
+    "schema_revision": 1,
+    "owning_module": "UnrealMCPGAS",
+    "required_engine_plugins": ["GameplayAbilities"]
+  },
+  "Plugins": [
+    {
+      "Name": "UnrealMCP",
+      "Enabled": true
+    },
+    {
+      "Name": "GameplayAbilities",
+      "Enabled": true
+    }
+  ],
+  "Modules": [
+    {
+      "Name": "UnrealMCPGAS",
+      "Type": "Editor",
+      "LoadingPhase": "PostEngineInit"
+    }
+  ]
+}

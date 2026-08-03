@@ -1,6 +1,7 @@
 # Completed features
 
 - [`companion-plugins` — Companion plugin extension foundation](companion-plugins.md).
+- [`gas-ability-blueprints-inspect` — Gameplay Ability Blueprint inspection](gas-ability-blueprints-inspect.md).
 
 - [`phase-4` — Reliable mutations, Actor components, and defaults](phase-4.md).
 - [`phase-5` — Blueprint member variables](phase-5.md).

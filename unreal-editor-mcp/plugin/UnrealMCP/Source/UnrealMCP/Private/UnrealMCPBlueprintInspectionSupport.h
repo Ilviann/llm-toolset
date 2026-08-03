@@ -33,6 +33,7 @@
 #include "Serialization/JsonWriter.h"
 #include "UnrealMCPVersion.h"
 #include "UnrealMCPBlueprintFamilyPolicy.h"
+#include "UnrealMCPExtensionRegistry.h"
 #include "UnrealMCPK2TypeCodec.h"
 #include "UnrealMCPPropertyCodec.h"
 #include "UObject/Package.h"
@@ -63,7 +64,8 @@ const TSet<FString> InspectSections = {
     TEXT("class_defaults"), TEXT("variables"), TEXT("functions"), TEXT("macros"), TEXT("custom_events"),
     TEXT("parameters"), TEXT("local_variables"),
     TEXT("graphs"), TEXT("nodes"), TEXT("pins"), TEXT("connections"),
-    TEXT("widget_tree"), TEXT("widget_defaults"), TEXT("widget_bindings")};
+    TEXT("widget_tree"), TEXT("widget_defaults"), TEXT("widget_bindings"),
+    TEXT("gameplay_ability")};
 
 const TSet<FString> SupportedPinCategories = {
     TEXT("exec"), TEXT("boolean"), TEXT("byte"), TEXT("int"), TEXT("int64"), TEXT("real"),
@@ -610,7 +612,9 @@ static void AddClassDefaultFingerprint(UBlueprint* Blueprint, TArray<FString>& F
     }
 }
 
-static UnrealMCP::BlueprintFamilyPolicy::FFamilyInfo AssetBlueprintFamily(const FAssetData& Asset)
+static UnrealMCP::BlueprintFamilyPolicy::FFamilyInfo AssetBlueprintFamily(
+    const FAssetData& Asset,
+    const FUnrealMCPExtensionRegistry* ExtensionRegistry)
 {
     FString NativeParent;
     if (!Asset.GetTagValue(FBlueprintTags::NativeParentClassPath, NativeParent))
@@ -619,7 +623,15 @@ static UnrealMCP::BlueprintFamilyPolicy::FFamilyInfo AssetBlueprintFamily(const 
     }
     const FString ObjectPath = FPackageName::ExportTextPathToObjectPath(NativeParent);
     UClass* NativeClass = FindObject<UClass>(nullptr, *ObjectPath);
-    return UnrealMCP::BlueprintFamilyPolicy::Classify(NativeClass);
+    UnrealMCP::BlueprintFamilyPolicy::FFamilyInfo Family =
+        UnrealMCP::BlueprintFamilyPolicy::Classify(NativeClass);
+    if (!Family.bSupported && ExtensionRegistry != nullptr
+        && ExtensionRegistry->ClassifyBlueprintClass(
+            NativeClass, Family.Name, Family.NativeBaseClass))
+    {
+        Family.bSupported = true;
+    }
+    return Family;
 }
 
 

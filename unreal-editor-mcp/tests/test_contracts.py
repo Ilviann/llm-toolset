@@ -55,24 +55,49 @@ class ReleaseContractTests(unittest.TestCase):
         native = re.search(r'Version\[\].*TEXT\("([^"]+)"\)', header)
         self.assertIsNotNone(native)
         versions = {project["project"]["version"], plugin["VersionName"], native.group(1), unreal_editor_mcp.__version__}
-        self.assertEqual(versions, {"0.29.0"})
+        self.assertEqual(versions, {"0.30.0"})
 
-    def test_companion_api_and_fixture_versions_are_internally_consistent(self):
+    def test_companion_api_and_companion_versions_are_internally_consistent(self):
         base = json.loads((ROOT / "plugin/UnrealMCP/UnrealMCP.uplugin").read_text(encoding="utf-8"))
         fixture = json.loads((ROOT / "plugin/UnrealMCPTestCompanion/UnrealMCPTestCompanion.uplugin").read_text(encoding="utf-8"))
+        gas = json.loads((ROOT / "plugin/UnrealMCPGAS/UnrealMCPGAS.uplugin").read_text(encoding="utf-8"))
         base_header = (ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Public/UnrealMCPVersion.h").read_text(encoding="utf-8")
         fixture_header = (ROOT / "plugin/UnrealMCPTestCompanion/Source/UnrealMCPTestCompanion/Public/UnrealMCPTestCompanionVersion.h").read_text(encoding="utf-8")
+        gas_header = (ROOT / "plugin/UnrealMCPGAS/Source/UnrealMCPGAS/Public/UnrealMCPGASVersion.h").read_text(encoding="utf-8")
         base_api = re.search(r"CompanionApiVersion\s*=\s*(\d+)", base_header)
         fixture_api = re.search(r"CompanionApiVersion\s*=\s*(\d+)", fixture_header)
+        gas_api = re.search(r"CompanionApiVersion\s*=\s*(\d+)", gas_header)
         fixture_version = re.search(r'Version\[\].*TEXT\("([^"]+)"\)', fixture_header)
+        gas_version = re.search(r'Version\[\].*TEXT\("([^"]+)"\)', gas_header)
         self.assertIsNotNone(base_api)
         self.assertIsNotNone(fixture_api)
+        self.assertIsNotNone(gas_api)
         self.assertIsNotNone(fixture_version)
+        self.assertIsNotNone(gas_version)
         self.assertEqual({base["companion_api_version"], fixture["companion_api_version"],
-                          int(base_api.group(1)), int(fixture_api.group(1))}, {1})
+                          gas["companion_api_version"], int(base_api.group(1)),
+                          int(fixture_api.group(1)), int(gas_api.group(1))}, {1})
         self.assertEqual(fixture["VersionName"], fixture_version.group(1))
+        self.assertEqual(gas["VersionName"], gas_version.group(1))
         self.assertNotEqual(fixture["VersionName"], base["VersionName"])
+        self.assertNotEqual(gas["VersionName"], base["VersionName"])
         self.assertEqual(fixture["unreal_mcp_companion"]["schema_revision"], 1)
+        self.assertEqual(gas["unreal_mcp_companion"]["schema_revision"], 1)
+
+    def test_gas_companion_is_read_only_bounded_and_keeps_base_gas_free(self):
+        base_build = (ROOT / "plugin/UnrealMCP/Source/UnrealMCP/UnrealMCP.Build.cs").read_text(encoding="utf-8")
+        gas_build = (ROOT / "plugin/UnrealMCPGAS/Source/UnrealMCPGAS/UnrealMCPGAS.Build.cs").read_text(encoding="utf-8")
+        gas_source = (ROOT / "plugin/UnrealMCPGAS/Source/UnrealMCPGAS/Private/UnrealMCPGASModule.cpp").read_text(encoding="utf-8")
+        self.assertNotIn("GameplayAbilities", base_build)
+        for dependency in ["GameplayAbilities", "GameplayTags", "GameplayTasks"]:
+            self.assertIn(f'"{dependency}"', gas_build)
+        for contract in [
+            "gameplay_ability", "gameplay_ability_policies", "gameplay_ability_tags",
+            "gameplay_ability_triggers", "gameplay_ability_effects",
+            "MaxTagsPerContainer", "MaxAbilityTriggers", "EUnrealMCPExtensionAccess::Read",
+        ]:
+            self.assertIn(contract, gas_source)
+        self.assertNotIn("EUnrealMCPExtensionAccess::Mutation", gas_source)
 
     def test_public_companion_api_does_not_expose_bridge_or_credentials(self):
         public = "\n".join(

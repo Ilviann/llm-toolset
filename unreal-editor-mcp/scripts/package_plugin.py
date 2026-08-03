@@ -21,8 +21,10 @@ PLUGIN_DESCRIPTOR = APPLICATION_ROOT / "plugin" / "UnrealMCP" / "UnrealMCP.uplug
 FIXTURE_DESCRIPTOR = (
     APPLICATION_ROOT / "plugin" / "UnrealMCPTestCompanion" / "UnrealMCPTestCompanion.uplugin"
 )
+GAS_DESCRIPTOR = APPLICATION_ROOT / "plugin" / "UnrealMCPGAS" / "UnrealMCPGAS.uplugin"
 DEFAULT_OUTPUT = WORKSPACE_ROOT / "build" / "unreal-editor-mcp"
 DEFAULT_FIXTURE_OUTPUT = WORKSPACE_ROOT / "build" / "unreal-mcp-test-companion"
+DEFAULT_GAS_OUTPUT = WORKSPACE_ROOT / "build" / "unreal-mcp-gas"
 _PLATFORM_NAME = re.compile(r"^[A-Za-z][A-Za-z0-9_]*$")
 
 
@@ -177,10 +179,16 @@ def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Build UnrealMCP with Unreal AutomationTool for binary deployment.",
     )
-    parser.add_argument(
+    plugin_selection = parser.add_mutually_exclusive_group()
+    plugin_selection.add_argument(
         "--companion-fixture",
         action="store_true",
         help="package the disposable UnrealMCPTestCompanion instead of the base plugin",
+    )
+    plugin_selection.add_argument(
+        "--gas-companion",
+        action="store_true",
+        help="package the optional UnrealMCPGAS companion instead of the base plugin",
     )
     parser.add_argument(
         "--engine-root",
@@ -236,9 +244,15 @@ def main(argv: Sequence[str] | None = None) -> int:
 
         engine_root = resolved(configured_engine)
         run_uat = validate_engine_root(engine_root, host_system)
-        plugin_descriptor = FIXTURE_DESCRIPTOR if arguments.companion_fixture else PLUGIN_DESCRIPTOR
+        plugin_descriptor = (
+            FIXTURE_DESCRIPTOR if arguments.companion_fixture
+            else GAS_DESCRIPTOR if arguments.gas_companion
+            else PLUGIN_DESCRIPTOR
+        )
         if arguments.companion_fixture and arguments.output == DEFAULT_OUTPUT:
             arguments.output = DEFAULT_FIXTURE_OUTPUT
+        if arguments.gas_companion and arguments.output == DEFAULT_OUTPUT:
+            arguments.output = DEFAULT_GAS_OUTPUT
         output = validate_output(arguments.output, engine_root, plugin_descriptor)
         target_platforms = normalize_target_platforms(arguments.target_platforms)
         environment = configure_environment(host_system, arguments.developer_dir)
@@ -249,7 +263,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             strict_includes=arguments.strict_includes,
             unversioned=arguments.unversioned,
             plugin_descriptor=plugin_descriptor,
-            dependency_plugins=(PLUGIN_DESCRIPTOR,) if arguments.companion_fixture else (),
+            dependency_plugins=(PLUGIN_DESCRIPTOR,) if (
+                arguments.companion_fixture or arguments.gas_companion
+            ) else (),
         )
     except PackagingError as error:
         parser.error(str(error))

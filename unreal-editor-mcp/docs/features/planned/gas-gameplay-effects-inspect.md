@@ -12,7 +12,7 @@ released_in: null
 
 **Depends on:**
 
-- [`gas-ability-blueprints-inspect`](gas-ability-blueprints-inspect.md)
+- [`gas-ability-blueprints-inspect`](../completed/gas-ability-blueprints-inspect.md)
 
 ### Read and inspection implementation
 

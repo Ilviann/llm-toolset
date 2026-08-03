@@ -573,6 +573,237 @@ const FUnrealMCPExtensionContribution* FUnrealMCPExtensionRegistry::FindContribu
     return nullptr;
 }
 
+const FUnrealMCPExtensionContribution* FUnrealMCPExtensionRegistry::FindBlueprintFamilyContribution(
+    const UClass* Class,
+    const FAcceptedRecord*& OutOwner) const
+{
+    OutOwner = nullptr;
+    if (!bFrozen || bShuttingDown || Class == nullptr)
+    {
+        return nullptr;
+    }
+    for (const FAcceptedRecord& Record : Accepted)
+    {
+        for (const FUnrealMCPExtensionContribution& Contribution : Record.Registration.Contributions)
+        {
+            if (Contribution.Category != EUnrealMCPExtensionCategory::AssetFamily
+                || Contribution.Access != EUnrealMCPExtensionAccess::Read
+                || Contribution.ToolFamily != TEXT("blueprint_inspect"))
+            {
+                continue;
+            }
+            FString UnavailableReason;
+            UClass* TargetClass = LoadObject<UClass>(nullptr, *Contribution.TargetClassPath);
+            const bool bClassMatches = TargetClass != nullptr
+                && (Contribution.bAllowDerivedTargetClasses
+                    ? Class->IsChildOf(TargetClass) : Class == TargetClass);
+            if (bClassMatches && Contribution.Handler->IsReady(UnavailableReason))
+            {
+                OutOwner = &Record;
+                return &Contribution;
+            }
+        }
+    }
+    return nullptr;
+}
+
+bool FUnrealMCPExtensionRegistry::ClassifyBlueprintClass(
+    const UClass* Class,
+    FString& OutFamily,
+    FString& OutNativeBaseClass) const
+{
+    const FAcceptedRecord* Owner = nullptr;
+    const FUnrealMCPExtensionContribution* Contribution =
+        FindBlueprintFamilyContribution(Class, Owner);
+    if (Contribution == nullptr || Owner == nullptr)
+    {
+        return false;
+    }
+    OutFamily = Contribution->TargetFamily;
+    OutNativeBaseClass = Contribution->TargetClassPath;
+    return true;
+}
+
+bool FUnrealMCPExtensionRegistry::AppendBlueprintInspection(
+    const UBlueprint& Blueprint,
+    const TSharedPtr<FJsonObject>& Arguments,
+    TArray<TSharedPtr<FJsonValue>>& OutRecords,
+    TArray<FString>& OutFingerprint,
+    TSharedPtr<FJsonObject>& InOutFamilyCapabilities,
+    FUnrealMCPError& OutError) const
+{
+    const UClass* BlueprintClass = Blueprint.GeneratedClass != nullptr
+        ? Blueprint.GeneratedClass : Blueprint.ParentClass;
+    const FAcceptedRecord* Owner = nullptr;
+    const FUnrealMCPExtensionContribution* Contribution =
+        FindBlueprintFamilyContribution(BlueprintClass, Owner);
+    if (Contribution == nullptr || Owner == nullptr)
+    {
+        return true;
+    }
+    const UObject* Target = BlueprintClass != nullptr
+        ? BlueprintClass->GetDefaultObject(false) : nullptr;
+    if (Target == nullptr || !Contribution->Handler->SupportsTarget(*Target))
+    {
+        OutError = {TEXT("invalid_asset"),
+            TEXT("The Blueprint generated class does not satisfy its companion family policy")};
+        return false;
+    }
+    FUnrealMCPExtensionError ExtensionError;
+    if (!Contribution->Handler->ValidateArguments(
+        Contribution->Operation, Arguments, ExtensionError))
+    {
+        ConvertError(ExtensionError, OutError);
+        return false;
+    }
+    const FString Before = SnapshotFor(
+        *Target, Contribution->Operation, *Contribution->Handler, ExtensionError);
+    if (Before.IsEmpty())
+    {
+        ConvertError(ExtensionError, OutError);
+        return false;
+    }
+    TSharedPtr<FJsonObject> ExtensionResult;
+    if (!Contribution->Handler->Inspect(
+        *Target, Contribution->Operation, Arguments, ExtensionResult, ExtensionError))
+    {
+        ConvertError(ExtensionError, OutError);
+        return false;
+    }
+    const FString After = SnapshotFor(
+        *Target, Contribution->Operation, *Contribution->Handler, ExtensionError);
+    if (After.IsEmpty())
+    {
+        ConvertError(ExtensionError, OutError);
+        return false;
+    }
+    if (After != Before)
+    {
+        OutError = {TEXT("extension_contract_violation"),
+            TEXT("The companion changed its target during Blueprint inspection")};
+        return false;
+    }
+    if (!ExtensionResult.IsValid())
+    {
+        OutError = {TEXT("extension_contract_violation"),
+            TEXT("The companion returned no Blueprint inspection result")};
+        return false;
+    }
+    const TArray<TSharedPtr<FJsonValue>>* Records = nullptr;
+    const int32* RecordLimit = Contribution->StableLimits.Find(TEXT("records"));
+    if (!ExtensionResult->TryGetArrayField(TEXT("records"), Records) || Records == nullptr
+        || Records->Num() > (RecordLimit != nullptr ? *RecordLimit : 32)
+        || OutRecords.Num() + Records->Num() > UnrealMCP::MaxInspectRecords)
+    {
+        OutError = {TEXT("response_too_large"),
+            TEXT("The companion Blueprint inspection records exceed their stable bound")};
+        return false;
+    }
+    for (const TSharedPtr<FJsonValue>& Value : *Records)
+    {
+        const TSharedPtr<FJsonObject>* RecordObject = nullptr;
+        if (!Value.IsValid() || !Value->TryGetObject(RecordObject)
+            || RecordObject == nullptr || !RecordObject->IsValid())
+        {
+            OutError = {TEXT("extension_contract_violation"),
+                TEXT("The companion returned a malformed Blueprint inspection record")};
+            return false;
+        }
+        OutRecords.Add(Value);
+    }
+    const TSharedPtr<FJsonObject>* Capabilities = nullptr;
+    if (ExtensionResult->TryGetObjectField(TEXT("family_capabilities"), Capabilities)
+        && Capabilities != nullptr && Capabilities->IsValid())
+    {
+        if (!InOutFamilyCapabilities.IsValid())
+        {
+            InOutFamilyCapabilities = MakeShared<FJsonObject>();
+        }
+        InOutFamilyCapabilities->SetObjectField(
+            Contribution->TargetFamily, Capabilities->ToSharedRef());
+    }
+    OutFingerprint.Add(Owner->Registration.ExtensionId + TEXT("|")
+        + Contribution->ContributionId + TEXT("|") + Before);
+    return true;
+}
+
+TArray<TSharedPtr<FJsonValue>> FUnrealMCPExtensionRegistry::BuildBlueprintFamilyCapabilities() const
+{
+    TArray<TSharedPtr<FJsonValue>> Result;
+    TSet<FString> AddedFamilies;
+    if (!bFrozen || bShuttingDown)
+    {
+        return Result;
+    }
+    for (const FAcceptedRecord& Record : Accepted)
+    {
+        for (const FUnrealMCPExtensionContribution& Contribution : Record.Registration.Contributions)
+        {
+            FString UnavailableReason;
+            if (Contribution.Category != EUnrealMCPExtensionCategory::AssetFamily
+                || Contribution.Access != EUnrealMCPExtensionAccess::Read
+                || Contribution.ToolFamily != TEXT("blueprint_inspect")
+                || AddedFamilies.Contains(Contribution.TargetFamily)
+                || !Contribution.Handler->IsReady(UnavailableReason))
+            {
+                continue;
+            }
+            const TSharedRef<FJsonObject> Operations = MakeShared<FJsonObject>();
+            for (const TCHAR* Name : {TEXT("discover"), TEXT("inspect")})
+            {
+                Operations->SetBoolField(Name, true);
+            }
+            for (const TCHAR* Name : {TEXT("create"), TEXT("compile"), TEXT("save"),
+                TEXT("class_defaults"), TEXT("components"), TEXT("widget_tree"),
+                TEXT("member_variables"), TEXT("functions"), TEXT("local_variables"),
+                TEXT("macros"), TEXT("custom_events"), TEXT("action_catalog"),
+                TEXT("graph_edit"), TEXT("parent_change"), TEXT("project_settings_assignment")})
+            {
+                Operations->SetBoolField(Name, false);
+            }
+            const TSharedRef<FJsonObject> Family = MakeShared<FJsonObject>();
+            Family->SetStringField(TEXT("family"), Contribution.TargetFamily);
+            Family->SetStringField(TEXT("native_base_class"), Contribution.TargetClassPath);
+            Family->SetStringField(TEXT("inheritance_category"), TEXT("uobject_derived"));
+            Family->SetStringField(TEXT("extension_id"), Record.Registration.ExtensionId);
+            Family->SetObjectField(TEXT("operations"), Operations);
+            const TSharedRef<FJsonObject> Multiplayer = MakeShared<FJsonObject>();
+            Multiplayer->SetBoolField(TEXT("actor_replication"), false);
+            Multiplayer->SetBoolField(TEXT("component_replication"), false);
+            Multiplayer->SetBoolField(TEXT("replicated_variables"), false);
+            Multiplayer->SetArrayField(TEXT("rpc_modes"), {
+                MakeShared<FJsonValueString>(TEXT("not_replicated"))});
+            Family->SetObjectField(TEXT("multiplayer"), Multiplayer);
+            Result.Add(MakeShared<FJsonValueObject>(Family));
+            AddedFamilies.Add(Contribution.TargetFamily);
+        }
+    }
+    return Result;
+}
+
+bool FUnrealMCPExtensionRegistry::HasReadyFamilyCapability(
+    const FString& TargetFamily,
+    EUnrealMCPExtensionAccess Access) const
+{
+    if (!bFrozen || bShuttingDown)
+    {
+        return false;
+    }
+    for (const FAcceptedRecord& Record : Accepted)
+    {
+        for (const FUnrealMCPExtensionContribution& Contribution : Record.Registration.Contributions)
+        {
+            FString UnavailableReason;
+            if (Contribution.TargetFamily == TargetFamily && Contribution.Access == Access
+                && Contribution.Handler->IsReady(UnavailableReason))
+            {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 bool FUnrealMCPExtensionRegistry::HasOnlyAllowedFields(
     const FJsonObject& Arguments,
     const FUnrealMCPExtensionContribution& Contribution)

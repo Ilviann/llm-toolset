@@ -17,6 +17,8 @@ For example, an enabled plugin whose mount point is `/MyGameplayPlugin` can be s
 
 Mutation tools intentionally use a narrower policy: they may change only `/Game` assets and content mounted from a plugin physically located in the current project's `Plugins/` directory. A local plugin mount must remain below a symlink-free plugin directory containing a `.uplugin` descriptor. `/Engine`, engine plugins, marketplace plugins installed outside the project, arbitrary external mounts, and symlink escapes remain read-only. `capabilities.asset_access` reports this split.
 
+The optional `UnrealMCPGAS` companion adds the inspection-only `gameplay_ability` family and a `gameplay_ability` section to this same tool only while its exact native/Python capability is ready. See the [Gameplay Ability guide](gameplay-ability-blueprints.md) for typed policy, tag, trigger, and effect-reference records.
+
 Inspect one exact asset after discovery. The shallow default returns summary, parent, compile state, components, variables, functions, macros, custom events, function-local variables, and graph summaries. Request parameter or graph details only when needed:
 
 ```json

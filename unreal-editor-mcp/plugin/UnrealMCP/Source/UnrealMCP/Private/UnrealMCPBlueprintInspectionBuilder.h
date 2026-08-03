@@ -4,10 +4,13 @@
 #include "Dom/JsonObject.h"
 #include "UnrealMCPProtocol.h"
 
+class FUnrealMCPExtensionRegistry;
+
 namespace UnrealMCP::BlueprintInspectionPrivate
 {
 bool BuildDiscovery(
     const FJsonObject& Arguments,
+    const FUnrealMCPExtensionRegistry* ExtensionRegistry,
     TArray<TSharedPtr<FJsonValue>>& OutRecords,
     FString& OutSnapshot,
     bool& OutScanTruncated,
@@ -15,6 +18,7 @@ bool BuildDiscovery(
 
 bool BuildInspection(
     const FJsonObject& Arguments,
+    const FUnrealMCPExtensionRegistry* ExtensionRegistry,
     TArray<TSharedPtr<FJsonValue>>& OutRecords,
     FString& OutSnapshot,
     FString& OutBlueprintFamily,

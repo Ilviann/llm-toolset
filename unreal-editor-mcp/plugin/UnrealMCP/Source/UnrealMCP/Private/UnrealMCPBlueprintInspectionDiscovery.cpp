@@ -5,6 +5,7 @@ namespace UnrealMCP::BlueprintInspectionPrivate
 {
 bool BuildDiscovery(
     const FJsonObject& Arguments,
+    const FUnrealMCPExtensionRegistry* ExtensionRegistry,
     TArray<TSharedPtr<FJsonValue>>& OutRecords,
     FString& OutSnapshot,
     bool& OutScanTruncated,
@@ -64,7 +65,8 @@ bool BuildDiscovery(
     for (int32 Index = 0; Index < Assets.Num(); ++Index)
     {
         const FAssetData& Asset = Assets[Index];
-        const UnrealMCP::BlueprintFamilyPolicy::FFamilyInfo Family = AssetBlueprintFamily(Asset);
+        const UnrealMCP::BlueprintFamilyPolicy::FFamilyInfo Family =
+            AssetBlueprintFamily(Asset, ExtensionRegistry);
         if ((!AssetName.IsEmpty() && Asset.AssetName.ToString() != AssetName) || !Family.bSupported)
         {
             continue;

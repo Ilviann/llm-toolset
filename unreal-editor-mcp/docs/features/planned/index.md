@@ -2,7 +2,6 @@
 
 - [`umg-mvvm-inspect` — UMG ViewModel and View Binding inspection](umg-mvvm-inspect.md).
 - [`umg-mvvm` — UMG ViewModel and View Binding authoring](umg-mvvm.md).
-- [`gas-ability-blueprints-inspect` — Gameplay Ability Blueprint inspection](gas-ability-blueprints-inspect.md).
 - [`gas-ability-blueprints` — Gameplay Ability Blueprint creation and updating](gas-ability-blueprints.md).
 - [`gas-gameplay-effects-inspect` — Gameplay Effect inspection](gas-gameplay-effects-inspect.md).
 - [`gas-gameplay-effects` — Gameplay Effect creation and updating](gas-gameplay-effects.md).

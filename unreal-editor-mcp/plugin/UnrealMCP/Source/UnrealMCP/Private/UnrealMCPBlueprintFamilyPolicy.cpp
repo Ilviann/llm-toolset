@@ -167,9 +167,17 @@ bool SupportsRpcMode(const UClass* Class, const FString& Mode)
 
 TSharedRef<FJsonObject> BuildLiveCapabilities(const UBlueprint* Blueprint)
 {
+    return BuildLiveCapabilities(
+        Blueprint,
+        Classify(Blueprint != nullptr ? Blueprint->ParentClass : nullptr));
+}
+
+TSharedRef<FJsonObject> BuildLiveCapabilities(
+    const UBlueprint* Blueprint,
+    const FFamilyInfo& Family)
+{
     const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
     const UClass* ParentClass = Blueprint != nullptr ? Blueprint->ParentClass : nullptr;
-    const FFamilyInfo Family = Classify(ParentClass);
     const bool bNormalBlueprint = Blueprint != nullptr && Blueprint->BlueprintType == BPTYPE_Normal;
     const bool bDefaults = Blueprint != nullptr && Blueprint->GeneratedClass != nullptr
         && Blueprint->GeneratedClass->GetDefaultObject(false) != nullptr;

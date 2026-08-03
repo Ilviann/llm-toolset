@@ -34,6 +34,23 @@ def capabilities(*, ready=True, schema=EXTENSION_SCHEMA_REVISION, api=COMPANION_
     }
 
 
+def gas_capabilities(*, ready=True, schema=EXTENSION_SCHEMA_REVISION, api=COMPANION_API_VERSION):
+    return {
+        "companion_api_version": api,
+        "companions": [{
+            "extension_id": "unreal-mcp-gas",
+            "companion_api_version": api,
+            "schema_revision": schema,
+            "ready": ready,
+            "contributions": [{
+                "tool_family": "blueprint_inspect",
+                "operation": "inspect_gameplay_ability",
+                "access": "read",
+            }],
+        }],
+    }
+
+
 class ExtensionCatalogTests(unittest.TestCase):
     def tool(self, writable, name, native=None):
         base = tools_for_configuration(writable=writable, lifecycle_enabled=False)
@@ -88,6 +105,34 @@ class ExtensionCatalogTests(unittest.TestCase):
                 tool = self.tool(False, "blueprint_inspect", native)
                 with self.assertRaises(SchemaValidationError):
                     validate_tool_arguments(request, tool["inputSchema"])
+
+    def test_gas_companion_extends_standard_inspection_sections_only_when_ready(self):
+        valid = {
+            "mode": "inspect",
+            "asset_path": "/Game/Abilities/GA_Test.GA_Test",
+            "sections": ["summary", "gameplay_ability"],
+        }
+        validate_tool_arguments(
+            valid, self.tool(False, "blueprint_inspect", gas_capabilities())["inputSchema"],
+        )
+        for native in ({}, gas_capabilities(ready=False), gas_capabilities(schema=2), gas_capabilities(api=2)):
+            with self.subTest(native=native), self.assertRaises(SchemaValidationError):
+                validate_tool_arguments(
+                    valid, self.tool(False, "blueprint_inspect", native)["inputSchema"],
+                )
+
+    def test_gas_companion_never_adds_a_mutation_branch(self):
+        tools = compose_extension_tools(
+            tools_for_configuration(writable=True, lifecycle_enabled=False),
+            gas_capabilities(), writable=True,
+        )
+        inspect = next(tool for tool in tools if tool["name"] == "blueprint_inspect")
+        validate_tool_arguments({
+            "mode": "inspect", "asset_path": "/Game/GA.GA",
+            "sections": ["gameplay_ability"],
+        }, inspect["inputSchema"])
+        default_edit = next(tool for tool in tools if tool["name"] == "blueprint_default_edit")
+        self.assertNotIn("unreal-mcp-gas", json.dumps(default_edit))
 
     def test_server_rejects_forged_extensions_before_dispatch_and_routes_known_exact_schema(self):
         class Bridge:

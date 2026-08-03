@@ -10,6 +10,13 @@ FUnrealMCPBlueprintInspector::FUnrealMCPBlueprintInspector(TFunction<double()> I
 {
 }
 
+FUnrealMCPBlueprintInspector::FUnrealMCPBlueprintInspector(
+    const FUnrealMCPExtensionRegistry& InExtensionRegistry,
+    TFunction<double()> InNow)
+    : Now(MoveTemp(InNow)), ExtensionRegistry(&InExtensionRegistry)
+{
+}
+
 void FUnrealMCPBlueprintInspector::RemoveExpiredCursors(double CurrentTime)
 {
     using namespace UnrealMCP::BlueprintInspectionPrivate;
@@ -97,8 +104,8 @@ bool FUnrealMCPBlueprintInspector::ExecuteInitial(
     TSharedPtr<FJsonObject> FamilyCapabilities;
     bool bScanTruncated = false;
     const bool bBuilt = Mode == TEXT("discover")
-        ? BuildDiscovery(*Arguments, Records, Snapshot, bScanTruncated, OutError)
-        : BuildInspection(*Arguments, Records, Snapshot, BlueprintFamily, FamilyCapabilities, bScanTruncated, OutError);
+        ? BuildDiscovery(*Arguments, ExtensionRegistry, Records, Snapshot, bScanTruncated, OutError)
+        : BuildInspection(*Arguments, ExtensionRegistry, Records, Snapshot, BlueprintFamily, FamilyCapabilities, bScanTruncated, OutError);
     if (!bBuilt)
     {
         return false;

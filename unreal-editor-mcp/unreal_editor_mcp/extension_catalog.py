@@ -69,6 +69,14 @@ EXTENSION_CATALOG: Final = {
                 _mutation_shape("set_test_contribution_value"),
         },
     },
+    "unreal-mcp-gas": {
+        "schema_revision": EXTENSION_SCHEMA_REVISION,
+        "contributions": {},
+        "integrated_sections": {
+            ("blueprint_inspect", "inspect_gameplay_ability", "read"):
+                ("gameplay_ability",),
+        },
+    },
 }
 
 
@@ -88,6 +96,7 @@ def compose_extension_tools(
     if not isinstance(companions, list):
         return tools
     accepted: list[tuple[str, str, str, dict[str, object]]] = []
+    integrated_sections: dict[str, set[str]] = {}
     for companion in companions[:64]:
         if not isinstance(companion, dict) or companion.get("ready") is not True:
             continue
@@ -109,6 +118,9 @@ def compose_extension_tools(
         for key, schema in known["contributions"].items():
             if key in native_keys and (key[2] == "read" or writable):
                 accepted.append((*key, schema))
+        for key, sections in known.get("integrated_sections", {}).items():
+            if key in native_keys and (key[2] == "read" or writable):
+                integrated_sections.setdefault(key[0], set()).update(sections)
 
     by_name = {tool["name"]: tool for tool in tools}
     for tool_name, _operation, _access, schema in sorted(accepted):
@@ -122,6 +134,33 @@ def compose_extension_tools(
             input_schema["oneOf"].append(deepcopy(schema))
         else:
             tool["inputSchema"] = {"oneOf": [deepcopy(input_schema), deepcopy(schema)]}
+    for tool_name, sections in integrated_sections.items():
+        tool = by_name.get(tool_name)
+        if tool is None or not isinstance(tool.get("inputSchema"), dict):
+            continue
+        branches = tool["inputSchema"].get("oneOf")
+        if not isinstance(branches, list):
+            continue
+        for branch in branches:
+            if not isinstance(branch, dict):
+                continue
+            properties = branch.get("properties")
+            if not isinstance(properties, dict):
+                continue
+            mode = properties.get("mode")
+            section_schema = properties.get("sections")
+            if not isinstance(mode, dict) or mode.get("const") != "inspect":
+                continue
+            if not isinstance(section_schema, dict):
+                continue
+            items = section_schema.get("items")
+            values = items.get("enum") if isinstance(items, dict) else None
+            if not isinstance(values, list):
+                continue
+            for section in sorted(sections):
+                if section not in values:
+                    values.append(section)
+            section_schema["maxItems"] = len(values)
     return tools
 
 

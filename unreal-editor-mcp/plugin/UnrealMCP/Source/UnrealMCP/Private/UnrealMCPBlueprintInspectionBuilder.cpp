@@ -10,6 +10,7 @@ namespace UnrealMCP::BlueprintInspectionPrivate
 
 bool BuildInspection(
     const FJsonObject& Arguments,
+    const FUnrealMCPExtensionRegistry* ExtensionRegistry,
     TArray<TSharedPtr<FJsonValue>>& OutRecords,
     FString& OutSnapshot,
     FString& OutBlueprintFamily,
@@ -47,14 +48,23 @@ bool BuildInspection(
         OutError = {TEXT("wrong_type"), TEXT("The requested asset is not a Blueprint")};
         return false;
     }
-    if (!UnrealMCP::BlueprintFamilyPolicy::Supports(
-        Blueprint->ParentClass, UnrealMCP::BlueprintFamilyPolicy::EOperation::Inspect))
+    UnrealMCP::BlueprintFamilyPolicy::FFamilyInfo Family =
+        UnrealMCP::BlueprintFamilyPolicy::Classify(Blueprint->ParentClass);
+    const UClass* ClassifiedClass = Blueprint->GeneratedClass != nullptr
+        ? Blueprint->GeneratedClass : Blueprint->ParentClass;
+    if (!Family.bSupported && ExtensionRegistry != nullptr
+        && ExtensionRegistry->ClassifyBlueprintClass(
+            ClassifiedClass, Family.Name, Family.NativeBaseClass))
+    {
+        Family.bSupported = true;
+    }
+    if (!Family.bSupported)
     {
         OutError = {TEXT("wrong_type"), TEXT("The requested Blueprint does not belong to a published authoring family")};
         return false;
     }
-    OutBlueprintFamily = UnrealMCP::BlueprintFamilyPolicy::Classify(Blueprint->ParentClass).Name;
-    OutFamilyCapabilities = UnrealMCP::BlueprintFamilyPolicy::BuildLiveCapabilities(Blueprint);
+    OutBlueprintFamily = Family.Name;
+    OutFamilyCapabilities = UnrealMCP::BlueprintFamilyPolicy::BuildLiveCapabilities(Blueprint, Family);
     UPackage* Package = Blueprint->GetOutermost();
     const bool bDirtyBefore = Package->IsDirty();
     const EBlueprintStatus StatusBefore = Blueprint->Status;
@@ -75,6 +85,13 @@ bool BuildInspection(
 
     if (!CollectGraphs(Blueprint, Owners, Sections, GraphFilter, Sink, OutError)) return false;
     if (!CollectWidgetTree(Blueprint, WidgetFilter, PropertyNames, Sections, Sink, OutError)) return false;
+    if (ExtensionRegistry != nullptr
+        && !ExtensionRegistry->AppendBlueprintInspection(
+            *Blueprint, MakeShared<FJsonObject>(Arguments), OutRecords, Sink.Fingerprint,
+            OutFamilyCapabilities, OutError))
+    {
+        return false;
+    }
     if (Sink.ExceedsStructuralLimit())
     {
         OutError = {TEXT("response_too_large"), TEXT("Inspection exceeds the configured structural record limit")};

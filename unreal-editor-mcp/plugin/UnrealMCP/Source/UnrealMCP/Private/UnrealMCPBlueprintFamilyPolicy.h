@@ -37,5 +37,8 @@ bool SupportsComponentReplication(const UClass* Class);
 bool SupportsReplicatedVariables(const UClass* Class);
 bool SupportsRpcMode(const UClass* Class, const FString& Mode);
 TSharedRef<FJsonObject> BuildLiveCapabilities(const UBlueprint* Blueprint);
+TSharedRef<FJsonObject> BuildLiveCapabilities(
+    const UBlueprint* Blueprint,
+    const FFamilyInfo& Family);
 TArray<TSharedPtr<FJsonValue>> BuildPublishedMatrix();
 }

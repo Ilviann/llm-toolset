@@ -16,7 +16,7 @@ Feature identifiers are stable names, not execution indexes. Unfinished features
 - [ ] [`umg-mvvm` — UMG ViewModel and View Binding authoring](docs/features/planned/umg-mvvm.md) — Add typed MVVM ViewModel creation and Widget View Binding authoring through the MVVM companion.
   - Depends on:
     - `umg-mvvm-inspect`
-- [ ] [`gas-ability-blueprints-inspect` — Gameplay Ability Blueprint inspection](docs/features/planned/gas-ability-blueprints-inspect.md) — Add bounded typed inspection of existing Gameplay Ability Blueprint assets through an optional API-compatible companion plugin.
+- [x] [`gas-ability-blueprints-inspect` — Gameplay Ability Blueprint inspection](docs/features/completed/gas-ability-blueprints-inspect.md) — Add bounded typed inspection of existing Gameplay Ability Blueprint assets through an optional API-compatible companion plugin.
   - Depends on:
     - `companion-plugins`
 - [ ] [`gas-ability-blueprints` — Gameplay Ability Blueprint creation and updating](docs/features/planned/gas-ability-blueprints.md) — Add typed Gameplay Ability Blueprint creation and authoring through the GAS companion.
@@ -94,5 +94,6 @@ Feature checkboxes record implementation completion after mandatory Windows veri
   - `level-edit`
   - `readonly-mode`
   - `companion-plugins`
+  - `gas-ability-blueprints-inspect`
 - Windows:
   - None

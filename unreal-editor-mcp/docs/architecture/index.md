@@ -5,6 +5,7 @@ Each file in this directory documents one implemented cohesive component: what i
 - [`python-mcp-server.md`](python-mcp-server.md) — stdio protocol, schemas, discovery, authenticated bridge client, errors, and shutdown.
 - [`editor-bridge.md`](editor-bridge.md) — plugin composition, credentials, listener/route ownership, dispatch, commands, limits, and heartbeat.
 - [`companion-extension-registry.md`](companion-extension-registry.md) — companion discovery, admission, lifecycle, capability intersection, and base-owned dispatch policy.
+- [`gas-ability-inspection.md`](gas-ability-inspection.md) — optional GAS companion ownership, Gameplay Ability family classification, typed inspection, fingerprints, and read-only capability policy.
 - [`editor-lifecycle.md`](editor-lifecycle.md) — opt-in configured launch, graceful shutdown, durable restart, cancellation, and retained records.
 - [`blueprint-family-policy.md`](blueprint-family-policy.md) — explicit Actor/GameMode/GameState/GameInstance/Widget classification, published operation matrix, live family capabilities, and exclusions.
 - [`blueprint-inspector.md`](blueprint-inspector.md) — bounded Asset Registry discovery, exact published-family Blueprint inspection, snapshots, identities, values, and cursors.

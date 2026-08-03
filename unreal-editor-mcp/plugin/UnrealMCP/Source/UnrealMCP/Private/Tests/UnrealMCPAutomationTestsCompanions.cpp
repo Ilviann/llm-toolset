@@ -4,6 +4,8 @@
 
 #include "UObject/StrongObjectPtr.h"
 #include "IUnrealMCPModule.h"
+#include "Kismet2/KismetEditorUtilities.h"
+#include "UnrealMCPBlueprintInspector.h"
 #include "UnrealMCPExtensionRegistry.h"
 
 namespace
@@ -25,6 +27,14 @@ public:
         TSharedPtr<FJsonObject>& OutResult, FUnrealMCPExtensionError&) override
     {
         OutResult = MakeShared<FJsonObject>();
+        const TSharedRef<FJsonObject> Record = MakeShared<FJsonObject>();
+        Record->SetStringField(TEXT("section"), TEXT("synthetic_family"));
+        OutResult->SetArrayField(TEXT("records"), {
+            MakeShared<FJsonValueObject>(Record)});
+        const TSharedRef<FJsonObject> Capabilities = MakeShared<FJsonObject>();
+        Capabilities->SetBoolField(TEXT("inspection"), true);
+        Capabilities->SetBoolField(TEXT("mutation"), false);
+        OutResult->SetObjectField(TEXT("family_capabilities"), Capabilities);
         return true;
     }
     virtual bool AppendFingerprint(const UObject&, const FString&, FString& OutFingerprint,
@@ -56,6 +66,7 @@ FUnrealMCPCompanionRegistration SyntheticRegistration(
     Contribution.Operation = Operation;
     Contribution.TargetFamily = TargetFamily;
     Contribution.TargetClassPath = TEXT("/Script/CoreUObject.Object");
+    Contribution.bAllowDerivedTargetClasses = true;
     Contribution.Handler = MakeShared<FSyntheticCompanionHandler>();
     FUnrealMCPCompanionRegistration Registration;
     Registration.PluginName = TEXT("SyntheticPlugin") + ExtensionId;
@@ -195,10 +206,22 @@ private:
             const TArray<TSharedPtr<FJsonValue>>* Companions = nullptr;
             Test.TestTrue(TEXT("capabilities publish the test companion"),
                 (*Object)->TryGetArrayField(TEXT("companions"), Companions)
-                    && Companions != nullptr && Companions->Num() == 1);
-            if (Companions != nullptr && Companions->Num() == 1)
+                    && Companions != nullptr && !Companions->IsEmpty());
+            if (Companions != nullptr)
             {
-                const TSharedPtr<FJsonObject> Companion = (*Companions)[0]->AsObject();
+                TSharedPtr<FJsonObject> Companion;
+                for (const TSharedPtr<FJsonValue>& Value : *Companions)
+                {
+                    const TSharedPtr<FJsonObject> Candidate = Value->AsObject();
+                    if (Candidate.IsValid()
+                        && Candidate->GetStringField(TEXT("extension_id")) == TEXT("unreal-mcp-test"))
+                    {
+                        Companion = Candidate;
+                        break;
+                    }
+                }
+                Test.TestTrue(TEXT("test companion record is present"), Companion.IsValid());
+                if (!Companion.IsValid()) return;
                 Test.TestEqual(TEXT("test companion identity"), Companion->GetStringField(TEXT("extension_id")),
                     FString(TEXT("unreal-mcp-test")));
                 Test.TestTrue(TEXT("test companion is ready"), Companion->GetBoolField(TEXT("ready")));
@@ -355,6 +378,59 @@ bool FUnrealMCPCompanionAdmissionTest::RunTest(const FString& Parameters)
             FirstCapability->GetStringField(TEXT("unavailable_reason")),
             FString(TEXT("shutting_down")));
     }
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FUnrealMCPCompanionBlueprintFamilyInspectionTest,
+    "UnrealMCP.Companions.BlueprintFamilyInspectionIntegration",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FUnrealMCPCompanionBlueprintFamilyInspectionTest::RunTest(const FString& Parameters)
+{
+    IUnrealMCPModule& Owner = IUnrealMCPModule::Get();
+    FUnrealMCPExtensionRegistry Registry;
+    FUnrealMCPCompanionRegistration Registration = SyntheticRegistration(
+        TEXT("synthetic_blueprint_family"), TEXT("inspect_synthetic_blueprint_family"));
+    Registration.Contributions[0].StableLimits.Add(TEXT("records"), 1);
+    Registry.AddDescriptorForTesting(Registration);
+    TestTrue(TEXT("synthetic Blueprint family registers"),
+        Registry.Register(Registration, Owner).bAccepted);
+    Registry.Freeze();
+
+    UPackage* Package = CreatePackage(TEXT("/Engine/Transient/UnrealMCPSyntheticFamilyTest"));
+    UBlueprint* Blueprint = FKismetEditorUtilities::CreateBlueprint(
+        UObject::StaticClass(), Package, TEXT("BP_SyntheticFamily"), BPTYPE_Normal,
+        UBlueprint::StaticClass(), UBlueprintGeneratedClass::StaticClass());
+    TestNotNull(TEXT("synthetic UObject Blueprint is created"), Blueprint);
+    if (Blueprint == nullptr)
+    {
+        return false;
+    }
+    FKismetEditorUtilities::CompileBlueprint(Blueprint);
+    const bool bDirtyBefore = Package->IsDirty();
+    FUnrealMCPBlueprintInspector Inspector(Registry);
+    const TSharedRef<FJsonObject> Arguments = MakeShared<FJsonObject>();
+    Arguments->SetStringField(TEXT("mode"), TEXT("inspect"));
+    Arguments->SetStringField(TEXT("asset_path"), Blueprint->GetPathName());
+    Arguments->SetArrayField(TEXT("sections"), {
+        MakeShared<FJsonValueString>(TEXT("summary"))});
+    TSharedPtr<FJsonObject> Result;
+    FUnrealMCPError Error;
+    TestTrue(TEXT("standard Blueprint inspector accepts the extension family"),
+        Inspector.Execute(Arguments, Result, Error));
+    if (!Result.IsValid())
+    {
+        return false;
+    }
+    TestEqual(TEXT("extension family identity is authoritative"),
+        Result->GetStringField(TEXT("blueprint_family")), FString(TEXT("synthetic_target")));
+    TestEqual(TEXT("extension record participates in the standard page"),
+        Result->GetArrayField(TEXT("records")).Num(), 2);
+    TestTrue(TEXT("extension family capabilities are nested by family"),
+        Result->GetObjectField(TEXT("family_capabilities"))->HasField(TEXT("synthetic_target")));
+    TestEqual(TEXT("inspection preserves package dirtiness"),
+        Package->IsDirty(), bDirtyBefore);
+    TestEqual(TEXT("published extension family matrix has one record"),
+        Registry.BuildBlueprintFamilyCapabilities().Num(), 1);
     return true;
 }
 

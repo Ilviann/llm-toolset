@@ -2,6 +2,8 @@
 
 `capabilities.blueprint_families` contains seven ordered family records. Each adds `multiplayer` with exact Actor/component/variable replication Booleans and supported RPC modes. Parent change is always false; project assignment is true only for the two GameMode families and GameInstance. GameInstance and Widget report components false; Widget alone reports `widget_tree: true` and live `umg_authoring: true`.
 
+Ready companion-owned inspection families follow those seven records in deterministic registry order. They publish their extension identity and enable only `discover` and `inspect`; mutation, catalog, project-assignment, component, and graph-edit operations remain false. `UnrealMCPGAS` contributes `gameplay_ability` only while its exact registration is live.
+
 Classification uses the live native or generated class. Descendants of `AGameMode` remain `game_mode`; other descendants of `AGameModeBase` are `game_mode_base`. The equivalent nearest-family rule applies to `AGameState` and `AGameStateBase`. Other `AActor` descendants are `actor`. `UGameInstance` descendants are `game_instance`, `UUserWidget` descendants are `widget`, and unrelated UObject classes remain unsupported.
 
 Discovery asset records add `blueprint_family` and `native_family_class`. Exact inspection pages, mutation results, action catalogs, and graph-edit results add `blueprint_family`. Exact inspection and mutation results also add `family_capabilities`, with live Booleans for `class_defaults`, `components`, `widget_tree`, `event_graphs`, `local_variables`, and `overrides`, plus `graph_types.event`, `graph_types.function`, and `graph_types.macro`.

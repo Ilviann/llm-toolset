@@ -10,6 +10,8 @@ Each `FUnrealMCPExtensionContribution` has one stable ID, category (`AssetFamily
 
 `IUnrealMCPExtensionHandler` provides readiness, exact target support, argument validation, inspection, companion-owned fingerprint material, mutation, and read-back callbacks. Handlers receive loaded objects only after base validation and always run on the Game thread. Model input remains untrusted even though companions are trusted native project code.
 
+For a read-only Blueprint `AssetFamily`, the base may use the existing target family/class policy, handler, and stable limits to integrate the family into ordinary `blueprint_inspect`. The handler receives the verified generated-class default object, returns bounded records plus nested family capabilities, and supplies fingerprint material included in the base snapshot. This does not enable any base mutation surface.
+
 ## Descriptor and capability records
 
 A companion descriptor has top-level `companion_api_version` and an `unreal_mcp_companion` object containing `extension_id`, `schema_revision`, `owning_module`, and `required_engine_plugins`. It must declare an enabled dependency on `UnrealMCP`; the base dependency has no semantic-version pin.

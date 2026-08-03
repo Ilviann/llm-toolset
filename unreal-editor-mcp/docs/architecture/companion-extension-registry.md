@@ -14,8 +14,10 @@ The Python server owns an exact-version allowlist in `unreal_editor_mcp/extensio
 
 Accepted requests still use the base authenticated route, bounded queue, Game-thread dispatch, mutation ledger, target and mount checks, stale snapshots, editor transactions, postcondition read-back, rollback verification, and stable protocol errors. The companion handler may narrow validation and operate only on its declared target; it cannot broaden base policy.
 
+An admitted read-only `AssetFamily` contribution for `blueprint_inspect` may classify a new Blueprint family through its existing target-family/class policy. The base inspector still owns discovery and ordinary Blueprint collection, calls the typed handler on the generated-class default object, incorporates the companion fingerprint into its snapshot, and appends only bounded companion records. This integration uses companion API v1 unchanged.
+
 ## Implementation and verification
 
-`plugin/UnrealMCPTestCompanion/` is an independently versioned, disabled-by-default editor-only fixture. It registers read and mutation pairs for a new UObject asset family, a Blueprint component family, and an existing Actor Blueprint contribution. `UnrealMCP.Companions.AuthenticatedBridgeRoundTrip`, Python schema/server contracts, the headless companion scenario, public API probes, builds, and packaging cover the boundary.
+`plugin/UnrealMCPTestCompanion/` is an independently versioned, disabled-by-default editor-only fixture. It registers read and mutation pairs for a new UObject asset family, a Blueprint component family, and an existing Actor Blueprint contribution. `plugin/UnrealMCPGAS/` is the first released companion and registers one inspection-only Gameplay Ability Blueprint family. `UnrealMCP.Companions.AuthenticatedBridgeRoundTrip`, `UnrealMCP.Companions.BlueprintFamilyInspectionIntegration`, Python schema/server contracts, headless companion checks, public API probes, builds, and packaging cover the boundary.
 
 [Types and author contract](../types/companion-extension-registry/index.md) · [User guide](../user/companion-plugins.md) · [Architecture index](index.md)

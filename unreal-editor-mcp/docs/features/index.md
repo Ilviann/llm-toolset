@@ -53,7 +53,7 @@ Keep the authoritative checklist in [`ROADMAP.md`](../../ROADMAP.md) synchronize
 - [`umg-mvvm` — UMG ViewModel and View Binding authoring](planned/umg-mvvm.md) — Add typed MVVM ViewModel creation and Widget View Binding authoring through the MVVM companion.
   - Depends on:
     - `umg-mvvm-inspect`
-- [`gas-ability-blueprints-inspect` — Gameplay Ability Blueprint inspection](planned/gas-ability-blueprints-inspect.md) — Add bounded typed inspection of existing Gameplay Ability Blueprint assets through an optional API-compatible companion plugin.
+- [`gas-ability-blueprints-inspect` — Gameplay Ability Blueprint inspection](completed/gas-ability-blueprints-inspect.md) — Add bounded typed inspection of existing Gameplay Ability Blueprint assets through an optional API-compatible companion plugin.
   - Depends on:
     - `companion-plugins`
 - [`gas-ability-blueprints` — Gameplay Ability Blueprint creation and updating](planned/gas-ability-blueprints.md) — Add typed Gameplay Ability Blueprint creation and authoring through the GAS companion.
