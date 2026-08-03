@@ -68,6 +68,10 @@ def serve(
                     response = error(None, -32603, "Internal error")
             if response is not None:
                 print(json.dumps(response, ensure_ascii=False, separators=(",", ":")), file=destination, flush=True)
+            drain_notifications = getattr(server, "drain_notifications", None)
+            if callable(drain_notifications):
+                for notification in drain_notifications():
+                    print(json.dumps(notification, ensure_ascii=False, separators=(",", ":")), file=destination, flush=True)
     finally:
         close = getattr(server, "close", None)
         if callable(close):

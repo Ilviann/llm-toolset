@@ -95,6 +95,19 @@ inline TSharedPtr<FHttpServerRequest> MakeRequest(const FString& Authorization, 
     return Request;
 }
 
+inline TSharedPtr<FHttpServerRequest> MakeJsonRequest(
+    const FString& Authorization,
+    const FString& Json)
+{
+    const TSharedPtr<FHttpServerRequest> Request = MakeShared<FHttpServerRequest>();
+    Request->RelativePath = Phase1RoutePath;
+    Request->Verb = EHttpServerRequestVerbs::VERB_POST;
+    Request->Headers.FindOrAdd(TEXT("authorization")).Add(Authorization);
+    FTCHARToUTF8 Encoded(*Json);
+    Request->Body.Append(reinterpret_cast<const uint8*>(Encoded.Get()), Encoded.Length());
+    return Request;
+}
+
 inline bool LoadLiveToken(FString& OutToken)
 {
     if (!FFileHelper::LoadFileToString(OutToken, *FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("UnrealMCP"), TEXT("bridge.token"))))

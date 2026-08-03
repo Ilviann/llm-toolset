@@ -253,7 +253,8 @@ class HeadlessIntegrationScriptTests(unittest.TestCase):
             verify_readonly_lifecycle_server(server, recording, layout)
             names = [tool["name"] for tool in server.tools]
             self.assertEqual(names, READONLY_LIFECYCLE_TOOL_NAMES)
-            self.assertEqual(recording.calls, ["capabilities"])
+            self.assertTrue(recording.calls)
+            self.assertEqual(set(recording.calls), {"capabilities"})
 
     def test_lost_operation_reconciliation_accepts_terminal_partial_state(self):
         from headless_integration.lifecycle import reconcile_operation

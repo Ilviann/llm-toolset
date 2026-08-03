@@ -595,7 +595,7 @@ bool FUnrealMCPLevelManagementService::Manage(
         bool bOpenAfterCreate = false;
         const TSharedPtr<FJsonObject>* Source = nullptr;
         if (!ReadExactMapPath(*Arguments, TEXT("destination_path"), MapPath, PackageName, AssetName, OutError)
-            || !ValidateMutationScope(PackageName, OutError)
+            || !UnrealMCPLevelManagementPrivate::ValidateMutationScope(PackageName, OutError)
             || !Arguments->TryGetBoolField(TEXT("open_after_create"), bOpenAfterCreate)
             || !Arguments->TryGetObjectField(TEXT("source"), Source) || Source == nullptr || !Source->IsValid()
             || !(*Source)->TryGetStringField(TEXT("kind"), SourceKind)) return false;
@@ -810,7 +810,7 @@ bool FUnrealMCPLevelManagementService::Manage(
     bool bReloadAfterSave = false;
     if (!Arguments->TryGetBoolField(TEXT("reload_after_save"), bReloadAfterSave)
         || !ReadExactMapPath(*Arguments, TEXT("map_path"), MapPath, PackageName, AssetName, OutError)
-        || !ValidateMutationScope(PackageName, OutError)) return false;
+        || !UnrealMCPLevelManagementPrivate::ValidateMutationScope(PackageName, OutError)) return false;
     if (MapPath != CurrentPath)
     {
         OutError = {TEXT("not_current_map"), TEXT("configure applies only to the exact current map; use level_open explicitly first")};

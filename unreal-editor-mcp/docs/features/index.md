@@ -43,7 +43,7 @@ Keep the authoritative checklist in [`ROADMAP.md`](../../ROADMAP.md) synchronize
 - [`umg-authoring` — UMG layout, styling, bindings, and UI logic](completed/umg-authoring.md) — Complete practical HUD and menu authoring on the Widget Blueprint family.
   - Depends on:
     - `widget-tree`
-- [`companion-plugins` — Companion plugin extension foundation](planned/companion-plugins.md) — Discover API-compatible independently versioned companion plugins and safely register bounded support for additional asset types, component types, and operations on existing assets.
+- [`companion-plugins` — Companion plugin extension foundation](completed/companion-plugins.md) — Discover API-compatible independently versioned companion plugins and safely register bounded support for additional asset types, component types, and operations on existing assets.
   - Depends on:
     - `readonly-mode`
 - [`umg-mvvm-inspect` — UMG ViewModel and View Binding inspection](planned/umg-mvvm-inspect.md) — Add bounded typed inspection of existing MVVM ViewModel Blueprints and Widget View Bindings through an optional API-compatible companion plugin.

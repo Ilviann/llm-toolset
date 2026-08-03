@@ -43,6 +43,7 @@ from .game_data_levels import (
 )
 from .readonly_mode import verify_readonly_mode, verify_windows_readonly_lifecycle
 from .widgets import author_widget_scenario, verify_restarted_widgets
+from .companions import verify_companion_scenario
 
 
 def required_path(name: str) -> Path:
@@ -664,6 +665,7 @@ def main() -> int:
                 "mutation_scope": "project_content_and_local_project_plugins",
             }:
                 raise AssertionError("asset access policy contract mismatch")
+            verify_companion_scenario(bridge, capabilities)
             level_scenario = open_acceptance_level(
                 bridge,
                 layout,

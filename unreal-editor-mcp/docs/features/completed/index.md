@@ -1,5 +1,7 @@
 # Completed features
 
+- [`companion-plugins` — Companion plugin extension foundation](companion-plugins.md).
+
 - [`phase-4` — Reliable mutations, Actor components, and defaults](phase-4.md).
 - [`phase-5` — Blueprint member variables](phase-5.md).
 - [`phase-6` — Function signatures and local variables](phase-6.md).

@@ -1,11 +1,15 @@
 #include "Modules/ModuleManager.h"
 
+#include "Dom/JsonObject.h"
 #include "HAL/FileManager.h"
+#include "Interfaces/IPluginManager.h"
+#include "IUnrealMCPModule.h"
 #include "Misc/ConfigCacheIni.h"
 #include "Misc/Paths.h"
 #include "Misc/SecureHash.h"
 #include "UnrealMCPBridge.h"
 #include "UnrealMCPCompatibility.h"
+#include "UnrealMCPExtensionRegistry.h"
 #include "UnrealMCPTokenStore.h"
 #include "UnrealMCPVersion.h"
 
@@ -46,7 +50,7 @@ void ConfigureLoopbackListener(uint32 Port)
 }
 }
 
-class FUnrealMCPModule final : public IModuleInterface
+class FUnrealMCPModule final : public IUnrealMCPModule
 {
 public:
     virtual void StartupModule() override
@@ -54,6 +58,16 @@ public:
         if (!UnrealMCP::Compatibility::SupportsCurrentEngine())
         {
             UE_LOG(LogUnrealMCP, Error, TEXT("Unreal MCP does not support this engine API line"));
+            return;
+        }
+        const TSharedPtr<IPlugin> BasePlugin = IPluginManager::Get().FindPlugin(TEXT("UnrealMCP"));
+        double DescriptorApiVersion = 0.0;
+        if (!BasePlugin.IsValid() || !BasePlugin->GetDescriptorJson().IsValid()
+            || !BasePlugin->GetDescriptorJson()->TryGetNumberField(TEXT("companion_api_version"), DescriptorApiVersion)
+            || !FMath::IsNearlyEqual(DescriptorApiVersion, FMath::RoundToDouble(DescriptorApiVersion))
+            || static_cast<int32>(DescriptorApiVersion) != UnrealMCP::CompanionApiVersion)
+        {
+            UE_LOG(LogUnrealMCP, Error, TEXT("Unreal MCP disabled: descriptor and compiled companion API versions disagree"));
             return;
         }
         const uint32 Port = ConfiguredPort();
@@ -74,7 +88,11 @@ public:
             return;
         }
         ConfigureLoopbackListener(Port);
-        Bridge = MakeShared<FUnrealMCPBridge>(MoveTemp(Token), StateDirectory, ProjectHash(), Port);
+        ExtensionRegistry = MakeShared<FUnrealMCPExtensionRegistry>();
+        ExtensionRegistry->DiscoverAndLoad();
+        ExtensionRegistry->Freeze();
+        Bridge = MakeShared<FUnrealMCPBridge>(
+            MoveTemp(Token), StateDirectory, ProjectHash(), Port, ExtensionRegistry.ToSharedRef());
         if (!Bridge->Start(Error))
         {
             UE_LOG(LogUnrealMCP, Error, TEXT("Unreal MCP disabled: %s"), *Error);
@@ -86,15 +104,45 @@ public:
 
     virtual void ShutdownModule() override
     {
+        if (ExtensionRegistry)
+        {
+            ExtensionRegistry->BeginShutdown();
+        }
         if (Bridge)
         {
             Bridge->Stop();
             Bridge.Reset();
         }
+        ExtensionRegistry.Reset();
+    }
+
+    virtual int32 GetCompanionApiVersion() const override
+    {
+        return UnrealMCP::CompanionApiVersion;
+    }
+
+    virtual FUnrealMCPRegistrationResult RegisterCompanion(
+        const FUnrealMCPCompanionRegistration& Registration,
+        IModuleInterface& OwningModule) override
+    {
+        return ExtensionRegistry
+            ? ExtensionRegistry->Register(Registration, OwningModule)
+            : FUnrealMCPRegistrationResult{false, {}, TEXT("registry_unavailable")};
+    }
+
+    virtual void UnregisterCompanion(
+        FUnrealMCPRegistrationHandle Handle,
+        IModuleInterface& OwningModule) override
+    {
+        if (ExtensionRegistry)
+        {
+            ExtensionRegistry->Unregister(Handle, OwningModule);
+        }
     }
 
 private:
     TSharedPtr<FUnrealMCPBridge> Bridge;
+    TSharedPtr<FUnrealMCPExtensionRegistry> ExtensionRegistry;
 };
 
 IMPLEMENT_MODULE(FUnrealMCPModule, UnrealMCP)

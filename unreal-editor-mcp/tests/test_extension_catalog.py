@@ -1,0 +1,167 @@
+import unittest
+import json
+
+from unreal_editor_mcp.extension_catalog import (
+    COMPANION_API_VERSION,
+    EXTENSION_SCHEMA_REVISION,
+    compose_extension_tools,
+)
+from unreal_editor_mcp.schema_validation import SchemaValidationError, validate_tool_arguments
+from unreal_editor_mcp.server import MCPServer
+from unreal_editor_mcp.errors import DomainError, ErrorCode
+from unreal_editor_mcp.project import ProjectIdentity
+from unreal_editor_mcp.tool_catalog import tools_for_configuration
+
+
+def capabilities(*, ready=True, schema=EXTENSION_SCHEMA_REVISION, api=COMPANION_API_VERSION):
+    contributions = [
+        {"tool_family": "blueprint_inspect", "operation": "inspect_test_asset", "access": "read"},
+        {"tool_family": "blueprint_default_edit", "operation": "set_test_asset_value", "access": "mutation"},
+        {"tool_family": "blueprint_inspect", "operation": "inspect_test_component", "access": "read"},
+        {"tool_family": "blueprint_component_edit", "operation": "set_test_component_value", "access": "mutation"},
+        {"tool_family": "blueprint_inspect", "operation": "inspect_test_contribution", "access": "read"},
+        {"tool_family": "blueprint_default_edit", "operation": "set_test_contribution_value", "access": "mutation"},
+    ]
+    return {
+        "companion_api_version": api,
+        "companions": [{
+            "extension_id": "unreal-mcp-test",
+            "companion_api_version": api,
+            "schema_revision": schema,
+            "ready": ready,
+            "contributions": contributions,
+        }],
+    }
+
+
+class ExtensionCatalogTests(unittest.TestCase):
+    def tool(self, writable, name, native=None):
+        base = tools_for_configuration(writable=writable, lifecycle_enabled=False)
+        tools = compose_extension_tools(base, capabilities() if native is None else native, writable=writable)
+        return next(tool for tool in tools if tool["name"] == name)
+
+    def test_readonly_intersection_adds_only_exact_read_contributions(self):
+        inspect = self.tool(False, "blueprint_inspect")
+        valid = {
+            "extension_id": "unreal-mcp-test",
+            "extension_schema_revision": 1,
+            "operation": "inspect_test_asset",
+            "asset_path": "/Game/Test.Asset",
+        }
+        validate_tool_arguments(valid, inspect["inputSchema"])
+        self.assertNotIn("blueprint_default_edit", {
+            tool["name"] for tool in compose_extension_tools(
+                tools_for_configuration(writable=False, lifecycle_enabled=False),
+                capabilities(), writable=False,
+            )
+        })
+
+    def test_writable_intersection_adds_exact_mutation_shape(self):
+        tool = self.tool(True, "blueprint_default_edit")
+        valid = {
+            "extension_id": "unreal-mcp-test",
+            "extension_schema_revision": 1,
+            "operation": "set_test_asset_value",
+            "operation_id": "a" * 32,
+            "asset_path": "/Game/Test.Asset",
+            "expected_snapshot": "b" * 40,
+            "value": 7,
+        }
+        validate_tool_arguments(valid, tool["inputSchema"])
+        for forged in (
+            {**valid, "extension_id": "forged"},
+            {**valid, "operation": "arbitrary"},
+            {**valid, "value": 1000001},
+            {**valid, "extra": True},
+        ):
+            with self.assertRaises(SchemaValidationError):
+                validate_tool_arguments(forged, tool["inputSchema"])
+
+    def test_absent_rejected_or_mismatched_native_extension_adds_no_schema(self):
+        cases = ({}, capabilities(ready=False), capabilities(schema=2), capabilities(api=2))
+        request = {
+            "extension_id": "unreal-mcp-test", "extension_schema_revision": 1,
+            "operation": "inspect_test_asset", "asset_path": "/Game/Test.Asset",
+        }
+        for native in cases:
+            with self.subTest(native=native):
+                tool = self.tool(False, "blueprint_inspect", native)
+                with self.assertRaises(SchemaValidationError):
+                    validate_tool_arguments(request, tool["inputSchema"])
+
+    def test_server_rejects_forged_extensions_before_dispatch_and_routes_known_exact_schema(self):
+        class Bridge:
+            def __init__(self):
+                self.calls = []
+
+            def call(self, command, arguments=None):
+                self.calls.append((command, arguments))
+                if command == "capabilities":
+                    return capabilities()
+                return {"routed": command, "operation": arguments["operation"]}
+
+            def close(self):
+                pass
+
+        bridge = Bridge()
+        server = MCPServer(bridge, writable=True)
+        server.handle({"jsonrpc": "2.0", "id": 1, "method": "tools/list"})
+        valid = {
+            "extension_id": "unreal-mcp-test", "extension_schema_revision": 1,
+            "operation": "inspect_test_asset", "asset_path": "/Game/Test.Asset",
+        }
+        response = server.handle({
+            "jsonrpc": "2.0", "id": 2, "method": "tools/call",
+            "params": {"name": "blueprint_inspect", "arguments": valid},
+        })
+        payload = json.loads(response["result"]["content"][0]["text"])
+        self.assertEqual(payload["operation"], "inspect_test_asset")
+        dispatched = len([call for call in bridge.calls if call[0] == "blueprint_inspect"])
+        forged = {**valid, "extension_id": "forged"}
+        rejected = server.handle({
+            "jsonrpc": "2.0", "id": 3, "method": "tools/call",
+            "params": {"name": "blueprint_inspect", "arguments": forged},
+        })
+        self.assertEqual(rejected["error"]["code"], -32602)
+        self.assertEqual(
+            len([call for call in bridge.calls if call[0] == "blueprint_inspect"]), dispatched,
+        )
+
+    def test_capability_transition_emits_one_bounded_tool_list_notification(self):
+        class Bridge:
+            available = True
+
+            def call(self, command, arguments=None):
+                if not self.available:
+                    raise DomainError("offline", code=ErrorCode.EDITOR_UNAVAILABLE)
+                return capabilities()
+
+            def close(self):
+                pass
+
+        bridge = Bridge()
+        server = MCPServer(bridge, project_identity=ProjectIdentity("Fixture", "a" * 40))
+        server.handle({
+            "jsonrpc": "2.0", "id": 4, "method": "tools/call",
+            "params": {"name": "capabilities", "arguments": {}},
+        })
+        self.assertEqual(server.drain_notifications(), [{
+            "jsonrpc": "2.0", "method": "notifications/tools/list_changed",
+        }])
+        server.handle({
+            "jsonrpc": "2.0", "id": 5, "method": "tools/call",
+            "params": {"name": "capabilities", "arguments": {}},
+        })
+        self.assertEqual(server.drain_notifications(), [])
+        bridge.available = False
+        server.handle({
+            "jsonrpc": "2.0", "id": 6, "method": "tools/call",
+            "params": {"name": "capabilities", "arguments": {}},
+        })
+        self.assertEqual(server.drain_notifications(), [{
+            "jsonrpc": "2.0", "method": "notifications/tools/list_changed",
+        }])
+
+
+if __name__ == "__main__":
+    unittest.main()

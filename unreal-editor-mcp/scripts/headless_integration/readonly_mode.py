@@ -106,6 +106,7 @@ def verify_readonly_lifecycle_server(
     layout: ProjectLayout,
 ) -> None:
     """Prove lifecycle-only access and preservation through a real restart."""
+    before = _project_fingerprint(layout.root)
     listed = server.handle({"jsonrpc": "2.0", "id": 1, "method": "tools/list"})
     names = [tool["name"] for tool in listed["result"]["tools"]]
     if names != READONLY_LIFECYCLE_TOOL_NAMES:
@@ -125,7 +126,6 @@ def verify_readonly_lifecycle_server(
     if recording_bridge.calls != before_rejection:
         raise AssertionError("writable-tool rejection contacted the native bridge")
 
-    before = _project_fingerprint(layout.root)
     launched = False
     stopped = False
     try:
@@ -222,13 +222,13 @@ def verify_readonly_mode(
     map_path: str,
 ) -> None:
     """Exercise every readonly tool and prove project-owned bytes are unchanged."""
+    before = _project_fingerprint(layout.root)
     server = MCPServer(bridge, project_identity=layout.identity())
     listed = server.handle({"jsonrpc": "2.0", "id": 1, "method": "tools/list"})
     names = [tool["name"] for tool in listed["result"]["tools"]]
     if names != READONLY_TOOL_NAMES:
         raise AssertionError(f"readonly tool catalog mismatch: {names!r}")
 
-    before = _project_fingerprint(layout.root)
     capabilities = _call(server, "capabilities", {})
     if capabilities.get("access_mode") != "readonly":
         raise AssertionError(f"readonly capability mode mismatch: {capabilities!r}")

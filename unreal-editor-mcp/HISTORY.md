@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.29.0 — 2026-08-03
+
+- Added companion API v1 with bounded plugin discovery, exact descriptor/compiled admission, frozen base-owned registration, deterministic capabilities, three typed contribution categories, authenticated Game-thread dispatch, stale-safe transactional mutation, postcondition read-back, and shutdown ordering.
+- Added exact Python/native schema intersection with readonly filtering and tool-list change notifications, plus an independently versioned disposable companion covering new asset, component, and existing-asset contributions.
+- Added companion packaging support, author and user contracts, public-header probes, Python/server contracts, native authenticated-route Automation, and Windows production-socket acceptance. macOS verification remains preferred follow-up work.
+
 ## 0.28.0 — 2026-08-03
 
 - Made readonly access the default nine-tool MCP catalog, required the explicit `--writable` trust decision for the 25-tool content-authoring catalog, and published the authoritative `access_mode` independently from native capabilities.

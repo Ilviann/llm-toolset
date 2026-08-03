@@ -4,7 +4,15 @@
 
 namespace UnrealMCP
 {
-inline constexpr TCHAR Version[] = TEXT("0.28.0");
+inline constexpr TCHAR Version[] = TEXT("0.29.0");
+inline constexpr int32 CompanionApiVersion = 1;
+inline constexpr int32 ExtensionSchemaRevision = 1;
+inline constexpr int32 MaxDiscoveredCompanions = 64;
+inline constexpr int32 MaxAcceptedCompanions = 16;
+inline constexpr int32 MaxCompanionContributions = 32;
+inline constexpr int32 MaxCompanionCapabilityRecords = 128;
+inline constexpr int32 MaxCompanionDiagnostics = 64;
+inline constexpr int32 MaxExtensionIdChars = 64;
 inline constexpr uint32 DefaultPort = 15485;
 inline constexpr int32 MaxRequestBytes = 64 * 1024;
 inline constexpr int32 MaxResponseBytes = 256 * 1024;

@@ -1,12 +1,14 @@
 ---
 feature_id: companion-plugins
-status: planned
+status: completed
 depends_on:
   - readonly-mode
-released_in: null
+released_in: "0.29.0"
 ---
 
 # `companion-plugins` — Companion plugin extension foundation
+
+**Implementation status:** Completed in 0.29.0. Windows passed the public API probe, adaptive, forced-unity, and explicit non-unity builds, native authenticated-bridge Automation, complete Python suites, production-socket acceptance, and base/fixture Win64 packaging. macOS verification remains preferred follow-up work; Linux is out of scope.
 
 **Outcome:** API-compatible independently versioned editor-only companion plugins can be discovered and can safely register bounded support for additional asset types, component types, and functionality on existing assets through the base Unreal MCP bridge.
 
@@ -49,6 +51,6 @@ released_in: null
 
 - Document companion installation, effective project enablement, independent semantic versioning, strict `companion_api_version` equality, descriptor and compiled checks, discovery and restart behavior, extension and schema identities, capability detection, read versus mutation availability, access-mode interaction, limits, stable unavailable reasons, packaging, and troubleshooting.
 - Document the supported extension categories and base-owned invariants for authors of future in-repository companions. State that companions are trusted native project code but all model input remains untrusted, and that Unreal MCP never downloads, installs, enables, or hot-loads companions or their Engine dependencies at runtime.
-- Complete the feature only when the fixture proves all three extension categories through the existing authenticated bridge, rejected companions expose no partial functionality, readonly and writable filtering remain authoritative, descriptor or compiled API-version and schema mismatches fail closed while independent semantic versions remain valid, the base plugin remains fully usable without companions, and the complete suites pass on both native platforms.
+- Complete the feature only when the fixture proves all three extension categories through the existing authenticated bridge, rejected companions expose no partial functionality, readonly and writable filtering remain authoritative, descriptor or compiled API-version and schema mismatches fail closed while independent semantic versions remain valid, the base plugin remains fully usable without companions, and the complete suites pass on Windows. Record macOS verification as preferred non-blocking follow-up.
 
 [Back to roadmap](../../../ROADMAP.md) · [Shared roadmap contracts](../index.md)

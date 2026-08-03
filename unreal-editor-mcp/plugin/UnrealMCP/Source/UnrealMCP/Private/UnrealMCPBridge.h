@@ -24,12 +24,18 @@ class FUnrealMCPLevelActorEditingService;
 class FUnrealMCPAssetReferenceService;
 class FUnrealMCPAssetDeletionService;
 class FUnrealMCPOperationLedger;
+class FUnrealMCPExtensionRegistry;
 class IHttpRouter;
 
 class FUnrealMCPBridge : public TSharedFromThis<FUnrealMCPBridge>
 {
 public:
-    FUnrealMCPBridge(FString InToken, FString InStateDirectory, FString InProjectHash, uint32 InPort);
+    FUnrealMCPBridge(
+        FString InToken,
+        FString InStateDirectory,
+        FString InProjectHash,
+        uint32 InPort,
+        TSharedRef<FUnrealMCPExtensionRegistry> InExtensionRegistry);
     ~FUnrealMCPBridge();
 
     bool Start(FString& OutError);
@@ -68,6 +74,7 @@ private:
     TUniquePtr<FUnrealMCPAssetReferenceService> AssetReferenceService;
     TUniquePtr<FUnrealMCPAssetDeletionService> AssetDeletionService;
     TUniquePtr<FUnrealMCPOperationLedger> OperationLedger;
+    TSharedRef<FUnrealMCPExtensionRegistry> ExtensionRegistry;
     FString BridgeInstanceId;
     FTSTicker::FDelegateHandle HeartbeatHandle;
     TAtomic<int32> Pending{0};

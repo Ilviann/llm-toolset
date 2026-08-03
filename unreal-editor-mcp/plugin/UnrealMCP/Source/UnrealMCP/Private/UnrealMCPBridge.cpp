@@ -15,6 +15,7 @@
 #include "Misc/ScopeLock.h"
 #include "Misc/SecureHash.h"
 #include "UnrealMCPDiscovery.h"
+#include "UnrealMCPExtensionRegistry.h"
 #include "UnrealMCPBlueprintInspector.h"
 #include "UnrealMCPBlueprintActionCatalog.h"
 #include "UnrealMCPBlueprintGraphEditor.h"
@@ -80,8 +81,14 @@ FString AuthenticationBinding(const FString& ProjectHash, const FString& BridgeI
 }
 }
 
-FUnrealMCPBridge::FUnrealMCPBridge(FString InToken, FString InStateDirectory, FString InProjectHash, uint32 InPort)
-    : Token(MoveTemp(InToken)), StateDirectory(MoveTemp(InStateDirectory)), ProjectHash(MoveTemp(InProjectHash)), Port(InPort)
+FUnrealMCPBridge::FUnrealMCPBridge(
+    FString InToken,
+    FString InStateDirectory,
+    FString InProjectHash,
+    uint32 InPort,
+    TSharedRef<FUnrealMCPExtensionRegistry> InExtensionRegistry)
+    : Token(MoveTemp(InToken)), StateDirectory(MoveTemp(InStateDirectory)),
+      ProjectHash(MoveTemp(InProjectHash)), Port(InPort), ExtensionRegistry(MoveTemp(InExtensionRegistry))
 {
     BridgeInstanceId = FGuid::NewGuid().ToString(EGuidFormats::Digits).ToLower();
     OperationLedger = MakeUnique<FUnrealMCPOperationLedger>(BridgeInstanceId, AuthenticationBinding(ProjectHash, BridgeInstanceId, Token));
@@ -377,6 +384,10 @@ bool FUnrealMCPBridge::Execute(const FString& Command, const TSharedPtr<FJsonObj
     {
         return EditorShutdown(OutResult, OutError);
     }
+    if (ExtensionRegistry->HasExtensionRequest(Arguments))
+    {
+        return ExtensionRegistry->Execute(Command, Arguments, OutResult, OutError);
+    }
     if (Command == TEXT("asset_references"))
     {
         if (!AssetReferenceService)
@@ -602,8 +613,15 @@ TSharedPtr<FJsonObject> FUnrealMCPBridge::Capabilities() const
     Features->SetBoolField(TEXT("editor_lifecycle"), true);
     Features->SetBoolField(TEXT("graceful_editor_shutdown"), true);
     Features->SetBoolField(TEXT("project_build"), false);
+    Features->SetBoolField(TEXT("companion_plugins"), true);
     Result->SetObjectField(TEXT("features"), Features);
     Result->SetArrayField(TEXT("blueprint_families"), UnrealMCP::BlueprintFamilyPolicy::BuildPublishedMatrix());
+    const TSharedPtr<FJsonObject> CompanionCapabilities = ExtensionRegistry->BuildCapabilities();
+    Result->SetNumberField(TEXT("companion_api_version"), CompanionCapabilities->GetNumberField(TEXT("companion_api_version")));
+    Result->SetNumberField(TEXT("extension_schema_revision"), CompanionCapabilities->GetNumberField(TEXT("extension_schema_revision")));
+    Result->SetStringField(TEXT("extension_registry_signature"), CompanionCapabilities->GetStringField(TEXT("registry_signature")));
+    Result->SetArrayField(TEXT("companions"), CompanionCapabilities->GetArrayField(TEXT("companions")));
+    Result->SetArrayField(TEXT("companion_registration_diagnostics"), CompanionCapabilities->GetArrayField(TEXT("registration_diagnostics")));
 
     const TSharedRef<FJsonObject> AssetAccess = MakeShared<FJsonObject>();
     AssetAccess->SetStringField(TEXT("read_scope"), TEXT("all_mounted_content"));
@@ -612,6 +630,12 @@ TSharedPtr<FJsonObject> FUnrealMCPBridge::Capabilities() const
 
     const TSharedRef<FJsonObject> Limits = MakeShared<FJsonObject>();
     Limits->SetNumberField(TEXT("request_bytes"), UnrealMCP::MaxRequestBytes);
+    Limits->SetNumberField(TEXT("companion_descriptors"), UnrealMCP::MaxDiscoveredCompanions);
+    Limits->SetNumberField(TEXT("companions"), UnrealMCP::MaxAcceptedCompanions);
+    Limits->SetNumberField(TEXT("companion_contributions"), UnrealMCP::MaxCompanionContributions);
+    Limits->SetNumberField(TEXT("companion_capability_records"), UnrealMCP::MaxCompanionCapabilityRecords);
+    Limits->SetNumberField(TEXT("companion_diagnostics"), UnrealMCP::MaxCompanionDiagnostics);
+    Limits->SetNumberField(TEXT("extension_id_chars"), UnrealMCP::MaxExtensionIdChars);
     Limits->SetNumberField(TEXT("response_bytes"), UnrealMCP::MaxResponseBytes);
     Limits->SetNumberField(TEXT("queued_requests"), UnrealMCP::MaxQueuedRequests);
     Limits->SetNumberField(TEXT("json_depth"), UnrealMCP::MaxJsonDepth);

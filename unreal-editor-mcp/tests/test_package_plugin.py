@@ -36,6 +36,19 @@ class PackagePluginScriptTests(unittest.TestCase):
             package_plugin.WORKSPACE_ROOT / "build" / "unreal-editor-mcp",
         )
 
+    def test_fixture_build_uses_its_independent_descriptor(self):
+        command = package_plugin.build_command(
+            Path("/Engine/RunUAT.sh"),
+            Path("/Workspace/build/unreal-mcp-test-companion"),
+            "Win64",
+            strict_includes=False,
+            unversioned=False,
+            plugin_descriptor=package_plugin.FIXTURE_DESCRIPTOR,
+            dependency_plugins=(package_plugin.PLUGIN_DESCRIPTOR,),
+        )
+        self.assertIn(f"-Plugin={package_plugin.FIXTURE_DESCRIPTOR}", command)
+        self.assertIn(f"-Dependencies={package_plugin.PLUGIN_DESCRIPTOR}", command)
+
     def test_engine_validation_selects_the_platform_launcher(self):
         with tempfile.TemporaryDirectory() as temporary:
             engine_root = Path(temporary)

@@ -1,0 +1,31 @@
+{
+  "FileVersion": 3,
+  "Version": 10000,
+  "VersionName": "0.1.0",
+  "companion_api_version": 1,
+  "FriendlyName": "Unreal MCP Test Companion",
+  "Description": "Disposable editor-only fixture for the Unreal MCP companion API.",
+  "Category": "Testing",
+  "CanContainContent": false,
+  "EnabledByDefault": false,
+  "Installed": false,
+  "unreal_mcp_companion": {
+    "extension_id": "unreal-mcp-test",
+    "schema_revision": 1,
+    "owning_module": "UnrealMCPTestCompanion",
+    "required_engine_plugins": []
+  },
+  "Plugins": [
+    {
+      "Name": "UnrealMCP",
+      "Enabled": true
+    }
+  ],
+  "Modules": [
+    {
+      "Name": "UnrealMCPTestCompanion",
+      "Type": "Editor",
+      "LoadingPhase": "PostEngineInit"
+    }
+  ]
+}

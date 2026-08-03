@@ -18,7 +18,11 @@ from typing import Sequence
 APPLICATION_ROOT = Path(__file__).resolve().parents[1]
 WORKSPACE_ROOT = APPLICATION_ROOT.parent
 PLUGIN_DESCRIPTOR = APPLICATION_ROOT / "plugin" / "UnrealMCP" / "UnrealMCP.uplugin"
+FIXTURE_DESCRIPTOR = (
+    APPLICATION_ROOT / "plugin" / "UnrealMCPTestCompanion" / "UnrealMCPTestCompanion.uplugin"
+)
 DEFAULT_OUTPUT = WORKSPACE_ROOT / "build" / "unreal-editor-mcp"
+DEFAULT_FIXTURE_OUTPUT = WORKSPACE_ROOT / "build" / "unreal-mcp-test-companion"
 _PLATFORM_NAME = re.compile(r"^[A-Za-z][A-Za-z0-9_]*$")
 
 
@@ -52,11 +56,15 @@ def validate_engine_root(engine_root: Path, host_system: str) -> Path:
     return run_uat
 
 
-def validate_output(output: Path, engine_root: Path) -> Path:
+def validate_output(
+    output: Path,
+    engine_root: Path,
+    plugin_descriptor: Path = PLUGIN_DESCRIPTOR,
+) -> Path:
     output = resolved(output)
     workspace_root = resolved(WORKSPACE_ROOT)
     application_root = resolved(APPLICATION_ROOT)
-    plugin_root = resolved(PLUGIN_DESCRIPTOR.parent)
+    plugin_root = resolved(plugin_descriptor.parent)
     engine_root = resolved(engine_root)
     home = resolved(Path.home())
 
@@ -98,16 +106,19 @@ def build_command(
     *,
     strict_includes: bool,
     unversioned: bool,
+    plugin_descriptor: Path = PLUGIN_DESCRIPTOR,
+    dependency_plugins: Sequence[Path] = (),
 ) -> list[str]:
     command = [
         str(run_uat),
         "BuildPlugin",
-        f"-Plugin={PLUGIN_DESCRIPTOR}",
+        f"-Plugin={plugin_descriptor}",
         f"-Package={output}",
         "-Rocket",
         "-NoP4",
         "-UTF8Output",
     ]
+    command.extend(f"-Dependencies={dependency}" for dependency in dependency_plugins)
     if target_platforms is not None:
         command.append(f"-TargetPlatforms={target_platforms}")
     if strict_includes:
@@ -146,8 +157,8 @@ def configure_environment(
     return environment
 
 
-def verify_package(output: Path) -> None:
-    descriptor_path = output / PLUGIN_DESCRIPTOR.name
+def verify_package(output: Path, plugin_descriptor: Path = PLUGIN_DESCRIPTOR) -> None:
+    descriptor_path = output / plugin_descriptor.name
     if not descriptor_path.is_file():
         raise PackagingError(f"packaging completed without the plugin descriptor: {descriptor_path}")
     try:
@@ -165,6 +176,11 @@ def verify_package(output: Path) -> None:
 def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Build UnrealMCP with Unreal AutomationTool for binary deployment.",
+    )
+    parser.add_argument(
+        "--companion-fixture",
+        action="store_true",
+        help="package the disposable UnrealMCPTestCompanion instead of the base plugin",
     )
     parser.add_argument(
         "--engine-root",
@@ -220,7 +236,10 @@ def main(argv: Sequence[str] | None = None) -> int:
 
         engine_root = resolved(configured_engine)
         run_uat = validate_engine_root(engine_root, host_system)
-        output = validate_output(arguments.output, engine_root)
+        plugin_descriptor = FIXTURE_DESCRIPTOR if arguments.companion_fixture else PLUGIN_DESCRIPTOR
+        if arguments.companion_fixture and arguments.output == DEFAULT_OUTPUT:
+            arguments.output = DEFAULT_FIXTURE_OUTPUT
+        output = validate_output(arguments.output, engine_root, plugin_descriptor)
         target_platforms = normalize_target_platforms(arguments.target_platforms)
         environment = configure_environment(host_system, arguments.developer_dir)
         command = build_command(
@@ -229,11 +248,13 @@ def main(argv: Sequence[str] | None = None) -> int:
             target_platforms,
             strict_includes=arguments.strict_includes,
             unversioned=arguments.unversioned,
+            plugin_descriptor=plugin_descriptor,
+            dependency_plugins=(PLUGIN_DESCRIPTOR,) if arguments.companion_fixture else (),
         )
     except PackagingError as error:
         parser.error(str(error))
 
-    print(f"Plugin: {PLUGIN_DESCRIPTOR}")
+    print(f"Plugin: {plugin_descriptor}")
     print(f"Output: {output}")
     print(f"Command: {display_command(command, host_system)}")
     if arguments.dry_run:
@@ -243,7 +264,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if result.returncode != 0:
         return result.returncode
     try:
-        verify_package(output)
+        verify_package(output, plugin_descriptor)
     except PackagingError as error:
         print(f"Packaging verification failed: {error}", file=sys.stderr)
         return 1

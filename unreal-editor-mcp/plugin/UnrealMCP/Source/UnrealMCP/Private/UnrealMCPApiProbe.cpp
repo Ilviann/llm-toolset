@@ -58,6 +58,8 @@
 #include "WorldPartition/WorldPartitionActorDescInstance.h"
 #include "WorldPartition/WorldPartitionHandle.h"
 #include "WorldPartition/WorldPartitionHelpers.h"
+#include "IUnrealMCPModule.h"
+#include "UnrealMCPCompanionApi.h"
 
 namespace UnrealMCP::ApiProbe
 {
@@ -152,6 +154,8 @@ void RequirePublicTypes()
     using FCleanupAfterDelete = void (*)(const TArray<UPackage*>&, bool);
     (void)static_cast<FCleanupAfterDelete>(&ObjectTools::CleanupAfterSuccessfulDelete);
     static_assert(sizeof(FThreadSafeObjectIterator) > 0);
+    static_assert(sizeof(FUnrealMCPCompanionRegistration) > 0);
+    static_assert(TIsDerivedFrom<IUnrealMCPExtensionHandler, IUnrealMCPExtensionHandler>::Value);
     (void)&FBlueprintActionDatabase::Get;
     (void)&UEdGraphSchema_K2::CanCreateConnection;
     (void)&UEdGraphSchema_K2::TryCreateConnection;

@@ -12,7 +12,7 @@ released_in: null
 
 **Depends on:**
 
-- [`companion-plugins`](companion-plugins.md)
+- [`companion-plugins`](../completed/companion-plugins.md)
 
 ### Companion and version contract
 

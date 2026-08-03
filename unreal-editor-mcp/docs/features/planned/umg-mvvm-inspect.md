@@ -14,7 +14,7 @@ released_in: null
 **Depends on:**
 
 - [`umg-authoring`](../completed/umg-authoring.md)
-- [`companion-plugins`](companion-plugins.md)
+- [`companion-plugins`](../completed/companion-plugins.md)
 
 ### Companion and version contract
 

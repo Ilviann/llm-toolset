@@ -4,6 +4,7 @@ References in this directory are grouped by the component that owns the contract
 
 - [`python/`](python/index.md) — Python project, discovery, error, schema, bridge-client, and editor-lifecycle contracts.
 - [`editor-bridge/`](editor-bridge/index.md) — native request, error, capability, state, discovery, and limit contracts.
+- [`companion-extension-registry/`](companion-extension-registry/index.md) — public native registration, contribution handlers, descriptor metadata, capability records, bounds, and errors.
 - [`blueprint-family-policy/`](blueprint-family-policy/index.md) — supported Actor/GameMode/GameState/GameInstance/Widget classifications, operation matrix, live capabilities, result fields, and exclusions.
 - [`blueprint-inspector/`](blueprint-inspector/index.md) — published-family Blueprint queries, pages, snapshots, identities, and bounded value encodings.
 - [`blueprint-action-catalog/`](blueprint-action-catalog/index.md) — graph-action queries, records, opaque identities, limits, caching, and invalidation.
