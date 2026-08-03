@@ -5,13 +5,14 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+import unreal_editor_mcp
 from unreal_editor_mcp.bridge import MAX_RESPONSE_BYTES, UnrealBridge
 from unreal_editor_mcp.discovery import DiscoveryRecord
 from unreal_editor_mcp.errors import BridgeError, ErrorCode
 from unreal_editor_mcp.project import ProjectLayout
 
 
-RECORD = DiscoveryRecord("a" * 40, 123, 15485, "0.27.0", "5.8.0", 1)
+RECORD = DiscoveryRecord("a" * 40, 123, 15485, unreal_editor_mcp.__version__, "5.8.0", 1)
 
 
 class FakeResponse:
@@ -80,6 +81,8 @@ class BridgeTests(unittest.TestCase):
         operation_id = "c" * 32
         snapshot = "d" * 40
         calls = (
+            ("operation_status", {"operation_id": operation_id, "bridge_instance_id": "e" * 32}),
+            ("operation_cancel", {"operation_id": operation_id, "bridge_instance_id": "e" * 32}),
             ("asset_references", {"asset_path": "/Game/DT_Weapons.DT_Weapons", "page_size": 10}),
             ("asset_delete", {"operation_id": operation_id, "asset_path": "/Game/DT_Disposable.DT_Disposable",
                 "expected_snapshot": snapshot}),

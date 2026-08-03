@@ -2,7 +2,7 @@
 
 ## Ownership
 
-`unreal_editor_mcp/lifecycle.py` owns the optional large-mode `editor_lifecycle` tool, configured editor launch, readiness/shutdown waits, cancellation, and the durable lifecycle record. `platforms.py` owns detached macOS and Windows process construction. The native bridge owns graceful-shutdown safety and the exit request.
+`unreal_editor_mcp/lifecycle.py` owns the independently optional `editor_lifecycle` tool, configured editor launch, readiness/shutdown waits, cancellation, and the durable lifecycle record. `platforms.py` owns detached macOS and Windows process construction. The native bridge owns graceful-shutdown safety and the exit request.
 
 ## Dependency direction
 
@@ -10,7 +10,7 @@ The CLI validates the optional absolute editor executable and injects one `Edito
 
 ## Invariants
 
-- `editor_lifecycle` is absent from default mode and appears only with `--tool-mode large`.
+- `editor_lifecycle` is absent unless `--editor-lifecycle <absolute-executable>` validates and constructs the controller. Lifecycle availability and readonly/writable project-content access are independent.
 - No tool argument can select an executable, project, environment value, process, port, shell fragment, forced exit, or arbitrary argument.
 - Windows launches only an absolute `UnrealEditor.exe`; macOS launches only an executable `UnrealEditor` app binary. Linux command construction rejects without claiming native launch support.
 - Only one lifecycle operation runs at a time. Launch and shutdown waits are bounded to 5–900 configured seconds; cancellation stops waiting but never force-terminates an editor.

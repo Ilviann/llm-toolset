@@ -41,6 +41,7 @@ from .game_data_levels import (
     verify_restarted_level_edit,
     verify_restarted_level_deletion,
 )
+from .readonly_mode import verify_readonly_mode
 from .widgets import author_widget_scenario, verify_restarted_widgets
 
 
@@ -452,7 +453,7 @@ def main() -> int:
             restore_framework_defaults(bridge, capabilities["project_hash"])
             state = bridge.call("editor_state")
             if capabilities.get("commands") != [
-                "capabilities", "editor_state", "editor_shutdown", "operation_status",
+                "capabilities", "editor_state", "editor_shutdown", "operation_status", "operation_cancel",
                 "asset_references", "asset_delete",
                 "level_inspect", "level_open", "level_manage", "level_actor_edit", "level_save",
                 "blueprint_inspect", "blueprint_action_catalog", "blueprint_graph_edit",
@@ -681,6 +682,14 @@ def main() -> int:
                 phase_fifteen_game_instance,
             )
             widget_scenario = author_widget_scenario(bridge)
+            verify_readonly_mode(
+                bridge,
+                layout,
+                bridge_instance_id=capabilities["bridge_instance_id"],
+                blueprint_path="/Game/UnrealMCPPhase4/BP_ComponentFixture.BP_ComponentFixture",
+                game_data_path=phase_seventeen_game_data["table_path"],
+                map_path=level_scenario["map_path"],
+            )
             assigned_game_instance_class = blueprint_scenario["assigned_game_instance_class"]
             assigned_game_mode_class = blueprint_scenario["assigned_game_mode_class"]
             reject_bad_token(layout)

@@ -5,7 +5,14 @@ import unittest
 from pathlib import Path
 
 import unreal_editor_mcp
-from unreal_editor_mcp.tool_catalog import LARGE_TOOLS, TOOLS
+from unreal_editor_mcp.tool_catalog import (
+    READONLY_TOOL_NAMES,
+    READONLY_TOOLS,
+    TOOLS,
+    TOOLS_WITH_LIFECYCLE,
+    WRITABLE_TOOL_NAMES,
+    tools_for_configuration,
+)
 from unreal_editor_mcp.tool_catalog_families.assets import ASSET_TOOLS
 from unreal_editor_mcp.tool_catalog_families.blueprints import BLUEPRINT_TOOLS
 from unreal_editor_mcp.tool_catalog_families.core import CORE_TOOLS
@@ -31,9 +38,15 @@ class ReleaseContractTests(unittest.TestCase):
             *GAME_DATA_TOOLS,
         )
         self.assertEqual(TOOLS, assembled)
-        self.assertEqual(LARGE_TOOLS, (*assembled, EDITOR_LIFECYCLE_TOOL))
+        self.assertEqual(TOOLS_WITH_LIFECYCLE, (*assembled, EDITOR_LIFECYCLE_TOOL))
         names = [tool["name"] for tool in assembled]
         self.assertEqual(len(names), len(set(names)))
+        self.assertEqual(READONLY_TOOL_NAMES | WRITABLE_TOOL_NAMES, set(names))
+        self.assertFalse(READONLY_TOOL_NAMES & WRITABLE_TOOL_NAMES)
+        self.assertEqual(
+            READONLY_TOOLS,
+            tools_for_configuration(writable=False, lifecycle_enabled=False),
+        )
 
     def test_versions_match_executable_metadata(self):
         project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
@@ -47,7 +60,8 @@ class ReleaseContractTests(unittest.TestCase):
     def test_only_released_commands_are_registered(self):
         names = [tool["name"] for tool in TOOLS]
         self.assertEqual(names, [
-            "capabilities", "editor_state", "operation_status", "asset_references", "asset_delete",
+            "capabilities", "editor_state", "operation_status", "operation_cancel",
+            "asset_references", "asset_delete",
             "level_inspect", "level_open", "level_manage", "level_actor_edit", "level_save",
             "blueprint_inspect", "blueprint_action_catalog", "blueprint_graph_edit",
             "blueprint_block_replace",
@@ -298,9 +312,9 @@ class ReleaseContractTests(unittest.TestCase):
             native_test,
         )
 
-    def test_editor_lifecycle_is_large_mode_only_and_natively_guarded(self):
+    def test_editor_lifecycle_is_independently_configured_and_natively_guarded(self):
         self.assertNotIn("editor_lifecycle", [tool["name"] for tool in TOOLS])
-        self.assertEqual([tool["name"] for tool in LARGE_TOOLS][-1], "editor_lifecycle")
+        self.assertEqual([tool["name"] for tool in TOOLS_WITH_LIFECYCLE][-1], "editor_lifecycle")
         bridge = (ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private/UnrealMCPBridge.cpp").read_text(encoding="utf-8")
         protocol = (ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private/UnrealMCPProtocol.cpp").read_text(encoding="utf-8")
         native_test = (ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private/Tests/UnrealMCPAutomationTestsLifecycle.cpp").read_text(encoding="utf-8")

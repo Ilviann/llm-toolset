@@ -1,6 +1,6 @@
 ---
 feature_id: readonly-mode
-status: planned
+status: active
 depends_on:
   - editor-restart
 released_in: null
@@ -9,6 +9,8 @@ released_in: null
 # `readonly-mode` — Readonly mode and explicit writable access
 
 **Outcome:** Unreal Editor MCP starts with only inspection and non-persistent editor-state tools, while project-content mutation requires the explicit startup flag `--writable`.
+
+**Implementation status:** Active and unreleased. The implementation and host-independent contract coverage are present, but required native readonly persistence and lifecycle acceptance has not yet been recorded on both Windows and macOS.
 
 **Depends on:**
 
@@ -37,6 +39,7 @@ released_in: null
 - Add `--editor-lifecycle <absolute-UnrealEditor-executable>` as the single canonical lifecycle opt-in. Supplying the validated executable both publishes `editor_lifecycle` and configures launch and restart; it does not imply `--writable`.
 - Remove `--tool-mode` and `--editor` when adding `--editor-lifecycle`; do not retain aliases, translation, or a deprecation period. Existing server configurations must migrate to the new option.
 - Represent lifecycle enablement and content-write access as independent configuration dimensions. Cover readonly, writable, readonly-with-lifecycle, and writable-with-lifecycle server configurations.
+- Make the Windows deployment helper generate readonly LM Studio JSON by default and expose independent writable and selected-Engine lifecycle choices with the same deterministic four configurations.
 
 ### Verification
 
@@ -44,11 +47,12 @@ released_in: null
 - Exercise every readonly tool against representative assets and levels. Compare package dirtiness, asset fingerprints, project configuration, source files, and Undo history before and after success, rejection, pagination, timeout, cancellation, editor restart, and `level_open` flows.
 - Test `operation_status` schema rejection of `cancel`, writable-only `operation_cancel`, retained-result lookup and cancellation, unknown and stale identities, and readonly reconciliation of prior operation outcomes without mutation.
 - Test CLI parsing for default readonly behavior, `--writable`, the single `--editor-lifecycle` path, invalid or relative executables, every access/lifecycle combination, and rejection of the removed `--tool-mode` and `--editor` options on supported platform branches.
+- Test Windows deployment JSON for readonly default, writable-only, lifecycle-only, and combined argument arrays plus fail-closed lifecycle-executable validation.
 - Run MCP initialization, `tools/list`, and `tools/call` framing tests plus the full Python and native suites. Verify on macOS and Windows that readonly mode cannot dirty or persist project content and that lifecycle-only mode can open, stop, and restart the configured project without gaining content-write tools.
 
 ### Documentation and completion gate
 
 - Update setup examples, the complete tool catalog, capability fields, security guidance, lifecycle configuration, and migration instructions. Show readonly configuration first and mark `--writable` as an explicit trust decision for a dedicated project root.
-- Complete the feature only when readonly is the tested default, every project-content mutation tool is both absent and undispatchable without `--writable`, transient editor-state tools remain usable, the new lifecycle option works without another enabling flag, and the four configuration combinations pass their contract and native verification.
+- Complete and release the feature only when readonly is the tested default, every project-content mutation tool is both absent and undispatchable without `--writable`, transient editor-state tools remain usable, the lifecycle option works without another enabling flag, all four configuration combinations pass their executable contract tests, and readonly persistence plus lifecycle-only behavior pass natively on Windows and macOS.
 
 [Back to roadmap](../../../ROADMAP.md) · [Shared roadmap contracts](../index.md)

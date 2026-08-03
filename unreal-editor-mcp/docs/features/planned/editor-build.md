@@ -16,7 +16,7 @@ released_in: null
 
 ### Implementation
 
-- Extend `project_build` with a typed `build_editor_target` operation while keeping the tool in opt-in large mode.
+- Extend the independently configured `project_build` tool with a typed `build_editor_target` operation.
 - Let the model select only targets and configurations from a bounded published allowlist. Never accept executable paths, project paths, shell fragments, environment variables, compiler/linker flags, working directories, or arbitrary arguments.
 - Reuse the `project-files` fixed platform adapters, stopped-editor precondition, durable lifecycle reconciliation, process bounds, retention, cancellation escalation, and child-process cleanup.
 - Normalize compiler diagnostics and keep raw subprocess output off MCP stdout except inside valid bounded tool results.

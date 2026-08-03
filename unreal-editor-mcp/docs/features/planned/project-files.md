@@ -17,7 +17,7 @@ released_in: null
 ### Implementation
 
 - Keep C++ source editing outside this application. Pair with `rooted-files-mcp` for separately configured confined text edits.
-- Add the single `project_build` tool in opt-in large mode with a typed `generate_project_files` operation.
+- Add the single `project_build` tool through an independent startup opt-in with a typed `generate_project_files` operation; do not couple it to project-content access or editor lifecycle enablement.
 - Resolve Unreal Build Tool or platform scripts from validated startup configuration and the installed engine layout. Use fixed templates owned by narrow platform adapters.
 - Accept no executable path, project path, shell fragment, environment variable, compiler flag, linker flag, working directory, or arbitrary argument from a tool call.
 - Refuse generation while the authenticated configured editor is running or its lifecycle state is uncertain. Reconcile with durable lifecycle operations before starting.

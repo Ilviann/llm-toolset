@@ -39,6 +39,7 @@ public:
         const TSharedPtr<FJsonObject>& Result);
     void Reject(const FString& OperationId, const FUnrealMCPError& Error);
     bool Status(const TSharedPtr<FJsonObject>& Arguments, TSharedPtr<FJsonObject>& OutResult, FUnrealMCPError& OutError);
+    bool Cancel(const TSharedPtr<FJsonObject>& Arguments, TSharedPtr<FJsonObject>& OutResult, FUnrealMCPError& OutError);
     void CancelQueued();
     TSharedPtr<FJsonObject> CurrentState() const;
 

@@ -5,7 +5,7 @@ This directory contains the detailed implementation, verification, documentation
 ## Status groups
 
 - [Planned features](planned/index.md).
-- Active: None.
+- [Active features](active/index.md).
 - [Completed features](completed/index.md).
 - Deferred: None.
 
@@ -74,7 +74,7 @@ Keep the authoritative checklist in [`ROADMAP.md`](../../ROADMAP.md) synchronize
     - `editor-launch`
     - `editor-shutdown`
 - [`offline-capabilities` — Offline project identity in capabilities](completed/offline-capabilities.md) — Return configured project identity and explicit native availability before Unreal starts.
-- [`readonly-mode` — Readonly mode and explicit writable access](planned/readonly-mode.md) — Make inspection-only operation the default, require `--writable` for project-content mutation, and simplify lifecycle opt-in.
+- [`readonly-mode` — Readonly mode and explicit writable access](active/readonly-mode.md) — Make inspection-only operation the default, require `--writable` for project-content mutation, and simplify lifecycle opt-in.
   - Depends on:
     - `editor-restart`
 - [`project-files` — Optional editor-offline project-file generation](planned/project-files.md) — Add optional editor-offline project-file generation.
@@ -132,7 +132,7 @@ The default installation remains an exact-version pair:
 
 `pie-multiprocess` adds a minimal exact-version runtime companion module to the same plugin distribution for editor-owned multi-process PIE children. It connects outward to editor-owned authenticated IPC and does not expose a model-facing game listener.
 
-Python owns MCP framing, published schemas, exact argument validation, tool modes, project configuration, discovery, authenticated HTTP calls, timeouts, process orchestration, and stable error presentation. The C++ plugin owns credentials, listener lifecycle, authentication, Game-thread dispatch, Unreal object access, Blueprint operations, compiler diagnostics, transactions, package saving, mutation-result retention, and authoritative capabilities.
+Python owns MCP framing, published schemas, exact argument validation, readonly/writable access filtering, project configuration, discovery, authenticated HTTP calls, timeouts, process orchestration, and stable error presentation. The C++ plugin owns credentials, listener lifecycle, authentication, Game-thread dispatch, Unreal object access, Blueprint operations, compiler diagnostics, transactions, package saving, mutation-result retention, and authoritative native capabilities.
 
 Deploy the Python package and base C++ plugin as an exact-version pair. Report both versions and the installed Unreal version through `capabilities`; reject a mismatched pair before mutation. For every optional editor companion, require its descriptor `Version` and `VersionName` to match the base plugin exactly, set its `UnrealMCP` plugin reference `RequestedVersion` to the base numeric `Version`, report its version and readiness through `capabilities`, and reject its operations unless the complete enabled set matches. Engine-plugin dependencies such as Gameplay Ability System and UMG Viewmodel remain tied to the exact supported Unreal build rather than receiving an `UnrealMCP` version pin. Support for later Unreal releases must be proven through compilation and behavioral tests, not inferred from version numbers.
 
@@ -143,6 +143,7 @@ Keep the public surface compact. Add typed operations to these remaining tool fa
 | Tool | First feature | Responsibility |
 | --- | --- | --- |
 | `operation_status` | `phase-4` | Resolve the retained outcome of one mutation operation without executing it again |
+| `operation_cancel` | `readonly-mode` | Request safe cancellation of one retained mutation without mixing write authority into status lookup |
 | `blueprint_component_edit` | `phase-4` | Perform one typed component-hierarchy or component-default mutation |
 | `blueprint_default_edit` | `phase-4` | Set one supported Blueprint class-default property |
 | `blueprint_member_edit` | `phase-5` | Perform one typed variable, function, macro, or custom-event mutation |
@@ -167,7 +168,7 @@ Keep the public surface compact. Add typed operations to these remaining tool fa
 | `play_session_inspect` | `pie-inspect` | Inspect one retained session or exact runtime world with bounded actor/property/log pages |
 | `play_session_command` | `pie-test` | Run one allowlisted test action or bounded wait against an exact retained session instance |
 
-Lifecycle and build tools remain absent from the default model context. Use an opt-in large mode for them. Measure the Blueprint schemas and use nested operation discriminators if context cost becomes excessive; the default mode must still support the complete Blueprint-authoring workflow.
+Lifecycle and future build tools remain absent unless independently configured. Readonly access is the default; complete Blueprint authoring requires the explicit `--writable` startup trust decision. Measure the Blueprint schemas and use nested operation discriminators if context cost becomes excessive.
 
 The GAS features extend the existing Blueprint tools when the companion capability is live and do not add a separate model-facing GAS tool. `gas-ability-blueprints-inspect` adds bounded typed inspection for its graph-capable family; `gas-ability-blueprints` then adds creation, default/member editing, action cataloging, graph editing, compilation, and saving. `gas-gameplay-effects-inspect` adds bounded typed inspection for its data-only family while explicitly rejecting graph and member surfaces; `gas-gameplay-effects` then adds creation, default editing, compilation, and saving. Capabilities distinguish read support from mutation support so an inspection-only release cannot advertise or execute create/update operations.
 
@@ -178,7 +179,7 @@ The GAS features extend the existing Blueprint tools when the companion capabili
 - Require a caller-generated `operation_id` for every mutating call, including existing mutation tools. Bind it to the exact normalized arguments, project identity, bridge instance, and authenticated client context.
 - Retain a bounded operation ledger with published capacity and lifetime limits. Repeating an operation ID with the same request returns the retained result; reusing it with different arguments returns a stable conflict and never executes.
 - Publish explicit operation states such as `queued`, `executing`, `committed`, `rejected`, and `outcome_unknown`. Never report cancellation after a mutation has committed.
-- Cancellation may remove queued work or stop preflight work, but it must not interrupt an active Unreal mutation at an unsafe point. A lost response must be reconciled through `operation_status` before retry.
+- Writable `operation_cancel` may remove queued work or stop preflight work, but it must not interrupt an active Unreal mutation at an unsafe point. A lost response must be reconciled through readonly `operation_status` before retry.
 - The ledger is process-scoped unless a later operation explicitly defines durable restart state. If the bridge instance changes and no result is available, return `outcome_unknown` and require inspection before further mutation.
 - Retained PIE lifecycle and wait operations may remain nonterminal across HTTP requests. Publish bounded starting/running/stopping progress, allow cancellation only at safe points, and keep terminal replay semantics identical to short mutations.
 - Reject mutation while the target asset is compiling, saving, loading, being reinstanced, undergoing undo/redo, or otherwise unable to provide stable preconditions.

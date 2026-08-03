@@ -13,7 +13,7 @@ released_in: "0.17.0"
 
 ### Implementation
 
-- Add the single `editor_lifecycle` tool only in opt-in large mode with a typed `launch` operation. Keep normal state reporting in the existing editor-state surface.
+- Add the single `editor_lifecycle` tool with a typed `launch` operation. The later [`readonly-mode`](../active/readonly-mode.md) configuration makes its validated absolute executable an independent opt-in; keep normal state reporting in the existing editor-state surface.
 - Accept no executable path, project path, environment variable, or arbitrary process argument from the model. Configure and validate absolute editor and `.uproject` paths at MCP startup and expose only bounded availability information.
 - Launch one detached configured editor instance through narrow platform adapters.
 - Detect the exact project-specific authenticated bridge and distinguish `starting`, `ready`, `already_running`, cancelled, timed out, and failed startup.

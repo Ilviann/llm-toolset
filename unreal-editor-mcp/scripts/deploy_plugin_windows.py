@@ -26,6 +26,7 @@ except ModuleNotFoundError:  # Direct execution puts this script's directory on 
 APPLICATION_ROOT = Path(__file__).resolve().parents[1]
 SERVER_ENTRY = APPLICATION_ROOT / "server.py"
 PLUGIN_NAME = "UnrealMCP"
+WINDOWS_EDITOR_RELATIVE = Path("Engine/Binaries/Win64/UnrealEditor.exe")
 MAX_PROJECT_DESCRIPTOR_BYTES = 1024 * 1024
 MAX_PROJECT_DIRECTORY_ENTRIES = 4096
 MAX_MODULE_RULE_BYTES = 64 * 1024
@@ -249,6 +250,24 @@ def validate_supported_engine_root(engine_root: Path) -> Path:
             f"Unreal MCP requires Unreal Engine 5.8 or newer; selected Engine is {major}.{minor}"
         )
     return run_uat
+
+
+def validate_editor_lifecycle_executable(executable: Path) -> Path:
+    if not executable.expanduser().is_absolute():
+        raise DeploymentError("editor lifecycle executable must be an absolute path")
+    try:
+        candidate = executable.expanduser().resolve(strict=True)
+    except (OSError, RuntimeError):
+        raise DeploymentError("editor lifecycle executable must be an existing regular file") from None
+    if not candidate.is_file():
+        raise DeploymentError("editor lifecycle executable must be an existing regular file")
+    if candidate.name.casefold() != "unrealeditor.exe":
+        raise DeploymentError("Windows editor lifecycle executable must be UnrealEditor.exe")
+    return candidate
+
+
+def windows_editor_lifecycle_executable(engine_root: Path) -> Path:
+    return validate_editor_lifecycle_executable(resolved(engine_root) / WINDOWS_EDITOR_RELATIVE)
 
 
 def build_command(engine_root: Path, output: Path) -> list[str]:
@@ -513,13 +532,27 @@ def install_binary_plugin(
     return destination
 
 
-def lm_studio_json(project: ProjectInfo, python_executable: Path | None = None) -> str:
+def lm_studio_json(
+    project: ProjectInfo,
+    python_executable: Path | None = None,
+    *,
+    writable: bool = False,
+    editor_lifecycle: Path | None = None,
+) -> str:
+    if type(writable) is not bool:
+        raise DeploymentError("writable must be Boolean")
     executable = resolved(Path(sys.executable) if python_executable is None else python_executable)
+    arguments = [str(SERVER_ENTRY), str(project.descriptor)]
+    if writable:
+        arguments.append("--writable")
+    if editor_lifecycle is not None:
+        lifecycle_executable = validate_editor_lifecycle_executable(editor_lifecycle)
+        arguments.extend(("--editor-lifecycle", str(lifecycle_executable)))
     value = {
         "mcpServers": {
             "unreal-editor": {
                 "command": str(executable),
-                "args": [str(SERVER_ENTRY), str(project.descriptor)],
+                "args": arguments,
             }
         }
     }
@@ -560,12 +593,14 @@ class DeploymentWindow:
         self.ttk = ttk
         self.root = tk.Tk()
         self.root.title("Unreal MCP — Windows Deployment")
-        self.root.geometry("820x650")
-        self.root.minsize(680, 560)
+        self.root.geometry("820x720")
+        self.root.minsize(680, 620)
         self.events: queue.Queue[tuple[str, object]] = queue.Queue()
         self.project_value = tk.StringVar()
         self.engine_value = tk.StringVar(value=default_engine_root())
         self.include_pdb_value = tk.BooleanVar(value=False)
+        self.writable_value = tk.BooleanVar(value=False)
+        self.lifecycle_value = tk.BooleanVar(value=False)
         self.status_value = tk.StringVar(value="Select the folder containing your .uproject file.")
         self.busy = False
         self._build()
@@ -578,8 +613,8 @@ class DeploymentWindow:
         frame = self.ttk.Frame(self.root, padding=14)
         frame.pack(fill="both", expand=True)
         frame.columnconfigure(1, weight=1)
-        frame.rowconfigure(6, weight=1)
         frame.rowconfigure(8, weight=1)
+        frame.rowconfigure(10, weight=1)
 
         self.ttk.Label(frame, text="Unreal project folder").grid(row=0, column=0, sticky="w")
         self.project_entry = self.ttk.Entry(frame, textvariable=self.project_value)
@@ -612,24 +647,36 @@ class DeploymentWindow:
             sticky="w",
             pady=(10, 0),
         )
+        self.writable_checkbox = self.ttk.Checkbutton(
+            frame,
+            text="Enable writable MCP tools in the generated LM Studio entry",
+            variable=self.writable_value,
+        )
+        self.writable_checkbox.grid(row=4, column=0, columnspan=3, sticky="w", pady=(8, 0))
+        self.lifecycle_checkbox = self.ttk.Checkbutton(
+            frame,
+            text="Enable editor lifecycle control using the selected Engine",
+            variable=self.lifecycle_value,
+        )
+        self.lifecycle_checkbox.grid(row=5, column=0, columnspan=3, sticky="w", pady=(8, 0))
         self.install_button = self.ttk.Button(frame, text="Build and install plugin", command=self._install)
-        self.install_button.grid(row=4, column=0, columnspan=3, sticky="ew", pady=12)
+        self.install_button.grid(row=6, column=0, columnspan=3, sticky="ew", pady=12)
         self.ttk.Label(frame, textvariable=self.status_value, wraplength=760).grid(
-            row=5, column=0, columnspan=3, sticky="w"
+            row=7, column=0, columnspan=3, sticky="w"
         )
 
         self.log_text = scrolledtext.ScrolledText(frame, height=12, state="disabled", wrap="word")
-        self.log_text.grid(row=6, column=0, columnspan=3, sticky="nsew", pady=(8, 12))
+        self.log_text.grid(row=8, column=0, columnspan=3, sticky="nsew", pady=(8, 12))
 
         self.ttk.Label(frame, text="LM Studio mcp.json entry").grid(
-            row=7, column=0, columnspan=2, sticky="w"
+            row=9, column=0, columnspan=2, sticky="w"
         )
         self.copy_button = self.ttk.Button(
             frame, text="Copy JSON", command=self._copy_json, state="disabled"
         )
-        self.copy_button.grid(row=7, column=2, sticky="e")
+        self.copy_button.grid(row=9, column=2, sticky="e")
         self.json_text = scrolledtext.ScrolledText(frame, height=11, state="disabled", wrap="none")
-        self.json_text.grid(row=8, column=0, columnspan=3, sticky="nsew", pady=(8, 0))
+        self.json_text.grid(row=10, column=0, columnspan=3, sticky="nsew", pady=(8, 0))
 
     def _browse_project(self) -> None:
         from tkinter import filedialog, messagebox
@@ -688,6 +735,8 @@ class DeploymentWindow:
             self.engine_entry,
             self.engine_button,
             self.include_pdb_checkbox,
+            self.writable_checkbox,
+            self.lifecycle_checkbox,
             self.install_button,
         ):
             widget.configure(state=state)
@@ -705,12 +754,18 @@ class DeploymentWindow:
             project = locate_project(Path(self.project_value.get()))
             configured = Path(self.engine_value.get()) if self.engine_value.get().strip() else None
             engine = resolve_engine_root(project, configured)
+            editor_lifecycle = (
+                windows_editor_lifecycle_executable(engine)
+                if bool(self.lifecycle_value.get())
+                else None
+            )
             destination = plugin_destination(project)
         except DeploymentError as error:
             messagebox.showerror("Cannot install Unreal MCP", str(error))
             return
         replace_existing = destination.exists()
         include_pdb = bool(self.include_pdb_value.get())
+        writable = bool(self.writable_value.get())
         if replace_existing and not messagebox.askyesno(
             "Replace existing plugin?",
             f"{destination} already exists.\n\nReplace it with a newly built binary plugin?",
@@ -733,7 +788,14 @@ class DeploymentWindow:
                     include_pdb=include_pdb,
                     log=lambda message: self.events.put(("log", message)),
                 )
-                result = (destination_path, lm_studio_json(project))
+                result = (
+                    destination_path,
+                    lm_studio_json(
+                        project,
+                        writable=writable,
+                        editor_lifecycle=editor_lifecycle,
+                    ),
+                )
                 self.events.put(("done", result))
             except Exception as error:
                 self.events.put(("error", str(error)))

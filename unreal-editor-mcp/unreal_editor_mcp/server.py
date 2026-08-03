@@ -9,7 +9,7 @@ from .errors import DomainError, ErrorCode
 from .project import ProjectIdentity
 from .schema_validation import SchemaValidationError, validate_tool_arguments
 from .stdio import error, result, tool_result
-from .tool_catalog import LATEST_PROTOCOL, SUPPORTED_PROTOCOLS, tools_for_mode
+from .tool_catalog import LATEST_PROTOCOL, SUPPORTED_PROTOCOLS, tools_for_configuration
 
 
 class BridgeClient(Protocol):
@@ -30,13 +30,18 @@ class MCPServer:
         *,
         project_identity: ProjectIdentity | None = None,
         lifecycle: LifecycleClient | None = None,
-        tool_mode: str = "default",
+        writable: bool = False,
     ) -> None:
+        if type(writable) is not bool:
+            raise TypeError("writable must be Boolean")
         self.bridge = bridge
         self.project_identity = project_identity
         self.lifecycle = lifecycle
-        self.tool_mode = tool_mode
-        self.tools = tools_for_mode(tool_mode)
+        self.writable = writable
+        self.tools = tools_for_configuration(
+            writable=writable,
+            lifecycle_enabled=lifecycle is not None,
+        )
         self.tool_by_name = {tool["name"]: tool for tool in self.tools}
         self.negotiated_protocol_version: str | None = None
 
@@ -109,7 +114,7 @@ class MCPServer:
         local = {
             "python_version": __version__,
             "mcp_protocol_version": self.negotiated_protocol_version,
-            "tool_mode": self.tool_mode,
+            "access_mode": "writable" if self.writable else "readonly",
             "native_capabilities_available": native_available,
             "editor_lifecycle": (
                 self.lifecycle.availability()

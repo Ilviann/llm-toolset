@@ -91,20 +91,21 @@ class LifecycleTests(unittest.TestCase):
             **kwargs,
         )
 
-    def test_large_mode_only_publishes_exact_lifecycle_schema(self):
+    def test_configured_lifecycle_is_independent_of_writable_access(self):
         default_names = [tool["name"] for tool in MCPServer(self.bridge).tools]
-        large = MCPServer(self.bridge, lifecycle=self._manager(), tool_mode="large")
-        large_names = [tool["name"] for tool in large.tools]
+        configured = MCPServer(self.bridge, lifecycle=self._manager())
+        configured_names = [tool["name"] for tool in configured.tools]
         self.assertNotIn("editor_lifecycle", default_names)
-        self.assertEqual(large_names[-1], "editor_lifecycle")
-        valid = large.handle({
+        self.assertEqual(configured_names[-1], "editor_lifecycle")
+        self.assertNotIn("asset_delete", configured_names)
+        valid = configured.handle({
             "jsonrpc": "2.0", "id": 1, "method": "tools/call",
             "params": {"name": "editor_lifecycle", "arguments": {
                 "operation_id": "a" * 32, "operation": "shutdown",
             }},
         })
         self.assertNotIn("error", valid)
-        invalid = large.handle({
+        invalid = configured.handle({
             "jsonrpc": "2.0", "id": 2, "method": "tools/call",
             "params": {"name": "editor_lifecycle", "arguments": {
                 "operation_id": "b" * 32, "operation": "launch",
@@ -199,21 +200,15 @@ class LifecycleTests(unittest.TestCase):
         self.assertEqual(result["old_bridge_instance_id"], "1" * 32)
         self.assertEqual(result["new_bridge_instance_id"], "2" * 32)
 
-    def test_missing_launch_configuration_and_version_mismatch_fail_closed(self):
-        manager = EditorLifecycle(
-            self.layout,
-            self.bridge,
-            startup_timeout=5.0,
-            platform=self.platform,
-        )
-        with self.assertRaises(ConfigurationError):
-            manager.execute({"operation_id": "a" * 32, "operation": "launch"})
+    def test_launch_configuration_is_required_and_version_mismatch_fails_closed(self):
+        with self.assertRaises(TypeError):
+            EditorLifecycle(
+                self.layout,
+                self.bridge,
+                startup_timeout=5.0,
+                platform=self.platform,
+            )
         self._write_discovery()
-        with self.assertRaises(ConfigurationError):
-            manager.execute({"operation_id": "b" * 32, "operation": "restart"})
-        self.assertNotIn("editor_shutdown", [call[0] for call in self.bridge.calls])
-        self.alive.clear()
-        self.layout.discovery_file.unlink()
         self._write_discovery(version="99.0.0")
         with self.assertRaises(BridgeError) as caught:
             self._manager().execute({"operation_id": "c" * 32, "operation": "launch"})

@@ -97,6 +97,95 @@ class HeadlessIntegrationScriptTests(unittest.TestCase):
                 environment = run_headless_integration.configure_editor_environment("Darwin")
             self.assertEqual(environment["DEVELOPER_DIR"], str(developer.resolve()))
 
+    def test_readonly_acceptance_exercises_every_tool_and_ignores_generated_state(self):
+        from headless_integration.readonly_mode import READONLY_TOOL_NAMES, verify_readonly_mode
+        from unreal_editor_mcp import __version__
+        from unreal_editor_mcp.project import ProjectLayout
+
+        class Bridge:
+            def __init__(self, layout):
+                self.layout = layout
+                self.calls = []
+
+            def call(self, command, arguments=None):
+                self.calls.append(command)
+                self.layout.state_dir.mkdir(parents=True, exist_ok=True)
+                (self.layout.state_dir / "allowed.json").write_text("generated", encoding="utf-8")
+                if command == "capabilities":
+                    return {"bridge_version": __version__, "bridge_instance_id": "b" * 32}
+                if command == "blueprint_inspect":
+                    return {
+                        "snapshot_id": "c" * 40,
+                        "records": [{"section": "graph", "id": "d" * 32}],
+                    }
+                return {}
+
+            def close(self):
+                pass
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            descriptor = root / "ReadonlyFixture.uproject"
+            descriptor.write_text("{}", encoding="utf-8")
+            content = root / "Content"
+            content.mkdir()
+            (content / "Fixture.uasset").write_bytes(b"unchanged")
+            layout = ProjectLayout.resolve(descriptor)
+            bridge = Bridge(layout)
+            verify_readonly_mode(
+                bridge,
+                layout,
+                bridge_instance_id="b" * 32,
+                blueprint_path="/Game/BP_Fixture.BP_Fixture",
+                game_data_path="/Game/DT_Fixture.DT_Fixture",
+                map_path="/Game/L_Fixture.L_Fixture",
+            )
+            self.assertEqual(set(bridge.calls), set(READONLY_TOOL_NAMES))
+
+    def test_readonly_acceptance_detects_project_content_changes(self):
+        from headless_integration.readonly_mode import verify_readonly_mode
+        from unreal_editor_mcp import __version__
+        from unreal_editor_mcp.project import ProjectLayout
+
+        class Bridge:
+            def __init__(self, layout):
+                self.layout = layout
+                self.changed = False
+
+            def call(self, command, arguments=None):
+                if not self.changed:
+                    (self.layout.root / "Config" / "DefaultGame.ini").write_text("changed", encoding="utf-8")
+                    self.changed = True
+                if command == "capabilities":
+                    return {"bridge_version": __version__, "bridge_instance_id": "b" * 32}
+                if command == "blueprint_inspect":
+                    return {
+                        "snapshot_id": "c" * 40,
+                        "records": [{"section": "graph", "id": "d" * 32}],
+                    }
+                return {}
+
+            def close(self):
+                pass
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            descriptor = root / "ReadonlyFixture.uproject"
+            descriptor.write_text("{}", encoding="utf-8")
+            config = root / "Config"
+            config.mkdir()
+            (config / "DefaultGame.ini").write_text("original", encoding="utf-8")
+            layout = ProjectLayout.resolve(descriptor)
+            with self.assertRaisesRegex(AssertionError, "changed project-owned files"):
+                verify_readonly_mode(
+                    Bridge(layout),
+                    layout,
+                    bridge_instance_id="b" * 32,
+                    blueprint_path="/Game/BP_Fixture.BP_Fixture",
+                    game_data_path="/Game/DT_Fixture.DT_Fixture",
+                    map_path="/Game/L_Fixture.L_Fixture",
+                )
+
 
 if __name__ == "__main__":
     unittest.main()

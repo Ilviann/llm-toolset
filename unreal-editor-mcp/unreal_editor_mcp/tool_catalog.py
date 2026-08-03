@@ -1,4 +1,4 @@
-"""Ordered assembly of the released Unreal Editor MCP tool catalog."""
+"""Ordered, access-aware assembly of the Unreal Editor MCP tool catalog."""
 
 from __future__ import annotations
 
@@ -26,15 +26,60 @@ TOOLS: Final = (
     *GAMEPLAY_TOOLS,
     *GAME_DATA_TOOLS,
 )
-LARGE_TOOLS: Final = (*TOOLS, EDITOR_LIFECYCLE_TOOL)
+
+READONLY_TOOL_NAMES: Final = frozenset({
+    "capabilities",
+    "editor_state",
+    "operation_status",
+    "asset_references",
+    "level_inspect",
+    "level_open",
+    "blueprint_inspect",
+    "blueprint_action_catalog",
+    "game_data_inspect",
+})
+WRITABLE_TOOL_NAMES: Final = frozenset({
+    "operation_cancel",
+    "asset_delete",
+    "level_manage",
+    "level_actor_edit",
+    "level_save",
+    "blueprint_graph_edit",
+    "blueprint_block_replace",
+    "blueprint_create",
+    "blueprint_compile",
+    "blueprint_save",
+    "blueprint_component_edit",
+    "blueprint_default_edit",
+    "blueprint_member_edit",
+    "widget_tree_edit",
+    "gameplay_framework_edit",
+    "game_data_edit",
+})
+
+_PUBLIC_NAMES = tuple(tool["name"] for tool in TOOLS)
+if len(_PUBLIC_NAMES) != len(set(_PUBLIC_NAMES)):
+    raise RuntimeError("Public tool names must be unique")
+if READONLY_TOOL_NAMES & WRITABLE_TOOL_NAMES:
+    raise RuntimeError("Public tools must have exactly one access classification")
+if READONLY_TOOL_NAMES | WRITABLE_TOOL_NAMES != set(_PUBLIC_NAMES):
+    raise RuntimeError("Every public tool must have an explicit access classification")
+
+READONLY_TOOLS: Final = tuple(tool for tool in TOOLS if tool["name"] in READONLY_TOOL_NAMES)
+TOOLS_WITH_LIFECYCLE: Final = (*TOOLS, EDITOR_LIFECYCLE_TOOL)
+READONLY_TOOLS_WITH_LIFECYCLE: Final = (*READONLY_TOOLS, EDITOR_LIFECYCLE_TOOL)
 
 
-def tools_for_mode(mode: str) -> tuple[dict[str, object], ...]:
-    if mode == "default":
-        return TOOLS
-    if mode == "large":
-        return LARGE_TOOLS
-    raise ValueError("Unsupported tool mode")
+def tools_for_configuration(
+    *,
+    writable: bool,
+    lifecycle_enabled: bool,
+) -> tuple[dict[str, object], ...]:
+    """Return the deterministic public catalog for immutable startup access."""
+    if type(writable) is not bool or type(lifecycle_enabled) is not bool:
+        raise TypeError("Tool catalog configuration flags must be Boolean")
+    tools = TOOLS if writable else READONLY_TOOLS
+    return (*tools, EDITOR_LIFECYCLE_TOOL) if lifecycle_enabled else tools
 
 
 TOOL_BY_NAME: Final = {tool["name"]: tool for tool in TOOLS}

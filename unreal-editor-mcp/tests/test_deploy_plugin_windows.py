@@ -345,6 +345,69 @@ class WindowsDeploymentScriptTests(unittest.TestCase):
             self.assertEqual(server["command"], str(Path("C:/Python312/python.exe").resolve()))
             self.assertEqual(server["args"], [str(deploy.SERVER_ENTRY), str(project.descriptor)])
 
+    def test_lm_studio_json_exposes_independent_access_and_lifecycle_options(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            project_folder = root / "Project"
+            project_folder.mkdir()
+            project = self.write_project(project_folder)
+            editor = root / "Engine" / deploy.WINDOWS_EDITOR_RELATIVE
+            editor.parent.mkdir(parents=True)
+            editor.write_bytes(b"editor")
+
+            writable = json.loads(deploy.lm_studio_json(project, writable=True))
+            self.assertEqual(
+                writable["mcpServers"]["unreal-editor"]["args"],
+                [str(deploy.SERVER_ENTRY), str(project.descriptor), "--writable"],
+            )
+            lifecycle = json.loads(deploy.lm_studio_json(project, editor_lifecycle=editor))
+            self.assertEqual(
+                lifecycle["mcpServers"]["unreal-editor"]["args"],
+                [
+                    str(deploy.SERVER_ENTRY),
+                    str(project.descriptor),
+                    "--editor-lifecycle",
+                    str(editor.resolve()),
+                ],
+            )
+            both = json.loads(
+                deploy.lm_studio_json(project, writable=True, editor_lifecycle=editor)
+            )
+            self.assertEqual(
+                both["mcpServers"]["unreal-editor"]["args"],
+                [
+                    str(deploy.SERVER_ENTRY),
+                    str(project.descriptor),
+                    "--writable",
+                    "--editor-lifecycle",
+                    str(editor.resolve()),
+                ],
+            )
+
+    def test_lifecycle_executable_validation_is_fail_closed(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            engine = root / "UE_5.8"
+            editor = engine / deploy.WINDOWS_EDITOR_RELATIVE
+            editor.parent.mkdir(parents=True)
+            editor.write_bytes(b"editor")
+            self.assertEqual(
+                deploy.windows_editor_lifecycle_executable(engine),
+                editor.resolve(),
+            )
+            with self.assertRaisesRegex(deploy.DeploymentError, "absolute path"):
+                deploy.validate_editor_lifecycle_executable(Path("UnrealEditor.exe"))
+            with self.assertRaisesRegex(deploy.DeploymentError, "existing regular file"):
+                deploy.validate_editor_lifecycle_executable(root / "Missing" / "UnrealEditor.exe")
+            wrong = root / "Editor.exe"
+            wrong.write_bytes(b"editor")
+            with self.assertRaisesRegex(deploy.DeploymentError, "must be UnrealEditor.exe"):
+                deploy.validate_editor_lifecycle_executable(wrong)
+            with self.assertRaisesRegex(deploy.DeploymentError, "writable must be Boolean"):
+                project_folder = root / "Project"
+                project_folder.mkdir()
+                deploy.lm_studio_json(self.write_project(project_folder), writable=1)  # type: ignore[arg-type]
+
     def test_verify_rejects_package_with_debug_artifacts(self):
         with tempfile.TemporaryDirectory() as temporary:
             package = Path(temporary)

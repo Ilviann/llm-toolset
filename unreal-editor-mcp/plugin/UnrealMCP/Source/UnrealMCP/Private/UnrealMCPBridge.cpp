@@ -58,7 +58,7 @@ FString Header(const FHttpServerRequest& Request, const TCHAR* LowercaseName)
     return Values != nullptr && Values->Num() == 1 ? (*Values)[0] : FString();
 }
 
-bool IsMutationCommand(const FString& Command)
+bool IsRetainedOperationCommand(const FString& Command)
 {
     return Command == TEXT("asset_delete") || Command == TEXT("level_open") || Command == TEXT("level_manage")
         || Command == TEXT("level_actor_edit") || Command == TEXT("level_save")
@@ -230,7 +230,7 @@ bool FUnrealMCPBridge::HandleRequest(const FHttpServerRequest& Request, const FH
         return true;
     }
     if (Command != TEXT("capabilities") && Command != TEXT("editor_state") && Command != TEXT("editor_shutdown")
-        && Command != TEXT("operation_status") && Command != TEXT("asset_references")
+        && Command != TEXT("operation_status") && Command != TEXT("operation_cancel") && Command != TEXT("asset_references")
         && Command != TEXT("asset_delete")
         && Command != TEXT("level_inspect") && Command != TEXT("level_open") && Command != TEXT("level_manage")
         && Command != TEXT("level_actor_edit") && Command != TEXT("level_save")
@@ -245,11 +245,15 @@ bool FUnrealMCPBridge::HandleRequest(const FHttpServerRequest& Request, const FH
         Complete(UnrealMCP::Protocol::Error(EHttpServerResponseCodes::BadRequest, TEXT("invalid_argument"), TEXT("Unknown or unavailable command")));
         return true;
     }
-    if (Command == TEXT("operation_status"))
+    if (Command == TEXT("operation_status") || Command == TEXT("operation_cancel"))
     {
         TSharedPtr<FJsonObject> Status;
         FUnrealMCPError Error;
-        if (!OperationLedger || !OperationLedger->Status(Arguments, Status, Error))
+        const bool bResolved = OperationLedger
+            && (Command == TEXT("operation_status")
+                ? OperationLedger->Status(Arguments, Status, Error)
+                : OperationLedger->Cancel(Arguments, Status, Error));
+        if (!bResolved)
         {
             Complete(UnrealMCP::Protocol::Error(EHttpServerResponseCodes::BadRequest, Error));
         }
@@ -266,7 +270,7 @@ bool FUnrealMCPBridge::HandleRequest(const FHttpServerRequest& Request, const FH
     }
     FString OperationId;
     FString RequestDigest;
-    if (IsMutationCommand(Command))
+    if (IsRetainedOperationCommand(Command))
     {
         const FUnrealMCPOperationAdmission Admission = OperationLedger->Admit(Command, Arguments);
         OperationId = Admission.OperationId;
@@ -400,7 +404,7 @@ bool FUnrealMCPBridge::Execute(const FString& Command, const TSharedPtr<FJsonObj
             {
                 OutError = {
                     TEXT("busy"),
-                    TEXT("Asset deletion refused while another mutation is queued or executing"),
+                    TEXT("Asset deletion refused while another retained operation is queued or executing"),
                     MakeShared<FJsonObject>(),
                     true};
                 return false;
@@ -423,7 +427,7 @@ bool FUnrealMCPBridge::Execute(const FString& Command, const TSharedPtr<FJsonObj
             {
                 OutError = {
                     TEXT("busy"),
-                    TEXT("Level mutation refused while another mutation is queued or executing"),
+                    TEXT("Level operation refused while another retained operation is queued or executing"),
                     MakeShared<FJsonObject>(),
                     true};
                 return false;
@@ -525,7 +529,7 @@ TSharedPtr<FJsonObject> FUnrealMCPBridge::Capabilities() const
     Result->SetStringField(TEXT("platform"), FPlatformProperties::PlatformName());
     Result->SetStringField(TEXT("mode"), TEXT("blueprint_family_authoring"));
     Result->SetBoolField(TEXT("bridge_ready"), bReady);
-    Result->SetArrayField(TEXT("commands"), Strings({TEXT("capabilities"), TEXT("editor_state"), TEXT("editor_shutdown"), TEXT("operation_status"), TEXT("asset_references"), TEXT("asset_delete"),
+    Result->SetArrayField(TEXT("commands"), Strings({TEXT("capabilities"), TEXT("editor_state"), TEXT("editor_shutdown"), TEXT("operation_status"), TEXT("operation_cancel"), TEXT("asset_references"), TEXT("asset_delete"),
         TEXT("level_inspect"), TEXT("level_open"), TEXT("level_manage"), TEXT("level_actor_edit"), TEXT("level_save"),
         TEXT("blueprint_inspect"), TEXT("blueprint_action_catalog"), TEXT("blueprint_graph_edit"),
         TEXT("blueprint_block_replace"), TEXT("blueprint_create"), TEXT("blueprint_compile"),

@@ -2,6 +2,8 @@
 
 Unreal Editor MCP 0.27.0 is an offline-first MCP bridge for Unreal Engine 5.8+. It pairs a dependency-free Python 3.10+ stdio server with an editor-only C++ plugin.
 
+The current checkout includes the active, unreleased `readonly-mode` implementation documented below. Its Windows and macOS native acceptance gate must pass before the next versioned release.
+
 ## Installation
 
 ### Windows graphical installer
@@ -12,7 +14,7 @@ Close Unreal Editor, then double-click:
 scripts\deploy_plugin_windows.cmd
 ```
 
-Select the folder containing the game's `.uproject`. Confirm or select the matching Unreal Engine 5.8+ installation, optionally enable **Include matching PDB crash symbols** for symbolicated plugin crash stacks, then choose **Build and install plugin**. The helper packages and installs the verified binary plugin at `<YourProject>\Plugins\UnrealMCP` without replacing an existing installation unless you approve it. PDB deployment is disabled by default and retains only a `Binaries/Win64` PDB whose basename matches a deployed DLL.
+Select the folder containing the game's `.uproject`. Confirm or select the matching Unreal Engine 5.8+ installation, optionally enable **Include matching PDB crash symbols** for symbolicated plugin crash stacks, then choose **Build and install plugin**. The generated LM Studio entry is readonly by default; independent checkboxes can add writable tools and editor lifecycle control using the selected Engine's `UnrealEditor.exe`. The helper packages and installs the verified binary plugin at `<YourProject>\Plugins\UnrealMCP` without replacing an existing installation unless you approve it. PDB deployment is disabled by default and retains only a `Binaries/Win64` PDB whose basename matches a deployed DLL.
 
 Python 3.10 or newer with tkinter is required. The build and installation are offline.
 
@@ -36,18 +38,18 @@ python3 scripts/package_plugin.py
 
 Windows Command Prompt users can run `scripts\package_plugin.cmd`. See the [detailed tool and deployment guides](docs/user/index.md) for packaging options, macOS requirements, custom ports, and optional editor lifecycle configuration.
 
-### Optional large mode
+### Access and optional editor lifecycle
 
-Large mode is enabled with `--tool-mode large`. It adds the `editor_lifecycle` tool for the configured project. To allow launch and restart, also pass the absolute Unreal Editor executable with `--editor`; without it, large mode can report state and gracefully shut down an already-running editor, but launch and restart are unavailable.
+The server is readonly by default. Add `--writable` only when the MCP client is trusted to create, edit, compile, save, or delete content in this dedicated project. The flag is fixed for the server process and cannot be enabled by a tool call, environment variable, native capability, or editor setting.
+
+Editor lifecycle control is independent. Add `--editor-lifecycle` followed by the absolute Unreal Editor executable to publish `editor_lifecycle` and configure launch/restart. This does not enable writable tools.
 
 For example, add the following arguments to an LM Studio MCP entry on macOS:
 
 ```json
 "args": [
   "/absolute/path/to/Project.uproject",
-  "--tool-mode",
-  "large",
-  "--editor",
+  "--editor-lifecycle",
   "/Users/Shared/Epic Games/UE_5.8/Engine/Binaries/Mac/UnrealEditor.app/Contents/MacOS/UnrealEditor"
 ]
 ```
@@ -57,19 +59,17 @@ On Windows:
 ```json
 "args": [
   "C:\\absolute\\path\\to\\Project.uproject",
-  "--tool-mode",
-  "large",
-  "--editor",
+  "--editor-lifecycle",
   "C:\\Program Files\\Epic Games\\UE_5.8\\Engine\\Binaries\\Win64\\UnrealEditor.exe"
 ]
 ```
 
-Each item must remain a separate `args` value; paths containing spaces do not need shell quoting. Add `--lifecycle-timeout` followed by a value from 5 to 900 seconds to override the 120-second default. Native launch and restart are supported on macOS and Windows; Linux rejects those operations. See [Optional editor lifecycle](docs/user/setup-and-operation.md#optional-editor-lifecycle) for operation examples and safety behavior.
+Each item must remain a separate `args` value; paths containing spaces do not need shell quoting. Add `--writable` to either example only when content mutation is required. Add `--lifecycle-timeout` followed by a value from 5 to 900 seconds to override the 120-second default. Native launch and restart are supported on macOS and Windows; Linux rejects those operations. See [Access configuration and migration](docs/user/setup-and-operation.md#access-configuration-and-migration) and [Optional editor lifecycle](docs/user/setup-and-operation.md#optional-editor-lifecycle).
 
 ## Quickstart
 
 1. Install and enable the plugin, then open the target Unreal project.
-2. Add an LM Studio MCP entry using absolute paths. The committed [`examples/lm-studio.json`](examples/lm-studio.json) contains a complete example:
+2. Add an LM Studio MCP entry using absolute paths. The committed [`examples/lm-studio.json`](examples/lm-studio.json) contains the preferred readonly example; [`examples/lm-studio-writable.json`](examples/lm-studio-writable.json) is the explicit trusted-project alternative:
 
    ```json
    {
@@ -83,30 +83,32 @@ Each item must remain a separate `args` value; paths containing spaces do not ne
    ```
 
 3. Start or reload the MCP server.
-4. Call `capabilities` first. Confirm the configured project identity, Python/plugin/Unreal versions, listener readiness, effective limits, supported Blueprint families, and available commands.
-5. Use inspection before mutation. Preserve returned asset, graph, member, pin, project, and snapshot identities; supply the latest required preconditions and a fresh 32-hex `operation_id` for each new mutation.
+4. Call `capabilities` first. Confirm `access_mode`, the configured project identity, Python/plugin/Unreal versions, listener readiness, lifecycle availability, effective limits, supported Blueprint families, and available native commands.
+5. Use inspection before mutation. To enable mutation, make the explicit trust decision to restart this MCP entry with `--writable`. Preserve returned asset, graph, member, pin, project, and snapshot identities; supply the latest required preconditions and a fresh 32-hex `operation_id` for each new mutation.
 6. Call `blueprint_compile` and `blueprint_save` explicitly when authoring is complete. After a lost mutation response, reconcile the same operation through `operation_status` instead of retrying under a new ID.
 
 Start Unreal before calling normal tools. When Unreal is unavailable, `capabilities` still returns the configured `.uproject` name and hash with `bridge_ready: false` and `native_capabilities_available: false`; native-only fields are absent. MCP protocol messages use stdout; diagnostics use stderr.
 
 ## Contract overview
 
-Default mode exposes twenty-four tools:
+Readonly mode is the default and exposes exactly nine tools:
 
 - Core and lifecycle state: `capabilities`, `editor_state`, and `operation_status`.
-- Levels and assets: `level_inspect`, `level_open`, `level_manage`, `level_actor_edit`, `level_save`, `asset_references`, and `asset_delete`.
-- Blueprint discovery and authoring: `blueprint_inspect`, `blueprint_action_catalog`, `blueprint_graph_edit`, `blueprint_block_replace`, `blueprint_create`, `blueprint_compile`, `blueprint_save`, `blueprint_component_edit`, `blueprint_default_edit`, and `blueprint_member_edit`.
-- Widget Blueprint hierarchy, layout, styling, binding, and Designer-event authoring: `widget_tree_edit`.
-- Project and game data: `gameplay_framework_edit`, `game_data_inspect`, and `game_data_edit`.
+- Levels and assets: `asset_references`, `level_inspect`, and `level_open`.
+- Blueprint and game-data inspection: `blueprint_inspect`, `blueprint_action_catalog`, and `game_data_inspect`.
 
-Opt-in large mode adds `editor_lifecycle` for a single configured trusted project. It supports bounded launch, graceful shutdown, restart, and cancellation; it never accepts model-supplied executables, projects, process IDs, environment values, shell fragments, or arbitrary editor arguments.
+`level_open` may change the active editor map, but it refuses dirty work and never saves, discards, overwrites, compiles, or dirties project content. Readonly operation may still maintain bounded generated discovery, cursor, lifecycle, and retained-operation records under `Saved/UnrealMCP/`; that generated state is not project-content write authority.
+
+`--writable` exposes exactly twenty-five tools. In addition to the readonly set, it adds `operation_cancel`, `asset_delete`, `level_manage`, `level_actor_edit`, `level_save`, `blueprint_graph_edit`, `blueprint_block_replace`, `blueprint_create`, `blueprint_compile`, `blueprint_save`, `blueprint_component_edit`, `blueprint_default_edit`, `blueprint_member_edit`, `widget_tree_edit`, `gameplay_framework_edit`, and `game_data_edit`. `operation_status` only looks up a retained result; cancellation is the separate writable-only `operation_cancel` tool.
+
+`--editor-lifecycle <absolute-executable>` independently appends `editor_lifecycle`, producing ten readonly-with-lifecycle tools or twenty-six writable-with-lifecycle tools. It supports bounded launch, graceful shutdown, restart, and cancellation; it never accepts model-supplied executables, projects, process IDs, environment values, shell fragments, or arbitrary editor arguments.
 
 The executable schemas, runtime `capabilities` response, source, plugin metadata, and behavioral tests are authoritative. Important cross-tool rules are:
 
 - The plugin listens only on `127.0.0.1` and authenticates every request with a durable per-project token stored under `Saved/UnrealMCP`. Discovery never exposes the token or absolute project path.
 - Model input is bounded and validated. Filesystem paths, force flags, arbitrary reflection, console commands, unrestricted serialization, and code execution are not exposed.
 - Read operations return bounded pages tied to exact queries and snapshots. Continuation cursors are short-lived and single-use.
-- Mutations use stale-state preconditions and a retained operation ledger. Reusing an operation ID with different arguments is rejected; unknown or partial outcomes require reconciliation before another mutation.
+- Writable tools use stale-state preconditions and a retained operation ledger. Reusing an operation ID with different arguments is rejected; unknown or partial outcomes require `operation_status` reconciliation before another mutation, while safe cancellation uses `operation_cancel`.
 - Blueprint compilation and saving are explicit. A completed compile can return `compile_succeeded: false` with bounded diagnostics.
 - Maps use mounted World object paths, never `.umap` filenames. `level_manage` creates or configures exact maps with explicit current-map snapshots and setup bounds; safe map deletion remains in `asset_delete` and verifies the complete owned package closure.
 - `level_actor_edit` prevalidates one bounded stale-safe transaction and returns its exact dirty package set; `level_save` explicitly persists that set and verifies requested actor/component state by inspection or map reload.

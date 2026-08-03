@@ -77,6 +77,54 @@ TSharedRef<FJsonObject> ErrorValue(const FUnrealMCPError& Error)
     Value->SetBoolField(TEXT("retryable"), Error.bRetryable);
     return Value;
 }
+
+bool ParseOperationIdentity(
+    const TSharedPtr<FJsonObject>& Arguments,
+    const FString& Command,
+    FString& OutOperationId,
+    FString& OutBridgeInstanceId,
+    FUnrealMCPError& OutError)
+{
+    if (!Arguments.IsValid())
+    {
+        OutError = {TEXT("invalid_argument"), TEXT("arguments must be an object")};
+        return false;
+    }
+    for (const TPair<FString, TSharedPtr<FJsonValue>>& Pair : Arguments->Values)
+    {
+        if (Pair.Key != TEXT("operation_id") && Pair.Key != TEXT("bridge_instance_id"))
+        {
+            OutError = {
+                TEXT("invalid_argument"),
+                Command + TEXT(" contains an unknown field")};
+            return false;
+        }
+    }
+    if (!Arguments->TryGetStringField(TEXT("operation_id"), OutOperationId)
+        || !IsOperationId(OutOperationId)
+        || !Arguments->TryGetStringField(TEXT("bridge_instance_id"), OutBridgeInstanceId)
+        || !IsOperationId(OutBridgeInstanceId))
+    {
+        OutError = {
+            TEXT("invalid_argument"),
+            Command + TEXT(" requires valid operation_id and bridge_instance_id")};
+        return false;
+    }
+    return true;
+}
+
+TSharedRef<FJsonObject> UnknownOperationStatus(
+    const FString& OperationId,
+    const FString& BridgeInstanceId)
+{
+    const TSharedRef<FJsonObject> Unknown = MakeShared<FJsonObject>();
+    Unknown->SetStringField(TEXT("operation_id"), OperationId);
+    Unknown->SetStringField(TEXT("bridge_instance_id"), BridgeInstanceId);
+    Unknown->SetStringField(TEXT("state"), TEXT("outcome_unknown"));
+    Unknown->SetBoolField(TEXT("retained"), false);
+    Unknown->SetBoolField(TEXT("retry_safe"), false);
+    return Unknown;
+}
 }
 
 FUnrealMCPOperationLedger::FUnrealMCPOperationLedger(FString InBridgeInstanceId, FString InContextBinding, TFunction<double()> InNow)
@@ -132,7 +180,7 @@ FUnrealMCPOperationAdmission FUnrealMCPOperationLedger::Admit(const FString& Com
     if (!Arguments.IsValid() || !Arguments->TryGetStringField(TEXT("operation_id"), OperationId) || !IsOperationId(OperationId))
     {
         Admission.Kind = EUnrealMCPOperationAdmission::Conflict;
-        Admission.OwnedError = MakeShared<FUnrealMCPError>(FUnrealMCPError{TEXT("invalid_argument"), TEXT("Every mutation requires one 32-character lowercase hexadecimal operation_id")});
+        Admission.OwnedError = MakeShared<FUnrealMCPError>(FUnrealMCPError{TEXT("invalid_argument"), TEXT("Every retained operation requires one 32-character lowercase hexadecimal operation_id")});
         Admission.Error = Admission.OwnedError.Get();
         return Admission;
     }
@@ -165,7 +213,7 @@ FUnrealMCPOperationAdmission FUnrealMCPOperationLedger::Admit(const FString& Com
         else
         {
             Admission.Kind = EUnrealMCPOperationAdmission::Busy;
-            Admission.OwnedError = MakeShared<FUnrealMCPError>(FUnrealMCPError{TEXT("busy"), TEXT("The mutation operation is already queued or executing"), MakeShared<FJsonObject>(), true});
+            Admission.OwnedError = MakeShared<FUnrealMCPError>(FUnrealMCPError{TEXT("busy"), TEXT("The retained operation is already queued or executing"), MakeShared<FJsonObject>(), true});
             Admission.Error = Admission.OwnedError.Get();
         }
         return Admission;
@@ -173,7 +221,7 @@ FUnrealMCPOperationAdmission FUnrealMCPOperationLedger::Admit(const FString& Com
     if (!MakeRoomLocked())
     {
         Admission.Kind = EUnrealMCPOperationAdmission::Busy;
-        Admission.OwnedError = MakeShared<FUnrealMCPError>(FUnrealMCPError{TEXT("busy"), TEXT("The mutation operation ledger is full"), MakeShared<FJsonObject>(), true});
+        Admission.OwnedError = MakeShared<FUnrealMCPError>(FUnrealMCPError{TEXT("busy"), TEXT("The retained operation ledger is full"), MakeShared<FJsonObject>(), true});
         Admission.Error = Admission.OwnedError.Get();
         return Admission;
     }
@@ -194,7 +242,7 @@ bool FUnrealMCPOperationLedger::MarkExecuting(const FString& OperationId, FUnrea
     }
     if (Entry->State == TEXT("cancelled"))
     {
-        OutError = Entry->Error.IsValid() ? *Entry->Error : FUnrealMCPError{TEXT("cancelled"), TEXT("The queued mutation was cancelled")};
+        OutError = Entry->Error.IsValid() ? *Entry->Error : FUnrealMCPError{TEXT("cancelled"), TEXT("The queued operation was cancelled")};
         return false;
     }
     if (Entry->State != TEXT("queued"))
@@ -269,51 +317,61 @@ bool FUnrealMCPOperationLedger::Status(
     TSharedPtr<FJsonObject>& OutResult,
     FUnrealMCPError& OutError)
 {
-    if (!Arguments.IsValid())
-    {
-        OutError = {TEXT("invalid_argument"), TEXT("arguments must be an object")};
-        return false;
-    }
-    for (const TPair<FString, TSharedPtr<FJsonValue>>& Pair : Arguments->Values)
-    {
-        if (Pair.Key != TEXT("operation_id") && Pair.Key != TEXT("bridge_instance_id") && Pair.Key != TEXT("cancel"))
-        {
-            OutError = {TEXT("invalid_argument"), TEXT("operation_status contains an unknown field")};
-            return false;
-        }
-    }
     FString OperationId;
     FString RequestedInstance;
-    bool bCancel = false;
-    if (!Arguments->TryGetStringField(TEXT("operation_id"), OperationId) || !IsOperationId(OperationId)
-        || !Arguments->TryGetStringField(TEXT("bridge_instance_id"), RequestedInstance) || !IsOperationId(RequestedInstance)
-        || (Arguments->HasField(TEXT("cancel")) && !Arguments->TryGetBoolField(TEXT("cancel"), bCancel)))
+    if (!ParseOperationIdentity(
+        Arguments,
+        TEXT("operation_status"),
+        OperationId,
+        RequestedInstance,
+        OutError))
     {
-        OutError = {TEXT("invalid_argument"), TEXT("operation_status requires valid operation_id, bridge_instance_id, and optional boolean cancel")};
         return false;
     }
     FScopeLock Lock(&Mutex);
     RemoveExpiredLocked(Now());
     if (RequestedInstance != BridgeInstanceId || !Entries.Contains(OperationId))
     {
-        const TSharedRef<FJsonObject> Unknown = MakeShared<FJsonObject>();
-        Unknown->SetStringField(TEXT("operation_id"), OperationId);
-        Unknown->SetStringField(TEXT("bridge_instance_id"), BridgeInstanceId);
-        Unknown->SetStringField(TEXT("state"), TEXT("outcome_unknown"));
-        Unknown->SetBoolField(TEXT("retained"), false);
-        Unknown->SetBoolField(TEXT("retry_safe"), false);
-        OutResult = Unknown;
+        OutResult = UnknownOperationStatus(OperationId, BridgeInstanceId);
+        return true;
+    }
+    OutResult = EntryStatusLocked(OperationId, Entries[OperationId]);
+    return true;
+}
+
+bool FUnrealMCPOperationLedger::Cancel(
+    const TSharedPtr<FJsonObject>& Arguments,
+    TSharedPtr<FJsonObject>& OutResult,
+    FUnrealMCPError& OutError)
+{
+    FString OperationId;
+    FString RequestedInstance;
+    if (!ParseOperationIdentity(
+        Arguments,
+        TEXT("operation_cancel"),
+        OperationId,
+        RequestedInstance,
+        OutError))
+    {
+        return false;
+    }
+    FScopeLock Lock(&Mutex);
+    RemoveExpiredLocked(Now());
+    if (RequestedInstance != BridgeInstanceId || !Entries.Contains(OperationId))
+    {
+        OutResult = UnknownOperationStatus(OperationId, BridgeInstanceId);
+        OutResult->SetBoolField(TEXT("cancelled"), false);
         return true;
     }
     FEntry& Entry = Entries[OperationId];
-    if (bCancel && Entry.State == TEXT("queued"))
+    if (Entry.State == TEXT("queued"))
     {
         Entry.State = TEXT("cancelled");
-        Entry.Error = MakeShared<FUnrealMCPError>(FUnrealMCPError{TEXT("cancelled"), TEXT("The queued mutation was cancelled")});
+        Entry.Error = MakeShared<FUnrealMCPError>(FUnrealMCPError{TEXT("cancelled"), TEXT("The queued operation was cancelled")});
         Entry.ExpiresAt = Now() + UnrealMCP::OperationLifetimeSeconds;
     }
     OutResult = EntryStatusLocked(OperationId, Entry);
-    if (bCancel) OutResult->SetBoolField(TEXT("cancelled"), Entry.State == TEXT("cancelled"));
+    OutResult->SetBoolField(TEXT("cancelled"), Entry.State == TEXT("cancelled"));
     return true;
 }
 
@@ -325,7 +383,7 @@ void FUnrealMCPOperationLedger::CancelQueued()
         if (Pair.Value.State == TEXT("queued"))
         {
             Pair.Value.State = TEXT("cancelled");
-            Pair.Value.Error = MakeShared<FUnrealMCPError>(FUnrealMCPError{TEXT("cancelled"), TEXT("Bridge shutdown cancelled queued mutation")});
+            Pair.Value.Error = MakeShared<FUnrealMCPError>(FUnrealMCPError{TEXT("cancelled"), TEXT("Bridge shutdown cancelled queued operation")});
         }
     }
 }

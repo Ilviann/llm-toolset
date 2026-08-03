@@ -13,7 +13,7 @@ If a mutation times out or its response is lost, do not retry it with a new ID. 
 }
 ```
 
-`queued` may be cancelled by adding `"cancel": true`; `executing` is not interrupted unsafely. `committed` contains the verified retained result, `partial` contains a non-retry-safe mutation result whose persistence or reload verification disagreed, and `rejected` contains the retained error. `outcome_unknown` means either an explicitly retained unknown result or that the bridge restarted/forgot the record: inspect the asset before deciding on another mutation.
+Use the readonly `operation_status` tool with this object to look up the result. In writable mode, pass the same object to the separate `operation_cancel` tool to request safe cancellation; `operation_status` rejects the former `cancel` field. Queued work may be cancelled, while executing Unreal mutation is not interrupted unsafely. `committed` contains the verified retained result, `partial` contains a non-retry-safe mutation result whose persistence or reload verification disagreed, and `rejected` contains the retained error. `outcome_unknown` means either an explicitly retained unknown result or that the bridge restarted/forgot the record: inspect the asset before deciding on another mutation.
 
 ## Creation, components, defaults, compile, and save
 

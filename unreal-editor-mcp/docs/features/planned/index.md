@@ -8,7 +8,6 @@
 - [`event-macro-replace` — Event, custom-event, and macro replacement](event-macro-replace.md).
 - [`node-layout` — Deterministic changed-node layout](node-layout.md).
 - [`pcg-graph-authoring` — Procedural Content Generation graph authoring](pcg-graph-authoring.md).
-- [`readonly-mode` — Readonly mode and explicit writable access](readonly-mode.md).
 - [`project-files` — Optional editor-offline project-file generation](project-files.md).
 - [`editor-build` — Optional editor-target builds](editor-build.md).
 - [`pcg-component-edit` — Level actor PCG Component editing](pcg-component-edit.md).

@@ -62,6 +62,17 @@ bool FUnrealMCPPhase4OperationLedgerTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("conflicting ID reuse rejects"), Admission.Kind, EUnrealMCPOperationAdmission::Conflict);
     TestEqual(TEXT("conflict code is stable"), Admission.Error->Code, FString(TEXT("operation_conflict")));
 
+    const TSharedRef<FJsonObject> CommittedIdentity = MakeShared<FJsonObject>();
+    CommittedIdentity->SetStringField(TEXT("operation_id"), OperationId);
+    CommittedIdentity->SetStringField(TEXT("bridge_instance_id"), BridgeId);
+    TSharedPtr<FJsonObject> Status;
+    TestTrue(TEXT("status lookup resolves retained result"), Ledger.Status(CommittedIdentity, Status, Error));
+    TestEqual(TEXT("status lookup preserves committed state"), Status->GetStringField(TEXT("state")), FString(TEXT("committed")));
+    TestFalse(TEXT("status lookup has no cancellation field"), Status->HasField(TEXT("cancelled")));
+    TestTrue(TEXT("terminal cancellation request resolves"), Ledger.Cancel(CommittedIdentity, Status, Error));
+    TestEqual(TEXT("terminal cancellation preserves state"), Status->GetStringField(TEXT("state")), FString(TEXT("committed")));
+    TestFalse(TEXT("terminal operation is not cancelled"), Status->GetBoolField(TEXT("cancelled")));
+
     const FString CancelId = TEXT("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
     const TSharedRef<FJsonObject> Queued = MakeShared<FJsonObject>();
     Queued->SetStringField(TEXT("operation_id"), CancelId);
@@ -69,11 +80,55 @@ bool FUnrealMCPPhase4OperationLedgerTest::RunTest(const FString& Parameters)
     const TSharedRef<FJsonObject> StatusArguments = MakeShared<FJsonObject>();
     StatusArguments->SetStringField(TEXT("operation_id"), CancelId);
     StatusArguments->SetStringField(TEXT("bridge_instance_id"), BridgeId);
-    StatusArguments->SetBoolField(TEXT("cancel"), true);
-    TSharedPtr<FJsonObject> Status;
-    TestTrue(TEXT("queued cancellation resolves"), Ledger.Status(StatusArguments, Status, Error));
+    TestTrue(TEXT("queued status lookup resolves"), Ledger.Status(StatusArguments, Status, Error));
+    TestEqual(TEXT("status lookup cannot alter queued state"), Status->GetStringField(TEXT("state")), FString(TEXT("queued")));
+    const TSharedRef<FJsonObject> StatusWithCancel = MakeShared<FJsonObject>(*StatusArguments);
+    StatusWithCancel->SetBoolField(TEXT("cancel"), true);
+    TestFalse(TEXT("operation_status rejects the removed cancel field"), Ledger.Status(StatusWithCancel, Status, Error));
+    TestEqual(TEXT("status cancel rejection is stable"), Error.Code, FString(TEXT("invalid_argument")));
+    TestTrue(TEXT("rejected status arguments leave operation queued"), Ledger.Status(StatusArguments, Status, Error));
+    TestEqual(TEXT("invalid status lookup cannot cancel"), Status->GetStringField(TEXT("state")), FString(TEXT("queued")));
+    TestTrue(TEXT("queued cancellation resolves"), Ledger.Cancel(StatusArguments, Status, Error));
     TestEqual(TEXT("queued operation becomes cancelled"), Status->GetStringField(TEXT("state")), FString(TEXT("cancelled")));
+    TestTrue(TEXT("queued cancellation reports cancellation"), Status->GetBoolField(TEXT("cancelled")));
     TestFalse(TEXT("cancelled operation never executes"), Ledger.MarkExecuting(CancelId, Error));
+
+    const FString ExecutingId = TEXT("eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee");
+    const TSharedRef<FJsonObject> ExecutingRequest = MakeShared<FJsonObject>();
+    ExecutingRequest->SetStringField(TEXT("operation_id"), ExecutingId);
+    TestEqual(TEXT("executing fixture is admitted"),
+        Ledger.Admit(TEXT("blueprint_compile"), ExecutingRequest).Kind,
+        EUnrealMCPOperationAdmission::Accepted);
+    TestTrue(TEXT("executing fixture starts"), Ledger.MarkExecuting(ExecutingId, Error));
+    const TSharedRef<FJsonObject> ExecutingIdentity = MakeShared<FJsonObject>();
+    ExecutingIdentity->SetStringField(TEXT("operation_id"), ExecutingId);
+    ExecutingIdentity->SetStringField(TEXT("bridge_instance_id"), BridgeId);
+    TestTrue(TEXT("executing cancellation request resolves"), Ledger.Cancel(ExecutingIdentity, Status, Error));
+    TestEqual(TEXT("executing operation is not interrupted"), Status->GetStringField(TEXT("state")), FString(TEXT("executing")));
+    TestFalse(TEXT("executing operation reports no cancellation"), Status->GetBoolField(TEXT("cancelled")));
+    TestTrue(TEXT("executing status remains available"), Ledger.Status(ExecutingIdentity, Status, Error));
+    TestEqual(TEXT("executing lookup remains non-mutating"), Status->GetStringField(TEXT("state")), FString(TEXT("executing")));
+
+    const FString WrongInstanceId = TEXT("ffffffffffffffffffffffffffffffff");
+    const TSharedRef<FJsonObject> WrongInstanceRequest = MakeShared<FJsonObject>();
+    WrongInstanceRequest->SetStringField(TEXT("operation_id"), WrongInstanceId);
+    TestEqual(TEXT("wrong-instance fixture is admitted"),
+        Ledger.Admit(TEXT("blueprint_compile"), WrongInstanceRequest).Kind,
+        EUnrealMCPOperationAdmission::Accepted);
+    const TSharedRef<FJsonObject> WrongInstanceIdentity = MakeShared<FJsonObject>();
+    WrongInstanceIdentity->SetStringField(TEXT("operation_id"), WrongInstanceId);
+    WrongInstanceIdentity->SetStringField(TEXT("bridge_instance_id"), TEXT("cccccccccccccccccccccccccccccccc"));
+    TestTrue(TEXT("wrong-instance cancellation resolves safely"), Ledger.Cancel(WrongInstanceIdentity, Status, Error));
+    TestEqual(TEXT("wrong-instance cancellation reports unknown outcome"), Status->GetStringField(TEXT("state")), FString(TEXT("outcome_unknown")));
+    TestFalse(TEXT("wrong-instance cancellation reports no cancellation"), Status->GetBoolField(TEXT("cancelled")));
+    WrongInstanceIdentity->SetStringField(TEXT("bridge_instance_id"), BridgeId);
+    TestTrue(TEXT("wrong-instance cancellation did not alter queued work"), Ledger.Status(WrongInstanceIdentity, Status, Error));
+    TestEqual(TEXT("queued work survives wrong identity"), Status->GetStringField(TEXT("state")), FString(TEXT("queued")));
+    const TSharedRef<FJsonObject> CancelWithExtra = MakeShared<FJsonObject>(*WrongInstanceIdentity);
+    CancelWithExtra->SetBoolField(TEXT("cancel"), true);
+    TestFalse(TEXT("operation_cancel rejects unknown fields"), Ledger.Cancel(CancelWithExtra, Status, Error));
+    TestEqual(TEXT("cancel schema rejection is stable"), Error.Code, FString(TEXT("invalid_argument")));
+    TestTrue(TEXT("exact cancellation still succeeds"), Ledger.Cancel(WrongInstanceIdentity, Status, Error));
 
     StatusArguments->SetStringField(TEXT("bridge_instance_id"), TEXT("cccccccccccccccccccccccccccccccc"));
     TestTrue(TEXT("another bridge instance resolves safely"), Ledger.Status(StatusArguments, Status, Error));
@@ -81,9 +136,11 @@ bool FUnrealMCPPhase4OperationLedgerTest::RunTest(const FString& Parameters)
     CurrentTime += UnrealMCP::OperationLifetimeSeconds + 1.0;
     StatusArguments->SetStringField(TEXT("operation_id"), OperationId);
     StatusArguments->SetStringField(TEXT("bridge_instance_id"), BridgeId);
-    StatusArguments->RemoveField(TEXT("cancel"));
     TestTrue(TEXT("expired result resolves safely"), Ledger.Status(StatusArguments, Status, Error));
     TestEqual(TEXT("expired result becomes unknown"), Status->GetStringField(TEXT("state")), FString(TEXT("outcome_unknown")));
+    TestTrue(TEXT("expired cancellation resolves safely"), Ledger.Cancel(StatusArguments, Status, Error));
+    TestEqual(TEXT("expired cancellation remains unknown"), Status->GetStringField(TEXT("state")), FString(TEXT("outcome_unknown")));
+    TestFalse(TEXT("expired operation cannot be cancelled"), Status->GetBoolField(TEXT("cancelled")));
 
     FUnrealMCPOperationLedger BoundedLedger(BridgeId, TEXT("bounded-capacity-context"), [] { return 20.0; });
     for (int32 Index = 0; Index < UnrealMCP::MaxRetainedOperations + 1; ++Index)

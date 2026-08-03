@@ -17,7 +17,7 @@ from .project import ProjectLayout
 BRIDGE_PATH = "/unreal-mcp/v1/command"
 MAX_REQUEST_BYTES = 64 * 1024
 MAX_RESPONSE_BYTES = 256 * 1024
-MUTATING_COMMANDS = {
+RETAINED_OPERATION_COMMANDS = {
     "asset_delete",
     "level_open",
     "level_manage",
@@ -61,6 +61,7 @@ class UnrealBridge:
             "editor_state",
             "editor_shutdown",
             "operation_status",
+            "operation_cancel",
             "asset_references",
             "asset_delete",
             "level_inspect",
@@ -124,9 +125,9 @@ class UnrealBridge:
             response = connection.getresponse()
             body = response.read(MAX_RESPONSE_BYTES + 1)
         except TimeoutError:
-            if command in MUTATING_COMMANDS:
+            if command in RETAINED_OPERATION_COMMANDS:
                 raise BridgeError(
-                    "Mutation response was lost; resolve operation_status before retrying",
+                    "Retained operation response was lost; resolve operation_status before retrying",
                     code=ErrorCode.OUTCOME_UNKNOWN,
                     details={
                         "operation_id": (arguments or {}).get("operation_id", ""),

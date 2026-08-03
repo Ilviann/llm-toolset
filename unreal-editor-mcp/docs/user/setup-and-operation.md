@@ -10,6 +10,8 @@ The plugin binds its HTTP route to `127.0.0.1` only and authenticates every requ
 
 Treat the project `Saved/` directory as generated state and keep it out of source control. Never copy `bridge.token` into an MCP configuration, log, issue, or repository.
 
+Readonly mode may still update bounded operational records under `Saved/UnrealMCP/`, including discovery, cursors, lifecycle progress, and retained operation outcomes. These generated records do not grant permission to modify project-owned content under `Content/`, `Config/`, `Source/`, the `.uproject`, or project-plugin content.
+
 ## Install
 
 ### Windows graphical installer
@@ -20,11 +22,11 @@ Close Unreal Editor, then double-click:
 scripts\deploy_plugin_windows.cmd
 ```
 
-Select the folder that directly contains your game's `.uproject` file. When `UNREAL_MCP_ENGINE_ROOT` is set, its value is already shown in the Unreal Engine field and is preserved after project selection when valid. Otherwise, the helper detects a matching Unreal Engine 5.8+ installation from `EngineAssociation` and standard Epic/user-build registry records; use the second Browse button if manual selection is needed. For readable plugin frames in Windows crash reports, enable **Include matching PDB crash symbols (larger installation)**. Click **Build and install plugin**.
+Select the folder that directly contains your game's `.uproject` file. When `UNREAL_MCP_ENGINE_ROOT` is set, its value is already shown in the Unreal Engine field and is preserved after project selection when valid. Otherwise, the helper detects a matching Unreal Engine 5.8+ installation from `EngineAssociation` and standard Epic/user-build registry records; use the second Browse button if manual selection is needed. For readable plugin frames in Windows crash reports, enable **Include matching PDB crash symbols (larger installation)**. The generated LM Studio entry is readonly by default. Enable **writable MCP tools** only for a dedicated trusted project, and enable **editor lifecycle control** independently to add the selected Engine's validated `UnrealEditor.exe`. Click **Build and install plugin**.
 
 The helper uses the installed Engine and Visual Studio toolchain to package `Win64`, removes C++ implementation source and external debug/symbol artifacts by default, and installs the verified binary plugin at `<YourProject>\Plugins\UnrealMCP`. When PDB deployment is enabled, it retains only PDBs directly under `Binaries/Win64` whose basenames match deployed DLLs and rejects an installation missing a matching symbol file. The small `UnrealMCP.Build.cs` module rule and precompiled Unreal Build Tool metadata are retained, and the installed rule explicitly selects the packaged module so later game-project builds do not rebuild it. If that plugin folder already exists, the GUI asks before replacing it, and a failed build leaves the existing installation unchanged.
 
-After installation, open the project and wait for the Unreal MCP ready message in the editor log. Use **Copy JSON** to copy the displayed `mcpServers` object and merge it into LM Studio's `mcp.json`. The generated entry uses the Python interpreter that launched the helper, this checkout's `server.py`, and the selected absolute `.uproject` path; it contains no bridge token. Keep this checkout and Python executable at those paths while LM Studio uses the entry.
+After installation, open the project and wait for the Unreal MCP ready message in the editor log. Use **Copy JSON** to copy the displayed `mcpServers` object and merge it into LM Studio's `mcp.json`. The generated entry uses the Python interpreter that launched the helper, this checkout's `server.py`, and the selected absolute `.uproject` path. Depending on the independent choices, it also contains `--writable` and/or `--editor-lifecycle <selected-Engine-UnrealEditor.exe>`; it never contains the bridge token. Keep this checkout, Python executable, and any configured editor executable at those paths while LM Studio uses the entry.
 
 Python 3.10 or newer with tkinter is required. Official Windows Python installers normally include tkinter. The build and installation are offline and may take several minutes.
 
@@ -69,7 +71,7 @@ Only one bridge may own a configured port. A bind or duplicate-route failure is 
 
 ## LM Studio
 
-Use an absolute `.uproject` path. The committed [`examples/lm-studio.json`](../../examples/lm-studio.json) shows the complete entry:
+Use an absolute `.uproject` path. The committed [`examples/lm-studio.json`](../../examples/lm-studio.json) shows the preferred readonly entry; [`examples/lm-studio-writable.json`](../../examples/lm-studio-writable.json) is the explicit trusted-project alternative:
 
 ```json
 {
@@ -82,18 +84,38 @@ Use an absolute `.uproject` path. The committed [`examples/lm-studio.json`](../.
 }
 ```
 
-Start the Unreal project before calling editor-backed tools. `capabilities` remains available while Unreal is inactive and returns the configured project name/hash, Python metadata, `bridge_ready: false`, and `native_capabilities_available: false`; native-only fields are absent. With an active bridge it also diagnoses exact-version mismatches. MCP stdout contains protocol messages only, while diagnostics go to stderr.
+Start the Unreal project before calling editor-backed tools. `capabilities` remains available while Unreal is inactive and returns the configured project name/hash, Python metadata, authoritative `access_mode`, lifecycle availability, `bridge_ready: false`, and `native_capabilities_available: false`; native-only fields are absent. With an active bridge it also diagnoses exact-version mismatches. MCP stdout contains protocol messages only, while diagnostics go to stderr.
+
+## Access configuration and migration
+
+The default entry is readonly and exposes inspection, safe map opening, and retained-result lookup. To authorize project-content mutation for one dedicated trusted project, add `--writable` as a separate argument:
+
+```json
+"args": [
+  "/absolute/path/to/Project.uproject",
+  "--writable"
+]
+```
+
+This is a startup trust decision. The effective permission is reported as `access_mode: "readonly"` or `access_mode: "writable"`; do not infer it from the editor being active, lifecycle availability, or the native command list. Tools omitted by the selected access mode are absent from `tools/list` and direct calls fail as unknown tools before contacting Unreal.
+
+The upcoming readonly-mode release removes `--tool-mode` and `--editor`; configurations containing either option are rejected by the current implementation. Migrate as follows:
+
+- Remove `--tool-mode default`; readonly is now the default.
+- Replace mutation-capable/default 0.27 configurations with the explicit `--writable` flag.
+- Replace `--tool-mode large --editor <absolute-executable>` with `--editor-lifecycle <absolute-executable>`, adding `--writable` separately only if content mutation is required.
+- There is no lifecycle-without-executable configuration. `--editor-lifecycle` both publishes the tool and configures launch/restart.
 
 ## Optional editor lifecycle
 
-`editor_lifecycle` is absent from default mode. Enable it only for an MCP entry dedicated to one trusted project by adding `--tool-mode large` and an absolute `--editor` path. Windows requires `UnrealEditor.exe`; macOS requires the executable inside `UnrealEditor.app`. For example, the configured argument arrays end with:
+`editor_lifecycle` is absent unless separately configured. Enable it for one fixed project by adding `--editor-lifecycle` and an absolute editor executable. Windows requires `UnrealEditor.exe`; macOS requires the executable inside `UnrealEditor.app`. For example, the configured argument arrays end with:
 
 ```text
-Windows: C:\absolute\Project.uproject --tool-mode large --editor C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe
-macOS:   /absolute/Project.uproject --tool-mode large --editor /Users/Shared/Epic Games/UE_5.8/Engine/Binaries/Mac/UnrealEditor.app/Contents/MacOS/UnrealEditor
+Windows: C:\absolute\Project.uproject --editor-lifecycle C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe
+macOS:   /absolute/Project.uproject --editor-lifecycle /Users/Shared/Epic Games/UE_5.8/Engine/Binaries/Mac/UnrealEditor.app/Contents/MacOS/UnrealEditor
 ```
 
-Pass each shown value as a separate MCP `args` element; spaces are part of a path, not shell quoting. `--lifecycle-timeout` configures one 5–900 second bound and defaults to 120 seconds. Linux rejects launch/restart; its command construction remains unit-tested without a native-support claim. Large mode without `--editor` can report and gracefully shut down the configured running project, but launch and restart reject as unavailable.
+Pass each shown value as a separate MCP `args` element; spaces are part of a path, not shell quoting. Lifecycle configuration does not imply `--writable`; combine the flags only when both permissions are intended. `--lifecycle-timeout` configures one 5–900 second bound and defaults to 120 seconds. Linux rejects launch/restart; its command construction remains unit-tested without a native-support claim.
 
 The tool accepts only:
 

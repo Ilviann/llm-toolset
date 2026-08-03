@@ -140,6 +140,7 @@ bool FUnrealMCPGameThreadDispatchTest::RunTest(const FString& Parameters)
     {
         bool bCompleted = false;
         bool bOnGameThread = false;
+        bool bCapabilitiesContainOperationCancel = false;
         int32 ResponseCode = static_cast<int32>(EHttpServerResponseCodes::Unknown);
     };
 
@@ -159,6 +160,33 @@ bool FUnrealMCPGameThreadDispatchTest::RunTest(const FString& Parameters)
         {
             State->bOnGameThread = IsInGameThread();
             State->ResponseCode = Response.IsValid() ? static_cast<int32>(Response->Code) : static_cast<int32>(EHttpServerResponseCodes::Unknown);
+            if (Response.IsValid())
+            {
+                FUTF8ToTCHAR Converted(
+                    reinterpret_cast<const ANSICHAR*>(Response->Body.GetData()),
+                    Response->Body.Num());
+                TSharedPtr<FJsonObject> Root;
+                const TSharedPtr<FJsonObject>* Result = nullptr;
+                const TArray<TSharedPtr<FJsonValue>>* Commands = nullptr;
+                if (FJsonSerializer::Deserialize(
+                        TJsonReaderFactory<>::Create(FString(Converted.Length(), Converted.Get())),
+                        Root)
+                    && Root.IsValid()
+                    && Root->TryGetObjectField(TEXT("result"), Result)
+                    && Result != nullptr
+                    && (*Result)->TryGetArrayField(TEXT("commands"), Commands)
+                    && Commands != nullptr)
+                {
+                    for (const TSharedPtr<FJsonValue>& Command : *Commands)
+                    {
+                        if (Command.IsValid() && Command->AsString() == TEXT("operation_cancel"))
+                        {
+                            State->bCapabilitiesContainOperationCancel = true;
+                            break;
+                        }
+                    }
+                }
+            }
             State->bCompleted = true;
         });
     TestTrue(TEXT("valid request reaches bridge route"), bMatched);
@@ -170,6 +198,7 @@ bool FUnrealMCPGameThreadDispatchTest::RunTest(const FString& Parameters)
             TestTrue(TEXT("queued request completes"), State->bCompleted);
             TestTrue(TEXT("bridge callback runs on Game thread"), State->bOnGameThread);
             TestEqual(TEXT("valid request succeeds"), State->ResponseCode, static_cast<int32>(EHttpServerResponseCodes::Ok));
+            TestTrue(TEXT("native capabilities publish operation_cancel"), State->bCapabilitiesContainOperationCancel);
         },
         0.1f));
     return true;

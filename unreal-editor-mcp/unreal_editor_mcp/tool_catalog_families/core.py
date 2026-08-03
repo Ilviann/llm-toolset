@@ -19,13 +19,25 @@ CORE_TOOLS: Final = (
     },
     {
         "name": "operation_status",
-        "description": "Resolve or cancel one retained mutation by operation and bridge-instance identity.",
+        "description": "Resolve one retained operation by operation and bridge-instance identity.",
         "inputSchema": {
             "type": "object",
             "properties": {
                 "operation_id": _OPERATION_ID,
                 "bridge_instance_id": _OPERATION_ID,
-                "cancel": {"type": "boolean"},
+            },
+            "required": ["operation_id", "bridge_instance_id"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "operation_cancel",
+        "description": "Cancel one queued retained mutation by operation and bridge-instance identity.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "operation_id": _OPERATION_ID,
+                "bridge_instance_id": _OPERATION_ID,
             },
             "required": ["operation_id", "bridge_instance_id"],
             "additionalProperties": False,

@@ -61,7 +61,7 @@ class EditorLifecycle:
         layout: ProjectLayout,
         bridge: BridgeClient,
         *,
-        editor_executable: Path | None = None,
+        editor_executable: Path,
         startup_timeout: float = 120.0,
         platform: PlatformAdapter = DEFAULT_PLATFORM,
         process_factory: Callable[..., Any] | None = None,
@@ -73,11 +73,7 @@ class EditorLifecycle:
         self.layout = layout
         self.bridge = bridge
         self.platform = platform
-        self.editor_executable = (
-            resolve_editor_executable(editor_executable, platform)
-            if editor_executable is not None
-            else None
-        )
+        self.editor_executable = resolve_editor_executable(editor_executable, platform)
         self.startup_timeout = float(startup_timeout)
         self._process_factory = process_factory
         self._monotonic = monotonic
@@ -97,7 +93,7 @@ class EditorLifecycle:
         return {
             "enabled": True,
             "platform": self.platform.system,
-            "launch_configured": self.editor_executable is not None,
+            "launch_configured": True,
             "launch_supported": self.platform.system in {"macos", "windows"},
             "operations": ["launch", "shutdown", "restart", "cancel"],
             "startup_timeout_ms": int(self.startup_timeout * 1000),
@@ -168,8 +164,6 @@ class EditorLifecycle:
                 new_bridge_instance_id=capabilities["bridge_instance_id"],
             )
         self._refuse_live_stale_record()
-        if self.editor_executable is None:
-            raise ConfigurationError("Editor launch is unavailable because no editor executable was configured")
         self._check_cancel(event, editor_may_still_start=False)
         try:
             if self._process_factory is None:
@@ -258,10 +252,6 @@ class EditorLifecycle:
         )
 
     def _restart(self, record: dict[str, Any], event: threading.Event) -> dict[str, Any]:
-        if self.editor_executable is None:
-            raise ConfigurationError(
-                "Editor restart is unavailable because no editor executable was configured"
-            )
         active = self._active_discovery()
         old_instance = ""
         if active is None:

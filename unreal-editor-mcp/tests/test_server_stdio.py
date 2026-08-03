@@ -2,10 +2,12 @@ import io
 import json
 import unittest
 
+import unreal_editor_mcp
 from unreal_editor_mcp.errors import BridgeError, ErrorCode
 from unreal_editor_mcp.project import ProjectIdentity
 from unreal_editor_mcp.server import MCPServer
 from unreal_editor_mcp.stdio import MAX_MCP_MESSAGE_CHARS, serve
+from unreal_editor_mcp.tool_catalog import TOOLS_WITH_LIFECYCLE
 
 
 class FakeBridge:
@@ -16,8 +18,9 @@ class FakeBridge:
     def call(self, command, arguments=None):
         self.calls.append((command, arguments))
         if command == "capabilities":
-            return {"bridge_version": "0.27.0", "commands": [
-                "capabilities", "editor_state", "operation_status", "asset_references", "asset_delete",
+            return {"bridge_version": unreal_editor_mcp.__version__, "commands": [
+                "capabilities", "editor_state", "operation_status", "operation_cancel",
+                "asset_references", "asset_delete",
                 "level_inspect", "level_open", "level_manage", "level_actor_edit", "level_save",
                 "blueprint_inspect", "blueprint_action_catalog", "blueprint_graph_edit",
                 "blueprint_block_replace",
@@ -36,22 +39,32 @@ class FakeBridge:
         self.closed = True
 
 
+class FakeLifecycle:
+    def __init__(self):
+        self.calls = []
+
+    def availability(self):
+        return {"enabled": True, "launch_configured": True}
+
+    def execute(self, arguments):
+        self.calls.append(arguments)
+        return {"state": "already_stopped"}
+
+    def close(self):
+        pass
+
+
 class ServerStdioTests(unittest.TestCase):
     def test_initialize_list_and_call(self):
         bridge = FakeBridge()
         server = MCPServer(bridge, project_identity=ProjectIdentity("Example Project", "a" * 40))
         initialized = server.handle({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2025-06-18"}})
-        self.assertEqual(initialized["result"]["serverInfo"]["version"], "0.27.0")
+        self.assertEqual(initialized["result"]["serverInfo"]["version"], unreal_editor_mcp.__version__)
         listed = server.handle({"jsonrpc": "2.0", "id": 2, "method": "tools/list"})
         self.assertEqual([tool["name"] for tool in listed["result"]["tools"]], [
-            "capabilities", "editor_state", "operation_status", "asset_references", "asset_delete",
-            "level_inspect", "level_open", "level_manage", "level_actor_edit", "level_save",
-            "blueprint_inspect", "blueprint_action_catalog", "blueprint_graph_edit",
-            "blueprint_block_replace",
-            "blueprint_create", "blueprint_compile", "blueprint_save",
-            "blueprint_component_edit", "blueprint_default_edit",
-            "blueprint_member_edit", "widget_tree_edit",
-            "gameplay_framework_edit", "game_data_inspect", "game_data_edit",
+            "capabilities", "editor_state", "operation_status", "asset_references",
+            "level_inspect", "level_open", "blueprint_inspect", "blueprint_action_catalog",
+            "game_data_inspect",
         ])
         called = server.handle({"jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": {"name": "capabilities", "arguments": {}}})
         payload = json.loads(called["result"]["content"][0]["text"])
@@ -60,9 +73,102 @@ class ServerStdioTests(unittest.TestCase):
         self.assertEqual(payload["project_name"], "Example Project")
         self.assertEqual(payload["project_hash"], "a" * 40)
         self.assertEqual(payload["mcp_protocol_version"], "2025-06-18")
+        self.assertEqual(payload["access_mode"], "readonly")
+        self.assertNotIn("tool_mode", payload)
+
+    def test_exact_catalogs_and_internal_access_classification(self):
+        readonly = [
+            "capabilities", "editor_state", "operation_status", "asset_references",
+            "level_inspect", "level_open", "blueprint_inspect", "blueprint_action_catalog",
+            "game_data_inspect",
+        ]
+        writable = [
+            "capabilities", "editor_state", "operation_status", "operation_cancel",
+            "asset_references", "asset_delete", "level_inspect", "level_open",
+            "level_manage", "level_actor_edit", "level_save", "blueprint_inspect",
+            "blueprint_action_catalog", "blueprint_graph_edit", "blueprint_block_replace",
+            "blueprint_create", "blueprint_compile", "blueprint_save",
+            "blueprint_component_edit", "blueprint_default_edit", "blueprint_member_edit",
+            "widget_tree_edit", "gameplay_framework_edit", "game_data_inspect",
+            "game_data_edit",
+        ]
+        cases = (
+            (MCPServer(FakeBridge()), readonly),
+            (MCPServer(FakeBridge(), lifecycle=FakeLifecycle()), [*readonly, "editor_lifecycle"]),
+            (MCPServer(FakeBridge(), writable=True), writable),
+            (MCPServer(FakeBridge(), writable=True, lifecycle=FakeLifecycle()),
+             [*writable, "editor_lifecycle"]),
+        )
+        for server, expected in cases:
+            with self.subTest(expected=expected):
+                self.assertEqual([tool["name"] for tool in server.tools], expected)
+                for tool in server.tools:
+                    self.assertEqual(set(tool), {"name", "description", "inputSchema"})
+
+    def test_online_capabilities_report_independent_access_and_lifecycle_dimensions(self):
+        for writable in (False, True):
+            for lifecycle_enabled in (False, True):
+                with self.subTest(writable=writable, lifecycle_enabled=lifecycle_enabled):
+                    lifecycle = FakeLifecycle() if lifecycle_enabled else None
+                    response = MCPServer(
+                        FakeBridge(), writable=writable, lifecycle=lifecycle,
+                    ).handle({
+                        "jsonrpc": "2.0", "id": 89, "method": "tools/call",
+                        "params": {"name": "capabilities", "arguments": {}},
+                    })
+                    payload = json.loads(response["result"]["content"][0]["text"])
+                    self.assertEqual(
+                        payload["access_mode"],
+                        "writable" if writable else "readonly",
+                    )
+                    self.assertEqual(payload["editor_lifecycle"]["enabled"], lifecycle_enabled)
+                    self.assertNotIn("tool_mode", payload)
+
+    def test_every_omitted_tool_is_unknown_without_bridge_dispatch(self):
+        universe = {tool["name"] for tool in TOOLS_WITH_LIFECYCLE}
+        cases = (
+            MCPServer(FakeBridge()),
+            MCPServer(FakeBridge(), lifecycle=FakeLifecycle()),
+            MCPServer(FakeBridge(), writable=True),
+            MCPServer(FakeBridge(), writable=True, lifecycle=FakeLifecycle()),
+        )
+        for server in cases:
+            advertised = {tool["name"] for tool in server.tools}
+            for name in sorted(universe - advertised):
+                with self.subTest(advertised=advertised, omitted=name):
+                    before = list(server.bridge.calls)
+                    response = server.handle({
+                        "jsonrpc": "2.0", "id": 90, "method": "tools/call",
+                        "params": {"name": name, "arguments": {"untrusted": True}},
+                    })
+                    self.assertEqual(response["error"], {"code": -32602, "message": "Unknown tool"})
+                    self.assertEqual(server.bridge.calls, before)
+
+    def test_operation_lookup_and_cancellation_are_separate(self):
+        identity = {"operation_id": "a" * 32, "bridge_instance_id": "b" * 32}
+        readonly = MCPServer(FakeBridge())
+        status = readonly.handle({
+            "jsonrpc": "2.0", "id": 91, "method": "tools/call",
+            "params": {"name": "operation_status", "arguments": identity},
+        })
+        self.assertNotIn("error", status)
+        rejected = readonly.handle({
+            "jsonrpc": "2.0", "id": 92, "method": "tools/call",
+            "params": {"name": "operation_status", "arguments": {**identity, "cancel": True}},
+        })
+        self.assertEqual(rejected["error"]["code"], -32602)
+        self.assertEqual(readonly.bridge.calls, [("operation_status", identity)])
+
+        writable = MCPServer(FakeBridge(), writable=True)
+        cancelled = writable.handle({
+            "jsonrpc": "2.0", "id": 93, "method": "tools/call",
+            "params": {"name": "operation_cancel", "arguments": identity},
+        })
+        self.assertNotIn("error", cancelled)
+        self.assertEqual(writable.bridge.calls, [("operation_cancel", identity)])
 
     def test_level_inspect_and_open_schemas_are_exact_and_bounded(self):
-        server = MCPServer(FakeBridge())
+        server = MCPServer(FakeBridge(), writable=True)
         map_id = "c" * 40
         snapshot = "d" * 40
         actor_id = map_id + ":" + "e" * 32
@@ -132,7 +238,7 @@ class ServerStdioTests(unittest.TestCase):
                 self.assertEqual(response["error"]["code"], -32602)
 
     def test_level_manage_schema_is_exact_bounded_and_explicit(self):
-        server = MCPServer(FakeBridge())
+        server = MCPServer(FakeBridge(), writable=True)
         operation_id = "a" * 32
         snapshot = "b" * 40
         blank = {
@@ -190,7 +296,7 @@ class ServerStdioTests(unittest.TestCase):
             self.assertEqual(response["error"]["code"], -32602)
 
     def test_asset_references_schema_is_exact_and_bounded(self):
-        server = MCPServer(FakeBridge())
+        server = MCPServer(FakeBridge(), writable=True)
         valid = (
             {"asset_path": "/Game/Data/DA_Config.DA_Config"},
             {"asset_path": "/Engine/EngineResources/DefaultTexture.DefaultTexture", "page_size": 100},
@@ -218,7 +324,7 @@ class ServerStdioTests(unittest.TestCase):
                 self.assertEqual(response["error"]["code"], -32602)
 
     def test_level_edit_and_save_schemas_are_exact_bounded_and_stale_safe(self):
-        server = MCPServer(FakeBridge())
+        server = MCPServer(FakeBridge(), writable=True)
         operation_id = "a" * 32
         map_id = "b" * 40
         snapshot = "c" * 40
@@ -280,7 +386,7 @@ class ServerStdioTests(unittest.TestCase):
             self.assertEqual(response["error"]["code"], -32602)
 
     def test_asset_delete_schema_is_exact_and_stale_safe(self):
-        server = MCPServer(FakeBridge())
+        server = MCPServer(FakeBridge(), writable=True)
         valid = {
             "operation_id": "a" * 32,
             "asset_path": "/Game/Data/DA_Disposable.DA_Disposable",
@@ -306,7 +412,7 @@ class ServerStdioTests(unittest.TestCase):
                 self.assertEqual(response["error"]["code"], -32602)
 
     def test_rejects_schema_and_unknown_tool(self):
-        server = MCPServer(FakeBridge())
+        server = MCPServer(FakeBridge(), writable=True)
         for params in (
             {"name": "capabilities", "arguments": {"unexpected": True}},
             {"name": "blueprint_component_edit", "arguments": {}},
@@ -315,7 +421,7 @@ class ServerStdioTests(unittest.TestCase):
             self.assertEqual(response["error"]["code"], -32602)
 
     def test_blueprint_inspect_schema_accepts_exact_modes_and_cursor(self):
-        server = MCPServer(FakeBridge())
+        server = MCPServer(FakeBridge(), writable=True)
         valid = (
             {"mode": "discover", "package_path": "/Game/Actors", "asset_name": "BP_Light", "page_size": 10},
             {"mode": "discover", "package_path": "/Engine", "asset_name": "BP_Light"},
@@ -350,7 +456,7 @@ class ServerStdioTests(unittest.TestCase):
                 self.assertEqual(response["error"]["code"], -32602)
 
     def test_released_mutation_schemas_are_exact(self):
-        server = MCPServer(FakeBridge())
+        server = MCPServer(FakeBridge(), writable=True)
         operation_id = "a" * 32
         snapshot = "b" * 40
         valid = (
@@ -478,7 +584,7 @@ class ServerStdioTests(unittest.TestCase):
                 self.assertEqual(response["error"]["code"], -32602)
 
     def test_widget_tree_schema_is_exact_and_stale_safe(self):
-        server = MCPServer(FakeBridge())
+        server = MCPServer(FakeBridge(), writable=True)
         base = {
             "operation_id": "a" * 32,
             "asset_path": "/Game/UI/WBP_HUD.WBP_HUD",
@@ -565,7 +671,7 @@ class ServerStdioTests(unittest.TestCase):
                 self.assertEqual(response["error"]["code"], -32602)
 
     def test_action_catalog_schema_is_exact_and_bounded(self):
-        server = MCPServer(FakeBridge())
+        server = MCPServer(FakeBridge(), writable=True)
         base = {
             "asset_path": "/Game/Actors/BP_Light.BP_Light",
             "graph_id": "a" * 32,
@@ -604,7 +710,7 @@ class ServerStdioTests(unittest.TestCase):
                 self.assertEqual(response["error"]["code"], -32602)
 
     def test_graph_edit_schema_is_exact_and_bounded(self):
-        server = MCPServer(FakeBridge())
+        server = MCPServer(FakeBridge(), writable=True)
         base = {
             "operation_id": "a" * 32,
             "asset_path": "/Game/Actors/BP_Light.BP_Light",
@@ -661,7 +767,7 @@ class ServerStdioTests(unittest.TestCase):
                 self.assertEqual(response["error"]["code"], -32602)
 
     def test_function_replace_schema_is_exact_and_bounded(self):
-        server = MCPServer(FakeBridge())
+        server = MCPServer(FakeBridge(), writable=True)
         base = {
             "operation_id": "a" * 32,
             "asset_path": "/Game/Actors/BP_Light.BP_Light",
@@ -748,19 +854,31 @@ class ServerStdioTests(unittest.TestCase):
                 raise BridgeError("offline", code=ErrorCode.EDITOR_UNAVAILABLE, retryable=True)
 
         identity = ProjectIdentity("Space Project", "f" * 40)
-        response = MCPServer(OfflineBridge(), project_identity=identity).handle({
-            "jsonrpc": "2.0", "id": 1, "method": "tools/call",
-            "params": {"name": "capabilities", "arguments": {}},
-        })
-        self.assertFalse(response["result"].get("isError", False))
-        payload = json.loads(response["result"]["content"][0]["text"])
-        self.assertEqual(payload["project_name"], "Space Project")
-        self.assertEqual(payload["project_hash"], "f" * 40)
-        self.assertFalse(payload["bridge_ready"])
-        self.assertFalse(payload["native_capabilities_available"])
-        self.assertNotIn("version_match", payload)
-        self.assertNotIn("bridge_version", payload)
-        self.assertNotIn("commands", payload)
+        for writable in (False, True):
+            for lifecycle_enabled in (False, True):
+                with self.subTest(writable=writable, lifecycle_enabled=lifecycle_enabled):
+                    lifecycle = FakeLifecycle() if lifecycle_enabled else None
+                    response = MCPServer(
+                        OfflineBridge(), project_identity=identity,
+                        writable=writable, lifecycle=lifecycle,
+                    ).handle({
+                        "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+                        "params": {"name": "capabilities", "arguments": {}},
+                    })
+                    self.assertFalse(response["result"].get("isError", False))
+                    payload = json.loads(response["result"]["content"][0]["text"])
+                    self.assertEqual(payload["project_name"], "Space Project")
+                    self.assertEqual(payload["project_hash"], "f" * 40)
+                    self.assertFalse(payload["bridge_ready"])
+                    self.assertFalse(payload["native_capabilities_available"])
+                    self.assertEqual(
+                        payload["access_mode"],
+                        "writable" if writable else "readonly",
+                    )
+                    self.assertEqual(payload["editor_lifecycle"]["enabled"], lifecycle_enabled)
+                    self.assertNotIn("version_match", payload)
+                    self.assertNotIn("bridge_version", payload)
+                    self.assertNotIn("commands", payload)
 
     def test_capabilities_preserves_non_availability_errors(self):
         class InvalidBridge(FakeBridge):
@@ -779,7 +897,7 @@ class ServerStdioTests(unittest.TestCase):
         self.assertEqual(payload["code"], "invalid_configuration")
 
     def test_phase_seventeen_game_data_schemas_are_exact_and_bounded(self):
-        server = MCPServer(FakeBridge())
+        server = MCPServer(FakeBridge(), writable=True)
         operation_id = "a" * 32
         snapshot = "b" * 40
         member = {"name": "Damage", "type": {"category": "int", "container": "none"},

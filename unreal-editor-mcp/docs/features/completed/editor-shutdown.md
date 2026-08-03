@@ -18,7 +18,7 @@ released_in: "0.17.0"
 
 ### Implementation
 
-- Extend `editor_lifecycle` with a typed `shutdown` operation while keeping the tool in opt-in large mode.
+- Extend the independently opt-in `editor_lifecycle` tool with a typed `shutdown` operation.
 - Implement bridge-owned graceful shutdown with bounded dirty-package summaries and explicit refusal while unsafe editor work is active.
 - Refuse shutdown during active compilation, save, PIE, transaction, or other live state that cannot be proven safe. Do not provide forced process termination.
 - Reconcile the accepted shutdown operation across the expected bridge disconnect and return a bounded terminal outcome.
