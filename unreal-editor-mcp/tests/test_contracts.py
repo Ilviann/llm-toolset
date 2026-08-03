@@ -55,7 +55,7 @@ class ReleaseContractTests(unittest.TestCase):
         native = re.search(r'Version\[\].*TEXT\("([^"]+)"\)', header)
         self.assertIsNotNone(native)
         versions = {project["project"]["version"], plugin["VersionName"], native.group(1), unreal_editor_mcp.__version__}
-        self.assertEqual(versions, {"0.30.0"})
+        self.assertEqual(versions, {"0.31.0"})
 
     def test_companion_api_and_companion_versions_are_internally_consistent(self):
         base = json.loads((ROOT / "plugin/UnrealMCP/UnrealMCP.uplugin").read_text(encoding="utf-8"))
@@ -86,18 +86,30 @@ class ReleaseContractTests(unittest.TestCase):
 
     def test_gas_companion_is_read_only_bounded_and_keeps_base_gas_free(self):
         base_build = (ROOT / "plugin/UnrealMCP/Source/UnrealMCP/UnrealMCP.Build.cs").read_text(encoding="utf-8")
+        inspection_query = (ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private/UnrealMCPBlueprintInspectionQuery.h").read_text(encoding="utf-8")
+        inspection_support = (ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private/UnrealMCPBlueprintInspectionSupport.h").read_text(encoding="utf-8")
         gas_build = (ROOT / "plugin/UnrealMCPGAS/Source/UnrealMCPGAS/UnrealMCPGAS.Build.cs").read_text(encoding="utf-8")
-        gas_source = (ROOT / "plugin/UnrealMCPGAS/Source/UnrealMCPGAS/Private/UnrealMCPGASModule.cpp").read_text(encoding="utf-8")
+        gas_source = "\n".join(
+            path.read_text(encoding="utf-8")
+            for path in sorted((ROOT / "plugin/UnrealMCPGAS/Source/UnrealMCPGAS/Private").glob("*.cpp"))
+        )
         self.assertNotIn("GameplayAbilities", base_build)
         for dependency in ["GameplayAbilities", "GameplayTags", "GameplayTasks"]:
             self.assertIn(f'"{dependency}"', gas_build)
         for contract in [
             "gameplay_ability", "gameplay_ability_policies", "gameplay_ability_tags",
             "gameplay_ability_triggers", "gameplay_ability_effects",
+            "gameplay_effect", "gameplay_effect_duration", "gameplay_effect_modifiers",
+            "gameplay_effect_executions", "gameplay_effect_stacking", "gameplay_effect_cues",
+            "gameplay_effect_tags", "gameplay_effect_granted_abilities",
+            "gameplay_effect_additional_effects", "gameplay_effect_requirements",
+            "gameplay_effect_components", "gameplay_effect_relationships",
             "MaxTagsPerContainer", "MaxAbilityTriggers", "EUnrealMCPExtensionAccess::Read",
         ]:
             self.assertIn(contract, gas_source)
         self.assertNotIn("EUnrealMCPExtensionAccess::Mutation", gas_source)
+        self.assertIn('TEXT("gameplay_effect")', inspection_query)
+        self.assertIn('TEXT("gameplay_effect")', inspection_support)
 
     def test_public_companion_api_does_not_expose_bridge_or_credentials(self):
         public = "\n".join(

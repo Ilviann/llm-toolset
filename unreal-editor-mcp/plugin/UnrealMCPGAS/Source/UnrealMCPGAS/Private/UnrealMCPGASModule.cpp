@@ -12,6 +12,11 @@
 #include "Modules/ModuleManager.h"
 #include "UObject/UnrealType.h"
 
+namespace UnrealMCPGAS
+{
+FUnrealMCPExtensionContribution MakeGameplayEffectInspectionContribution();
+}
+
 #if WITH_DEV_AUTOMATION_TESTS
 #include "Kismet2/KismetEditorUtilities.h"
 #include "Misc/AutomationTest.h"
@@ -532,29 +537,29 @@ class FUnrealMCPGASModule final : public IModuleInterface
 public:
     void StartupModule() override
     {
-        FUnrealMCPExtensionContribution Contribution;
-        Contribution.ContributionId = TEXT("gameplay_ability_inspection");
-        Contribution.Category = EUnrealMCPExtensionCategory::AssetFamily;
-        Contribution.Access = EUnrealMCPExtensionAccess::Read;
-        Contribution.Persistence = EUnrealMCPExtensionPersistence::None;
-        Contribution.ToolFamily = TEXT("blueprint_inspect");
-        Contribution.Operation = OperationName;
-        Contribution.TargetFamily = TEXT("gameplay_ability");
-        Contribution.TargetClassPath = UGameplayAbility::StaticClass()->GetPathName();
-        Contribution.bAllowDerivedTargetClasses = true;
-        Contribution.RequiredLiveCapability = TEXT("gas_ability_blueprints_inspection");
-        Contribution.AllowedArgumentFields = {
+        FUnrealMCPExtensionContribution AbilityContribution;
+        AbilityContribution.ContributionId = TEXT("gameplay_ability_inspection");
+        AbilityContribution.Category = EUnrealMCPExtensionCategory::AssetFamily;
+        AbilityContribution.Access = EUnrealMCPExtensionAccess::Read;
+        AbilityContribution.Persistence = EUnrealMCPExtensionPersistence::None;
+        AbilityContribution.ToolFamily = TEXT("blueprint_inspect");
+        AbilityContribution.Operation = OperationName;
+        AbilityContribution.TargetFamily = TEXT("gameplay_ability");
+        AbilityContribution.TargetClassPath = UGameplayAbility::StaticClass()->GetPathName();
+        AbilityContribution.bAllowDerivedTargetClasses = true;
+        AbilityContribution.RequiredLiveCapability = TEXT("gas_ability_blueprints_inspection");
+        AbilityContribution.AllowedArgumentFields = {
             TEXT("mode"), TEXT("sections"), TEXT("graph_id"), TEXT("component_id"),
             TEXT("member_id"), TEXT("function_id"), TEXT("local_id"), TEXT("macro_id"),
             TEXT("custom_event_id"), TEXT("widget_id"), TEXT("property_names"),
             TEXT("include_inherited"), TEXT("page_size")};
-        Contribution.StableLimits = {
+        AbilityContribution.StableLimits = {
             {TEXT("records"), UnrealMCPGAS::MaxInspectionRecords},
             {TEXT("tags_per_container"), UnrealMCPGAS::MaxTagsPerContainer},
             {TEXT("triggers"), UnrealMCPGAS::MaxAbilityTriggers},
             {TEXT("tag_scan"), UnrealMCPGAS::MaxTagScan},
             {TEXT("trigger_scan"), UnrealMCPGAS::MaxTriggerScan}};
-        Contribution.Handler = MakeShared<FGameplayAbilityInspectionHandler>();
+        AbilityContribution.Handler = MakeShared<FGameplayAbilityInspectionHandler>();
 
         FUnrealMCPCompanionRegistration Registration;
         Registration.PluginName = TEXT("UnrealMCPGAS");
@@ -568,7 +573,8 @@ public:
         // necessarily register either transitive runtime module as explicitly loaded. The
         // owning GameplayAbilities module is the authoritative live-module admission gate.
         Registration.RequiredEngineModules = {TEXT("GameplayAbilities")};
-        Registration.Contributions = {MoveTemp(Contribution)};
+        Registration.Contributions.Add(MoveTemp(AbilityContribution));
+        Registration.Contributions.Add(UnrealMCPGAS::MakeGameplayEffectInspectionContribution());
         RegistrationResult = IUnrealMCPModule::Get().RegisterCompanion(Registration, *this);
     }
 

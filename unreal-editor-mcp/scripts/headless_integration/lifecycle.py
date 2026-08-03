@@ -325,6 +325,9 @@ def run_automation(executable: Path, project: Path, environment: dict[str, str],
         "LayoutStyleBindingsAndEvents",
         "PreflightTransactionPreservation",
         "PreservationAcrossReadonlyFlows",
+        "AbilityBlueprintInspection",
+        "GameplayEffectInspection",
+        "GameplayEffectLiveFixture",
         "Protocol",
     )
     if test_filter == "UnrealMCP":
@@ -413,6 +416,30 @@ def prepare_phase_two_fixture(executable: Path, project: Path, environment: dict
     return snapshots[-1]
 
 
+def prepare_gas_effect_fixture(executable: Path, project: Path, environment: dict[str, str]) -> str:
+    command = [
+        str(executable), str(project), "-unattended", "-nop4", "-nosplash", "-nullrhi",
+        "-stdout", "-FullStdOutLogOutput", "-nocrashreports", "-NoAssetRegistryCache",
+        "-ExecCmds=Automation RunTests UnrealMCP.GAS.GameplayEffectLiveFixture;Quit",
+        "-TestExit=Automation Test Queue Empty",
+    ]
+    with tempfile.TemporaryFile() as log:
+        process = subprocess.Popen(command, cwd=ROOT, env=environment, stdout=log, stderr=subprocess.STDOUT)
+        try:
+            return_code = process.wait(timeout=180.0)
+        except subprocess.TimeoutExpired:
+            stop_editor(process)
+            raise RuntimeError("Gameplay Effect fixture preparation exceeded the three-minute deadline")
+        log.seek(0)
+        output = log.read().decode("utf-8", errors="replace")
+    marker = "UNREAL_MCP_GAS_EFFECT_FIXTURE="
+    fixtures = [line.split(marker, 1)[1].split()[0] for line in output.splitlines() if marker in line]
+    if return_code != 0 or "Result={Success} Name={GameplayEffectLiveFixture}" not in output or not fixtures:
+        sys.stderr.write(output[-32_000:])
+        raise RuntimeError("Gameplay Effect saved fixture preparation failed")
+    return fixtures[-1]
+
+
 def main() -> int:
     engine = required_path("UNREAL_MCP_ENGINE_ROOT")
     project = required_path("UNREAL_MCP_TEST_UPROJECT")
@@ -446,6 +473,9 @@ def main() -> int:
     (layout.root / "Content" / "UnrealMCPWidgetTree" / "WBP_WidgetTree.uasset").unlink(
         missing_ok=True
     )
+    gas_fixture_dir = layout.root / "Content" / "UnrealMCPGAS"
+    for name in ("GE_InspectionFixture", "GA_EffectReferenceFixture"):
+        (gas_fixture_dir / f"{name}.uasset").unlink(missing_ok=True)
     if sys.argv[1:] == ["--automation-only"]:
         return run_automation(executable, layout.descriptor, environment)
     if len(sys.argv) == 3 and sys.argv[1] == "--automation-filter":
@@ -461,6 +491,9 @@ def main() -> int:
     saved_fixture_snapshot = prepare_phase_two_fixture(executable, layout.descriptor, environment)
     if len(saved_fixture_snapshot) != 40:
         raise AssertionError("Phase 2 saved fixture did not report a structural snapshot")
+    gas_effect_fixture = prepare_gas_effect_fixture(executable, layout.descriptor, environment)
+    if gas_effect_fixture != "/Game/UnrealMCPGAS/GE_InspectionFixture.GE_InspectionFixture":
+        raise AssertionError(f"Gameplay Effect fixture path mismatch: {gas_effect_fixture!r}")
     command = [
         str(executable), str(layout.descriptor), "-unattended", "-nop4", "-nosplash",
         "-nullrhi", "-nosound", "-nocrashreports", "-NoAssetRegistryCache",

@@ -60,7 +60,7 @@ Keep the authoritative checklist in [`ROADMAP.md`](../../ROADMAP.md) synchronize
   - Depends on:
     - `phase-13`
     - `gas-ability-blueprints-inspect`
-- [`gas-gameplay-effects-inspect` — Gameplay Effect inspection](planned/gas-gameplay-effects-inspect.md) — Add bounded typed inspection of existing data-only Gameplay Effect Blueprint assets through the GAS companion.
+- [`gas-gameplay-effects-inspect` — Gameplay Effect inspection](completed/gas-gameplay-effects-inspect.md) — Add bounded typed inspection of existing data-only Gameplay Effect Blueprint assets through the GAS companion.
   - Depends on:
     - `gas-ability-blueprints-inspect`
 - [`gas-gameplay-effects` — Gameplay Effect creation and updating](planned/gas-gameplay-effects.md) — Add typed creation and data-only updating of Gameplay Effect Blueprint assets through the GAS companion.
@@ -142,7 +142,7 @@ The default installation remains an exact-version pair:
 
 `companion-plugins` adds the base-owned extension registry and discovery contract used by every optional editor companion. Companions extend existing bounded tool families through exact allowlisted extension IDs; they do not add listeners, credentials, HTTP routes, arbitrary MCP tools, runtime-provided schemas, or unrestricted reflection. The Python package and base plugin remain authoritative for model-facing schemas, access classification, authentication, dispatch, limits, errors, capability composition, and extension admission.
 
-`gas-ability-blueprints-inspect` adds an optional editor-only `UnrealMCPGAS` companion plugin. It owns every direct Gameplay Ability System module dependency, reuses the base plugin's listener, credential, dispatch, ledger, and capability contracts, and has an independent semantic version while requiring the same `companion_api_version` as `UnrealMCP`. The base plugin must continue to build, package, load, and expose its complete non-GAS contract when the companion or Gameplay Ability System plugin is absent.
+`gas-ability-blueprints-inspect` and `gas-gameplay-effects-inspect` use one optional editor-only `UnrealMCPGAS` companion plugin. It owns every direct Gameplay Ability System module dependency, reuses the base plugin's listener, credential, dispatch, ledger, and capability contracts, and has an independent semantic version while requiring the same `companion_api_version` as `UnrealMCP`. The base plugin must continue to build, package, load, and expose its complete non-GAS contract when the companion or Gameplay Ability System plugin is absent.
 
 `umg-mvvm-inspect` adds an independent optional editor-only `UnrealMCPMVVM` companion plugin. It owns every direct `ModelViewViewModel` plugin and module dependency, reuses the same base extension and bridge contracts, and has an independent semantic version while requiring the same `companion_api_version` as `UnrealMCP`. The base plugin must retain its complete Widget Blueprint, legacy property-binding, and Designer-event contract when the companion or Engine UMG Viewmodel plugin is absent.
 

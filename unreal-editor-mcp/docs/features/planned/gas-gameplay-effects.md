@@ -12,7 +12,7 @@ released_in: null
 
 **Depends on:**
 
-- [`gas-gameplay-effects-inspect`](gas-gameplay-effects-inspect.md)
+- [`gas-gameplay-effects-inspect`](../completed/gas-gameplay-effects-inspect.md)
 
 ### Creation and update implementation
 

@@ -75,6 +75,8 @@ EXTENSION_CATALOG: Final = {
         "integrated_sections": {
             ("blueprint_inspect", "inspect_gameplay_ability", "read"):
                 ("gameplay_ability",),
+            ("blueprint_inspect", "inspect_gameplay_effect", "read"):
+                ("gameplay_effect",),
         },
     },
 }

@@ -1,10 +1,10 @@
 {
   "FileVersion": 3,
-  "Version": 10000,
-  "VersionName": "0.1.0",
+  "Version": 20000,
+  "VersionName": "0.2.0",
   "companion_api_version": 1,
   "FriendlyName": "Unreal MCP Gameplay Ability System",
-  "Description": "Optional read-only Gameplay Ability Blueprint inspection companion for Unreal MCP.",
+  "Description": "Optional read-only Gameplay Ability and Gameplay Effect Blueprint inspection companion for Unreal MCP.",
   "Category": "Editor",
   "CreatedBy": "Ilviann Zed",
   "CreatedByURL": "https://github.com/Ilviann/llm-toolset",

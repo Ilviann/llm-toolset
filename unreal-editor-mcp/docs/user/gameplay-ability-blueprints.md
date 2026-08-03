@@ -1,6 +1,6 @@
 # Gameplay Ability Blueprint inspection
 
-Install `UnrealMCP` and the optional `UnrealMCPGAS` directory as separate project or Engine plugins, enable both plus the Engine Gameplay Ability System plugin, and restart Unreal Editor. The base and companion semantic versions are independent; both descriptors and binaries must agree on `companion_api_version: 1`, and the Python package must know schema revision 1.
+Install `UnrealMCP` and the optional `UnrealMCPGAS` 0.2.0 directory as separate project or Engine plugins, enable both plus the Engine Gameplay Ability System plugin, and restart Unreal Editor. The base and companion semantic versions are independent; both descriptors and binaries must agree on `companion_api_version: 1`, and the Python package must know schema revision 1.
 
 Check `capabilities` before using the family. `companions` must contain `extension_id: "unreal-mcp-gas"` with `effective_ready: true`; `features.gas_ability_blueprints_inspection` must be true and `features.gas_ability_blueprints_mutation` false. `blueprint_families` then contains an inspection-only `gameplay_ability` record.
 
@@ -32,4 +32,4 @@ python scripts/package_plugin.py --engine-root "C:\Program Files\Epic Games\UE_5
 
 Install the resulting base and companion packages separately. Unreal MCP never downloads or enables GAS at runtime. The Windows graphical deployment helper does not deploy this companion yet.
 
-[Companion setup](companion-plugins.md) · [Blueprint inspection](blueprint-inspection.md) · [Limits](limits-and-testing.md)
+[Gameplay Effect inspection](gameplay-effects.md) · [Companion setup](companion-plugins.md) · [Blueprint inspection](blueprint-inspection.md) · [Limits](limits-and-testing.md)

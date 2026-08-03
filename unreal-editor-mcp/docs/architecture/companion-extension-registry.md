@@ -18,6 +18,6 @@ An admitted read-only `AssetFamily` contribution for `blueprint_inspect` may cla
 
 ## Implementation and verification
 
-`plugin/UnrealMCPTestCompanion/` is an independently versioned, disabled-by-default editor-only fixture. It registers read and mutation pairs for a new UObject asset family, a Blueprint component family, and an existing Actor Blueprint contribution. `plugin/UnrealMCPGAS/` is the first released companion and registers one inspection-only Gameplay Ability Blueprint family. `UnrealMCP.Companions.AuthenticatedBridgeRoundTrip`, `UnrealMCP.Companions.BlueprintFamilyInspectionIntegration`, Python schema/server contracts, headless companion checks, public API probes, builds, and packaging cover the boundary.
+`plugin/UnrealMCPTestCompanion/` is an independently versioned, disabled-by-default editor-only fixture. It registers read and mutation pairs for a new UObject asset family, a Blueprint component family, and an existing Actor Blueprint contribution. `plugin/UnrealMCPGAS/` is the first released companion and registers inspection-only Gameplay Ability and Gameplay Effect Blueprint families. `UnrealMCP.Companions.AuthenticatedBridgeRoundTrip`, `UnrealMCP.Companions.BlueprintFamilyInspectionIntegration`, GAS Automation, Python schema/server contracts, headless companion checks, public API probes, builds, and packaging cover the boundary.
 
 [Types and author contract](../types/companion-extension-registry/index.md) · [User guide](../user/companion-plugins.md) · [Architecture index](index.md)

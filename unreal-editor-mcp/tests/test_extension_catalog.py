@@ -46,6 +46,10 @@ def gas_capabilities(*, ready=True, schema=EXTENSION_SCHEMA_REVISION, api=COMPAN
                 "tool_family": "blueprint_inspect",
                 "operation": "inspect_gameplay_ability",
                 "access": "read",
+            }, {
+                "tool_family": "blueprint_inspect",
+                "operation": "inspect_gameplay_effect",
+                "access": "read",
             }],
         }],
     }
@@ -133,6 +137,21 @@ class ExtensionCatalogTests(unittest.TestCase):
         }, inspect["inputSchema"])
         default_edit = next(tool for tool in tools if tool["name"] == "blueprint_default_edit")
         self.assertNotIn("unreal-mcp-gas", json.dumps(default_edit))
+
+    def test_gas_companion_adds_gameplay_effect_inspection_only_when_ready(self):
+        valid = {
+            "mode": "inspect",
+            "asset_path": "/Game/Effects/GE_Damage.GE_Damage",
+            "sections": ["summary", "gameplay_effect"],
+        }
+        validate_tool_arguments(
+            valid, self.tool(False, "blueprint_inspect", gas_capabilities())["inputSchema"],
+        )
+        for native in ({}, gas_capabilities(ready=False), gas_capabilities(schema=2), gas_capabilities(api=2)):
+            with self.subTest(native=native), self.assertRaises(SchemaValidationError):
+                validate_tool_arguments(
+                    valid, self.tool(False, "blueprint_inspect", native)["inputSchema"],
+                )
 
     def test_server_rejects_forged_extensions_before_dispatch_and_routes_known_exact_schema(self):
         class Bridge:

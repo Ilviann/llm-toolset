@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.31.0 — 2026-08-03
+
+- Added inspection-only `gameplay_effect` discovery to `UnrealMCPGAS` 0.2.0 and ordinary `blueprint_inspect` integration with eleven bounded typed sections covering duration/period, modifiers and magnitude forms, executions, stacking/overflow, cues, tags, granted abilities, additional effects, requirements, public Gameplay Effect Components, and cross-field relationships.
+- Added explicit local/inherited values, compatible and unresolved class/attribute/tag/curve/asset references, stable nested identities, bounded cycle-aware chained-effect traversal, deterministic full-state fingerprints, and unchanged companion API v1/schema revision 1.
+- Added exact read/mutation capabilities, dynamic Python catalog admission, read-only rejection checks, focused native and restart-persistent GAS fixtures, full production-socket inspection, independent companion versioning, and Gameplay Effect user/architecture/type documentation. The Windows deployment helper remains unchanged; macOS verification is tracked as preferred follow-up work.
+
 ## 0.30.0 — 2026-08-03
 
 - Added the independently versioned optional `UnrealMCPGAS` 0.1.0 editor companion with all GAS dependencies isolated from the base plugin and exact companion API v1/schema admission.

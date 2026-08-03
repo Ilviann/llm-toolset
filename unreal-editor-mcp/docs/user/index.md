@@ -7,6 +7,7 @@ Start with the [project README](../../README.md) for installation, first connect
 - [Setup and operation](setup-and-operation.md) — security, deployment, LM Studio, and optional editor lifecycle.
 - [Companion plugins](companion-plugins.md) — installation, exact compatibility, access filtering, capabilities, packaging, and author boundary.
 - [Gameplay Ability Blueprint inspection](gameplay-ability-blueprints.md) — optional GAS companion setup, capability checks, typed read records, limits, and examples.
+- [Gameplay Effect inspection](gameplay-effects.md) — data-only GAS effect discovery, typed configuration records, chained references, limits, and read-only examples.
 - [Levels and assets](levels-and-assets.md) — level discovery, inspection, opening, management, transactional actor editing, verified saving, asset references, and safe deletion.
 - [Blueprint inspection](blueprint-inspection.md) — families, snapshots, identities, pagination, and mutation scope.
 - [Blueprint graph authoring](graph-authoring.md) — action discovery, node lifecycle, function replacement, pin defaults, and connections.

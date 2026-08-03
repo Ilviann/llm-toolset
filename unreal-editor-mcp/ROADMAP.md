@@ -23,7 +23,7 @@ Feature identifiers are stable names, not execution indexes. Unfinished features
   - Depends on:
     - `phase-13`
     - `gas-ability-blueprints-inspect`
-- [ ] [`gas-gameplay-effects-inspect` — Gameplay Effect inspection](docs/features/planned/gas-gameplay-effects-inspect.md) — Add bounded typed inspection of existing data-only Gameplay Effect Blueprint assets through the GAS companion.
+- [x] [`gas-gameplay-effects-inspect` — Gameplay Effect inspection](docs/features/completed/gas-gameplay-effects-inspect.md) — Add bounded typed inspection of existing data-only Gameplay Effect Blueprint assets through the GAS companion.
   - Depends on:
     - `gas-ability-blueprints-inspect`
 - [ ] [`gas-gameplay-effects` — Gameplay Effect creation and updating](docs/features/planned/gas-gameplay-effects.md) — Add typed creation and data-only updating of Gameplay Effect Blueprint assets through the GAS companion.
@@ -95,5 +95,6 @@ Feature checkboxes record implementation completion after mandatory Windows veri
   - `readonly-mode`
   - `companion-plugins`
   - `gas-ability-blueprints-inspect`
+  - `gas-gameplay-effects-inspect`
 - Windows:
   - None

@@ -38,11 +38,11 @@ static bool DecodeInspectionQuery(const FJsonObject& Arguments, FInspectionQuery
     if (!ReadOptionalBool(Arguments, TEXT("include_inherited"), false, Out.bIncludeInherited, OutError)) return false;
     Out.Sections = {TEXT("summary"), TEXT("parent_class"), TEXT("compile_state"), TEXT("components"),
         TEXT("variables"), TEXT("functions"), TEXT("macros"), TEXT("custom_events"), TEXT("local_variables"),
-        TEXT("graphs"), TEXT("widget_tree"), TEXT("gameplay_ability")};
+        TEXT("graphs"), TEXT("widget_tree"), TEXT("gameplay_ability"), TEXT("gameplay_effect")};
     if (Arguments.HasField(TEXT("sections")))
     {
         const TArray<TSharedPtr<FJsonValue>>* Values = nullptr;
-        if (!Arguments.TryGetArrayField(TEXT("sections"), Values) || Values == nullptr || Values->IsEmpty() || Values->Num() > 19)
+        if (!Arguments.TryGetArrayField(TEXT("sections"), Values) || Values == nullptr || Values->IsEmpty() || Values->Num() > 20)
         {
             OutError = {TEXT("invalid_argument"), TEXT("sections must be a non-empty bounded array")};
             return false;
