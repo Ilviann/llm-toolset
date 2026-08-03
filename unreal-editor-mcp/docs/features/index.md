@@ -73,10 +73,10 @@ Keep the authoritative checklist in [`ROADMAP.md`](../../ROADMAP.md) synchronize
 - [`node-layout` — Deterministic changed-node layout](planned/node-layout.md) — Add deterministic layout for changed nodes.
   - Depends on:
     - `event-macro-replace`
-- [`pcg-graph-inspect` — Procedural Content Generation graph inspection](planned/pcg-graph-inspect.md) — Discover and inspect bounded PCG Graph assets only when Unreal reports PCG effectively enabled for the configured project.
+- [`pcg-graph-inspect` — Procedural Content Generation graph inspection](planned/pcg-graph-inspect.md) — Inspect PCG Graph assets; review and update the detailed contract before implementation.
   - Depends on:
     - `companion-plugins`
-- [`pcg-graph-authoring` — Procedural Content Generation graph authoring](planned/pcg-graph-authoring.md) — Create and transactionally edit bounded PCG Graph assets through the PCG companion.
+- [`pcg-graph-authoring` — Procedural Content Generation graph authoring](planned/pcg-graph-authoring.md) — Author PCG Graph assets; review and update the detailed contract before implementation.
   - Depends on:
     - `pcg-graph-inspect`
 - [`editor-launch` — Optional configured editor launch](completed/editor-launch.md) — Add optional configured editor launch.
@@ -110,7 +110,7 @@ Keep the authoritative checklist in [`ROADMAP.md`](../../ROADMAP.md) synchronize
 - [`level-edit` — Transactional level actor editing and verified saving](completed/level-edit.md) — Add stale-safe actor batches and honest per-package World Partition save verification.
   - Depends on:
     - `level-inspect`
-- [`pcg-component-edit` — Level actor PCG Component editing](planned/pcg-component-edit.md) — Inspect, configure, generate, clean up, and persist PCG Components on exact level actors when Unreal reports PCG effectively enabled for the configured project.
+- [`pcg-component-edit` — Level PCG node inspection and authoring](planned/pcg-component-edit.md) — Inspect and author PCG-related level actors, components, and other supported level objects; review and update the detailed contract before implementation.
   - Depends on:
     - `pcg-graph-authoring`
     - `level-edit`
@@ -192,7 +192,7 @@ The GAS features extend the existing Blueprint tools when the companion capabili
 
 The MVVM features extend existing Blueprint and Widget tools rather than adding a separate model-facing MVVM tool. `umg-mvvm-inspect` adds bounded typed inspection for ViewModel Blueprints, Widget Blueprint ViewModel contexts, and View Bindings while keeping those records distinct from legacy property bindings and Designer events. `umg-mvvm` then adds ViewModel Blueprint creation and editing plus typed `widget_tree_edit` mutations for contexts and bindings. Capabilities distinguish read support from mutation support so an inspection-only release cannot advertise or execute create/update operations.
 
-The PCG graph features extend compact asset inspection and mutation families rather than adding unrestricted reflection or execution. `pcg-graph-inspect` adds bounded typed discovery and inspection; `pcg-graph-authoring` then adds creation, settings and parameter mutation, node and edge editing, compilation where required by public PCG APIs, and saving. Capabilities distinguish project enablement, read support, and mutation support so an installed but project-disabled PCG plugin exposes no PCG operations and an inspection-only release cannot advertise or execute graph mutation.
+Review and update every detailed PCG contract against the executable tool catalog, companion foundation, and supported Unreal public APIs before implementation. The only stable functional scope is inspection and authoring of PCG Graph assets plus inspection and authoring of PCG-related level actors, components, and other supported level objects. Current tool mappings, operation shapes, snapshots, validation, asynchronous lifecycle, persistence, limits, and verification details are provisional.
 
 ### Mutation delivery and concurrency contracts
 

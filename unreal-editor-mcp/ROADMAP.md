@@ -36,10 +36,10 @@ Feature identifiers are stable names, not execution indexes. Unfinished features
 - [ ] [`node-layout` — Deterministic changed-node layout](docs/features/planned/node-layout.md) — Add deterministic layout for changed nodes.
   - Depends on:
     - `event-macro-replace`
-- [ ] [`pcg-graph-inspect` — Procedural Content Generation graph inspection](docs/features/planned/pcg-graph-inspect.md) — Discover and inspect bounded PCG Graph assets only when Unreal reports PCG effectively enabled for the configured project.
+- [ ] [`pcg-graph-inspect` — Procedural Content Generation graph inspection](docs/features/planned/pcg-graph-inspect.md) — Inspect PCG Graph assets; review and update the detailed contract before implementation.
   - Depends on:
     - `companion-plugins`
-- [ ] [`pcg-graph-authoring` — Procedural Content Generation graph authoring](docs/features/planned/pcg-graph-authoring.md) — Create and transactionally edit bounded PCG Graph assets through the PCG companion.
+- [ ] [`pcg-graph-authoring` — Procedural Content Generation graph authoring](docs/features/planned/pcg-graph-authoring.md) — Author PCG Graph assets; review and update the detailed contract before implementation.
   - Depends on:
     - `pcg-graph-inspect`
 - [x] [`editor-restart` — Optional durable editor restart](docs/features/completed/editor-restart.md) — Add optional durable editor restart.
@@ -64,7 +64,7 @@ Feature identifiers are stable names, not execution indexes. Unfinished features
 - [x] [`level-edit` — Transactional level actor editing and verified saving](docs/features/completed/level-edit.md) — Add stale-safe actor batches and honest per-package World Partition save verification.
   - Depends on:
     - `level-inspect`
-- [ ] [`pcg-component-edit` — Level actor PCG Component editing](docs/features/planned/pcg-component-edit.md) — Inspect, configure, generate, clean up, and persist PCG Components on exact level actors when Unreal reports PCG effectively enabled for the configured project.
+- [ ] [`pcg-component-edit` — Level PCG node inspection and authoring](docs/features/planned/pcg-component-edit.md) — Inspect and author PCG-related level actors, components, and other supported level objects; review and update the detailed contract before implementation.
   - Depends on:
     - `pcg-graph-authoring`
     - `level-edit`

@@ -8,11 +8,13 @@ released_in: null
 
 # `pcg-graph-inspect` — Procedural Content Generation graph inspection
 
-**Outcome:** Agents can discover and inspect existing bounded Unreal PCG Graph assets through an optional editor-only companion plugin, but only when Unreal reports its PCG plugin effectively enabled for the configured project.
+**Outcome:** Agents can inspect PCG Graph assets.
 
 **Depends on:**
 
 - [`companion-plugins`](companion-plugins.md)
+
+**Planning note:** Review and update this detailed contract against the current executable tool catalog, companion foundation, and supported Unreal public PCG APIs immediately before implementation. Only inspection of PCG Graph assets is stable functional scope for this feature. The tool mapping, operation shapes, identities, snapshots, validation, lifecycle, persistence, limits, and verification details below are provisional and are not implementation authority until that review is complete.
 
 ### Project enablement and companion contract
 

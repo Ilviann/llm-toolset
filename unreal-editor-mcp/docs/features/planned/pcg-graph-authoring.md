@@ -8,11 +8,13 @@ released_in: null
 
 # `pcg-graph-authoring` — Procedural Content Generation graph authoring
 
-**Outcome:** Agents can create, transactionally edit, save, and read back bounded Unreal PCG Graph assets through the optional `UnrealMCPPCG` companion when Unreal reports its PCG plugin effectively enabled for the configured project and inspection support is live.
+**Outcome:** Agents can author PCG Graph assets.
 
 **Depends on:**
 
 - [`pcg-graph-inspect`](pcg-graph-inspect.md)
+
+**Planning note:** Review and update this detailed contract against the current executable tool catalog, companion foundation, and supported Unreal public PCG APIs immediately before implementation. Only authoring of PCG Graph assets is stable functional scope for this feature. The tool mapping, operation shapes, identities, snapshots, validation, lifecycle, persistence, limits, and verification details below are provisional and are not implementation authority until that review is complete.
 
 ### Graph creation and mutation
 

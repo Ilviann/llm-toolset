@@ -7,14 +7,16 @@ depends_on:
 released_in: null
 ---
 
-# `pcg-component-edit` — Level actor PCG Component editing
+# `pcg-component-edit` — Level PCG node inspection and authoring
 
-**Outcome:** Agents can inspect and transactionally configure PCG Components on exact level actors, explicitly generate or clean up their managed output, and save and verify all affected level packages when Unreal reports its PCG plugin effectively enabled for the configured project.
+**Outcome:** Agents can inspect and author PCG-related nodes in levels, including actors, components, and other supported level objects.
 
 **Depends on:**
 
 - [`pcg-graph-authoring`](pcg-graph-authoring.md)
 - [`level-edit`](../completed/level-edit.md)
+
+**Planning note:** Review and update this detailed contract against the current executable tool catalog, companion foundation, level contracts, and supported Unreal public PCG APIs immediately before implementation. Only inspection and authoring of PCG-related nodes in levels—including actors, components, and other supported level objects—is stable functional scope for this feature. The tool mapping, operation shapes, identities, snapshots, generation and cleanup lifecycle, persistence, limits, and verification details below are provisional and are not implementation authority until that review is complete.
 
 ### Implementation
 
