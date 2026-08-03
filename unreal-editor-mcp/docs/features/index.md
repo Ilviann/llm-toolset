@@ -46,12 +46,17 @@ Keep the authoritative checklist in [`ROADMAP.md`](../../ROADMAP.md) synchronize
 - [`umg-mvvm` — UMG ViewModels and View Bindings](planned/umg-mvvm.md) — Add typed MVVM ViewModel and Widget View Binding authoring through an optional lockstep-versioned companion plugin.
   - Depends on:
     - `umg-authoring`
-- [`gas-ability-blueprints` — Gameplay Ability Blueprint creation and editing](planned/gas-ability-blueprints.md) — Add typed Gameplay Ability Blueprint authoring through an optional lockstep-versioned companion plugin.
+- [`gas-ability-blueprints-inspect` — Gameplay Ability Blueprint inspection](planned/gas-ability-blueprints-inspect.md) — Add bounded typed inspection of existing Gameplay Ability Blueprint assets through an optional lockstep-versioned companion plugin.
+- [`gas-ability-blueprints` — Gameplay Ability Blueprint creation and updating](planned/gas-ability-blueprints.md) — Add typed Gameplay Ability Blueprint creation and authoring through the GAS companion.
   - Depends on:
     - `phase-13`
-- [`gas-gameplay-effects` — Gameplay Effect creation and editing](planned/gas-gameplay-effects.md) — Add typed creation and data-only editing of Gameplay Effect Blueprint assets through the GAS companion.
+    - `gas-ability-blueprints-inspect`
+- [`gas-gameplay-effects-inspect` — Gameplay Effect inspection](planned/gas-gameplay-effects-inspect.md) — Add bounded typed inspection of existing data-only Gameplay Effect Blueprint assets through the GAS companion.
   - Depends on:
-    - `gas-ability-blueprints`
+    - `gas-ability-blueprints-inspect`
+- [`gas-gameplay-effects` — Gameplay Effect creation and updating](planned/gas-gameplay-effects.md) — Add typed creation and data-only updating of Gameplay Effect Blueprint assets through the GAS companion.
+  - Depends on:
+    - `gas-gameplay-effects-inspect`
 - [`function-replace` — Complete function replacement](completed/function-replace.md) — Add transactional replacement of one complete user-owned function.
 - [`event-macro-replace` — Event, custom-event, and macro replacement](planned/event-macro-replace.md) — Extend bounded replacement to events, custom events, and macros.
   - Depends on:
@@ -118,7 +123,7 @@ The default installation remains an exact-version pair:
 1. A dependency-free Python 3.10+ MCP server using stdio JSON-RPC.
 2. An Unreal Editor C++ plugin using public editor APIs and a bounded authenticated localhost HTTP bridge.
 
-`gas-ability-blueprints` adds an optional editor-only `UnrealMCPGAS` companion plugin. It owns every direct Gameplay Ability System module dependency, reuses the base plugin's listener, credential, dispatch, ledger, and capability contracts, and ships in the same release bundle as the exact matching `UnrealMCP` version. The base plugin must continue to build, package, load, and expose its complete non-GAS contract when the companion or Gameplay Ability System plugin is absent.
+`gas-ability-blueprints-inspect` adds an optional editor-only `UnrealMCPGAS` companion plugin. It owns every direct Gameplay Ability System module dependency, reuses the base plugin's listener, credential, dispatch, ledger, and capability contracts, and ships in the same release bundle as the exact matching `UnrealMCP` version. The base plugin must continue to build, package, load, and expose its complete non-GAS contract when the companion or Gameplay Ability System plugin is absent.
 
 `umg-mvvm` adds an independent optional editor-only `UnrealMCPMVVM` companion plugin. It owns every direct `ModelViewViewModel` plugin and module dependency, reuses the same base extension and bridge contracts, and ships in the same release bundle as the exact matching `UnrealMCP` version. The base plugin must retain its complete Widget Blueprint, legacy property-binding, and Designer-event contract when the companion or Engine UMG Viewmodel plugin is absent.
 
@@ -161,7 +166,7 @@ Keep the public surface compact. Add typed operations to these remaining tool fa
 
 Lifecycle and build tools remain absent from the default model context. Use an opt-in large mode for them. Measure the Blueprint schemas and use nested operation discriminators if context cost becomes excessive; the default mode must still support the complete Blueprint-authoring workflow.
 
-The GAS features extend the existing Blueprint tools when the companion capability is live and do not add a separate model-facing GAS tool. `gas-ability-blueprints` adds its graph-capable family to creation, inspection, default/member editing, action cataloging, graph editing, compilation, and saving. `gas-gameplay-effects` adds its data-only family to creation, typed inspection/default editing, compilation, and saving while explicitly rejecting graph and member authoring.
+The GAS features extend the existing Blueprint tools when the companion capability is live and do not add a separate model-facing GAS tool. `gas-ability-blueprints-inspect` adds bounded typed inspection for its graph-capable family; `gas-ability-blueprints` then adds creation, default/member editing, action cataloging, graph editing, compilation, and saving. `gas-gameplay-effects-inspect` adds bounded typed inspection for its data-only family while explicitly rejecting graph and member surfaces; `gas-gameplay-effects` then adds creation, default editing, compilation, and saving. Capabilities distinguish read support from mutation support so an inspection-only release cannot advertise or execute create/update operations.
 
 `umg-mvvm` extends the existing Blueprint tools for ViewModel Blueprint authoring and adds typed MVVM operations to `widget_tree_edit` for Widget Blueprint ViewModel contexts and View Bindings. It does not add a separate model-facing MVVM tool, and its records remain explicitly distinct from legacy property bindings and Designer events.
 

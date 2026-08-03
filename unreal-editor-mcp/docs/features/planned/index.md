@@ -1,8 +1,10 @@
 # Planned features
 
 - [`umg-mvvm` — UMG ViewModels and View Bindings](umg-mvvm.md).
-- [`gas-ability-blueprints` — Gameplay Ability Blueprint creation and editing](gas-ability-blueprints.md).
-- [`gas-gameplay-effects` — Gameplay Effect creation and editing](gas-gameplay-effects.md).
+- [`gas-ability-blueprints-inspect` — Gameplay Ability Blueprint inspection](gas-ability-blueprints-inspect.md).
+- [`gas-ability-blueprints` — Gameplay Ability Blueprint creation and updating](gas-ability-blueprints.md).
+- [`gas-gameplay-effects-inspect` — Gameplay Effect inspection](gas-gameplay-effects-inspect.md).
+- [`gas-gameplay-effects` — Gameplay Effect creation and updating](gas-gameplay-effects.md).
 - [`event-macro-replace` — Event, custom-event, and macro replacement](event-macro-replace.md).
 - [`node-layout` — Deterministic changed-node layout](node-layout.md).
 - [`pcg-graph-authoring` — Procedural Content Generation graph authoring](pcg-graph-authoring.md).

@@ -9,12 +9,17 @@ Feature identifiers are stable names, not execution indexes. Unfinished features
 - [ ] [`umg-mvvm` — UMG ViewModels and View Bindings](docs/features/planned/umg-mvvm.md) — Add typed MVVM ViewModel and Widget View Binding authoring through an optional lockstep-versioned companion plugin.
   - Depends on:
     - `umg-authoring`
-- [ ] [`gas-ability-blueprints` — Gameplay Ability Blueprint creation and editing](docs/features/planned/gas-ability-blueprints.md) — Add typed Gameplay Ability Blueprint authoring through an optional lockstep-versioned companion plugin.
+- [ ] [`gas-ability-blueprints-inspect` — Gameplay Ability Blueprint inspection](docs/features/planned/gas-ability-blueprints-inspect.md) — Add bounded typed inspection of existing Gameplay Ability Blueprint assets through an optional lockstep-versioned companion plugin.
+- [ ] [`gas-ability-blueprints` — Gameplay Ability Blueprint creation and updating](docs/features/planned/gas-ability-blueprints.md) — Add typed Gameplay Ability Blueprint creation and authoring through the GAS companion.
   - Depends on:
     - `phase-13`
-- [ ] [`gas-gameplay-effects` — Gameplay Effect creation and editing](docs/features/planned/gas-gameplay-effects.md) — Add typed creation and data-only editing of Gameplay Effect Blueprint assets through the GAS companion.
+    - `gas-ability-blueprints-inspect`
+- [ ] [`gas-gameplay-effects-inspect` — Gameplay Effect inspection](docs/features/planned/gas-gameplay-effects-inspect.md) — Add bounded typed inspection of existing data-only Gameplay Effect Blueprint assets through the GAS companion.
   - Depends on:
-    - `gas-ability-blueprints`
+    - `gas-ability-blueprints-inspect`
+- [ ] [`gas-gameplay-effects` — Gameplay Effect creation and updating](docs/features/planned/gas-gameplay-effects.md) — Add typed creation and data-only updating of Gameplay Effect Blueprint assets through the GAS companion.
+  - Depends on:
+    - `gas-gameplay-effects-inspect`
 - [x] [`function-replace` — Complete function replacement](docs/features/completed/function-replace.md) — Add transactional replacement of one complete user-owned function.
 - [ ] [`event-macro-replace` — Event, custom-event, and macro replacement](docs/features/planned/event-macro-replace.md) — Extend bounded replacement to events, custom events, and macros.
   - Depends on:
