@@ -10,6 +10,7 @@ from typing import Any
 
 from unreal_editor_mcp.project import ProjectLayout
 from unreal_editor_mcp.server import MCPServer
+from unreal_editor_mcp.tool_catalog import WRITABLE_TOOL_NAMES
 
 
 READONLY_TOOL_NAMES = [
@@ -23,6 +24,7 @@ READONLY_TOOL_NAMES = [
     "blueprint_action_catalog",
     "game_data_inspect",
 ]
+READONLY_LIFECYCLE_TOOL_NAMES = [*READONLY_TOOL_NAMES, "editor_lifecycle"]
 
 _GENERATED_DIRECTORIES = {
     ".git",
@@ -81,6 +83,133 @@ def _continue_once(server: MCPServer, name: str, result: dict[str, Any]) -> None
     cursor = result.get("next_cursor")
     if isinstance(cursor, str):
         _call(server, name, {"cursor": cursor, "page_size": 1})
+
+
+class _RecordingBridge:
+    """Record native dispatch while retaining the production bridge behavior."""
+
+    def __init__(self, bridge: Any) -> None:
+        self.bridge = bridge
+        self.calls: list[str] = []
+
+    def call(self, command: str, arguments: dict[str, Any] | None = None) -> Any:
+        self.calls.append(command)
+        return self.bridge.call(command, arguments)
+
+    def close(self) -> None:
+        self.bridge.close()
+
+
+def verify_readonly_lifecycle_server(
+    server: MCPServer,
+    recording_bridge: _RecordingBridge,
+    layout: ProjectLayout,
+) -> None:
+    """Prove lifecycle-only access and preservation through a real restart."""
+    listed = server.handle({"jsonrpc": "2.0", "id": 1, "method": "tools/list"})
+    names = [tool["name"] for tool in listed["result"]["tools"]]
+    if names != READONLY_LIFECYCLE_TOOL_NAMES:
+        raise AssertionError(f"readonly+lifecycle tool catalog mismatch: {names!r}")
+
+    before_rejection = list(recording_bridge.calls)
+    for name in sorted(WRITABLE_TOOL_NAMES):
+        rejected = server.handle({
+            "jsonrpc": "2.0",
+            "id": uuid.uuid4().hex,
+            "method": "tools/call",
+            "params": {"name": name, "arguments": {}},
+        })
+        error = rejected.get("error", {}) if isinstance(rejected, dict) else {}
+        if error.get("code") != -32602 or error.get("message") != "Unknown tool":
+            raise AssertionError(f"writable tool was not rejected as unknown: {name}: {rejected!r}")
+    if recording_bridge.calls != before_rejection:
+        raise AssertionError("writable-tool rejection contacted the native bridge")
+
+    before = _project_fingerprint(layout.root)
+    launched = False
+    stopped = False
+    try:
+        launch = _call(server, "editor_lifecycle", {
+            "operation_id": uuid.uuid4().hex,
+            "operation": "launch",
+        })
+        if launch.get("state") != "ready":
+            raise AssertionError(f"lifecycle acceptance did not launch a new editor: {launch!r}")
+        launched = True
+        launched_instance = launch.get("new_bridge_instance_id")
+        if not isinstance(launched_instance, str) or len(launched_instance) != 32:
+            raise AssertionError(f"launched bridge identity is invalid: {launch!r}")
+
+        capabilities = _call(server, "capabilities", {})
+        if capabilities.get("access_mode") != "readonly" \
+                or capabilities.get("editor_lifecycle", {}).get("enabled") is not True:
+            raise AssertionError(f"lifecycle-only access dimensions changed: {capabilities!r}")
+
+        restart = _call(server, "editor_lifecycle", {
+            "operation_id": uuid.uuid4().hex,
+            "operation": "restart",
+        })
+        restarted_instance = restart.get("new_bridge_instance_id")
+        if restart.get("state") != "ready" \
+                or restart.get("old_bridge_instance_id") != launched_instance \
+                or not isinstance(restarted_instance, str) \
+                or len(restarted_instance) != 32 \
+                or restarted_instance == launched_instance:
+            raise AssertionError(f"restart did not replace the bridge instance: {restart!r}")
+
+        shutdown = _call(server, "editor_lifecycle", {
+            "operation_id": uuid.uuid4().hex,
+            "operation": "shutdown",
+        })
+        if shutdown.get("state") != "stopped":
+            raise AssertionError(f"lifecycle acceptance did not stop the editor: {shutdown!r}")
+        stopped = True
+
+        after = _project_fingerprint(layout.root)
+        if after != before:
+            changed = sorted(set(before) ^ set(after) | {
+                path for path in set(before) & set(after) if before[path] != after[path]
+            })
+            raise AssertionError(
+                f"readonly lifecycle changed project-owned files: {changed[:32]!r}"
+            )
+    finally:
+        if launched and not stopped:
+            try:
+                _call(server, "editor_lifecycle", {
+                    "operation_id": uuid.uuid4().hex,
+                    "operation": "shutdown",
+                })
+            except Exception:
+                pass
+
+
+def verify_windows_readonly_lifecycle(
+    layout: ProjectLayout,
+    editor_executable: Path,
+    *,
+    startup_timeout: float = 120.0,
+) -> None:
+    """Run the production lifecycle-only MCP server against UnrealEditor.exe."""
+    from unreal_editor_mcp.bridge import UnrealBridge
+    from unreal_editor_mcp.lifecycle import EditorLifecycle
+
+    recording_bridge = _RecordingBridge(UnrealBridge(layout, timeout=3.0))
+    lifecycle = EditorLifecycle(
+        layout,
+        recording_bridge,
+        editor_executable=editor_executable,
+        startup_timeout=startup_timeout,
+    )
+    server = MCPServer(
+        recording_bridge,
+        project_identity=layout.identity(),
+        lifecycle=lifecycle,
+    )
+    try:
+        verify_readonly_lifecycle_server(server, recording_bridge, layout)
+    finally:
+        server.close()
 
 
 def verify_readonly_mode(

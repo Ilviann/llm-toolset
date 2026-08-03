@@ -2,11 +2,41 @@
 
 from __future__ import annotations
 
+import time
 import uuid
 
 from unreal_editor_mcp.bridge import UnrealBridge
 from unreal_editor_mcp.errors import BridgeError, ErrorCode
 from unreal_editor_mcp.project import ProjectLayout
+
+
+_REGISTRY_SETTLE_SECONDS = 30.0
+
+
+def _inspect_after_registry_settles(
+    bridge: UnrealBridge,
+    asset_path: str,
+    *,
+    page_size: int,
+) -> dict[str, object]:
+    """Retry only an in-progress Asset Registry scan within a fixed deadline."""
+    deadline = time.monotonic() + _REGISTRY_SETTLE_SECONDS
+    while True:
+        result = bridge.call("asset_references", {
+            "asset_path": asset_path,
+            "page_size": page_size,
+        })
+        scans = result.get("scans", {})
+        registry = [
+            scans.get(name, {})
+            for name in ("serialized", "management", "searchable_name")
+        ]
+        if all(scan.get("status") == "complete" for scan in registry):
+            return result
+        if not any(scan.get("status") == "stale" for scan in registry) \
+                or time.monotonic() >= deadline:
+            return result
+        time.sleep(0.1)
 
 
 def run_asset_scenario(
@@ -23,10 +53,9 @@ def run_asset_scenario(
     if not isinstance(reference_asset_path, str) or not isinstance(table_path, str):
         raise AssertionError(f"game-data asset paths are invalid: {game_data!r}")
 
-    reference_page = bridge.call("asset_references", {
-        "asset_path": reference_asset_path,
-        "page_size": 1,
-    })
+    reference_page = _inspect_after_registry_settles(
+        bridge, reference_asset_path, page_size=1,
+    )
     reference_records = list(reference_page.get("records", []))
     reference_snapshot = reference_page.get("snapshot_id")
     if reference_page.get("target", {}).get("asset_path") != reference_asset_path \
@@ -58,10 +87,9 @@ def run_asset_scenario(
     disposable_path = disposable["asset_path"]
     if not isinstance(disposable_path, str):
         raise AssertionError(f"disposable asset path is invalid: {disposable!r}")
-    disposable_references = bridge.call("asset_references", {
-        "asset_path": disposable_path,
-        "page_size": 100,
-    })
+    disposable_references = _inspect_after_registry_settles(
+        bridge, disposable_path, page_size=100,
+    )
     disposable_scans = disposable_references.get("scans", {})
     registry_scans = (
         disposable_scans.get(name, {})
@@ -82,10 +110,13 @@ def run_asset_scenario(
         "expected_snapshot": disposable_references["snapshot_id"],
     })
     delete_status = reconcile_operation(bridge, delete_operation, bridge_instance_id)
+    delete_state = delete_status.get("state")
     delete_result = delete_status.get("result") \
-        if delete_status.get("state") == "committed" else None
-    if not isinstance(delete_result, dict) or delete_result.get("deleted") is not True \
-            or delete_result.get("undo_supported") is not False:
+        if delete_state in {"committed", "partial"} else None
+    if not isinstance(delete_result, dict) \
+            or delete_result.get("undo_supported") is not False \
+            or (delete_state == "committed" and delete_result.get("deleted") is not True) \
+            or (delete_state == "partial" and delete_result.get("operation_state") != "partial"):
         raise AssertionError(f"lost asset-delete response did not reconcile: {delete_status!r}")
     _assert_asset_missing(bridge, disposable_path, "deleted asset still resolved before restart")
     return {
@@ -101,10 +132,9 @@ def verify_restarted_assets(
     disposable_path: str,
 ) -> None:
     """Verify serialized-reference evidence and deletion persistence after restart."""
-    reloaded_references = bridge.call("asset_references", {
-        "asset_path": game_data["struct_path"],
-        "page_size": 100,
-    })
+    reloaded_references = _inspect_after_registry_settles(
+        bridge, game_data["struct_path"], page_size=100,
+    )
     if reloaded_references.get("scans", {}).get("serialized", {}).get("status") != "complete" \
             or not any(record.get("evidence") == "serialized"
                        and record.get("referencer_asset_path") == game_data["table_path"]

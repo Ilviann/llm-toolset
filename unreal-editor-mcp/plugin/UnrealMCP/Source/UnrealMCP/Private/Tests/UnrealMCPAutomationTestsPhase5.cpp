@@ -67,6 +67,11 @@ bool FUnrealMCPPhase5K2TypeCodecTest::RunTest(const FString& Parameters)
     FEdGraphPinType Unsupported;
     TestFalse(TEXT("unknown type rejects"), UnrealMCP::K2TypeCodec::DecodeType(K2Type(TEXT("wildcard")), Unsupported, Error));
     TestEqual(TEXT("unknown type error is stable"), Error.Code, FString(TEXT("unsupported_type")));
+    Unsupported.PinCategory = TEXT("unreal_mcp_unsupported");
+    TestEqual(TEXT("unsupported empty default is unavailable"),
+        UnrealMCP::K2TypeCodec::EncodeDefault(Unsupported, FString())->GetStringField(TEXT("kind")), FString(TEXT("unavailable")));
+    TestEqual(TEXT("unsupported populated default is unavailable"),
+        UnrealMCP::K2TypeCodec::EncodeDefault(Unsupported, TEXT("legacy"))->GetStringField(TEXT("kind")), FString(TEXT("unavailable")));
     return true;
 }
 

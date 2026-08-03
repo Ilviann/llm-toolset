@@ -12,7 +12,7 @@ released_in: null
 
 **Depends on:**
 
-- [`readonly-mode`](../active/readonly-mode.md)
+- [`readonly-mode`](../completed/readonly-mode.md)
 
 ### Discovery, identity, and lifecycle
 

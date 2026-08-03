@@ -464,6 +464,12 @@ bool DecodeType(const TSharedPtr<FJsonObject>& Value, FEdGraphPinType& OutType, 
 
 TSharedRef<FJsonObject> EncodeDefault(const FEdGraphPinType& Type, const FString& DefaultText)
 {
+    if (!EncodeType(Type)->GetBoolField(TEXT("supported")))
+    {
+        const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+        Result->SetStringField(TEXT("kind"), TEXT("unavailable"));
+        return Result;
+    }
     if (DefaultText.IsEmpty())
     {
         const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();

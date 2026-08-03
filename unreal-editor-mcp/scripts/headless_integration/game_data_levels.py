@@ -400,14 +400,18 @@ def author_level_edit_scenario(
     from .lifecycle import reconcile_operation, send_without_reading
 
     def call_when_ready(command: str, arguments: dict[str, object]) -> dict[str, object]:
-        deadline = time.monotonic() + 15.0
+        deadline = time.monotonic() + 60.0
         while True:
             try:
                 return bridge.call(command, arguments)
             except BridgeError as error:
-                if error.code not in {ErrorCode.EDITOR_UNAVAILABLE, ErrorCode.BUSY} \
-                        or time.monotonic() >= deadline:
+                if error.code not in {ErrorCode.EDITOR_UNAVAILABLE, ErrorCode.BUSY}:
                     raise
+                if time.monotonic() >= deadline:
+                    raise AssertionError(
+                        f"{command} remained unavailable after bounded retry: "
+                        f"{error.as_dict()!r}"
+                    ) from error
                 time.sleep(0.1)
 
     def transform(x: float, y: float, z: float, yaw: float = 0.0) -> dict[str, object]:

@@ -717,6 +717,7 @@ bool FUnrealMCPLevelManagementService::Manage(
         Result->SetArrayField(TEXT("package_persistence"), Persistence);
         Result->SetBoolField(TEXT("saved"), true);
         bool bReloadVerified = false;
+        bool bInactiveReloadUnloaded = false;
         TArray<TSharedPtr<FJsonValue>> ReloadedProperties;
         if (!bOpenAfterCreate)
         {
@@ -737,6 +738,19 @@ bool FUnrealMCPLevelManagementService::Manage(
                 return CompletePartial(OutError);
             }
             if (!VerifySettingsReadback(World, Changed, ReloadedProperties, OutError)) return CompletePartial(OutError);
+            SetIdentity(Result, ProjectHash, MapPath, World);
+            UPackageTools::FUnloadPackageParams UnloadReloaded({ReloadedPackage});
+            UnloadReloaded.bUnloadDirtyPackages = false;
+            UnloadReloaded.bResetTransBuffer = false;
+            if (!UPackageTools::UnloadPackages(UnloadReloaded))
+            {
+                OutError = {
+                    TEXT("reload_failed"),
+                    TEXT("The verified inactive map could not be released after persistence read-back")};
+                return CompletePartial(OutError);
+            }
+            World = nullptr;
+            bInactiveReloadUnloaded = true;
             bReloadVerified = true;
         }
         Result->SetArrayField(TEXT("changed_properties"), bReloadVerified && !bOpenAfterCreate ? ReloadedProperties : Changed);
@@ -759,7 +773,10 @@ bool FUnrealMCPLevelManagementService::Manage(
         }
         else
         {
-            SetIdentity(Result, ProjectHash, MapPath, World);
+            if (!bInactiveReloadUnloaded)
+            {
+                SetIdentity(Result, ProjectHash, MapPath, World);
+            }
         }
         Result->SetBoolField(TEXT("opened"), bOpened);
         bool bCurrentPreserved = false;

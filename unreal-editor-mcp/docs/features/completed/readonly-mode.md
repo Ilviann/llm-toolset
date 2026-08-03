@@ -1,16 +1,16 @@
 ---
 feature_id: readonly-mode
-status: active
+status: completed
 depends_on:
   - editor-restart
-released_in: null
+released_in: "0.28.0"
 ---
 
 # `readonly-mode` — Readonly mode and explicit writable access
 
 **Outcome:** Unreal Editor MCP starts with only inspection and non-persistent editor-state tools, while project-content mutation requires the explicit startup flag `--writable`.
 
-**Implementation status:** Active and unreleased. The implementation and host-independent contract coverage are present. Windows is the mandatory native release platform; macOS verification is preferred follow-up work and Linux verification is out of scope.
+**Implementation status:** Completed in 0.28.0. Windows passed the native preservation suite, the real lifecycle-only acceptance, two consecutive complete cross-process runs, adaptive and forced-unity builds, and Win64 plugin/deployment qualification. macOS verification remains preferred follow-up work and Linux verification is out of scope.
 
 **Depends on:**
 

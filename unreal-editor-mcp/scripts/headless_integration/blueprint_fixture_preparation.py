@@ -49,6 +49,7 @@ def prepare_blueprint_scenario(bridge: UnrealBridge) -> dict[str, object]:
         raise AssertionError(f"Actor Blueprint creation contract mismatch: {created!r}")
     return {
         "phase_two_loaded_snapshot": loaded_snapshot,
+        "phase_two_loaded_inspection": inspection,
         "created": created,
         "phase_fourteen_families": author_phase_fourteen_families(bridge),
         "phase_fifteen_game_instance": author_phase_fifteen_game_instance(bridge),

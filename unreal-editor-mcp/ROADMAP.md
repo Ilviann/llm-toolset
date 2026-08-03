@@ -46,7 +46,7 @@ Feature identifiers are stable names, not execution indexes. Unfinished features
   - Depends on:
     - `editor-launch`
     - `editor-shutdown`
-- [ ] [`readonly-mode` — Readonly mode and explicit writable access](docs/features/active/readonly-mode.md) — Make inspection-only operation the default, require `--writable` for project-content mutation, and simplify lifecycle opt-in.
+- [x] [`readonly-mode` — Readonly mode and explicit writable access](docs/features/completed/readonly-mode.md) — Make inspection-only operation the default, require `--writable` for project-content mutation, and simplify lifecycle opt-in.
   - Depends on:
     - `editor-restart`
 - [ ] [`project-files` — Optional editor-offline project-file generation](docs/features/planned/project-files.md) — Add optional editor-offline project-file generation.
@@ -92,5 +92,6 @@ Feature checkboxes record implementation completion after mandatory Windows veri
 - macOS:
   - `level-management`
   - `level-edit`
+  - `readonly-mode`
 - Windows:
   - None

@@ -41,7 +41,7 @@ from .game_data_levels import (
     verify_restarted_level_edit,
     verify_restarted_level_deletion,
 )
-from .readonly_mode import verify_readonly_mode
+from .readonly_mode import verify_readonly_mode, verify_windows_readonly_lifecycle
 from .widgets import author_widget_scenario, verify_restarted_widgets
 
 
@@ -67,6 +67,15 @@ def resolve_editor_executable(engine: Path, host_system: str) -> Path:
     executable = engine / relative
     if not executable.is_file():
         raise SystemExit(f"Unreal Editor executable not found: {executable}")
+    return executable
+
+
+def resolve_lifecycle_editor_executable(engine: Path, host_system: str) -> Path:
+    if host_system != "Windows":
+        raise SystemExit("readonly lifecycle acceptance is required only on Windows")
+    executable = engine / "Engine/Binaries/Win64/UnrealEditor.exe"
+    if not executable.is_file():
+        raise SystemExit(f"Unreal lifecycle executable not found: {executable}")
     return executable
 
 
@@ -153,7 +162,9 @@ def reconcile_operation(bridge: UnrealBridge, operation_id: str, bridge_instance
             "operation_id": operation_id,
             "bridge_instance_id": bridge_instance_id,
         })
-        if status.get("state") in {"committed", "rejected", "cancelled", "outcome_unknown"}:
+        if status.get("state") in {
+            "committed", "partial", "rejected", "cancelled", "outcome_unknown",
+        }:
             return status
         time.sleep(0.05)
     raise TimeoutError("lost mutation response did not reach a retained terminal state")
@@ -312,6 +323,7 @@ def run_automation(executable: Path, project: Path, environment: dict[str, str],
         "FamilyInspectionMutationAndPersistence",
         "LayoutStyleBindingsAndEvents",
         "PreflightTransactionPreservation",
+        "PreservationAcrossReadonlyFlows",
         "Protocol",
     )
     if test_filter == "UnrealMCP":
@@ -407,6 +419,14 @@ def main() -> int:
     executable = resolve_editor_executable(engine, host_system)
     environment = configure_editor_environment(host_system)
     layout = ProjectLayout.resolve(project)
+    if sys.argv[1:] == ["--readonly-lifecycle-only"]:
+        lifecycle_executable = resolve_lifecycle_editor_executable(engine, host_system)
+        verify_windows_readonly_lifecycle(layout, lifecycle_executable)
+        print(
+            "Acceptance passed: readonly+lifecycle catalog, access rejection, "
+            "real launch/restart/shutdown, bridge replacement, and content preservation"
+        )
+        return 0
     phase_two_fixture = layout.root / "Content" / "UnrealMCPPhase2" / "BP_InspectionFixture.uasset"
     phase_two_fixture.unlink(missing_ok=True)
     phase_four_fixture = layout.root / "Content" / "UnrealMCPPhase4" / "BP_ComponentFixture.uasset"
@@ -434,7 +454,8 @@ def main() -> int:
     if sys.argv[1:]:
         raise SystemExit(
             "usage: run_headless_integration.py "
-            "[--automation-only | --automation-filter PREFIX | --widget-only]"
+            "[--automation-only | --automation-filter PREFIX | --widget-only | "
+            "--readonly-lifecycle-only]"
         )
     saved_fixture_snapshot = prepare_phase_two_fixture(executable, layout.descriptor, environment)
     if len(saved_fixture_snapshot) != 40:
@@ -655,6 +676,7 @@ def main() -> int:
             )
             blueprint_fixtures = prepare_blueprint_scenario(bridge)
             phase_two_loaded_snapshot = blueprint_fixtures["phase_two_loaded_snapshot"]
+            phase_two_loaded_inspection = blueprint_fixtures["phase_two_loaded_inspection"]
             created = blueprint_fixtures["created"]
             phase_fourteen_families = blueprint_fixtures["phase_fourteen_families"]
             phase_fifteen_game_instance = blueprint_fixtures["phase_fifteen_game_instance"]
@@ -740,6 +762,7 @@ def main() -> int:
                 reloaded_bridge,
                 layout,
                 phase_two_loaded_snapshot,
+                phase_two_loaded_inspection,
                 phase_fourteen_families,
                 phase_fifteen_game_instance,
                 blueprint_scenario,

@@ -120,6 +120,7 @@ bool FUnrealMCPLevelManagementTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("creation saves"), Result->GetBoolField(TEXT("saved")));
     TestTrue(TEXT("creation reload verifies"), Result->GetBoolField(TEXT("reload_verified")));
     TestTrue(TEXT("creation preserves current map"), Result->GetBoolField(TEXT("current_map_preserved")));
+    TestNull(TEXT("inactive verification package is released"), FindPackage(nullptr, *CreatedPackage));
     TestFalse(TEXT("non-partition facts are exact"), Result->GetObjectField(TEXT("effective_creation"))->GetBoolField(TEXT("world_partition")));
     FAssetCompilingManager::Get().FinishAllCompilation();
     FlushAsyncLoading();

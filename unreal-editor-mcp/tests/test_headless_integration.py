@@ -186,6 +186,89 @@ class HeadlessIntegrationScriptTests(unittest.TestCase):
                     map_path="/Game/L_Fixture.L_Fixture",
                 )
 
+    def test_lifecycle_only_acceptance_covers_catalog_rejection_and_restart(self):
+        from headless_integration.readonly_mode import (
+            READONLY_LIFECYCLE_TOOL_NAMES,
+            _RecordingBridge,
+            verify_readonly_lifecycle_server,
+        )
+        from unreal_editor_mcp import __version__
+        from unreal_editor_mcp.project import ProjectLayout
+        from unreal_editor_mcp.server import MCPServer
+
+        class Bridge:
+            def __init__(self):
+                self.instance = "a" * 32
+
+            def call(self, command, arguments=None):
+                if command == "capabilities":
+                    return {
+                        "bridge_version": __version__,
+                        "bridge_instance_id": self.instance,
+                    }
+                return {}
+
+            def close(self):
+                pass
+
+        class Lifecycle:
+            def __init__(self, bridge):
+                self.bridge = bridge
+
+            def availability(self):
+                return {"enabled": True, "launch_configured": True}
+
+            def execute(self, arguments):
+                operation = arguments["operation"]
+                if operation == "launch":
+                    return {"state": "ready", "new_bridge_instance_id": self.bridge.instance}
+                if operation == "restart":
+                    old = self.bridge.instance
+                    self.bridge.instance = "b" * 32
+                    return {
+                        "state": "ready",
+                        "old_bridge_instance_id": old,
+                        "new_bridge_instance_id": self.bridge.instance,
+                    }
+                return {"state": "stopped"}
+
+            def close(self):
+                pass
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            descriptor = root / "ReadonlyLifecycle.uproject"
+            descriptor.write_text("{}", encoding="utf-8")
+            content = root / "Content"
+            content.mkdir()
+            (content / "Fixture.uasset").write_bytes(b"unchanged")
+            layout = ProjectLayout.resolve(descriptor)
+            bridge = Bridge()
+            recording = _RecordingBridge(bridge)
+            server = MCPServer(
+                recording,
+                project_identity=layout.identity(),
+                lifecycle=Lifecycle(bridge),
+            )
+            verify_readonly_lifecycle_server(server, recording, layout)
+            names = [tool["name"] for tool in server.tools]
+            self.assertEqual(names, READONLY_LIFECYCLE_TOOL_NAMES)
+            self.assertEqual(recording.calls, ["capabilities"])
+
+    def test_lost_operation_reconciliation_accepts_terminal_partial_state(self):
+        from headless_integration.lifecycle import reconcile_operation
+
+        class Bridge:
+            def call(self, command, arguments=None):
+                self.command = command
+                self.arguments = arguments
+                return {"state": "partial", "retained": True}
+
+        bridge = Bridge()
+        result = reconcile_operation(bridge, "a" * 32, "b" * 32)
+        self.assertEqual(result["state"], "partial")
+        self.assertEqual(bridge.command, "operation_status")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -108,6 +108,8 @@ The direct Windows build does not require generated Visual Studio project files.
 
 `scripts/run_headless_integration.py` derives the headless executable from the current host: the macOS app binary, `UnrealEditor-Cmd.exe` on Windows, and the Linux editor binary. Only macOS requires and forwards `UNREAL_MCP_DEVELOPER_DIR`.
 
+On Windows, run `python scripts/run_headless_integration.py --readonly-lifecycle-only` for the committed lifecycle-only acceptance against `UnrealEditor.exe`. It requires no pre-existing editor process and verifies the exact ten-tool catalog, access rejection, real launch/restart/shutdown, bridge replacement, and unchanged project-owned content.
+
 ## Binary plugin packaging
 
 `scripts/package_plugin.py` invokes the configured engine's platform-appropriate `RunUAT` launcher with the standard `BuildPlugin` command. It accepts the engine only through `UNREAL_MCP_ENGINE_ROOT` or `--engine-root`, keeps the plugin descriptor fixed to `plugin/UnrealMCP/UnrealMCP.uplugin`, and passes every UAT argument as a subprocess array. On macOS it also requires `UNREAL_MCP_DEVELOPER_DIR`, `DEVELOPER_DIR`, or `--developer-dir` and exports the resolved value as `DEVELOPER_DIR` for the child build.

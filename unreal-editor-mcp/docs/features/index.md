@@ -88,7 +88,7 @@ Keep the authoritative checklist in [`ROADMAP.md`](../../ROADMAP.md) synchronize
     - `editor-launch`
     - `editor-shutdown`
 - [`offline-capabilities` — Offline project identity in capabilities](completed/offline-capabilities.md) — Return configured project identity and explicit native availability before Unreal starts.
-- [`readonly-mode` — Readonly mode and explicit writable access](active/readonly-mode.md) — Make inspection-only operation the default, require `--writable` for project-content mutation, and simplify lifecycle opt-in.
+- [`readonly-mode` — Readonly mode and explicit writable access](completed/readonly-mode.md) — Make inspection-only operation the default, require `--writable` for project-content mutation, and simplify lifecycle opt-in.
   - Depends on:
     - `editor-restart`
 - [`project-files` — Optional editor-offline project-file generation](planned/project-files.md) — Add optional editor-offline project-file generation.

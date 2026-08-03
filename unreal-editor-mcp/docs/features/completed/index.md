@@ -27,3 +27,4 @@
 - [`level-management` — Level management](level-management.md).
 - [`level-edit` — Transactional level actor editing and verified saving](level-edit.md).
 - [`offline-capabilities` — Offline project identity in capabilities](offline-capabilities.md).
+- [`readonly-mode` — Readonly mode and explicit writable access](readonly-mode.md).

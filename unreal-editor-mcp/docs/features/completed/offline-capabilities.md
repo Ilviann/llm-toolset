@@ -16,7 +16,7 @@ released_in: "0.27.0"
 ### Implementation
 
 - `ProjectLayout` derives an immutable non-path identity from the `.uproject` filename stem and the existing platform-normalized project hash.
-- The CLI injects that identity into the MCP server. Every `capabilities` success reports it with Python and negotiated-protocol metadata; the active [`readonly-mode`](../active/readonly-mode.md) work reports authoritative access and independent lifecycle metadata.
+- The CLI injects that identity into the MCP server. Every `capabilities` success reports it with Python and negotiated-protocol metadata; [`readonly-mode`](readonly-mode.md) reports authoritative access and independent lifecycle metadata.
 - An `editor_unavailable` native call returns an explicit partial success with `bridge_ready: false` and `native_capabilities_available: false`. Native version, commands, features, limits, listener, asset-access, Blueprint-family, and version-match fields remain absent rather than being guessed.
 - Live capability calls retain the complete authenticated native response, add configured project identity, and set `native_capabilities_available: true`.
 - Authentication, invalid configuration, timeout, cancellation, version, and invalid-response errors remain model-facing errors.
