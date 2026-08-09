@@ -827,11 +827,30 @@ class ServerStdioTests(unittest.TestCase):
                 "to": {"node_key": "body", "pin_name": "Value"},
             }],
         }
+        layout_macro = {
+            **{key: value for key, value in macro.items()
+               if key not in {"entry_position", "result_position"}},
+            "layout": {"policy": "layered_v1"},
+            "nodes": [{"key": "body", "action_id": "3" * 32}],
+            "connections": [{
+                "from": {"node_key": "$entry", "pin_name": "then"},
+                "to": {"node_key": "body", "pin_name": "execute"},
+                "automatic_conversion": True,
+            }],
+        }
+        layout_handler = {
+            **{key: value for key, value in handler.items() if key != "entry_position"},
+            "layout": {"policy": "layered_v1"},
+            "nodes": [{"key": "body", "action_id": "3" * 32}],
+        }
         valid = (
             base,
             macro,
             handler,
             {**handler, "target_kind": "event"},
+            layout_macro,
+            layout_handler,
+            {**layout_handler, "target_kind": "event"},
             {
                 **base,
                 "nodes": [{
@@ -882,6 +901,16 @@ class ServerStdioTests(unittest.TestCase):
             }]},
             {**handler, "result_node_id": "f" * 32},
             {**handler, "local_variable_ids": ["2" * 32]},
+            {**layout_macro, "entry_position": {"x": 0, "y": 0}},
+            {**layout_macro, "layout": {"policy": "unknown"}},
+            {**layout_macro, "nodes": [{"key": "body", "action_id": "3" * 32,
+                                         "position": {"x": 0, "y": 0}}]},
+            {**layout_macro, "connections": [{
+                "from": {"node_key": "$entry", "pin_name": "then"},
+                "to": {"node_key": "body", "pin_name": "execute"},
+                "automatic_conversion": True,
+                "conversion_position": {"x": 0, "y": 0},
+            }]},
             {**handler, "external_connections": [{
                 "from": {"node_id": "4" * 32, "pin_id": "5" * 32},
                 "to": {"node_id": "6" * 32, "pin_id": "7" * 32},

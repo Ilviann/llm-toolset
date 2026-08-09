@@ -33,7 +33,7 @@ Feature identifiers are stable names, not execution indexes. Unfinished features
 - [x] [`event-macro-replace` — Event, custom-event, and macro replacement](docs/features/completed/event-macro-replace.md) — Extend bounded replacement to events, custom events, and macros.
   - Depends on:
     - `function-replace`
-- [ ] [`node-layout` — Deterministic changed-node layout](docs/features/planned/node-layout.md) — Add deterministic layout for changed nodes.
+- [x] [`node-layout` — Deterministic changed-node layout](docs/features/completed/node-layout.md) — Add deterministic layout for changed nodes.
   - Depends on:
     - `event-macro-replace`
 - [ ] [`pcg-graph-inspect` — Procedural Content Generation graph inspection](docs/features/planned/pcg-graph-inspect.md) — Inspect PCG Graph assets; review and update the detailed contract before implementation.
@@ -97,5 +97,6 @@ Feature checkboxes record implementation completion after mandatory Windows veri
   - `gas-ability-blueprints-inspect`
   - `gas-gameplay-effects-inspect`
   - `event-macro-replace`
+  - `node-layout`
 - Windows:
   - None

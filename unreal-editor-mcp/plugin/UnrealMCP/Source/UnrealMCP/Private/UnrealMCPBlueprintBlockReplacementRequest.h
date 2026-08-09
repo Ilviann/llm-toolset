@@ -14,6 +14,12 @@ enum class ETargetKind : uint8
     Event,
 };
 
+enum class ELayoutPolicy : uint8
+{
+    Explicit,
+    LayeredV1,
+};
+
 struct FPosition
 {
     int32 X = 0;
@@ -63,6 +69,7 @@ struct FExternalConnectionPlan
 struct FRequest
 {
     ETargetKind TargetKind = ETargetKind::Function;
+    ELayoutPolicy LayoutPolicy = ELayoutPolicy::Explicit;
     bool bLegacyFunctionShape = false;
     FString AssetPath;
     FString PackageName;

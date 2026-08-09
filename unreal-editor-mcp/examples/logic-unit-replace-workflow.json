@@ -35,12 +35,11 @@
         "66666666666666666666666666666666"
       ],
       "local_variable_ids": [],
-      "entry_position": {"x": -320, "y": 0},
+      "layout": {"policy": "layered_v1"},
       "nodes": [
         {
           "key": "branch",
-          "action_id": "77777777777777777777777777777777",
-          "position": {"x": 0, "y": 0}
+          "action_id": "77777777777777777777777777777777"
         }
       ],
       "pin_defaults": [],

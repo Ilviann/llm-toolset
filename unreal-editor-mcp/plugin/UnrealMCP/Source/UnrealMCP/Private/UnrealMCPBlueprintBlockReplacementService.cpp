@@ -3,6 +3,7 @@
 #include "UnrealMCPBlueprintBlockReplacementRequest.h"
 #include "UnrealMCPBlueprintFamilyPolicy.h"
 #include "UnrealMCPBlueprintLogicUnitFingerprint.h"
+#include "UnrealMCPBlueprintNodeLayout.h"
 #include "UnrealMCPBlueprintGraphResultBuilder.h"
 #include "UnrealMCPBlueprintInspectionSupport.h"
 #include "UnrealMCPBlueprintMutationCommon.h"
@@ -14,6 +15,7 @@
 #include "EdGraph/EdGraph.h"
 #include "EdGraph/EdGraphNode.h"
 #include "EdGraph/EdGraphPin.h"
+#include "EdGraphNode_Comment.h"
 #include "EdGraphSchema_K2.h"
 #include "Engine/Blueprint.h"
 #include "K2Node.h"
@@ -46,6 +48,7 @@ struct FAppliedPlan
     TArray<UEdGraphNode*> CreatedNodes;
     TSet<FString> ExternalLinks;
     FString SemanticFingerprint;
+    UnrealMCP::BlueprintNodeLayout::FResult Layout;
     int32 ConversionNodeCount = 0;
 };
 
@@ -442,6 +445,46 @@ bool BuildSemanticFingerprint(
     return true;
 }
 
+bool BuildUntouchedGraphFingerprint(
+    UEdGraph* Graph,
+    const TSet<UEdGraphNode*>& ChangedNodes,
+    FString& OutFingerprint)
+{
+    if (Graph == nullptr) return false;
+    TArray<FString> Lines{TEXT("graph|") + GuidString(Graph->GraphGuid) + TEXT("|") + Graph->GetName()};
+    for (UEdGraphNode* Node : Graph->Nodes)
+    {
+        if (Node == nullptr || ChangedNodes.Contains(Node)) continue;
+        if (!Node->NodeGuid.IsValid()) return false;
+        const FString NodeId = GuidString(Node->NodeGuid);
+        Lines.Add(TEXT("node|") + NodeId + TEXT("|") + Node->GetClass()->GetPathName()
+            + FString::Printf(TEXT("|%d|%d"), Node->NodePosX, Node->NodePosY));
+        if (const UEdGraphNode_Comment* Comment = Cast<UEdGraphNode_Comment>(Node))
+            Lines.Add(FString::Printf(TEXT("comment|%s|%d|%d|%d"), *NodeId,
+                Comment->NodeWidth, Comment->NodeHeight, static_cast<int32>(Comment->MoveMode.GetValue())));
+        for (UEdGraphPin* Pin : Node->Pins)
+        {
+            if (!IsStructuralGraphPin(Node, Pin) || !Pin->PinId.IsValid()) continue;
+            const FString PinId = GuidString(Pin->PinId);
+            Lines.Add(TEXT("pin|") + NodeId + TEXT("|") + PinId + TEXT("|")
+                + Pin->PinName.ToString() + TEXT("|")
+                + LexToString(static_cast<int32>(Pin->Direction)) + TEXT("|")
+                + VariableTypeFingerprint(Pin->PinType) + TEXT("|") + PinDefaultText(Pin));
+            if (Pin->Direction != EGPD_Output) continue;
+            for (UEdGraphPin* Linked : Pin->LinkedTo)
+            {
+                UEdGraphNode* LinkedNode = Linked != nullptr ? Linked->GetOwningNodeUnchecked() : nullptr;
+                if (LinkedNode == nullptr || ChangedNodes.Contains(LinkedNode)
+                    || !LinkedNode->NodeGuid.IsValid() || !Linked->PinId.IsValid()) continue;
+                Lines.Add(TEXT("link|") + NodeId + TEXT("|") + PinId + TEXT("|")
+                    + GuidString(LinkedNode->NodeGuid) + TEXT("|") + GuidString(Linked->PinId));
+            }
+        }
+    }
+    OutFingerprint = HashLines(MoveTemp(Lines));
+    return true;
+}
+
 bool ApplyPlan(
     UBlueprint* Blueprint,
     UEdGraph* Graph,
@@ -450,6 +493,7 @@ bool ApplyPlan(
     const TMap<FString, FUnrealMCPBlueprintActionCatalog::FResolvedAction>& Actions,
     const FUnrealMCPBlueprintBlockReplacementService::FNodeInvoker& NodeInvoker,
     const FUnrealMCPBlueprintBlockReplacementService::FConnectionInvoker& ConnectionInvoker,
+    const UnrealMCP::BlueprintNodeLayout::FResult* ResolvedLayout,
     FAppliedPlan& Out,
     FUnrealMCPError& OutError)
 {
@@ -476,16 +520,22 @@ bool ApplyPlan(
     Boundary.Entry->Modify();
     for (UEdGraphPin* Pin : Boundary.Entry->Pins)
         if (Pin != nullptr) Pin->BreakAllPinLinks(true);
-    Boundary.Entry->NodePosX = Request.EntryPosition.X;
-    Boundary.Entry->NodePosY = Request.EntryPosition.Y;
+    if (Request.LayoutPolicy == ELayoutPolicy::Explicit)
+    {
+        Boundary.Entry->NodePosX = Request.EntryPosition.X;
+        Boundary.Entry->NodePosY = Request.EntryPosition.Y;
+    }
     Out.NodesByKey.Add(TEXT("$entry"), Boundary.Entry);
     if (Boundary.Result != nullptr)
     {
         Boundary.Result->Modify();
         for (UEdGraphPin* Pin : Boundary.Result->Pins)
             if (Pin != nullptr) Pin->BreakAllPinLinks(true);
-        Boundary.Result->NodePosX = Request.ResultPosition.X;
-        Boundary.Result->NodePosY = Request.ResultPosition.Y;
+        if (Request.LayoutPolicy == ELayoutPolicy::Explicit)
+        {
+            Boundary.Result->NodePosX = Request.ResultPosition.X;
+            Boundary.Result->NodePosY = Request.ResultPosition.Y;
+        }
         Out.NodesByKey.Add(TEXT("$result"), Boundary.Result);
     }
 
@@ -499,8 +549,10 @@ bool ApplyPlan(
         }
         TSet<UEdGraphNode*> Before;
         for (UEdGraphNode* Node : Graph->Nodes) if (Node != nullptr) Before.Add(Node);
-        UEdGraphNode* Created =
-            NodeInvoker(*Action, Graph, FVector2D(Plan.Position.X, Plan.Position.Y));
+        const FVector2D SpawnPosition = Request.LayoutPolicy == ELayoutPolicy::Explicit
+            ? FVector2D(Plan.Position.X, Plan.Position.Y)
+            : FVector2D(Boundary.Entry->NodePosX, Boundary.Entry->NodePosY);
+        UEdGraphNode* Created = NodeInvoker(*Action, Graph, SpawnPosition);
         if (Created == nullptr || Before.Contains(Created) || !Graph->Nodes.Contains(Created))
         {
             OutError = {TEXT("invalid_action"),
@@ -510,8 +562,11 @@ bool ApplyPlan(
         if (!Created->NodeGuid.IsValid()) Created->CreateNewGuid();
         for (UEdGraphPin* Pin : Created->Pins)
             if (IsStructuralGraphPin(Created, Pin) && !Pin->PinId.IsValid()) Pin->PinId = FGuid::NewGuid();
-        Created->NodePosX = Plan.Position.X;
-        Created->NodePosY = Plan.Position.Y;
+        if (Request.LayoutPolicy == ELayoutPolicy::Explicit)
+        {
+            Created->NodePosX = Plan.Position.X;
+            Created->NodePosY = Plan.Position.Y;
+        }
         if (!IsStableNode(Graph, Created))
         {
             OutError = {TEXT("invalid_action"),
@@ -591,8 +646,11 @@ bool ApplyPlan(
             for (UEdGraphPin* Pin : Conversion->Pins)
                 if (IsStructuralGraphPin(Conversion, Pin) && !Pin->PinId.IsValid())
                     Pin->PinId = FGuid::NewGuid();
-            Conversion->NodePosX = Plan.ConversionPosition.X;
-            Conversion->NodePosY = Plan.ConversionPosition.Y;
+            if (Request.LayoutPolicy == ELayoutPolicy::Explicit)
+            {
+                Conversion->NodePosX = Plan.ConversionPosition.X;
+                Conversion->NodePosY = Plan.ConversionPosition.Y;
+            }
             if (!IsStableNode(Graph, Conversion)
                 || !HasPathThrough(FromPin, ToPin, TSet<UEdGraphNode*>{Conversion}))
             {
@@ -662,6 +720,17 @@ bool ApplyPlan(
             : TEXT("out|") + Plan.Internal.NodeKey + TEXT("|") + Plan.Internal.PinName + TEXT("|")
                 + Plan.External.NodeId + TEXT("|") + Plan.External.PinId;
         Out.ExternalLinks.Add(Identity);
+    }
+
+    if (Request.LayoutPolicy == ELayoutPolicy::LayeredV1)
+    {
+        if (ResolvedLayout != nullptr)
+        {
+            Out.Layout = *ResolvedLayout;
+            if (!UnrealMCP::BlueprintNodeLayout::ApplyResolved(Out.NodesByKey, Out.Layout, OutError)) return false;
+        }
+        else if (!UnrealMCP::BlueprintNodeLayout::PlanAndApply(
+            Graph, Out.NodesByKey, Out.Layout, OutError)) return false;
     }
 
     if (Graph->Nodes.Num() > UnrealMCP::MaxGraphNodes
@@ -827,7 +896,7 @@ bool FUnrealMCPBlueprintBlockReplacementService::Execute(
             FText::FromString(TEXT("Unreal MCP scratch logic-unit replacement")));
         bScratchApplied = ApplyPlan(
             Scratch.Blueprint, ScratchGraph, Request, nullptr, Actions, NodeInvoker, ConnectionInvoker,
-            ScratchApplied, OutError);
+            nullptr, ScratchApplied, OutError);
         ScratchTransaction.Cancel();
     }
     if (!bScratchApplied) return false;
@@ -882,6 +951,17 @@ bool FUnrealMCPBlueprintBlockReplacementService::Execute(
         return false;
     }
 
+    TSet<UEdGraphNode*> UntouchedBeforeExclusions;
+    UntouchedBeforeExclusions.Add(Boundary.Entry);
+    if (Boundary.Result != nullptr) UntouchedBeforeExclusions.Add(Boundary.Result);
+    for (UEdGraphNode* Node : Boundary.OwnedNodes) UntouchedBeforeExclusions.Add(Node);
+    FString UntouchedFingerprintBefore;
+    if (!BuildUntouchedGraphFingerprint(Graph, UntouchedBeforeExclusions, UntouchedFingerprintBefore))
+    {
+        OutError = {TEXT("internal_error"), TEXT("The preflight could not fingerprint untouched graph content")};
+        return false;
+    }
+
     const bool bDirtyBefore = Blueprint->GetOutermost()->IsDirty();
     const EBlueprintStatus StatusBefore = Blueprint->Status;
     FAppliedPlan LiveApplied;
@@ -894,6 +974,7 @@ bool FUnrealMCPBlueprintBlockReplacementService::Execute(
         if (Boundary.Result != nullptr) Boundary.Result->Modify();
         for (UEdGraphNode* Node : Boundary.OwnedNodes) Node->Modify();
         bApplied = ApplyPlan(Blueprint, Graph, Request, &Boundary, Actions, NodeInvoker, ConnectionInvoker,
+            Request.LayoutPolicy == ELayoutPolicy::LayeredV1 ? &ScratchApplied.Layout : nullptr,
             LiveApplied, OutError);
     }
     if (!bApplied)
@@ -906,6 +987,20 @@ bool FUnrealMCPBlueprintBlockReplacementService::Execute(
     {
         OutError = {TEXT("internal_error"),
             TEXT("The live replacement did not match the compiled scratch candidate")};
+        RollbackAndVerify(
+            Inspector, Blueprint, Request.AssetPath, Snapshot, bDirtyBefore, StatusBefore, OutError);
+        return false;
+    }
+
+    TSet<UEdGraphNode*> UntouchedAfterExclusions;
+    for (const TPair<FString, UEdGraphNode*>& Pair : LiveApplied.NodesByKey)
+        UntouchedAfterExclusions.Add(Pair.Value);
+    FString UntouchedFingerprintAfter;
+    if (!BuildUntouchedGraphFingerprint(Graph, UntouchedAfterExclusions, UntouchedFingerprintAfter)
+        || UntouchedFingerprintAfter != UntouchedFingerprintBefore)
+    {
+        OutError = {TEXT("internal_error"),
+            TEXT("The live replacement changed untouched graph content or positions")};
         RollbackAndVerify(
             Inspector, Blueprint, Request.AssetPath, Snapshot, bDirtyBefore, StatusBefore, OutError);
         return false;
@@ -948,6 +1043,21 @@ bool FUnrealMCPBlueprintBlockReplacementService::Execute(
     Changed->SetStringField(TEXT("entry_node_id"), Request.EntryNodeId);
     if (!Request.ResultNodeId.IsEmpty()) Changed->SetStringField(TEXT("result_node_id"), Request.ResultNodeId);
     Changed->SetStringField(TEXT("semantic_fingerprint"), LiveApplied.SemanticFingerprint);
+    Changed->SetStringField(TEXT("untouched_graph_fingerprint"), UntouchedFingerprintAfter);
+    if (Request.LayoutPolicy == ELayoutPolicy::LayeredV1)
+    {
+        const TSharedRef<FJsonObject> Layout = MakeShared<FJsonObject>();
+        Layout->SetStringField(TEXT("policy"), TEXT("layered_v1"));
+        Layout->SetStringField(TEXT("fingerprint"), LiveApplied.Layout.Fingerprint);
+        Layout->SetNumberField(TEXT("iterations"), LiveApplied.Layout.Iterations);
+        const TSharedRef<FJsonObject> Bounds = MakeShared<FJsonObject>();
+        Bounds->SetNumberField(TEXT("min_x"), LiveApplied.Layout.MinX);
+        Bounds->SetNumberField(TEXT("min_y"), LiveApplied.Layout.MinY);
+        Bounds->SetNumberField(TEXT("max_x"), LiveApplied.Layout.MaxX);
+        Bounds->SetNumberField(TEXT("max_y"), LiveApplied.Layout.MaxY);
+        Layout->SetObjectField(TEXT("bounds"), Bounds);
+        Changed->SetObjectField(TEXT("layout"), Layout);
+    }
     Changed->SetBoolField(TEXT("scratch_preflight"), true);
     Changed->SetBoolField(TEXT("compile_succeeded"), true);
     Changed->SetNumberField(TEXT("removed_node_count"), Request.OwnedNodeIds.Num());

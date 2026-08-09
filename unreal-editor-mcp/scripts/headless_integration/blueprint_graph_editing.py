@@ -24,6 +24,12 @@ def author_blueprint_scenario(
     """Author, compile, save, and validate the complete Blueprint graph fixture."""
     from .lifecycle import reconcile_operation, send_without_reading
 
+    def require_layered_layout(result: dict[str, object], label: str) -> None:
+        layout_result = result.get("changed", {}).get("layout", {})
+        if layout_result.get("policy") != "layered_v1" or not isinstance(
+                layout_result.get("fingerprint"), str):
+            raise AssertionError(f"{label} omitted deterministic layout evidence: {result!r}")
+
     declarations = author_blueprint_declarations(
         bridge,
         layout,
@@ -84,18 +90,18 @@ def author_blueprint_scenario(
         "operation_id": function_replace_operation,
         "asset_path": asset_path,
         "expected_snapshot": function_inspection["snapshot_id"],
-        "function_id": function_id,
-        "expected_function_fingerprint": boundary["function_fingerprint"],
+        "target_kind": "function",
+        "logic_unit_id": function_id,
+        "graph_id": function_id,
+        "expected_logic_unit_fingerprint": boundary["logic_unit_fingerprint"],
         "entry_node_id": boundary["entry_node_id"],
         "result_node_id": boundary["result_node_id"],
         "owned_node_ids": boundary["owned_node_ids"],
         "local_variable_ids": boundary["local_variable_ids"],
-        "entry_position": {"x": -320, "y": 0},
-        "result_position": {"x": 640, "y": 0},
+        "layout": {"policy": "layered_v1"},
         "nodes": [{
             "key": "branch",
             "action_id": branch_actions[0]["action_id"],
-            "position": {"x": 0, "y": 0},
         }],
         "pin_defaults": [{
             "endpoint": {"node_key": "$result", "pin_name": "Result"},
@@ -111,6 +117,7 @@ def author_blueprint_scenario(
                 "to": {"node_key": "$result", "pin_name": "execute"},
             },
         ],
+        "external_connections": [],
     }
     send_without_reading(layout, "blueprint_block_replace", function_replace_arguments)
     function_replace_status = reconcile_operation(
@@ -134,6 +141,7 @@ def author_blueprint_scenario(
     function_node_id = function_replace_nodes[0].get("id")
     if not isinstance(function_node_id, str) or len(function_node_id) != 32:
         raise AssertionError(f"function replacement omitted its node identity: {function_replace!r}")
+    require_layered_layout(function_replace, "function replacement")
 
     macro_inspection = collect_inspection(bridge, {
         "mode": "inspect", "asset_path": asset_path,
@@ -167,12 +175,10 @@ def author_blueprint_scenario(
         "result_node_id": macro_boundary["result_node_id"],
         "owned_node_ids": macro_boundary["owned_node_ids"],
         "local_variable_ids": [],
-        "entry_position": {"x": -320, "y": 0},
-        "result_position": {"x": 640, "y": 0},
+        "layout": {"policy": "layered_v1"},
         "nodes": [{
             "key": "literal",
             "action_id": macro_catalog["actions"][0]["action_id"],
-            "position": {"x": 0, "y": 0},
         }],
         "pin_defaults": [],
         "connections": [{
@@ -184,6 +190,7 @@ def author_blueprint_scenario(
     macro_replace_node_id = macro_replace.get("changed", {}).get("nodes", [{}])[0].get("id")
     if not isinstance(macro_replace_node_id, str):
         raise AssertionError(f"macro replacement omitted its created node: {macro_replace!r}")
+    require_layered_layout(macro_replace, "macro replacement")
 
     custom_inspection = collect_inspection(bridge, {
         "mode": "inspect", "asset_path": asset_path,
@@ -220,11 +227,10 @@ def author_blueprint_scenario(
         "entry_node_id": custom_boundary["entry_node_id"],
         "owned_node_ids": custom_boundary["owned_node_ids"],
         "local_variable_ids": [],
-        "entry_position": {"x": -320, "y": 240},
+        "layout": {"policy": "layered_v1"},
         "nodes": [{
             "key": "branch",
             "action_id": custom_branch_actions[0]["action_id"],
-            "position": {"x": 0, "y": 240},
         }],
         "pin_defaults": [{
             "endpoint": {"node_key": "branch", "pin_name": "Condition"},
@@ -239,6 +245,7 @@ def author_blueprint_scenario(
     custom_replace_node_id = custom_replace.get("changed", {}).get("nodes", [{}])[0].get("id")
     if not isinstance(custom_replace_node_id, str):
         raise AssertionError(f"custom-event replacement omitted its created node: {custom_replace!r}")
+    require_layered_layout(custom_replace, "custom-event replacement")
 
     graph_catalog = bridge.call("blueprint_action_catalog", {
         "asset_path": asset_path,
@@ -687,11 +694,10 @@ def author_blueprint_scenario(
         "entry_node_id": event_boundary["entry_node_id"],
         "owned_node_ids": event_boundary["owned_node_ids"],
         "local_variable_ids": [],
-        "entry_position": {"x": 1120, "y": 0},
+        "layout": {"policy": "layered_v1"},
         "nodes": [{
             "key": "print",
             "action_id": event_catalog["actions"][0]["action_id"],
-            "position": {"x": 1840, "y": 240},
         }],
         "pin_defaults": [],
         "connections": [{
@@ -706,6 +712,7 @@ def author_blueprint_scenario(
     print_node_id = event_replace.get("changed", {}).get("nodes", [{}])[0].get("id")
     if not isinstance(print_node_id, str):
         raise AssertionError(f"event replacement omitted its created node: {event_replace!r}")
+    require_layered_layout(event_replace, "native-event replacement")
     compiled = bridge.call("blueprint_compile", {
         "operation_id": uuid.uuid4().hex,
         "asset_path": asset_path,

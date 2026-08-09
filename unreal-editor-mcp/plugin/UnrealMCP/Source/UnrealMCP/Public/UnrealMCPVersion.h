@@ -4,7 +4,7 @@
 
 namespace UnrealMCP
 {
-inline constexpr TCHAR Version[] = TEXT("0.33.0");
+inline constexpr TCHAR Version[] = TEXT("0.34.0");
 inline constexpr int32 CompanionApiVersion = 1;
 inline constexpr int32 ExtensionSchemaRevision = 1;
 inline constexpr int32 MaxDiscoveredCompanions = 64;
@@ -59,6 +59,12 @@ inline constexpr int32 MaxLogicUnitLocals = MaxFunctionReplacementLocals;
 inline constexpr int32 MaxLogicUnitDefaults = MaxFunctionReplacementDefaults;
 inline constexpr int32 MaxLogicUnitConnections = MaxFunctionReplacementConnections;
 inline constexpr int32 MaxLogicUnitExternalConnections = 64;
+inline constexpr int32 MaxLogicUnitLayoutNodes = 322;
+inline constexpr int32 MaxLogicUnitLayoutEdges = 1024;
+inline constexpr int32 MaxLogicUnitLayoutIterations = 8;
+inline constexpr int32 MaxLogicUnitLayoutCollisionProbes = 128;
+inline constexpr int32 MaxLogicUnitLayoutWork = 2000000;
+inline constexpr double MaxLogicUnitLayoutSeconds = 0.1;
 inline constexpr int32 MaxGameDataFields = 64;
 inline constexpr int32 MaxGameDataRows = 2048;
 inline constexpr int32 MaxGameDataBatchRows = 64;

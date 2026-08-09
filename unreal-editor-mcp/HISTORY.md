@@ -4,6 +4,11 @@
 
 - Standardized Unreal Engine 5.8 development tooling on the `UE58` environment variable and moved the disposable integration project to `ue-test/ue58/`.
 
+## 0.34.0 — 2026-08-09
+
+- Added deterministic bounded `layered_v1` placement for changed nodes in function, macro, custom-event, and native-event block replacement while retaining exact explicit-position plans.
+- Added scratch-resolved live replay, SCC-aware layering, stable barycenter sweeps, comment and unrelated-node collision handling, untouched-graph fingerprints, published resource limits, Windows native/headless coverage, and layout architecture, contract, and user documentation. macOS native verification remains preferred follow-up work.
+
 ## 0.33.0 — 2026-08-09
 
 - Extended `blueprint_block_replace` from complete user functions to local macros, custom-event handlers, and native-event-rooted handlers through one bounded scratch-compile, fingerprint, retained-operation, transaction, rollback, and preservation engine.

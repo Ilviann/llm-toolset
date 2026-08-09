@@ -183,6 +183,15 @@ _BLOCK_NODE = {
     "required": ["key", "action_id", "position"],
     "additionalProperties": False,
 }
+_BLOCK_LAYOUT_NODE = {
+    "type": "object",
+    "properties": {
+        "key": _BLOCK_NODE_KEY,
+        "action_id": _ACTION_ID,
+    },
+    "required": ["key", "action_id"],
+    "additionalProperties": False,
+}
 _BLOCK_PIN_DEFAULT = {
     "type": "object",
     "properties": {
@@ -212,8 +221,27 @@ _BLOCK_CONVERTED_CONNECTION = {
     "required": ["from", "to", "automatic_conversion", "conversion_position"],
     "additionalProperties": False,
 }
+_BLOCK_LAYOUT_CONVERTED_CONNECTION = {
+    "type": "object",
+    "properties": {
+        "from": _BLOCK_PIN_ENDPOINT,
+        "to": _BLOCK_PIN_ENDPOINT,
+        "automatic_conversion": {"const": True},
+    },
+    "required": ["from", "to", "automatic_conversion"],
+    "additionalProperties": False,
+}
 _BLOCK_CONNECTION = {
     "oneOf": [_BLOCK_DIRECT_CONNECTION, _BLOCK_CONVERTED_CONNECTION],
+}
+_BLOCK_LAYOUT_CONNECTION = {
+    "oneOf": [_BLOCK_DIRECT_CONNECTION, _BLOCK_LAYOUT_CONVERTED_CONNECTION],
+}
+_BLOCK_LAYOUT = {
+    "type": "object",
+    "properties": {"policy": {"const": "layered_v1"}},
+    "required": ["policy"],
+    "additionalProperties": False,
 }
 _BLOCK_EXTERNAL_ENDPOINT = {
     "type": "object",

@@ -13,10 +13,10 @@ The bridge admits and dispatches the retained mutation. The service resolves the
 - One complete editable user function, local macro, custom-event handler, or native-event-rooted handler is supported; arbitrary regions, inherited/interface/override functions, multiple-result function boundaries, and ambiguous roots reject.
 - Function and macro ownership covers the complete body between required boundary nodes. Event ownership follows execution from one root, cuts at shared control joins, and includes only private pure data dependencies whose outputs are not shared.
 - Entry, optional result, old owned-node, local-variable, external-link, Blueprint snapshot, and logic-unit-fingerprint preconditions must exactly match the latest inspection record.
-- Body nodes come only from unexpired context-free action IDs bound to that graph snapshot. Every changed or conversion node has an explicit position. Boundary links are direct and bounded; any conversion is an internal plan connection.
+- Body nodes come only from unexpired context-free action IDs bound to that graph snapshot. Every changed or conversion node either has an explicit position or receives one exact `layered_v1` scratch layout position; the two contracts cannot mix. Boundary links are direct and bounded; any conversion is an internal plan connection.
 - Boundary links and the old body are cleared only in scratch or inside the live transaction. Declarations, tunnel/root semantics, locals, metadata, graph identity, shared external nodes, and unrelated Blueprint content are preserved.
 - Scratch compile must succeed and must not alter the planned semantic fingerprint. Scratch objects are removed before the live snapshot is checked again.
-- Live output must match the compiled scratch fingerprint and authoritative inspection. Unexpected failure undoes the transaction and verifies the exact prior snapshot, dirty state, and compile status.
+- Live output must match the compiled scratch fingerprint and authoritative inspection. Automatic layout reuses scratch positions rather than replanning live, and an untouched-graph fingerprint verifies unrelated nodes, positions, comments, defaults, and links. Unexpected failure undoes the transaction and verifies the exact prior snapshot, dirty state, and compile status.
 - Results are retained by `operation_id`; a lost response is reconciled through `operation_status`, and same-request replay does not execute again.
 
 ## Verification

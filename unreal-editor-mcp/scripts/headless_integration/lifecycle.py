@@ -255,6 +255,7 @@ def run_widget_restart_integration(
     command = [
         str(executable), str(layout.descriptor), "-unattended", "-nop4", "-nosplash",
         "-nullrhi", "-nosound", "-nocrashreports", "-NoAssetRegistryCache",
+        "-DDC-ForceMemoryCache",
     ]
     with tempfile.TemporaryFile() as log:
         bridge = None
@@ -328,6 +329,7 @@ def run_automation(executable: Path, project: Path, environment: dict[str, str],
         "FamilyInspectionMutationAndPersistence",
         "LayoutStyleBindingsAndEvents",
         "PreflightTransactionPreservation",
+        "DeterministicChangedNodes",
         "PreservationAcrossReadonlyFlows",
         "AbilityBlueprintInspection",
         "GameplayEffectInspection",
@@ -374,6 +376,7 @@ def run_automation(executable: Path, project: Path, environment: dict[str, str],
     command = [
         str(executable), str(project), "-unattended", "-nop4", "-nosplash", "-nullrhi",
         "-stdout", "-FullStdOutLogOutput", "-nocrashreports", "-NoAssetRegistryCache",
+        "-DDC-ForceMemoryCache",
         f"-ExecCmds=Automation RunTests {test_filter};Quit",
         "-TestExit=Automation Test Queue Empty",
     ]
@@ -400,6 +403,7 @@ def prepare_phase_two_fixture(executable: Path, project: Path, environment: dict
     command = [
         str(executable), str(project), "-unattended", "-nop4", "-nosplash", "-nullrhi",
         "-stdout", "-FullStdOutLogOutput", "-nocrashreports", "-NoAssetRegistryCache",
+        "-DDC-ForceMemoryCache",
         "-ExecCmds=Automation RunTests UnrealMCP.Phase2.LiveFixture;Quit",
         "-TestExit=Automation Test Queue Empty",
     ]
@@ -424,6 +428,7 @@ def prepare_gas_effect_fixture(executable: Path, project: Path, environment: dic
     command = [
         str(executable), str(project), "-unattended", "-nop4", "-nosplash", "-nullrhi",
         "-stdout", "-FullStdOutLogOutput", "-nocrashreports", "-NoAssetRegistryCache",
+        "-DDC-ForceMemoryCache",
         "-ExecCmds=Automation RunTests UnrealMCP.GAS.GameplayEffectLiveFixture;Quit",
         "-TestExit=Automation Test Queue Empty",
     ]
@@ -501,6 +506,7 @@ def main() -> int:
     command = [
         str(executable), str(layout.descriptor), "-unattended", "-nop4", "-nosplash",
         "-nullrhi", "-nosound", "-nocrashreports", "-NoAssetRegistryCache",
+        "-DDC-ForceMemoryCache",
     ]
     with tempfile.TemporaryFile() as log:
         bridge = None
@@ -538,6 +544,7 @@ def main() -> int:
                 "blueprint_custom_event_replacement",
                 "blueprint_event_replacement",
                 "blueprint_logic_unit_external_connections",
+                "blueprint_node_layout",
             ):
                 if capabilities.get("features", {}).get(feature) is not True:
                     raise AssertionError(f"function replacement capability is unavailable: {feature}")
@@ -660,6 +667,12 @@ def main() -> int:
                 "logic_unit_replacement_defaults": 128,
                 "logic_unit_replacement_connections": 256,
                 "logic_unit_external_connections": 64,
+                "logic_unit_layout_nodes": 322,
+                "logic_unit_layout_edges": 1024,
+                "logic_unit_layout_iterations": 8,
+                "logic_unit_layout_collision_probes": 128,
+                "logic_unit_layout_work": 2000000,
+                "logic_unit_layout_ms": 100,
             }
             if any(capabilities.get("limits", {}).get(name) != value
                    for name, value in expected_replacement_limits.items()):

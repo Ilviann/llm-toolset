@@ -29,6 +29,7 @@
 - [`umg-authoring` — UMG layout, styling, bindings, and UI logic](umg-authoring.md).
 - [`function-replace` — Complete function replacement](function-replace.md).
 - [`event-macro-replace` — Event, custom-event, and macro replacement](event-macro-replace.md).
+- [`node-layout` — Deterministic changed-node layout](node-layout.md).
 - [`level-inspect` — World Partition actor and instance inspection](level-inspect.md).
 - [`level-management` — Level management](level-management.md).
 - [`level-edit` — Transactional level actor editing and verified saving](level-edit.md).

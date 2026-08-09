@@ -31,6 +31,9 @@ from .schemas import (
     _SNAPSHOT_ID,
     _BLOCK_CONNECTION,
     _BLOCK_EXTERNAL_CONNECTION,
+    _BLOCK_LAYOUT,
+    _BLOCK_LAYOUT_CONNECTION,
+    _BLOCK_LAYOUT_NODE,
     _BLOCK_NODE,
     _BLOCK_PIN_DEFAULT,
     _component_shape,
@@ -47,6 +50,7 @@ def _logic_unit_replace_shape(
     terminal: bool,
     locals_allowed: bool,
     external_allowed: bool,
+    automatic_layout: bool = False,
 ) -> dict[str, object]:
     properties: dict[str, object] = {
         "operation_id": _OPERATION_ID,
@@ -63,10 +67,17 @@ def _logic_unit_replace_shape(
         "local_variable_ids": {
             "type": "array", "maxItems": 64 if locals_allowed else 0, "items": _LOCAL_ID,
         },
-        "entry_position": _GRAPH_POSITION,
-        "nodes": {"type": "array", "maxItems": 64, "items": _BLOCK_NODE},
+        "nodes": {
+            "type": "array",
+            "maxItems": 64,
+            "items": _BLOCK_LAYOUT_NODE if automatic_layout else _BLOCK_NODE,
+        },
         "pin_defaults": {"type": "array", "maxItems": 128, "items": _BLOCK_PIN_DEFAULT},
-        "connections": {"type": "array", "maxItems": 256, "items": _BLOCK_CONNECTION},
+        "connections": {
+            "type": "array",
+            "maxItems": 256,
+            "items": _BLOCK_LAYOUT_CONNECTION if automatic_layout else _BLOCK_CONNECTION,
+        },
         "external_connections": {
             "type": "array",
             "maxItems": 64 if external_allowed else 0,
@@ -76,13 +87,21 @@ def _logic_unit_replace_shape(
     required = [
         "operation_id", "asset_path", "expected_snapshot", "target_kind",
         "logic_unit_id", "graph_id", "expected_logic_unit_fingerprint",
-        "entry_node_id", "owned_node_ids", "local_variable_ids", "entry_position",
+        "entry_node_id", "owned_node_ids", "local_variable_ids",
         "nodes", "pin_defaults", "connections", "external_connections",
     ]
+    if automatic_layout:
+        properties["layout"] = _BLOCK_LAYOUT
+        required.append("layout")
+    else:
+        properties["entry_position"] = _GRAPH_POSITION
+        required.append("entry_position")
     if terminal:
         properties["result_node_id"] = _NODE_ID
-        properties["result_position"] = _GRAPH_POSITION
-        required.extend(["result_node_id", "result_position"])
+        required.append("result_node_id")
+        if not automatic_layout:
+            properties["result_position"] = _GRAPH_POSITION
+            required.append("result_position")
     return {
         "type": "object",
         "properties": properties,
@@ -241,7 +260,7 @@ BLUEPRINT_TOOLS: Final = (
     },
     {
         "name": "blueprint_block_replace",
-        "description": "Preflight, compile, and transactionally replace one complete inspected function, macro, custom-event, or event-rooted logic unit.",
+        "description": "Preflight, compile, deterministically lay out when requested, and transactionally replace one complete inspected function, macro, custom-event, or event-rooted logic unit.",
         "inputSchema": {
             "oneOf": [
                 {
@@ -286,6 +305,18 @@ BLUEPRINT_TOOLS: Final = (
                     "custom_event", terminal=False, locals_allowed=False, external_allowed=True),
                 _logic_unit_replace_shape(
                     "event", terminal=False, locals_allowed=False, external_allowed=True),
+                _logic_unit_replace_shape(
+                    "function", terminal=True, locals_allowed=True, external_allowed=False,
+                    automatic_layout=True),
+                _logic_unit_replace_shape(
+                    "macro", terminal=True, locals_allowed=False, external_allowed=False,
+                    automatic_layout=True),
+                _logic_unit_replace_shape(
+                    "custom_event", terminal=False, locals_allowed=False, external_allowed=True,
+                    automatic_layout=True),
+                _logic_unit_replace_shape(
+                    "event", terminal=False, locals_allowed=False, external_allowed=True,
+                    automatic_layout=True),
             ],
         },
     },

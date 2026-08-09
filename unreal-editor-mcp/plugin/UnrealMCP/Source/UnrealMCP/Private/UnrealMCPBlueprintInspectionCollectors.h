@@ -1,6 +1,7 @@
 #pragma once
 
 #include "UnrealMCPBlueprintInspectionSupport.h"
+#include "EdGraphNode_Comment.h"
 
 namespace UnrealMCP::BlueprintInspectionPrivate
 {
@@ -184,6 +185,9 @@ for (const TPair<UEdGraph*, FString>& Entry : Graphs)
         }
         Sink.Fingerprint.Add(TEXT("node|") + GraphId + TEXT("|") + NodeId + TEXT("|") + Node->GetClass()->GetPathName()
             + FString::Printf(TEXT("|%d|%d"), Node->NodePosX, Node->NodePosY));
+        if (const UEdGraphNode_Comment* Comment = Cast<UEdGraphNode_Comment>(Node))
+            Sink.Fingerprint.Add(FString::Printf(TEXT("comment|%s|%s|%d|%d|%d"), *GraphId, *NodeId,
+                Comment->NodeWidth, Comment->NodeHeight, static_cast<int32>(Comment->MoveMode.GetValue())));
         for (UEdGraphPin* Pin : Node->Pins)
         {
             if (!IsStructuralGraphPin(Node, Pin)) continue;

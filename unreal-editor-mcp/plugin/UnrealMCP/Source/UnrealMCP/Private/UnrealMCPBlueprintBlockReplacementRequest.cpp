@@ -114,27 +114,34 @@ bool ReadIdentityAndBoundary(
 {
     FString OperationId;
     FString RawAssetPath;
-    const TSharedPtr<FJsonObject>* EntryPosition = nullptr;
-    const TSharedPtr<FJsonObject>* ResultPosition = nullptr;
     if (!Arguments->TryGetStringField(TEXT("operation_id"), OperationId) || !IsGuidString(OperationId, 32)
         || !Arguments->TryGetStringField(TEXT("asset_path"), RawAssetPath)
         || !NormalizeAssetPath(RawAssetPath, Out.AssetPath, Out.PackageName)
         || !Arguments->TryGetStringField(TEXT("expected_snapshot"), Out.ExpectedSnapshot)
         || !IsGuidString(Out.ExpectedSnapshot, 40)
-        || !Arguments->TryGetObjectField(TEXT("entry_position"), EntryPosition) || EntryPosition == nullptr
-        || !ReadPosition(*EntryPosition, Out.EntryPosition, OutError)
         || !ReadGuidArray(*Arguments, TEXT("owned_node_ids"), UnrealMCP::MaxLogicUnitOwnedNodes,
             Out.OwnedNodeIds, OutError)
         || !ReadGuidArray(*Arguments, TEXT("local_variable_ids"), UnrealMCP::MaxLogicUnitLocals,
             Out.LocalVariableIds, OutError))
         return false;
+    if (Out.LayoutPolicy == ELayoutPolicy::Explicit)
+    {
+        const TSharedPtr<FJsonObject>* EntryPosition = nullptr;
+        if (!Arguments->TryGetObjectField(TEXT("entry_position"), EntryPosition)
+            || EntryPosition == nullptr || !ReadPosition(*EntryPosition, Out.EntryPosition, OutError))
+            return false;
+    }
     if (Out.TargetKind == ETargetKind::Function || Out.TargetKind == ETargetKind::Macro)
     {
         if (!Arguments->TryGetStringField(TEXT("result_node_id"), Out.ResultNodeId)
-            || !IsGuidString(Out.ResultNodeId, 32)
-            || !Arguments->TryGetObjectField(TEXT("result_position"), ResultPosition)
-            || ResultPosition == nullptr || !ReadPosition(*ResultPosition, Out.ResultPosition, OutError))
-            return false;
+            || !IsGuidString(Out.ResultNodeId, 32)) return false;
+        if (Out.LayoutPolicy == ELayoutPolicy::Explicit)
+        {
+            const TSharedPtr<FJsonObject>* ResultPosition = nullptr;
+            if (!Arguments->TryGetObjectField(TEXT("result_position"), ResultPosition)
+                || ResultPosition == nullptr || !ReadPosition(*ResultPosition, Out.ResultPosition, OutError))
+                return false;
+        }
     }
     return true;
 }
@@ -184,18 +191,45 @@ bool DecodeGenericIdentity(
     else if (Target == TEXT("event")) Out.TargetKind = ETargetKind::Event;
     else return false;
     const bool bWholeGraph = Out.TargetKind == ETargetKind::Function || Out.TargetKind == ETargetKind::Macro;
+    const bool bAutomaticLayout = Arguments->HasField(TEXT("layout"));
+    Out.LayoutPolicy = bAutomaticLayout ? ELayoutPolicy::LayeredV1 : ELayoutPolicy::Explicit;
     const bool bExactShape = bWholeGraph
-        ? HasOnlyFields(*Arguments, {
+        ? (bAutomaticLayout
+            ? HasOnlyFields(*Arguments, {
+                TEXT("operation_id"), TEXT("asset_path"), TEXT("expected_snapshot"), TEXT("target_kind"),
+                TEXT("logic_unit_id"), TEXT("graph_id"), TEXT("expected_logic_unit_fingerprint"),
+                TEXT("entry_node_id"), TEXT("result_node_id"), TEXT("owned_node_ids"),
+                TEXT("local_variable_ids"), TEXT("layout"), TEXT("nodes"), TEXT("pin_defaults"),
+                TEXT("connections"), TEXT("external_connections")})
+            : HasOnlyFields(*Arguments, {
             TEXT("operation_id"), TEXT("asset_path"), TEXT("expected_snapshot"), TEXT("target_kind"),
             TEXT("logic_unit_id"), TEXT("graph_id"), TEXT("expected_logic_unit_fingerprint"),
             TEXT("entry_node_id"), TEXT("result_node_id"), TEXT("owned_node_ids"),
             TEXT("local_variable_ids"), TEXT("entry_position"), TEXT("result_position"),
-            TEXT("nodes"), TEXT("pin_defaults"), TEXT("connections"), TEXT("external_connections")})
-        : HasOnlyFields(*Arguments, {
+            TEXT("nodes"), TEXT("pin_defaults"), TEXT("connections"), TEXT("external_connections")}))
+        : (bAutomaticLayout
+            ? HasOnlyFields(*Arguments, {
+                TEXT("operation_id"), TEXT("asset_path"), TEXT("expected_snapshot"), TEXT("target_kind"),
+                TEXT("logic_unit_id"), TEXT("graph_id"), TEXT("expected_logic_unit_fingerprint"),
+                TEXT("entry_node_id"), TEXT("owned_node_ids"), TEXT("local_variable_ids"), TEXT("layout"),
+                TEXT("nodes"), TEXT("pin_defaults"), TEXT("connections"), TEXT("external_connections")})
+            : HasOnlyFields(*Arguments, {
             TEXT("operation_id"), TEXT("asset_path"), TEXT("expected_snapshot"), TEXT("target_kind"),
             TEXT("logic_unit_id"), TEXT("graph_id"), TEXT("expected_logic_unit_fingerprint"),
             TEXT("entry_node_id"), TEXT("owned_node_ids"), TEXT("local_variable_ids"), TEXT("entry_position"),
-            TEXT("nodes"), TEXT("pin_defaults"), TEXT("connections"), TEXT("external_connections")});
+            TEXT("nodes"), TEXT("pin_defaults"), TEXT("connections"), TEXT("external_connections")}));
+    if (bAutomaticLayout)
+    {
+        const TSharedPtr<FJsonObject>* Layout = nullptr;
+        FString Policy;
+        if (!Arguments->TryGetObjectField(TEXT("layout"), Layout) || Layout == nullptr
+            || !HasOnlyFields(**Layout, {TEXT("policy")})
+            || !(*Layout)->TryGetStringField(TEXT("policy"), Policy) || Policy != TEXT("layered_v1"))
+        {
+            OutError = {TEXT("invalid_argument"), TEXT("Automatic replacement layout requires exact layered_v1 policy")};
+            return false;
+        }
+    }
     if (!bExactShape
         || !Arguments->TryGetStringField(TEXT("logic_unit_id"), Out.LogicUnitId)
         || !IsGuidString(Out.LogicUnitId, 32)
@@ -238,13 +272,18 @@ bool DecodePlan(
         const TSharedPtr<FJsonObject>* Object = nullptr;
         const TSharedPtr<FJsonObject>* Position = nullptr;
         FNodePlan Plan;
+        const bool bExactNodeShape = Value.IsValid() && Value->TryGetObject(Object) && Object != nullptr
+            && (Out.LayoutPolicy == ELayoutPolicy::Explicit
+                ? HasOnlyFields(**Object, {TEXT("key"), TEXT("action_id"), TEXT("position")})
+                : HasOnlyFields(**Object, {TEXT("key"), TEXT("action_id")}));
         if (!Value.IsValid() || !Value->TryGetObject(Object) || Object == nullptr
-            || !HasOnlyFields(**Object, {TEXT("key"), TEXT("action_id"), TEXT("position")})
+            || !bExactNodeShape
             || !(*Object)->TryGetStringField(TEXT("key"), Plan.Key) || !IsNodeKey(Plan.Key)
             || NodeKeys.Contains(Plan.Key)
             || !(*Object)->TryGetStringField(TEXT("action_id"), Plan.ActionId) || !IsGuidString(Plan.ActionId, 32)
-            || !(*Object)->TryGetObjectField(TEXT("position"), Position) || Position == nullptr
-            || !ReadPosition(*Position, Plan.Position, OutError))
+            || (Out.LayoutPolicy == ELayoutPolicy::Explicit
+                && (!(*Object)->TryGetObjectField(TEXT("position"), Position) || Position == nullptr
+                    || !ReadPosition(*Position, Plan.Position, OutError))))
         {
             if (OutError.Code.IsEmpty())
                 OutError = {TEXT("invalid_action"), TEXT("Each replacement node requires a unique key, action, and position")};
@@ -307,11 +346,15 @@ bool DecodePlan(
         if ((*Object)->HasField(TEXT("automatic_conversion")))
         {
             const TSharedPtr<FJsonObject>* Position = nullptr;
-            if (!HasOnlyFields(**Object, {TEXT("from"), TEXT("to"), TEXT("automatic_conversion"), TEXT("conversion_position")})
+            const bool bExactConversionShape = Out.LayoutPolicy == ELayoutPolicy::Explicit
+                ? HasOnlyFields(**Object, {TEXT("from"), TEXT("to"), TEXT("automatic_conversion"), TEXT("conversion_position")})
+                : HasOnlyFields(**Object, {TEXT("from"), TEXT("to"), TEXT("automatic_conversion")});
+            if (!bExactConversionShape
                 || !(*Object)->TryGetBoolField(TEXT("automatic_conversion"), Plan.bAutomaticConversion)
                 || !Plan.bAutomaticConversion
-                || !(*Object)->TryGetObjectField(TEXT("conversion_position"), Position) || Position == nullptr
-                || !ReadPosition(*Position, Plan.ConversionPosition, OutError)) return false;
+                || (Out.LayoutPolicy == ELayoutPolicy::Explicit
+                    && (!(*Object)->TryGetObjectField(TEXT("conversion_position"), Position) || Position == nullptr
+                        || !ReadPosition(*Position, Plan.ConversionPosition, OutError)))) return false;
         }
         else if (!HasOnlyFields(**Object, {TEXT("from"), TEXT("to")}))
         {

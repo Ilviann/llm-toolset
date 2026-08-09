@@ -1,0 +1,9 @@
+# Deterministic changed-node layout
+
+Uniform function, macro, custom-event, and native-event replacement requests accept an exact automatic alternative with `"layout":{"policy":"layered_v1"}`. In this variant, omit `entry_position`, `result_position`, every body-node `position`, and every automatic `conversion_position`. Explicit-position requests remain supported unchanged. Mixing either position contract with `layout`, using an unknown policy, or adding layout to the legacy function shape rejects.
+
+The entry/root or input tunnel stays at its inspected position. The planner places the optional result/output tunnel, requested body nodes, and conversion nodes inserted by the K2 schema. Execution and data links, cycles, branches, joins, fixed unrelated nodes, graph coordinates, and comment containment all contribute to the scratch-only plan. The live transaction receives the exact resolved scratch positions rather than running layout again.
+
+A successful replacement adds `changed.layout` with policy, 40-hex layout fingerprint, fixed iteration count, and integer bounds. `changed.nodes` remains the authoritative created-node read-back and includes final positions. `changed.untouched_graph_fingerprint` proves the unrelated target-graph nodes, positions, comments, defaults, and internal unrelated links remained stable. The request's layout object is included automatically in retained-operation identity; replaying the same operation ID with a different layout contract returns `operation_conflict`.
+
+Layout accepts at most 322 changed nodes and 1,024 internal directed edges, performs eight ordering sweeps, probes at most 128 candidate slots per node, consumes at most 2,000,000 work units and 100 milliseconds, and retains the existing ±1,000,000 graph-coordinate bound. Any limit, collision, comment-container, or timeout failure rejects the scratch candidate without touching the live Blueprint.

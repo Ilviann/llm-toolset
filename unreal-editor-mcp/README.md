@@ -1,6 +1,6 @@
 # Unreal Editor MCP
 
-Unreal Editor MCP 0.33.0 is an offline-first MCP bridge for Unreal Engine 5.8+. It pairs a dependency-free Python 3.10+ stdio server with an editor-only C++ plugin.
+Unreal Editor MCP 0.34.0 is an offline-first MCP bridge for Unreal Engine 5.8+. It pairs a dependency-free Python 3.10+ stdio server with an editor-only C++ plugin.
 
 Readonly access is the released default. Project-content mutation requires the explicit `--writable` trust decision; optional editor lifecycle control remains independent.
 
@@ -26,7 +26,7 @@ Python 3.10 or newer with tkinter is required. The build and installation are of
 
 1. Copy [`plugin/UnrealMCP`](plugin/UnrealMCP) to `<YourProject>/Plugins/UnrealMCP`, or add this repository's `plugin/` directory to `AdditionalPluginDirectories` in a disposable development `.uproject`.
 2. Enable `UnrealMCP` and compile the project's Editor target with Unreal Engine 5.8 or newer.
-3. Open the project and wait for `Unreal MCP 0.33.0 ready on 127.0.0.1:15485` in the editor log.
+3. Open the project and wait for `Unreal MCP 0.34.0 ready on 127.0.0.1:15485` in the editor log.
 4. Create a virtual environment and install the Python package offline:
 
    ```sh
@@ -103,7 +103,7 @@ Readonly mode is the default and exposes exactly nine tools:
 
 `level_open` may change the active editor map, but it refuses dirty work and never saves, discards, overwrites, compiles, or dirties project content. Readonly operation may still maintain bounded generated discovery, cursor, lifecycle, and retained-operation records under `Saved/UnrealMCP/`; that generated state is not project-content write authority.
 
-`--writable` exposes exactly twenty-five tools. In addition to the readonly set, it adds `operation_cancel`, `asset_delete`, `level_manage`, `level_actor_edit`, `level_save`, `blueprint_graph_edit`, `blueprint_block_replace`, `blueprint_create`, `blueprint_compile`, `blueprint_save`, `blueprint_component_edit`, `blueprint_default_edit`, `blueprint_member_edit`, `widget_tree_edit`, `gameplay_framework_edit`, and `game_data_edit`. `blueprint_block_replace` supports complete user functions, local macros, custom-event handlers, and native-event-rooted handlers with exact boundaries. `operation_status` only looks up a retained result; cancellation is the separate writable-only `operation_cancel` tool.
+`--writable` exposes exactly twenty-five tools. In addition to the readonly set, it adds `operation_cancel`, `asset_delete`, `level_manage`, `level_actor_edit`, `level_save`, `blueprint_graph_edit`, `blueprint_block_replace`, `blueprint_create`, `blueprint_compile`, `blueprint_save`, `blueprint_component_edit`, `blueprint_default_edit`, `blueprint_member_edit`, `widget_tree_edit`, `gameplay_framework_edit`, and `game_data_edit`. `blueprint_block_replace` supports complete user functions, local macros, custom-event handlers, and native-event-rooted handlers with exact boundaries and either explicit positions or deterministic changed-node layout. `operation_status` only looks up a retained result; cancellation is the separate writable-only `operation_cancel` tool.
 
 `--editor-lifecycle <absolute-executable>` independently appends `editor_lifecycle`, producing ten readonly-with-lifecycle tools or twenty-six writable-with-lifecycle tools. It supports bounded launch, graceful shutdown, restart, and cancellation; it never accepts model-supplied executables, projects, process IDs, environment values, shell fragments, or arbitrary editor arguments.
 

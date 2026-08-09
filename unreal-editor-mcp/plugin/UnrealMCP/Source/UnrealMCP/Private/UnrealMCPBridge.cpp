@@ -576,6 +576,7 @@ TSharedPtr<FJsonObject> FUnrealMCPBridge::Capabilities() const
     Features->SetBoolField(TEXT("blueprint_custom_event_replacement"), true);
     Features->SetBoolField(TEXT("blueprint_event_replacement"), true);
     Features->SetBoolField(TEXT("blueprint_logic_unit_external_connections"), true);
+    Features->SetBoolField(TEXT("blueprint_node_layout"), true);
     Features->SetBoolField(TEXT("blueprint_family_policy"), true);
     Features->SetBoolField(TEXT("game_mode_families"), true);
     Features->SetBoolField(TEXT("game_state_families"), true);
@@ -695,6 +696,12 @@ TSharedPtr<FJsonObject> FUnrealMCPBridge::Capabilities() const
     Limits->SetNumberField(TEXT("logic_unit_replacement_defaults"), UnrealMCP::MaxLogicUnitDefaults);
     Limits->SetNumberField(TEXT("logic_unit_replacement_connections"), UnrealMCP::MaxLogicUnitConnections);
     Limits->SetNumberField(TEXT("logic_unit_external_connections"), UnrealMCP::MaxLogicUnitExternalConnections);
+    Limits->SetNumberField(TEXT("logic_unit_layout_nodes"), UnrealMCP::MaxLogicUnitLayoutNodes);
+    Limits->SetNumberField(TEXT("logic_unit_layout_edges"), UnrealMCP::MaxLogicUnitLayoutEdges);
+    Limits->SetNumberField(TEXT("logic_unit_layout_iterations"), UnrealMCP::MaxLogicUnitLayoutIterations);
+    Limits->SetNumberField(TEXT("logic_unit_layout_collision_probes"), UnrealMCP::MaxLogicUnitLayoutCollisionProbes);
+    Limits->SetNumberField(TEXT("logic_unit_layout_work"), UnrealMCP::MaxLogicUnitLayoutWork);
+    Limits->SetNumberField(TEXT("logic_unit_layout_ms"), static_cast<int32>(UnrealMCP::MaxLogicUnitLayoutSeconds * 1000.0));
     Limits->SetNumberField(TEXT("game_data_fields"), UnrealMCP::MaxGameDataFields);
     Limits->SetNumberField(TEXT("game_data_rows"), UnrealMCP::MaxGameDataRows);
     Limits->SetNumberField(TEXT("game_data_batch_rows"), UnrealMCP::MaxGameDataBatchRows);
