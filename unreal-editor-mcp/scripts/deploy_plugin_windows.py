@@ -41,6 +41,7 @@ MAX_PROJECT_DIRECTORY_ENTRIES = 4096
 MAX_MODULE_RULE_BYTES = 64 * 1024
 MAX_REGISTRY_INSTALLATIONS = 256
 MAX_PROJECT_PLUGIN_REFERENCES = 4096
+MAX_DEPLOYMENT_PLUGINS = 3
 DEBUG_SUFFIXES = frozenset(
     {".pdb", ".ipdb", ".iobj", ".idb", ".ilk", ".obj", ".pch", ".map", ".debug"}
 )
@@ -268,18 +269,10 @@ def resolve_engine_root(project: ProjectInfo, configured: Path | None = None) ->
 
 
 def validate_supported_engine_root(engine_root: Path) -> Path:
-    run_uat = package_plugin.validate_engine_root(engine_root, "Windows")
-    version_file = resolved(engine_root) / "Engine" / "Build" / "Build.version"
-    version = read_json_object(version_file, "Unreal Engine build version")
-    major = version.get("MajorVersion")
-    minor = version.get("MinorVersion")
-    if type(major) is not int or type(minor) is not int:
-        raise DeploymentError(f"Unreal Engine build version has invalid major/minor fields: {version_file}")
-    if (major, minor) < (5, 8):
-        raise DeploymentError(
-            f"Unreal MCP requires Unreal Engine 5.8 or newer; selected Engine is {major}.{minor}"
-        )
-    return run_uat
+    try:
+        return package_plugin.validate_engine_root(engine_root, "Windows")
+    except package_plugin.PackagingError as error:
+        raise DeploymentError(str(error)) from error
 
 
 def validate_editor_lifecycle_executable(executable: Path) -> Path:
@@ -712,8 +705,10 @@ def install_binary_plugins(
         raise DeploymentError("replace_existing must be Boolean")
     if type(include_pdb) is not bool:
         raise DeploymentError("include_pdb must be Boolean")
-    if not packages or len(packages) > 2:
-        raise DeploymentError("deployment must contain one or two plugins")
+    if not packages or len(packages) > MAX_DEPLOYMENT_PLUGINS:
+        raise DeploymentError(
+            f"deployment must contain one to {MAX_DEPLOYMENT_PLUGINS} plugins"
+        )
     names = [plugin.name.casefold() for plugin, _, _ in packages]
     if len(names) != len(set(names)):
         raise DeploymentError("deployment plugin names must be unique")

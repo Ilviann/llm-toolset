@@ -7,6 +7,7 @@
 - [`windows-deployment-install-modes` — Windows deployment companion and install modes](windows-deployment-install-modes.md).
 - [`windows-deployment-commonui` — CommonUI companion deployment option](windows-deployment-commonui.md).
 - [`windows-deployment-codex-preview` — Codex deployment configuration preview](windows-deployment-codex-preview.md).
+- [`windows-deployment-validation-fixes` — Deployment selection and Engine validation fixes](windows-deployment-validation-fixes.md).
 
 - [`phase-4` — Reliable mutations, Actor components, and defaults](phase-4.md).
 - [`phase-5` — Blueprint member variables](phase-5.md).

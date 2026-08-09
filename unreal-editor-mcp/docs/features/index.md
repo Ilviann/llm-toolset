@@ -70,6 +70,9 @@ Keep the authoritative checklist in [`ROADMAP.md`](../../ROADMAP.md) synchronize
   - Depends on:
     - `windows-deployment-install-modes`
     - `commonui-assets-inspect`
+- [`windows-deployment-validation-fixes` — Deployment selection and Engine validation fixes](completed/windows-deployment-validation-fixes.md) — Support the complete three-plugin transaction and enforce Unreal Engine 5.8+ through one packaging validator.
+  - Depends on:
+    - `windows-deployment-commonui`
 - [`gas-ability-blueprints` — Gameplay Ability Blueprint creation and updating](planned/gas-ability-blueprints.md) — Add typed Gameplay Ability Blueprint creation and authoring through the GAS companion.
   - Depends on:
     - `phase-13`

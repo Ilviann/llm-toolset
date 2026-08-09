@@ -18,13 +18,24 @@ SPEC.loader.exec_module(package_plugin)
 
 
 class PackagePluginScriptTests(unittest.TestCase):
+    def write_engine(self, folder: Path, major: int = 5, minor: int = 8) -> None:
+        batch_files = folder / "Engine" / "Build" / "BatchFiles"
+        batch_files.mkdir(parents=True)
+        shell_launcher = batch_files / "RunUAT.sh"
+        shell_launcher.write_text("#!/bin/sh\n", encoding="utf-8")
+        shell_launcher.chmod(0o755)
+        (batch_files / "RunUAT.bat").write_text("@echo off\r\n", encoding="utf-8")
+        (folder / "Engine" / "Build" / "Build.version").write_text(
+            json.dumps({"MajorVersion": major, "MinorVersion": minor}),
+            encoding="utf-8",
+        )
+
     def test_main_uses_ue58_environment_default(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             engine_root = root / "UE_5.8"
+            self.write_engine(engine_root)
             run_uat = engine_root / "Engine" / "Build" / "BatchFiles" / "RunUAT.bat"
-            run_uat.parent.mkdir(parents=True)
-            run_uat.write_text("@echo off\r\n", encoding="utf-8")
             output = root / "Package"
             stdout = io.StringIO()
 
@@ -106,13 +117,10 @@ class PackagePluginScriptTests(unittest.TestCase):
     def test_engine_validation_selects_the_platform_launcher(self):
         with tempfile.TemporaryDirectory() as temporary:
             engine_root = Path(temporary)
+            self.write_engine(engine_root)
             batch_files = engine_root / "Engine" / "Build" / "BatchFiles"
-            batch_files.mkdir(parents=True)
             shell_launcher = batch_files / "RunUAT.sh"
-            shell_launcher.write_text("#!/bin/sh\n", encoding="utf-8")
-            shell_launcher.chmod(0o755)
             batch_launcher = batch_files / "RunUAT.bat"
-            batch_launcher.write_text("@echo off\r\n", encoding="utf-8")
 
             self.assertEqual(
                 package_plugin.validate_engine_root(engine_root, "Darwin"), shell_launcher.resolve()
@@ -123,6 +131,23 @@ class PackagePluginScriptTests(unittest.TestCase):
             self.assertEqual(
                 package_plugin.validate_engine_root(engine_root, "Windows"), batch_launcher.resolve()
             )
+
+    def test_engine_validation_rejects_unsupported_or_invalid_version(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            unsupported = root / "UE_5.7"
+            self.write_engine(unsupported, 5, 7)
+            with self.assertRaisesRegex(package_plugin.PackagingError, "5.8 or newer"):
+                package_plugin.validate_engine_root(unsupported, "Windows")
+
+            invalid = root / "UE_Invalid"
+            self.write_engine(invalid)
+            (invalid / "Engine" / "Build" / "Build.version").write_text(
+                json.dumps({"MajorVersion": True, "MinorVersion": 8}),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(package_plugin.PackagingError, "invalid major/minor"):
+                package_plugin.validate_engine_root(invalid, "Windows")
 
     def test_environment_validates_macos_xcode_and_skips_it_elsewhere(self):
         with tempfile.TemporaryDirectory() as temporary:

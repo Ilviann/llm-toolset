@@ -406,44 +406,42 @@ class WindowsDeploymentScriptTests(unittest.TestCase):
             with self.assertRaisesRegex(deploy.DeploymentError, "duplicate UnrealMCP"):
                 deploy.configured_project_descriptor(project, ("UnrealMCP",))
 
-    def test_engine_install_sets_requested_default_for_both_plugins(self):
+    def test_engine_install_sets_requested_default_for_all_selected_plugins(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             engine = root / "UE_5.8"
             self.write_engine(engine)
-            base_package = root / "BasePackage"
-            gas_package = root / "GasPackage"
-            base_package.mkdir()
-            gas_package.mkdir()
-            self.write_package(base_package)
-            self.write_package(gas_package, "UnrealMCPGAS")
-            destinations = (
-                deploy.engine_plugin_destination(engine),
-                deploy.engine_plugin_destination(engine, "UnrealMCPGAS"),
-            )
+            plugins = (deploy.BASE_PLUGIN, deploy.GAS_PLUGIN, deploy.COMMONUI_PLUGIN)
+            packages = []
+            destinations = []
+            for plugin in plugins:
+                package = root / f"{plugin.name}Package"
+                package.mkdir()
+                self.write_package(package, plugin.name)
+                destination = deploy.engine_plugin_destination(engine, plugin.name)
+                packages.append((plugin, package, destination))
+                destinations.append(destination)
 
             installed = deploy.install_binary_plugins(
-                (
-                    (deploy.BASE_PLUGIN, base_package, destinations[0]),
-                    (deploy.GAS_PLUGIN, gas_package, destinations[1]),
-                ),
+                packages,
                 replace_existing=False,
                 enabled_by_default=True,
             )
 
-            self.assertEqual(installed, destinations)
-            for plugin_name, destination in zip(("UnrealMCP", "UnrealMCPGAS"), installed):
+            self.assertEqual(installed, tuple(destinations))
+            for plugin, destination in zip(plugins, installed):
                 descriptor = json.loads(
-                    (destination / f"{plugin_name}.uplugin").read_text(encoding="utf-8")
+                    (destination / f"{plugin.name}.uplugin").read_text(encoding="utf-8")
                 )
                 self.assertIs(descriptor["EnabledByDefault"], True)
 
-    def test_two_plugin_install_rolls_back_when_project_enable_fails(self):
+    def test_three_plugin_install_rolls_back_when_project_enable_fails(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             destination_root = root / "Plugins"
             packages = []
-            for plugin in (deploy.BASE_PLUGIN, deploy.GAS_PLUGIN):
+            plugins = (deploy.BASE_PLUGIN, deploy.GAS_PLUGIN, deploy.COMMONUI_PLUGIN)
+            for plugin in plugins:
                 package = root / f"{plugin.name}Package"
                 package.mkdir()
                 self.write_package(package, plugin.name)
@@ -461,7 +459,7 @@ class WindowsDeploymentScriptTests(unittest.TestCase):
                     ),
                 )
 
-            for plugin in (deploy.BASE_PLUGIN, deploy.GAS_PLUGIN):
+            for plugin in plugins:
                 self.assertEqual(
                     (destination_root / plugin.name / "old.txt").read_text(encoding="utf-8"),
                     plugin.name,

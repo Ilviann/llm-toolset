@@ -30,6 +30,8 @@ DEFAULT_FIXTURE_OUTPUT = WORKSPACE_ROOT / "build" / "unreal-mcp-test-companion"
 DEFAULT_GAS_OUTPUT = WORKSPACE_ROOT / "build" / "unreal-mcp-gas"
 DEFAULT_COMMONUI_OUTPUT = WORKSPACE_ROOT / "build" / "unreal-mcp-commonui"
 ENGINE_ROOT_ENV = "UE58"
+MIN_UNREAL_ENGINE_VERSION = (5, 8)
+MAX_ENGINE_VERSION_BYTES = 64 * 1024
 MAX_PLUGIN_DESCRIPTOR_BYTES = 1024 * 1024
 PACKAGING_OWNED_DESCRIPTOR_FIELDS = frozenset({"EngineVersion", "Installed"})
 _PLATFORM_NAME = re.compile(r"^[A-Za-z][A-Za-z0-9_]*$")
@@ -51,6 +53,41 @@ def is_within(path: Path, directory: Path) -> bool:
     return True
 
 
+def read_engine_version(engine_root: Path) -> tuple[int, int]:
+    version_file = resolved(engine_root) / "Engine" / "Build" / "Build.version"
+    try:
+        with version_file.open("rb") as stream:
+            data = stream.read(MAX_ENGINE_VERSION_BYTES + 1)
+        if len(data) > MAX_ENGINE_VERSION_BYTES:
+            raise PackagingError(
+                f"Unreal Engine build version is larger than 64 KiB: {version_file}"
+            )
+        value = json.loads(data.decode("utf-8-sig"))
+    except PackagingError:
+        raise
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        raise PackagingError(
+            f"Unreal Engine build version is not readable JSON: {version_file}: {error}"
+        ) from error
+    if not isinstance(value, dict):
+        raise PackagingError(
+            f"Unreal Engine build version must contain one JSON object: {version_file}"
+        )
+    major = value.get("MajorVersion")
+    minor = value.get("MinorVersion")
+    if type(major) is not int or type(minor) is not int:
+        raise PackagingError(
+            f"Unreal Engine build version has invalid major/minor fields: {version_file}"
+        )
+    if (major, minor) < MIN_UNREAL_ENGINE_VERSION:
+        minimum = ".".join(str(part) for part in MIN_UNREAL_ENGINE_VERSION)
+        raise PackagingError(
+            f"Unreal MCP requires Unreal Engine {minimum} or newer; "
+            f"selected Engine is {major}.{minor}"
+        )
+    return major, minor
+
+
 def validate_engine_root(engine_root: Path, host_system: str) -> Path:
     engine_root = resolved(engine_root)
     if not (engine_root / "Engine").is_dir():
@@ -62,6 +99,7 @@ def validate_engine_root(engine_root: Path, host_system: str) -> Path:
         raise PackagingError(f"Unreal AutomationTool launcher does not exist: {run_uat}")
     if host_system != "Windows" and not os.access(run_uat, os.X_OK):
         raise PackagingError(f"Unreal AutomationTool launcher is not executable: {run_uat}")
+    read_engine_version(engine_root)
     return run_uat
 
 
