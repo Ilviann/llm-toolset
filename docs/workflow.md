@@ -6,6 +6,12 @@ Use this workflow for changes anywhere in the workspace. Project `AGENTS.md` and
 
 Before implementation work, verify that at least one available tool can retrieve a selected Markdown section by heading or fragment without loading the whole document. If no such tool is available, warn the user and stop working. Resume only after the tool becomes available or the user explicitly asks to continue without it.
 
+## Long-running feature design
+
+For a feature design that may span sessions or use sub-agents, maintain incremental working notes under the affected application's `docs/plans/` directory. Notes may be created and updated before requirements gathering is complete so decisions survive context-window limits and bounded research tasks can be handed off without relying on conversation history.
+
+Clearly distinguish confirmed decisions, proposals, open questions, rejected alternatives, and verification evidence. Keep each plan's immediate index current. Treat these notes as design workspace rather than executable truth; when the design is accepted, move its durable feature contract into the applicable status directory under `docs/features/` and update affected architecture or type documentation through the normal change workflow.
+
 ## Change workflow
 
 Use this workflow for every feature, fix, or refactor.
