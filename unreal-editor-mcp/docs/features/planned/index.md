@@ -1,5 +1,9 @@
 # Planned features
 
+- [`asset-inspect-core` — General asset inspection foundation and gameplay Blueprints](asset-inspect-core.md).
+- [`asset-inspect-data` — Data Asset and Data Table inspection](asset-inspect-data.md).
+- [`asset-inspect-umg` — Base UMG Widget Blueprint inspection](asset-inspect-umg.md).
+- [`asset-inspect-animation` — Animation Blueprint semantic inspection](asset-inspect-animation.md).
 - [`umg-mvvm-inspect` — UMG ViewModel and View Binding inspection](umg-mvvm-inspect.md).
 - [`umg-mvvm` — UMG ViewModel and View Binding authoring](umg-mvvm.md).
 - [`commonui-assets-authoring` — Create/update assets with CommonUI plugin dependencies](commonui-assets-authoring.md).

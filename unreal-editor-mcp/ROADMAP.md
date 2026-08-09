@@ -9,6 +9,16 @@ Feature identifiers are stable names, not execution indexes. Unfinished features
 - [x] [`companion-plugins` — Companion plugin extension foundation](docs/features/completed/companion-plugins.md) — Discover API-compatible independently versioned companion plugins and safely register bounded support for additional asset types, component types, and operations on existing assets.
   - Depends on:
     - `readonly-mode`
+- [ ] [`asset-inspect-core` — General asset inspection foundation and gameplay Blueprints](docs/features/planned/asset-inspect-core.md) — Add the common read-only facade and deep inspection for gameplay-framework and Interface Blueprints.
+- [ ] [`asset-inspect-data` — Data Asset and Data Table inspection](docs/features/planned/asset-inspect-data.md) — Extend the facade to structured Data Assets and Data Tables.
+  - Depends on:
+    - `asset-inspect-core`
+- [ ] [`asset-inspect-umg` — Base UMG Widget Blueprint inspection](docs/features/planned/asset-inspect-umg.md) — Extend the facade to base UMG logic, hierarchy, layout and bindings.
+  - Depends on:
+    - `asset-inspect-core`
+- [ ] [`asset-inspect-animation` — Animation Blueprint semantic inspection](docs/features/planned/asset-inspect-animation.md) — Extend the facade to pose graphs, layers and state machines.
+  - Depends on:
+    - `asset-inspect-core`
 - [ ] [`umg-mvvm-inspect` — UMG ViewModel and View Binding inspection](docs/features/planned/umg-mvvm-inspect.md) — Add bounded typed inspection of existing MVVM ViewModel Blueprints and Widget View Bindings through an optional API-compatible companion plugin.
   - Depends on:
     - `umg-authoring`
