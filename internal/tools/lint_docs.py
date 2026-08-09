@@ -27,6 +27,7 @@ MAX_LINKED_MARKDOWN_BYTES = 16 * 1024 * 1024
 MAX_DIAGNOSTIC_CHARACTERS = 400
 DEFAULT_MAX_DIAGNOSTICS = 200
 ALLOWED_STATUSES = {"planned", "active", "completed", "deferred"}
+ALLOWED_RELEASE_TRACKS = {"runtime", "support-tooling"}
 IGNORED_DIRECTORY_NAMES = {
     ".git",
     ".hg",
@@ -97,6 +98,7 @@ class Feature:
     status: str
     depends_on: list[str]
     released_in: str | None
+    release_track: str
 
 
 class DocumentationLinter:
@@ -410,6 +412,7 @@ class DocumentationLinter:
             status = values["status"]
             depends_on = values["depends_on"]
             released_in = values["released_in"]
+            release_track = values.get("release_track", "runtime")
             if not isinstance(feature_id, str) or not FEATURE_ID_RE.fullmatch(feature_id):
                 self._add(document.path, key_lines.get("feature_id", 1), "FEAT003", "feature_id must be an alphanumeric string allowing '-' and '_'")
                 continue
@@ -427,9 +430,25 @@ class DocumentationLinter:
                 self._add(document.path, key_lines.get("depends_on", 1), "FEAT008", "depends_on contains duplicate IDs")
             if feature_id in depends_on:
                 self._add(document.path, key_lines.get("depends_on", 1), "FEAT009", "feature cannot depend on itself")
-            if status == "completed":
+            if not isinstance(release_track, str) or release_track not in ALLOWED_RELEASE_TRACKS:
+                self._add(
+                    document.path,
+                    key_lines.get("release_track", 1),
+                    "FEAT023",
+                    "release_track must be runtime or support-tooling",
+                )
+                release_track = "runtime"
+            if status == "completed" and release_track == "support-tooling":
+                if released_in is not None:
+                    self._add(
+                        document.path,
+                        key_lines.get("released_in", 1),
+                        "FEAT024",
+                        "completed support-tooling feature must use released_in: null",
+                    )
+            elif status == "completed":
                 if not isinstance(released_in, str) or not released_in.strip():
-                    self._add(document.path, key_lines.get("released_in", 1), "FEAT010", "completed feature requires a release version")
+                    self._add(document.path, key_lines.get("released_in", 1), "FEAT010", "completed runtime feature requires a release version")
             elif released_in is not None:
                 self._add(document.path, key_lines.get("released_in", 1), "FEAT011", "unreleased feature must use released_in: null")
 
@@ -448,7 +467,15 @@ class DocumentationLinter:
                 first = features[feature_id].document.relative_path
                 self._add(document.path, key_lines.get("feature_id", 1), "FEAT014", f"duplicate feature_id; first defined in {first}")
             else:
-                features[feature_id] = Feature(document, feature_root, feature_id, status, depends_on, released_in)
+                features[feature_id] = Feature(
+                    document,
+                    feature_root,
+                    feature_id,
+                    status,
+                    depends_on,
+                    released_in,
+                    release_track,
+                )
 
         issue_ids = {
             path.stem

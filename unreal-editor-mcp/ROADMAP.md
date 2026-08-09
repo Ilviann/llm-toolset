@@ -85,6 +85,15 @@ Feature identifiers are stable names, not execution indexes. Unfinished features
   - Depends on:
     - `pie-test`
 
+## Support tooling
+
+Support-tooling features change repository utilities without changing Unreal MCP runtime functionality or triggering plugin version changes.
+
+- [x] [`windows-deployment-install-modes` — Windows deployment companion and install modes](docs/features/completed/windows-deployment-install-modes.md) — Build and install the base plugin alone or with `UnrealMCPGAS` into a selected project or Engine.
+- [x] [`windows-deployment-codex-preview` — Codex deployment configuration preview](docs/features/completed/windows-deployment-codex-preview.md) — Show one shared launch definition as LM Studio JSON and separately copyable ChatGPT Codex STDIO fields.
+  - Depends on:
+    - `windows-deployment-install-modes`
+
 ## Native platform test backlog
 
 Feature checkboxes record implementation completion after mandatory Windows verification. This section separately tracks preferred macOS verification that may occur after a feature is completed and released. Linux is outside the current support and verification scope and is not tracked.

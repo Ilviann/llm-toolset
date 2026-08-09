@@ -29,10 +29,12 @@ class DocumentationLinterTests(unittest.TestCase):
         feature_id: str,
         depends_on: list[str] | None = None,
         released_in: str | None = None,
+        release_track: str | None = None,
     ) -> None:
         dependencies = depends_on or []
         dependency_yaml = "[]" if not dependencies else "\n" + "\n".join(f"  - {item}" for item in dependencies)
         release_yaml = "null" if released_in is None else f'"{released_in}"'
+        release_track_yaml = [] if release_track is None else [f"release_track: {release_track}"]
         dependency_section = ""
         if dependencies:
             dependency_section = "\n**Depends on:**\n\n" + "\n".join(
@@ -47,6 +49,7 @@ class DocumentationLinterTests(unittest.TestCase):
                     f"status: {status}",
                     f"depends_on: {dependency_yaml}",
                     f"released_in: {release_yaml}",
+                    *release_track_yaml,
                     "---",
                     "",
                     f"# {feature_id}",
@@ -69,9 +72,12 @@ class DocumentationLinterTests(unittest.TestCase):
         )
         self.write("docs/guide.md", "# Guide\n\n## Section\n\nText.\n")
         self.write_feature("completed", "base", released_in="1.0.0")
+        self.write_feature("completed", "helper", release_track="support-tooling")
         self.write_feature("planned", "next", ["base"])
         self.write_feature("completed", "issue-fix", ["issue-1"], released_in="1.0.1")
-        self.write_feature_indexes({"completed": ["base", "issue-fix"], "planned": ["next"]})
+        self.write_feature_indexes(
+            {"completed": ["base", "helper", "issue-fix"], "planned": ["next"]}
+        )
         self.write("docs/issues/index.md", "# Issues\n\n- [Issue 1](issue-1.md)\n")
         self.write("docs/issues/issue-1.md", "# Issue 1\n\n## Status\n\nResolved.\n")
         self.write("skills/template/docs/broken.md", "This excluded template is intentionally invalid.\n")
@@ -121,6 +127,28 @@ class DocumentationLinterTests(unittest.TestCase):
         self.assertIn("FEAT004", codes)
         self.assertIn("FEAT010", codes)
         self.assertIn("FEAT015", codes)
+
+    def test_rejects_versioned_support_tooling_and_unknown_release_track(self) -> None:
+        self.write("docs/index.md", "# Documentation\n\n- [Features](features/index.md)\n")
+        self.write_feature(
+            "completed",
+            "versioned-helper",
+            released_in="1.0.0",
+            release_track="support-tooling",
+        )
+        self.write_feature(
+            "completed",
+            "unknown-track",
+            released_in="1.0.0",
+            release_track="other",
+        )
+        self.write_feature_indexes(
+            {"completed": ["versioned-helper", "unknown-track"]}
+        )
+
+        codes = self.codes()
+        self.assertIn("FEAT023", codes)
+        self.assertIn("FEAT024", codes)
 
     def test_reports_body_dependency_mismatch(self) -> None:
         self.write("docs/index.md", "# Documentation\n\n- [Features](features/index.md)\n")

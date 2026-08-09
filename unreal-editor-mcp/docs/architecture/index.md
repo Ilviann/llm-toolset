@@ -33,5 +33,5 @@ Each file in this directory documents one implemented cohesive component: what i
 - [`asset-reference-snapshot-builder.md`](asset-reference-snapshot-builder.md) — scan aggregation, stable ordering, and deterministic snapshot identity.
 - [`asset-reference-cursor-store.md`](asset-reference-cursor-store.md) — registry serials, bounded snapshot retention, and stale-safe single-use pagination.
 - [`asset-deletion-service.md`](asset-deletion-service.md) — exact ordinary-asset and bounded map-closure deletion, conservative preflight, retained outcomes, and persistence verification.
-- [`windows-deployment-helper.md`](windows-deployment-helper.md) — tkinter project/Engine selection, installed Win64 packaging, optional matching-PDB deployment, and LM Studio configuration.
+- [`windows-deployment-helper.md`](windows-deployment-helper.md) — tkinter project/Engine selection, installed Win64 packaging, optional matching-PDB deployment, and LM Studio/Codex configuration previews.
 - [`automated-verification.md`](automated-verification.md) — Python, native, public-API-probe, and cross-process verification boundaries.

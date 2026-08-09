@@ -11,13 +11,13 @@ This directory contains the detailed implementation, verification, documentation
 
 ## Front matter contract
 
-Every feature document begins with YAML front matter containing string `feature_id`, enum `status`, string-list `depends_on`, and nullable string `released_in`. The status must match its containing status directory. Completed features require a release version; unreleased features use `null`. Dependencies name stable feature IDs or explicit issue IDs and must match the document's direct-prerequisite section.
+Every feature document begins with YAML front matter containing string `feature_id`, enum `status`, string-list `depends_on`, and nullable string `released_in`. The status must match its containing status directory. Runtime features omit `release_track` or set it to `runtime`; completed runtime features require a release version, while unreleased runtime features use `null`. Features that change only repository support tooling set `release_track: support-tooling` and always use `released_in: null`, including after completion. Dependencies name stable feature IDs or explicit issue IDs and must match the document's direct-prerequisite section.
 
 ## Roadmap workflow
 
 The target is Unreal Engine 5.8 and newer. Windows support and applicable native verification are mandatory before feature completion and release. macOS support is preferred but non-blocking; completed features that still need macOS verification remain in the [`ROADMAP.md` native platform test backlog](../../ROADMAP.md#native-platform-test-backlog). Linux is outside the current support and verification scope.
 
-Keep the authoritative checklist in [`ROADMAP.md`](../../ROADMAP.md) synchronized with every unfinished feature and each completed feature that is its direct prerequisite. Remove other completed checklist entries while retaining their feature documents below. Feature identifiers are stable names rather than execution indexes. A feature may be implemented and completed whenever every direct dependency listed in its description is complete. Every feature must include implementation, tests, documentation, examples, and a releasable completion gate.
+Keep the authoritative checklist in [`ROADMAP.md`](../../ROADMAP.md) synchronized with every unfinished runtime feature and each completed runtime feature that is its direct prerequisite. Keep support-tooling features in the roadmap's separate **Support tooling** section even after completion. Feature identifiers are stable names rather than execution indexes. A feature may be implemented and completed whenever every direct dependency listed in its description is complete. Every feature must include proportional implementation, tests, documentation, examples, and a completion gate; only runtime features require a versioned release gate.
 
 ## Feature catalog
 
@@ -56,6 +56,9 @@ Keep the authoritative checklist in [`ROADMAP.md`](../../ROADMAP.md) synchronize
 - [`gas-ability-blueprints-inspect` — Gameplay Ability Blueprint inspection](completed/gas-ability-blueprints-inspect.md) — Add bounded typed inspection of existing Gameplay Ability Blueprint assets through an optional API-compatible companion plugin.
   - Depends on:
     - `companion-plugins`
+- [`windows-deployment-codex-preview` — Codex deployment configuration preview](completed/windows-deployment-codex-preview.md) — Show one shared launch definition as LM Studio JSON and separately copyable ChatGPT Codex STDIO fields.
+  - Depends on:
+    - `windows-deployment-install-modes`
 - [`gas-ability-blueprints` — Gameplay Ability Blueprint creation and updating](planned/gas-ability-blueprints.md) — Add typed Gameplay Ability Blueprint creation and authoring through the GAS companion.
   - Depends on:
     - `phase-13`

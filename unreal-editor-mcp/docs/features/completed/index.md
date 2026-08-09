@@ -4,6 +4,7 @@
 - [`gas-ability-blueprints-inspect` — Gameplay Ability Blueprint inspection](gas-ability-blueprints-inspect.md).
 - [`gas-gameplay-effects-inspect` — Gameplay Effect inspection](gas-gameplay-effects-inspect.md).
 - [`windows-deployment-install-modes` — Windows deployment companion and install modes](windows-deployment-install-modes.md).
+- [`windows-deployment-codex-preview` — Codex deployment configuration preview](windows-deployment-codex-preview.md).
 
 - [`phase-4` — Reliable mutations, Actor components, and defaults](phase-4.md).
 - [`phase-5` — Blueprint member variables](phase-5.md).

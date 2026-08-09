@@ -18,7 +18,7 @@ Close Unreal Editor, then double-click:
 scripts\deploy_plugin_windows.cmd
 ```
 
-Select the folder containing the game's `.uproject` and the matching Unreal Engine 5.8+ installation. Optionally select **Build and install Unreal MCP GAS companion plugin**, then choose project installation with explicit `.uproject` enablement, Engine installation enabled by default, or Engine installation without default enablement. Engine plugins are installed under `<Engine>\Engine\Plugins\Marketplace`; project plugins are installed under `<YourProject>\Plugins`. Existing selected-plugin installations require approval before replacement. Matching Win64 PDB deployment, writable MCP tools, and editor lifecycle control remain independent options.
+Select the folder containing the game's `.uproject` and the matching Unreal Engine 5.8+ installation. Optionally select **Build and install Unreal MCP GAS companion plugin**, then choose project installation with explicit `.uproject` enablement, Engine installation enabled by default, or Engine installation without default enablement. Engine plugins are installed under `<Engine>\Engine\Plugins\Marketplace`; project plugins are installed under `<YourProject>\Plugins`. Existing selected-plugin installations require approval before replacement. Matching Win64 PDB deployment, writable MCP tools, and editor lifecycle control remain independent options. After installation, the tabbed configuration preview provides complete LM Studio JSON plus separately copyable ChatGPT Codex STDIO name, command, and argument fields.
 
 Python 3.10 or newer with tkinter is required. The build and installation are offline.
 

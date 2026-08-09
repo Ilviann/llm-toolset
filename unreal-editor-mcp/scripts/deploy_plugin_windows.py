@@ -25,6 +25,7 @@ except ModuleNotFoundError:  # Direct execution puts this script's directory on 
 
 APPLICATION_ROOT = Path(__file__).resolve().parents[1]
 SERVER_ENTRY = APPLICATION_ROOT / "server.py"
+SERVER_NAME = "unreal-editor"
 PLUGIN_NAME = "UnrealMCP"
 GAS_PLUGIN_NAME = "UnrealMCPGAS"
 INSTALL_IN_PROJECT = "project"
@@ -785,13 +786,13 @@ def install_binary_plugin(
     )[0]
 
 
-def lm_studio_json(
+def mcp_server_definition(
     project: ProjectInfo,
     python_executable: Path | None = None,
     *,
     writable: bool = False,
     editor_lifecycle: Path | None = None,
-) -> str:
+) -> dict[str, object]:
     if type(writable) is not bool:
         raise DeploymentError("writable must be Boolean")
     executable = resolved(Path(sys.executable) if python_executable is None else python_executable)
@@ -801,15 +802,31 @@ def lm_studio_json(
     if editor_lifecycle is not None:
         lifecycle_executable = validate_editor_lifecycle_executable(editor_lifecycle)
         arguments.extend(("--editor-lifecycle", str(lifecycle_executable)))
-    value = {
-        "mcpServers": {
-            "unreal-editor": {
-                "command": str(executable),
-                "args": arguments,
-            }
-        }
-    }
-    return json.dumps(value, indent=2, ensure_ascii=False)
+    return {"command": str(executable), "args": arguments}
+
+
+def format_lm_studio_json(definition: Mapping[str, object]) -> str:
+    return json.dumps(
+        {"mcpServers": {SERVER_NAME: dict(definition)}},
+        indent=2,
+        ensure_ascii=False,
+    )
+
+
+def lm_studio_json(
+    project: ProjectInfo,
+    python_executable: Path | None = None,
+    *,
+    writable: bool = False,
+    editor_lifecycle: Path | None = None,
+) -> str:
+    definition = mcp_server_definition(
+        project,
+        python_executable,
+        writable=writable,
+        editor_lifecycle=editor_lifecycle,
+    )
+    return format_lm_studio_json(definition)
 
 
 def deploy(
@@ -908,6 +925,10 @@ class DeploymentWindow:
         self.install_method_value = tk.StringVar(value=INSTALL_IN_PROJECT)
         self.writable_value = tk.BooleanVar(value=False)
         self.lifecycle_value = tk.BooleanVar(value=False)
+        self.server_name_value = tk.StringVar(value=SERVER_NAME)
+        self.command_value = tk.StringVar()
+        self.argument_values = [tk.StringVar() for _ in range(5)]
+        self.configuration_copy_buttons: list[object] = []
         self.status_value = tk.StringVar(value="Select the folder containing your .uproject file.")
         self.busy = False
         self._build()
@@ -1016,15 +1037,82 @@ class DeploymentWindow:
         self.log_text = scrolledtext.ScrolledText(frame, height=12, state="disabled", wrap="word")
         self.log_text.grid(row=10, column=0, columnspan=3, sticky="nsew", pady=(8, 12))
 
-        self.ttk.Label(frame, text="LM Studio mcp.json entry").grid(
-            row=11, column=0, columnspan=2, sticky="w"
+        self.ttk.Label(frame, text="MCP configuration preview").grid(
+            row=11, column=0, columnspan=3, sticky="w"
+        )
+        previews = self.ttk.Notebook(frame)
+        previews.grid(row=12, column=0, columnspan=3, sticky="nsew", pady=(8, 0))
+
+        lm_studio = self.ttk.Frame(previews, padding=10)
+        lm_studio.columnconfigure(0, weight=1)
+        lm_studio.rowconfigure(1, weight=1)
+        previews.add(lm_studio, text="LM Studio JSON")
+        json_header = self.ttk.Frame(lm_studio)
+        json_header.grid(row=0, column=0, sticky="ew", pady=(0, 8))
+        json_header.columnconfigure(0, weight=1)
+        self.ttk.Label(json_header, text="Complete mcpServers object").grid(
+            row=0, column=0, sticky="w"
         )
         self.copy_button = self.ttk.Button(
-            frame, text="Copy JSON", command=self._copy_json, state="disabled"
+            json_header, text="Copy JSON", command=self._copy_json, state="disabled"
         )
-        self.copy_button.grid(row=11, column=2, sticky="e")
-        self.json_text = scrolledtext.ScrolledText(frame, height=11, state="disabled", wrap="none")
-        self.json_text.grid(row=12, column=0, columnspan=3, sticky="nsew", pady=(8, 0))
+        self.copy_button.grid(row=0, column=1, sticky="e")
+        self.json_text = scrolledtext.ScrolledText(
+            lm_studio, height=11, state="disabled", wrap="none"
+        )
+        self.json_text.grid(row=1, column=0, sticky="nsew")
+
+        codex = self.ttk.Frame(previews, padding=10)
+        codex.columnconfigure(1, weight=1)
+        previews.add(codex, text="ChatGPT Codex STDIO")
+        self._copyable_row(codex, 0, "Name", self.server_name_value)
+        self._copyable_row(codex, 1, "Command / Python", self.command_value)
+        for index, value in enumerate(self.argument_values, start=1):
+            self._copyable_row(codex, index + 1, f"Argument {index}", value)
+
+    def _copyable_row(self, parent: object, row: int, label: str, value: object) -> None:
+        self.ttk.Label(parent, text=label).grid(
+            row=row, column=0, sticky="w", padx=(0, 10), pady=2
+        )
+        self.ttk.Entry(parent, textvariable=value, state="readonly").grid(
+            row=row, column=1, sticky="ew", pady=2
+        )
+        button = self.ttk.Button(
+            parent,
+            text="Copy",
+            command=lambda item=value: self._copy_value(item.get()),
+            state="disabled",
+        )
+        button.grid(row=row, column=2, padx=(10, 0), pady=2)
+        self.configuration_copy_buttons.append(button)
+
+    def _set_configuration(self, configuration: str, definition: Mapping[str, object]) -> None:
+        self.json_text.configure(state="normal")
+        self.json_text.delete("1.0", "end")
+        self.json_text.insert("1.0", configuration)
+        self.json_text.configure(state="disabled")
+        self.command_value.set(str(definition["command"]))
+        arguments = definition["args"]
+        assert isinstance(arguments, list)
+        for index, value in enumerate(self.argument_values):
+            value.set(str(arguments[index]) if index < len(arguments) else "")
+        copy_values = [
+            self.server_name_value.get(),
+            self.command_value.get(),
+            *(value.get() for value in self.argument_values),
+        ]
+        for button, value in zip(self.configuration_copy_buttons, copy_values):
+            button.configure(state="normal" if value else "disabled")
+
+    def _clear_configuration(self) -> None:
+        self.json_text.configure(state="normal")
+        self.json_text.delete("1.0", "end")
+        self.json_text.configure(state="disabled")
+        self.command_value.set("")
+        for value in self.argument_values:
+            value.set("")
+        for button in self.configuration_copy_buttons:
+            button.configure(state="disabled")
 
     def _browse_project(self) -> None:
         from tkinter import filedialog, messagebox
@@ -1134,6 +1222,7 @@ class DeploymentWindow:
 
         self._set_busy(True)
         self.copy_button.configure(state="disabled")
+        self._clear_configuration()
         self.status_value.set("Building Unreal MCP. This can take several minutes…")
         self.log_text.configure(state="normal")
         self.log_text.delete("1.0", "end")
@@ -1150,13 +1239,15 @@ class DeploymentWindow:
                     install_method=install_method,
                     log=lambda message: self.events.put(("log", message)),
                 )
+                definition = mcp_server_definition(
+                    project,
+                    writable=writable,
+                    editor_lifecycle=editor_lifecycle,
+                )
                 result = (
                     destination_paths,
-                    lm_studio_json(
-                        project,
-                        writable=writable,
-                        editor_lifecycle=editor_lifecycle,
-                    ),
+                    format_lm_studio_json(definition),
+                    definition,
                 )
                 self.events.put(("done", result))
             except Exception as error:
@@ -1173,11 +1264,8 @@ class DeploymentWindow:
                 if kind == "log":
                     self._append_log(str(payload))
                 elif kind == "done":
-                    destinations, configuration = payload  # type: ignore[misc]
-                    self.json_text.configure(state="normal")
-                    self.json_text.delete("1.0", "end")
-                    self.json_text.insert("1.0", configuration)
-                    self.json_text.configure(state="disabled")
+                    destinations, configuration, definition = payload  # type: ignore[misc]
+                    self._set_configuration(configuration, definition)
                     self.copy_button.configure(state="normal")
                     self._set_busy(False)
                     self.status_value.set(
@@ -1198,11 +1286,16 @@ class DeploymentWindow:
         self.root.after(100, self._poll_events)
 
     def _copy_json(self) -> None:
-        configuration = self.json_text.get("1.0", "end-1c")
+        self._copy_value(self.json_text.get("1.0", "end-1c"))
+
+    def _copy_value(self, value: str) -> None:
+        if not value:
+            self.status_value.set("Install the selected plugins before copying configuration.")
+            return
         self.root.clipboard_clear()
-        self.root.clipboard_append(configuration)
+        self.root.clipboard_append(value)
         self.root.update()
-        self.status_value.set("LM Studio JSON copied to the clipboard.")
+        self.status_value.set("Configuration value copied to the clipboard.")
 
     def _close(self) -> None:
         if self.busy:

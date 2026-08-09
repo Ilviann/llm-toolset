@@ -671,10 +671,14 @@ class WindowsDeploymentScriptTests(unittest.TestCase):
     def test_lm_studio_json_runs_checkout_server_for_exact_project(self):
         with tempfile.TemporaryDirectory() as temporary:
             project = self.write_project(Path(temporary))
+            definition = deploy.mcp_server_definition(
+                project, Path("C:/Python312/python.exe")
+            )
             configuration = json.loads(
                 deploy.lm_studio_json(project, Path("C:/Python312/python.exe"))
             )
             server = configuration["mcpServers"]["unreal-editor"]
+            self.assertEqual(server, definition)
             self.assertEqual(server["command"], str(Path("C:/Python312/python.exe").resolve()))
             self.assertEqual(server["args"], [str(deploy.SERVER_ENTRY), str(project.descriptor)])
 
@@ -706,6 +710,10 @@ class WindowsDeploymentScriptTests(unittest.TestCase):
             both = json.loads(
                 deploy.lm_studio_json(project, writable=True, editor_lifecycle=editor)
             )
+            definition = deploy.mcp_server_definition(
+                project, writable=True, editor_lifecycle=editor
+            )
+            self.assertEqual(both["mcpServers"][deploy.SERVER_NAME], definition)
             self.assertEqual(
                 both["mcpServers"]["unreal-editor"]["args"],
                 [
