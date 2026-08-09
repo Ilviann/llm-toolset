@@ -107,6 +107,9 @@ Support-tooling features change repository utilities without changing Unreal MCP
 - [x] [`windows-deployment-validation-fixes` — Deployment selection and Engine validation fixes](docs/features/completed/windows-deployment-validation-fixes.md) — Support the complete three-plugin transaction and enforce Unreal Engine 5.8+ through one packaging validator.
   - Depends on:
     - `windows-deployment-commonui`
+- [ ] [`python-tooling-decomposition` — Python support-tool responsibility decomposition](docs/features/planned/python-tooling-decomposition.md) — Split Unreal-local packaging, deployment, and headless Python tools along narrow reusable responsibility boundaries without behavior changes.
+  - Depends on:
+    - `windows-deployment-validation-fixes`
 
 ## Native platform test backlog
 
