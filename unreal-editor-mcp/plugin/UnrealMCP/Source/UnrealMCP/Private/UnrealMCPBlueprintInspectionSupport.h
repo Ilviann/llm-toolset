@@ -3,6 +3,7 @@
 #include "UnrealMCPBlueprintInspector.h"
 
 #include "UnrealMCPBlueprintReferenceScanner.h"
+#include "UnrealMCPBlueprintLogicUnitFingerprint.h"
 
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "AssetRegistry/IAssetRegistry.h"
@@ -20,6 +21,7 @@
 #include "HAL/PlatformTime.h"
 #include "K2Node.h"
 #include "K2Node_CustomEvent.h"
+#include "K2Node_Event.h"
 #include "K2Node_FunctionEntry.h"
 #include "K2Node_FunctionResult.h"
 #include "K2Node_MacroInstance.h"
@@ -76,6 +78,47 @@ const TSet<FString> SupportedPinCategories = {
 static FString GuidString(const FGuid& Guid)
 {
     return Guid.IsValid() ? Guid.ToString(EGuidFormats::Digits).ToLower() : FString();
+}
+
+static TSharedRef<FJsonObject> ReplacementBoundaryRecord(
+    const UnrealMCP::BlueprintLogicUnitFingerprint::FBoundary& Boundary,
+    bool bReplaceable)
+{
+    using namespace UnrealMCP::BlueprintLogicUnitFingerprint;
+    const TSharedRef<FJsonObject> Value = MakeShared<FJsonObject>();
+    Value->SetBoolField(TEXT("replaceable"), bReplaceable);
+    Value->SetStringField(TEXT("target_kind"), KindString(Boundary.Kind));
+    Value->SetStringField(TEXT("logic_unit_id"),
+        Boundary.Kind == EKind::Function || Boundary.Kind == EKind::Macro
+            ? GuidString(Boundary.Graph != nullptr ? Boundary.Graph->GraphGuid : FGuid())
+            : GuidString(Boundary.Entry != nullptr ? Boundary.Entry->NodeGuid : FGuid()));
+    Value->SetStringField(TEXT("graph_id"),
+        GuidString(Boundary.Graph != nullptr ? Boundary.Graph->GraphGuid : FGuid()));
+    Value->SetStringField(TEXT("logic_unit_fingerprint"), Boundary.Fingerprint);
+    Value->SetStringField(TEXT("entry_node_id"),
+        GuidString(Boundary.Entry != nullptr ? Boundary.Entry->NodeGuid : FGuid()));
+    if (Boundary.Result != nullptr)
+        Value->SetStringField(TEXT("result_node_id"), GuidString(Boundary.Result->NodeGuid));
+    TArray<TSharedPtr<FJsonValue>> OwnedNodeIds;
+    for (const FString& Id : Boundary.OwnedNodeIds)
+        OwnedNodeIds.Add(MakeShared<FJsonValueString>(Id));
+    Value->SetArrayField(TEXT("owned_node_ids"), OwnedNodeIds);
+    TArray<TSharedPtr<FJsonValue>> LocalVariableIds;
+    for (const FString& Id : Boundary.LocalVariableIds)
+        LocalVariableIds.Add(MakeShared<FJsonValueString>(Id));
+    Value->SetArrayField(TEXT("local_variable_ids"), LocalVariableIds);
+    TArray<TSharedPtr<FJsonValue>> ExternalLinks;
+    for (const FExternalLink& Link : Boundary.ExternalLinks)
+    {
+        const TSharedRef<FJsonObject> Record = MakeShared<FJsonObject>();
+        Record->SetStringField(TEXT("from_node_id"), Link.FromNodeId);
+        Record->SetStringField(TEXT("from_pin_id"), Link.FromPinId);
+        Record->SetStringField(TEXT("to_node_id"), Link.ToNodeId);
+        Record->SetStringField(TEXT("to_pin_id"), Link.ToPinId);
+        ExternalLinks.Add(MakeShared<FJsonValueObject>(Record));
+    }
+    Value->SetArrayField(TEXT("external_links"), ExternalLinks);
+    return Value;
 }
 
 static bool IsStructuralGraphPin(const UEdGraphNode* Node, const UEdGraphPin* Pin)

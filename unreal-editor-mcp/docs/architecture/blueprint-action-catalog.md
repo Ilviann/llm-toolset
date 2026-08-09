@@ -2,7 +2,7 @@
 
 ## Ownership
 
-`FUnrealMCPBlueprintActionCatalog` is the read-only `blueprint_action_catalog` facade after Game-thread dispatch. A typed query decoder owns exact filter normalization, a focused scanner owns target-first database traversal plus family classification/record encoding, and the facade owns live Blueprint/graph/pin resolution plus retained catalog/action identity. The scanner releases function-call, variable get/set, event, flow-control, cast, literal, and operator families through one classifier. Its graph resolver rebuilds one retained signature; its replacement resolver batch-resolves context-free retained actions from one exact function snapshot in one bounded database scan.
+`FUnrealMCPBlueprintActionCatalog` is the read-only `blueprint_action_catalog` facade after Game-thread dispatch. A typed query decoder owns exact filter normalization, a focused scanner owns target-first database traversal plus family classification/record encoding, and the facade owns live Blueprint/graph/pin resolution plus retained catalog/action identity. The scanner releases function-call, variable get/set, event, flow-control, cast, literal, and operator families through one classifier. Its graph resolver rebuilds one retained signature; its replacement resolver batch-resolves context-free retained actions from one exact logic-unit graph snapshot in one bounded database scan.
 
 ## Dependency direction
 
@@ -12,7 +12,7 @@ The editor bridge constructs the catalog facade with the bridge-instance identit
 
 - Every query requires one exact supported Blueprint-family asset path, stable graph GUID, and current structural snapshot. Results report the resolved family.
 - Optional filters are exact case-insensitive text, owner-class path, function name, member name, node family, and one exact node/pin context. Function and variable filters cannot be combined incompatibly.
-- Only `function_call`, `variable_get`, `variable_set`, `event`, `flow_control`, `cast`, `literal`, and `operator` records are released. Callers never supply a node class, field signature, or spawner; graph add and complete-function replacement accept only opaque retained IDs.
+- Only `function_call`, `variable_get`, `variable_set`, `event`, `flow_control`, `cast`, `literal`, and `operator` records are released. Callers never supply a node class, field signature, or spawner; graph add and complete logic-unit replacement accept only opaque retained IDs.
 - Event spawners are accepted only for real event functions and are suppressed when their unique event already exists. Flow control covers direct supported K2 flow nodes and context-valid standard flow-control macro actions. Literal and operator classification precedes generic function-call classification.
 - Unreal's live action filter remains authoritative for graph kind, Blueprint family, latent availability, static/instance context, inheritance, and optional pin compatibility. Promotable operators remain observable as wildcard candidates without specializing them.
 - Every action passes Unreal's live Blueprint/graph/pin action filter. Results expose descriptive metadata, not unrestricted construction data.

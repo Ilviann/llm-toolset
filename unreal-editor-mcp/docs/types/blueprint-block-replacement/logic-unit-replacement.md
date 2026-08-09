@@ -1,0 +1,11 @@
+# Macro and event replacement
+
+An unfiltered `macros` or `custom_events` inspection publishes `replacement_boundary` on each supported record; native event roots publish it on their `nodes` record. The boundary contains `target_kind`, `logic_unit_id`, `graph_id`, `logic_unit_fingerprint`, `entry_node_id`, optional `result_node_id`, exact sorted `owned_node_ids` and `local_variable_ids`, and exact sorted `external_links`. A request echoes the complete boundary with the current global structural snapshot.
+
+Function and macro plans preserve `$entry` and `$result`; custom-event and native-event plans preserve `$entry`. Macro ownership is the complete local macro graph. Event ownership follows private execution descendants from the exact root, cuts at shared execution joins, and includes a pure dependency only while its output is private to the handler. Cycles and latent nodes are supported when they remain inside that ownership closure. Event handlers do not declare locals.
+
+Each inspected external link must appear exactly once in `external_connections`. Its external endpoint uses stable `{node_id,pin_id}` and its internal endpoint uses `{node_key,pin_name}` so the old owned identity can be replaced. Boundary links are direct; requested conversions belong in the internal `connections` plan. External nodes and unrelated consumers are never owned or removed. At most 64 external connections are accepted.
+
+The common plan limits are 64 new nodes, 256 old owned nodes, 64 locals, 128 defaults, 256 internal connections, and coordinates within ±1,000,000. Every new, root/result/tunnel, and conversion position is explicit. The service rejects missing/extra boundary links, shared-node ownership claims, stale fingerprints, ambiguous roots/pins, expired actions, compile drift, and unsupported graph families before live mutation.
+
+Scratch Blueprint duplication can regenerate event-root and external node/pin GUIDs. The service performs bounded scratch-only rebinding to exact equivalent nodes and pins before applying the plan; live identities remain authoritative and are rechecked after scratch destruction. Compilation, fingerprint parity, retained operation replay, one-transaction live apply, rollback, explicit compile/save, and recovery otherwise match complete function replacement.

@@ -67,7 +67,7 @@ Keep the authoritative checklist in [`ROADMAP.md`](../../ROADMAP.md) synchronize
   - Depends on:
     - `gas-gameplay-effects-inspect`
 - [`function-replace` — Complete function replacement](completed/function-replace.md) — Add transactional replacement of one complete user-owned function.
-- [`event-macro-replace` — Event, custom-event, and macro replacement](planned/event-macro-replace.md) — Extend bounded replacement to events, custom events, and macros.
+- [`event-macro-replace` — Event, custom-event, and macro replacement](completed/event-macro-replace.md) — Extend bounded replacement to events, custom events, and macros.
   - Depends on:
     - `function-replace`
 - [`node-layout` — Deterministic changed-node layout](planned/node-layout.md) — Add deterministic layout for changed nodes.

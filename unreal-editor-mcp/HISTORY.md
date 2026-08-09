@@ -4,6 +4,11 @@
 
 - Standardized Unreal Engine 5.8 development tooling on the `UE58` environment variable and moved the disposable integration project to `ue-test/ue58/`.
 
+## 0.33.0 — 2026-08-09
+
+- Extended `blueprint_block_replace` from complete user functions to local macros, custom-event handlers, and native-event-rooted handlers through one bounded scratch-compile, fingerprint, retained-operation, transaction, rollback, and preservation engine.
+- Added exact inspected ownership boundaries and declared external crossing links, scratch-only identity rebinding for duplicated event/external nodes, uniform Python schemas, capabilities and limits, Windows native/headless coverage, examples, and complete user/architecture/type documentation. macOS native verification remains preferred follow-up work.
+
 ## 0.32.2 — 2026-08-09
 
 - Fixed Blueprint inspection crashes when a Blueprint-owned reflected property, including a class-reference member, was exported or fingerprinted against a parent CDO that did not contain that field. Reflected property exports now use Unreal's archetype-size-aware default lookup across member, class, component, widget, and slot inspection.

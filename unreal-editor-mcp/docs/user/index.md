@@ -10,7 +10,7 @@ Start with the [project README](../../README.md) for installation, first connect
 - [Gameplay Effect inspection](gameplay-effects.md) — data-only GAS effect discovery, typed configuration records, chained references, limits, and read-only examples.
 - [Levels and assets](levels-and-assets.md) — level discovery, inspection, opening, management, transactional actor editing, verified saving, asset references, and safe deletion.
 - [Blueprint inspection](blueprint-inspection.md) — families, snapshots, identities, pagination, and mutation scope.
-- [Blueprint graph authoring](graph-authoring.md) — action discovery, node lifecycle, function replacement, pin defaults, and connections.
+- [Blueprint graph authoring](graph-authoring.md) — action discovery, node lifecycle, complete logic-unit replacement, pin defaults, and connections.
 - [Blueprint mutation](blueprint-mutation.md) — reliable mutations, creation, components, defaults, members, functions, locals, macros, and custom events.
 - [Gameplay frameworks and data](gameplay-and-data.md) — GameMode, GameState, GameInstance, multiplayer assignment, structs, and Data Tables.
 - [Widget Blueprint authoring](widget-blueprints.md) — hierarchy, layout, styling, property bindings, Designer events, safety, and limits.

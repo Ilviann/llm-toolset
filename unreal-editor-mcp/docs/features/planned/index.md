@@ -4,7 +4,6 @@
 - [`umg-mvvm` — UMG ViewModel and View Binding authoring](umg-mvvm.md).
 - [`gas-ability-blueprints` — Gameplay Ability Blueprint creation and updating](gas-ability-blueprints.md).
 - [`gas-gameplay-effects` — Gameplay Effect creation and updating](gas-gameplay-effects.md).
-- [`event-macro-replace` — Event, custom-event, and macro replacement](event-macro-replace.md).
 - [`node-layout` — Deterministic changed-node layout](node-layout.md).
 - [`pcg-graph-inspect` — Procedural Content Generation graph inspection](pcg-graph-inspect.md).
 - [`pcg-graph-authoring` — Procedural Content Generation graph authoring](pcg-graph-authoring.md).

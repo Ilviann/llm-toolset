@@ -57,7 +57,7 @@
 #include "UnrealMCPBlueprintActionCatalog.h"
 #include "UnrealMCPBlueprintGraphEditor.h"
 #include "UnrealMCPBlueprintBlockReplacementService.h"
-#include "UnrealMCPBlueprintFunctionFingerprint.h"
+#include "UnrealMCPBlueprintLogicUnitFingerprint.h"
 #include "UnrealMCPBlueprintFamilyPolicy.h"
 #include "UnrealMCPBlueprintMutator.h"
 #include "UnrealMCPGameplayFrameworkEditor.h"

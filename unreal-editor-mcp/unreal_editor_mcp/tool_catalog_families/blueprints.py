@@ -30,6 +30,7 @@ from .schemas import (
     _PROPERTY_VALUE,
     _SNAPSHOT_ID,
     _BLOCK_CONNECTION,
+    _BLOCK_EXTERNAL_CONNECTION,
     _BLOCK_NODE,
     _BLOCK_PIN_DEFAULT,
     _component_shape,
@@ -38,6 +39,56 @@ from .schemas import (
     _mutation_properties,
     _scoped_member_shape,
 )
+
+
+def _logic_unit_replace_shape(
+    target_kind: str,
+    *,
+    terminal: bool,
+    locals_allowed: bool,
+    external_allowed: bool,
+) -> dict[str, object]:
+    properties: dict[str, object] = {
+        "operation_id": _OPERATION_ID,
+        "asset_path": _PATH,
+        "expected_snapshot": _SNAPSHOT_ID,
+        "target_kind": {"const": target_kind},
+        "logic_unit_id": _NODE_ID,
+        "graph_id": _COMPONENT_ID,
+        "expected_logic_unit_fingerprint": _FUNCTION_FINGERPRINT,
+        "entry_node_id": _NODE_ID,
+        "owned_node_ids": {
+            "type": "array", "maxItems": 256, "items": _NODE_ID,
+        },
+        "local_variable_ids": {
+            "type": "array", "maxItems": 64 if locals_allowed else 0, "items": _LOCAL_ID,
+        },
+        "entry_position": _GRAPH_POSITION,
+        "nodes": {"type": "array", "maxItems": 64, "items": _BLOCK_NODE},
+        "pin_defaults": {"type": "array", "maxItems": 128, "items": _BLOCK_PIN_DEFAULT},
+        "connections": {"type": "array", "maxItems": 256, "items": _BLOCK_CONNECTION},
+        "external_connections": {
+            "type": "array",
+            "maxItems": 64 if external_allowed else 0,
+            "items": _BLOCK_EXTERNAL_CONNECTION,
+        },
+    }
+    required = [
+        "operation_id", "asset_path", "expected_snapshot", "target_kind",
+        "logic_unit_id", "graph_id", "expected_logic_unit_fingerprint",
+        "entry_node_id", "owned_node_ids", "local_variable_ids", "entry_position",
+        "nodes", "pin_defaults", "connections", "external_connections",
+    ]
+    if terminal:
+        properties["result_node_id"] = _NODE_ID
+        properties["result_position"] = _GRAPH_POSITION
+        required.extend(["result_node_id", "result_position"])
+    return {
+        "type": "object",
+        "properties": properties,
+        "required": required,
+        "additionalProperties": False,
+    }
 
 BLUEPRINT_TOOLS: Final = (
     {
@@ -190,52 +241,52 @@ BLUEPRINT_TOOLS: Final = (
     },
     {
         "name": "blueprint_block_replace",
-        "description": "Preflight, compile, and transactionally replace one complete inspected user-owned function body.",
+        "description": "Preflight, compile, and transactionally replace one complete inspected function, macro, custom-event, or event-rooted logic unit.",
         "inputSchema": {
-            "type": "object",
-            "properties": {
-                "operation_id": _OPERATION_ID,
-                "asset_path": _PATH,
-                "expected_snapshot": _SNAPSHOT_ID,
-                "function_id": _FUNCTION_ID,
-                "expected_function_fingerprint": _FUNCTION_FINGERPRINT,
-                "entry_node_id": _NODE_ID,
-                "result_node_id": _NODE_ID,
-                "owned_node_ids": {
-                    "type": "array",
-                    "maxItems": 256,
-                    "items": _NODE_ID,
+            "oneOf": [
+                {
+                    "type": "object",
+                    "properties": {
+                        "operation_id": _OPERATION_ID,
+                        "asset_path": _PATH,
+                        "expected_snapshot": _SNAPSHOT_ID,
+                        "function_id": _FUNCTION_ID,
+                        "expected_function_fingerprint": _FUNCTION_FINGERPRINT,
+                        "entry_node_id": _NODE_ID,
+                        "result_node_id": _NODE_ID,
+                        "owned_node_ids": {
+                            "type": "array", "maxItems": 256, "items": _NODE_ID,
+                        },
+                        "local_variable_ids": {
+                            "type": "array", "maxItems": 64, "items": _LOCAL_ID,
+                        },
+                        "entry_position": _GRAPH_POSITION,
+                        "result_position": _GRAPH_POSITION,
+                        "nodes": {"type": "array", "maxItems": 64, "items": _BLOCK_NODE},
+                        "pin_defaults": {
+                            "type": "array", "maxItems": 128, "items": _BLOCK_PIN_DEFAULT,
+                        },
+                        "connections": {
+                            "type": "array", "maxItems": 256, "items": _BLOCK_CONNECTION,
+                        },
+                    },
+                    "required": [
+                        "operation_id", "asset_path", "expected_snapshot", "function_id",
+                        "expected_function_fingerprint", "entry_node_id", "result_node_id",
+                        "owned_node_ids", "local_variable_ids", "entry_position", "result_position",
+                        "nodes", "pin_defaults", "connections",
+                    ],
+                    "additionalProperties": False,
                 },
-                "local_variable_ids": {
-                    "type": "array",
-                    "maxItems": 64,
-                    "items": _LOCAL_ID,
-                },
-                "entry_position": _GRAPH_POSITION,
-                "result_position": _GRAPH_POSITION,
-                "nodes": {
-                    "type": "array",
-                    "maxItems": 64,
-                    "items": _BLOCK_NODE,
-                },
-                "pin_defaults": {
-                    "type": "array",
-                    "maxItems": 128,
-                    "items": _BLOCK_PIN_DEFAULT,
-                },
-                "connections": {
-                    "type": "array",
-                    "maxItems": 256,
-                    "items": _BLOCK_CONNECTION,
-                },
-            },
-            "required": [
-                "operation_id", "asset_path", "expected_snapshot", "function_id",
-                "expected_function_fingerprint", "entry_node_id", "result_node_id",
-                "owned_node_ids", "local_variable_ids", "entry_position", "result_position",
-                "nodes", "pin_defaults", "connections",
+                _logic_unit_replace_shape(
+                    "function", terminal=True, locals_allowed=True, external_allowed=False),
+                _logic_unit_replace_shape(
+                    "macro", terminal=True, locals_allowed=False, external_allowed=False),
+                _logic_unit_replace_shape(
+                    "custom_event", terminal=False, locals_allowed=False, external_allowed=True),
+                _logic_unit_replace_shape(
+                    "event", terminal=False, locals_allowed=False, external_allowed=True),
             ],
-            "additionalProperties": False,
         },
     },
     {

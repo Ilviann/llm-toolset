@@ -766,7 +766,7 @@ class ServerStdioTests(unittest.TestCase):
                     "params": {"name": "blueprint_graph_edit", "arguments": arguments}})
                 self.assertEqual(response["error"]["code"], -32602)
 
-    def test_function_replace_schema_is_exact_and_bounded(self):
+    def test_logic_unit_replace_schema_is_exact_and_bounded(self):
         server = MCPServer(FakeBridge(), writable=True)
         base = {
             "operation_id": "a" * 32,
@@ -784,8 +784,54 @@ class ServerStdioTests(unittest.TestCase):
             "pin_defaults": [],
             "connections": [],
         }
+        macro = {
+            "operation_id": "a" * 32,
+            "asset_path": "/Game/Actors/BP_Light.BP_Light",
+            "expected_snapshot": "b" * 40,
+            "target_kind": "macro",
+            "logic_unit_id": "c" * 32,
+            "graph_id": "c" * 32,
+            "expected_logic_unit_fingerprint": "d" * 40,
+            "entry_node_id": "e" * 32,
+            "result_node_id": "f" * 32,
+            "owned_node_ids": ["1" * 32],
+            "local_variable_ids": [],
+            "entry_position": {"x": -320, "y": 0},
+            "result_position": {"x": 640, "y": 0},
+            "nodes": [],
+            "pin_defaults": [],
+            "connections": [],
+            "external_connections": [],
+        }
+        handler = {
+            "operation_id": "a" * 32,
+            "asset_path": "/Game/Actors/BP_Light.BP_Light",
+            "expected_snapshot": "b" * 40,
+            "target_kind": "custom_event",
+            "logic_unit_id": "e" * 32,
+            "graph_id": "c" * 32,
+            "expected_logic_unit_fingerprint": "d" * 40,
+            "entry_node_id": "e" * 32,
+            "owned_node_ids": ["1" * 32],
+            "local_variable_ids": [],
+            "entry_position": {"x": -320, "y": 0},
+            "nodes": [{"key": "body", "action_id": "3" * 32,
+                       "position": {"x": 0, "y": 0}}],
+            "pin_defaults": [],
+            "connections": [{
+                "from": {"node_key": "$entry", "pin_name": "then"},
+                "to": {"node_key": "body", "pin_name": "execute"},
+            }],
+            "external_connections": [{
+                "from": {"node_id": "4" * 32, "pin_id": "5" * 32},
+                "to": {"node_key": "body", "pin_name": "Value"},
+            }],
+        }
         valid = (
             base,
+            macro,
+            handler,
+            {**handler, "target_kind": "event"},
             {
                 **base,
                 "nodes": [{
@@ -830,6 +876,16 @@ class ServerStdioTests(unittest.TestCase):
                 "automatic_conversion": True,
             }]},
             {**base, "force": True},
+            {**macro, "external_connections": [{
+                "from": {"node_id": "4" * 32, "pin_id": "5" * 32},
+                "to": {"node_key": "$entry", "pin_name": "Value"},
+            }]},
+            {**handler, "result_node_id": "f" * 32},
+            {**handler, "local_variable_ids": ["2" * 32]},
+            {**handler, "external_connections": [{
+                "from": {"node_id": "4" * 32, "pin_id": "5" * 32},
+                "to": {"node_id": "6" * 32, "pin_id": "7" * 32},
+            }]},
         )
         for arguments in invalid:
             with self.subTest(arguments=arguments):

@@ -572,6 +572,10 @@ TSharedPtr<FJsonObject> FUnrealMCPBridge::Capabilities() const
     Features->SetBoolField(TEXT("blueprint_graph_automatic_conversion"), true);
     Features->SetBoolField(TEXT("blueprint_function_replacement"), true);
     Features->SetBoolField(TEXT("blueprint_function_replacement_scratch_preflight"), true);
+    Features->SetBoolField(TEXT("blueprint_macro_replacement"), true);
+    Features->SetBoolField(TEXT("blueprint_custom_event_replacement"), true);
+    Features->SetBoolField(TEXT("blueprint_event_replacement"), true);
+    Features->SetBoolField(TEXT("blueprint_logic_unit_external_connections"), true);
     Features->SetBoolField(TEXT("blueprint_family_policy"), true);
     Features->SetBoolField(TEXT("game_mode_families"), true);
     Features->SetBoolField(TEXT("game_state_families"), true);
@@ -685,6 +689,12 @@ TSharedPtr<FJsonObject> FUnrealMCPBridge::Capabilities() const
     Limits->SetNumberField(TEXT("function_replacement_locals"), UnrealMCP::MaxFunctionReplacementLocals);
     Limits->SetNumberField(TEXT("function_replacement_defaults"), UnrealMCP::MaxFunctionReplacementDefaults);
     Limits->SetNumberField(TEXT("function_replacement_connections"), UnrealMCP::MaxFunctionReplacementConnections);
+    Limits->SetNumberField(TEXT("logic_unit_replacement_nodes"), UnrealMCP::MaxLogicUnitReplacementNodes);
+    Limits->SetNumberField(TEXT("logic_unit_replacement_owned_nodes"), UnrealMCP::MaxLogicUnitOwnedNodes);
+    Limits->SetNumberField(TEXT("logic_unit_replacement_locals"), UnrealMCP::MaxLogicUnitLocals);
+    Limits->SetNumberField(TEXT("logic_unit_replacement_defaults"), UnrealMCP::MaxLogicUnitDefaults);
+    Limits->SetNumberField(TEXT("logic_unit_replacement_connections"), UnrealMCP::MaxLogicUnitConnections);
+    Limits->SetNumberField(TEXT("logic_unit_external_connections"), UnrealMCP::MaxLogicUnitExternalConnections);
     Limits->SetNumberField(TEXT("game_data_fields"), UnrealMCP::MaxGameDataFields);
     Limits->SetNumberField(TEXT("game_data_rows"), UnrealMCP::MaxGameDataRows);
     Limits->SetNumberField(TEXT("game_data_batch_rows"), UnrealMCP::MaxGameDataBatchRows);

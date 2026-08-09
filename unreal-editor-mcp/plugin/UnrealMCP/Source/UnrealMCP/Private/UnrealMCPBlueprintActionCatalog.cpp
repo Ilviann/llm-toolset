@@ -29,7 +29,7 @@ bool FUnrealMCPBlueprintActionCatalog::ResolveManyForReplacement(
     check(IsInGameThread());
     OutActions.Reset();
     RemoveExpired(Now());
-    if (ActionIds.Num() > UnrealMCP::MaxFunctionReplacementNodes)
+    if (ActionIds.Num() > UnrealMCP::MaxLogicUnitReplacementNodes)
     {
         OutError = {TEXT("graph_limit_exceeded"), TEXT("The replacement contains too many action-backed nodes")};
         return false;
@@ -55,7 +55,7 @@ bool FUnrealMCPBlueprintActionCatalog::ResolveManyForReplacement(
             || Schema->GetClass()->GetPathName() != Retained->GraphSchema)
         {
             OutError = {TEXT("invalid_action"),
-                TEXT("Replacement actions must be context-free actions from this exact live function snapshot")};
+                TEXT("Replacement actions must be context-free actions from this exact live graph snapshot")};
             return false;
         }
         IdsBySignature.FindOrAdd(Retained->RebuildSignature).Add(ActionId);

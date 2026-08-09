@@ -30,7 +30,7 @@ Feature identifiers are stable names, not execution indexes. Unfinished features
   - Depends on:
     - `gas-gameplay-effects-inspect`
 - [x] [`function-replace` — Complete function replacement](docs/features/completed/function-replace.md) — Add transactional replacement of one complete user-owned function.
-- [ ] [`event-macro-replace` — Event, custom-event, and macro replacement](docs/features/planned/event-macro-replace.md) — Extend bounded replacement to events, custom events, and macros.
+- [x] [`event-macro-replace` — Event, custom-event, and macro replacement](docs/features/completed/event-macro-replace.md) — Extend bounded replacement to events, custom events, and macros.
   - Depends on:
     - `function-replace`
 - [ ] [`node-layout` — Deterministic changed-node layout](docs/features/planned/node-layout.md) — Add deterministic layout for changed nodes.
@@ -96,5 +96,6 @@ Feature checkboxes record implementation completion after mandatory Windows veri
   - `companion-plugins`
   - `gas-ability-blueprints-inspect`
   - `gas-gameplay-effects-inspect`
+  - `event-macro-replace`
 - Windows:
   - None

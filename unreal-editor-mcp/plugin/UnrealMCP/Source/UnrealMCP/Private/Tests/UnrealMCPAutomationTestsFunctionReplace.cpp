@@ -127,8 +127,8 @@ bool FUnrealMCPFunctionReplaceTest::RunTest(const FString& Parameters)
     };
     auto ReplacementArguments = [&](const FString& CurrentSnapshot, const FString& CurrentAction)
     {
-        UnrealMCP::BlueprintFunctionFingerprint::FBoundary Boundary;
-        check(UnrealMCP::BlueprintFunctionFingerprint::Describe(FunctionGraph, Boundary));
+        UnrealMCP::BlueprintLogicUnitFingerprint::FBoundary Boundary;
+        check(UnrealMCP::BlueprintLogicUnitFingerprint::DescribeFunction(FunctionGraph, Boundary));
         const TSharedRef<FJsonObject> Arguments = MakeShared<FJsonObject>();
         Arguments->SetStringField(TEXT("operation_id"),
             FGuid::NewGuid().ToString(EGuidFormats::Digits).ToLower());

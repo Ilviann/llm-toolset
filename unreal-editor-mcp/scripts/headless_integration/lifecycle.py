@@ -534,6 +534,10 @@ def main() -> int:
             for feature in (
                 "blueprint_function_replacement",
                 "blueprint_function_replacement_scratch_preflight",
+                "blueprint_macro_replacement",
+                "blueprint_custom_event_replacement",
+                "blueprint_event_replacement",
+                "blueprint_logic_unit_external_connections",
             ):
                 if capabilities.get("features", {}).get(feature) is not True:
                     raise AssertionError(f"function replacement capability is unavailable: {feature}")
@@ -650,6 +654,12 @@ def main() -> int:
                 "function_replacement_locals": 64,
                 "function_replacement_defaults": 128,
                 "function_replacement_connections": 256,
+                "logic_unit_replacement_nodes": 64,
+                "logic_unit_replacement_owned_nodes": 256,
+                "logic_unit_replacement_locals": 64,
+                "logic_unit_replacement_defaults": 128,
+                "logic_unit_replacement_connections": 256,
+                "logic_unit_external_connections": 64,
             }
             if any(capabilities.get("limits", {}).get(name) != value
                    for name, value in expected_replacement_limits.items()):

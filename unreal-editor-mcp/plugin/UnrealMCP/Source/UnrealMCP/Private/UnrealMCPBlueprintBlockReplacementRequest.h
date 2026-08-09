@@ -6,6 +6,14 @@
 
 namespace UnrealMCP::BlueprintBlockReplacement
 {
+enum class ETargetKind : uint8
+{
+    Function,
+    Macro,
+    CustomEvent,
+    Event,
+};
+
 struct FPosition
 {
     int32 X = 0;
@@ -39,13 +47,29 @@ struct FConnectionPlan
     FPosition ConversionPosition;
 };
 
+struct FExternalEndpoint
+{
+    FString NodeId;
+    FString PinId;
+};
+
+struct FExternalConnectionPlan
+{
+    bool bExternalFrom = false;
+    FExternalEndpoint External;
+    FEndpoint Internal;
+};
+
 struct FRequest
 {
+    ETargetKind TargetKind = ETargetKind::Function;
+    bool bLegacyFunctionShape = false;
     FString AssetPath;
     FString PackageName;
     FString ExpectedSnapshot;
-    FString FunctionId;
-    FString ExpectedFunctionFingerprint;
+    FString LogicUnitId;
+    FString GraphId;
+    FString ExpectedLogicUnitFingerprint;
     FString EntryNodeId;
     FString ResultNodeId;
     TArray<FString> OwnedNodeIds;
@@ -55,7 +79,9 @@ struct FRequest
     TArray<FNodePlan> Nodes;
     TArray<FDefaultPlan> Defaults;
     TArray<FConnectionPlan> Connections;
+    TArray<FExternalConnectionPlan> ExternalConnections;
 };
 
+FString TargetKindString(ETargetKind Kind);
 bool Decode(const TSharedPtr<FJsonObject>& Arguments, FRequest& OutRequest, FUnrealMCPError& OutError);
 }

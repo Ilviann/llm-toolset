@@ -2,7 +2,7 @@
 
 #include "UnrealMCPBlueprintBlockReplacementRequest.h"
 #include "UnrealMCPBlueprintFamilyPolicy.h"
-#include "UnrealMCPBlueprintFunctionFingerprint.h"
+#include "UnrealMCPBlueprintLogicUnitFingerprint.h"
 #include "UnrealMCPBlueprintGraphResultBuilder.h"
 #include "UnrealMCPBlueprintInspectionSupport.h"
 #include "UnrealMCPBlueprintMutationCommon.h"
@@ -19,6 +19,9 @@
 #include "K2Node.h"
 #include "K2Node_FunctionEntry.h"
 #include "K2Node_FunctionResult.h"
+#include "K2Node_CustomEvent.h"
+#include "K2Node_Event.h"
+#include "K2Node_Tunnel.h"
 #include "Kismet2/BlueprintEditorUtils.h"
 #include "Kismet2/CompilerResultsLog.h"
 #include "Kismet2/KismetEditorUtilities.h"
@@ -32,6 +35,7 @@ namespace UnrealMCP::BlueprintBlockReplacementPrivate
 {
 using namespace UnrealMCP::BlueprintBlockReplacement;
 using namespace UnrealMCP::BlueprintMutationPrivate;
+namespace LogicUnit = UnrealMCP::BlueprintLogicUnitFingerprint;
 using UnrealMCP::BlueprintInspectionPrivate::IsStructuralGraphPin;
 using UnrealMCP::BlueprintInspectionPrivate::StructuralGraphPinCount;
 using UnrealMCP::BlueprintInspectionPrivate::VariableTypeFingerprint;
@@ -40,6 +44,7 @@ struct FAppliedPlan
 {
     TMap<FString, UEdGraphNode*> NodesByKey;
     TArray<UEdGraphNode*> CreatedNodes;
+    TSet<FString> ExternalLinks;
     FString SemanticFingerprint;
     int32 ConversionNodeCount = 0;
 };
@@ -70,12 +75,149 @@ bool SameStrings(const TArray<FString>& Left, const TArray<FString>& Right)
     return Left.Num() == Right.Num() && Left == Right;
 }
 
-UEdGraph* FindFunction(UBlueprint* Blueprint, const FString& FunctionId)
+UEdGraph* FindGraph(UBlueprint* Blueprint, const FRequest& Request)
 {
     if (Blueprint == nullptr) return nullptr;
-    for (UEdGraph* Graph : Blueprint->FunctionGraphs)
-        if (Graph != nullptr && GuidString(Graph->GraphGuid) == FunctionId) return Graph;
+    const TArray<TObjectPtr<UEdGraph>>* Graphs = nullptr;
+    switch (Request.TargetKind)
+    {
+    case ETargetKind::Function: Graphs = &Blueprint->FunctionGraphs; break;
+    case ETargetKind::Macro: Graphs = &Blueprint->MacroGraphs; break;
+    case ETargetKind::CustomEvent:
+    case ETargetKind::Event: Graphs = &Blueprint->UbergraphPages; break;
+    }
+    if (Graphs != nullptr)
+        for (UEdGraph* Graph : *Graphs)
+            if (Graph != nullptr && GuidString(Graph->GraphGuid) == Request.GraphId) return Graph;
     return nullptr;
+}
+
+UEdGraphNode* FindNode(UEdGraph* Graph, const FString& NodeId)
+{
+    if (Graph == nullptr) return nullptr;
+    for (UEdGraphNode* Node : Graph->Nodes)
+        if (Node != nullptr && GuidString(Node->NodeGuid) == NodeId) return Node;
+    return nullptr;
+}
+
+bool DescribeBoundary(
+    UBlueprint* Blueprint,
+    UEdGraph* Graph,
+    const FRequest& Request,
+    LogicUnit::FBoundary& Out)
+{
+    if (Blueprint == nullptr || Graph == nullptr) return false;
+    switch (Request.TargetKind)
+    {
+    case ETargetKind::Function:
+        return IsUserOwnedFunction(Blueprint, Graph) && Request.LogicUnitId == Request.GraphId
+            && LogicUnit::DescribeFunction(Graph, Out);
+    case ETargetKind::Macro:
+        return Blueprint->MacroGraphs.Contains(Graph) && Request.LogicUnitId == Request.GraphId
+            && LogicUnit::DescribeMacro(Graph, Out);
+    case ETargetKind::CustomEvent:
+    {
+        UK2Node_CustomEvent* Event = Cast<UK2Node_CustomEvent>(FindNode(Graph, Request.EntryNodeId));
+        return Event != nullptr && Request.LogicUnitId == Request.EntryNodeId
+            && LogicUnit::DescribeEventHandler(Graph, Event, Out);
+    }
+    case ETargetKind::Event:
+    {
+        UEdGraphNode* Event = FindNode(Graph, Request.EntryNodeId);
+        return Event != nullptr && Event->IsA<UK2Node_Event>() && !Event->IsA<UK2Node_CustomEvent>()
+            && Request.LogicUnitId == Request.EntryNodeId
+            && LogicUnit::DescribeEventHandler(Graph, Event, Out);
+    }
+    }
+    return false;
+}
+
+bool RebindScratchHandlerRoot(
+    UEdGraph* ScratchGraph,
+    const FRequest& Request,
+    const LogicUnit::FBoundary& LiveBoundary)
+{
+    if (Request.TargetKind != ETargetKind::CustomEvent && Request.TargetKind != ETargetKind::Event)
+        return true;
+    if (FindNode(ScratchGraph, Request.EntryNodeId) != nullptr) return true;
+    if (ScratchGraph == nullptr) return false;
+    UEdGraphNode* Match = nullptr;
+    for (UEdGraphNode* Candidate : ScratchGraph->Nodes)
+    {
+        if (Candidate == nullptr || LiveBoundary.Entry == nullptr
+            || Candidate->GetClass() != LiveBoundary.Entry->GetClass()) continue;
+        bool bSame = Candidate->GetFName() == LiveBoundary.Entry->GetFName();
+        if (const UK2Node_CustomEvent* LiveEvent = Cast<UK2Node_CustomEvent>(LiveBoundary.Entry))
+        {
+            const UK2Node_CustomEvent* ScratchEvent = Cast<UK2Node_CustomEvent>(Candidate);
+            bSame = ScratchEvent != nullptr
+                && ScratchEvent->CustomFunctionName == LiveEvent->CustomFunctionName;
+        }
+        else if (!bSame)
+            bSame = Candidate->GetNodeTitle(ENodeTitleType::ListView).EqualTo(
+                LiveBoundary.Entry->GetNodeTitle(ENodeTitleType::ListView));
+        if (!bSame) continue;
+        if (Match != nullptr) return false;
+        Match = Candidate;
+    }
+    FGuid ExpectedGuid;
+    if (Match == nullptr || !FGuid::ParseExact(
+        Request.EntryNodeId, EGuidFormats::Digits, ExpectedGuid)) return false;
+    Match->NodeGuid = ExpectedGuid;
+    return true;
+}
+
+bool RebindScratchExternalEndpoints(
+    UEdGraph* LiveGraph,
+    UEdGraph* ScratchGraph,
+    const FRequest& Request)
+{
+    if (Request.ExternalConnections.IsEmpty()) return true;
+    if (LiveGraph == nullptr || ScratchGraph == nullptr) return false;
+    for (const FExternalConnectionPlan& Plan : Request.ExternalConnections)
+    {
+        UEdGraphNode* LiveNode = FindNode(LiveGraph, Plan.External.NodeId);
+        if (LiveNode == nullptr) return false;
+        UEdGraphNode* ScratchNode = FindNode(ScratchGraph, Plan.External.NodeId);
+        if (ScratchNode == nullptr)
+        {
+            for (UEdGraphNode* Candidate : ScratchGraph->Nodes)
+            {
+                if (Candidate == nullptr || Candidate->GetClass() != LiveNode->GetClass()
+                    || Candidate->GetFName() != LiveNode->GetFName()) continue;
+                if (ScratchNode != nullptr) return false;
+                ScratchNode = Candidate;
+            }
+            FGuid NodeGuid;
+            if (ScratchNode == nullptr || !FGuid::ParseExact(
+                Plan.External.NodeId, EGuidFormats::Digits, NodeGuid)) return false;
+            ScratchNode->NodeGuid = NodeGuid;
+        }
+        UEdGraphPin* LivePin = nullptr;
+        for (UEdGraphPin* Pin : LiveNode->Pins)
+            if (Pin != nullptr && GuidString(Pin->PinId) == Plan.External.PinId) LivePin = Pin;
+        if (LivePin == nullptr) return false;
+        UEdGraphPin* ScratchPin = nullptr;
+        for (UEdGraphPin* Pin : ScratchNode->Pins)
+        {
+            if (Pin == nullptr) continue;
+            if (GuidString(Pin->PinId) == Plan.External.PinId)
+            {
+                ScratchPin = Pin;
+                break;
+            }
+            if (Pin->PinName == LivePin->PinName && Pin->Direction == LivePin->Direction)
+            {
+                if (ScratchPin != nullptr) return false;
+                ScratchPin = Pin;
+            }
+        }
+        FGuid PinGuid;
+        if (ScratchPin == nullptr || !FGuid::ParseExact(
+            Plan.External.PinId, EGuidFormats::Digits, PinGuid)) return false;
+        ScratchPin->PinId = PinGuid;
+    }
+    return true;
 }
 
 UEdGraphPin* FindUniquePin(
@@ -201,9 +343,18 @@ bool HasPathThrough(
     return false;
 }
 
+UEdGraphPin* FindPinById(UEdGraphNode* Node, const FString& PinId)
+{
+    if (Node == nullptr) return nullptr;
+    for (UEdGraphPin* Pin : Node->Pins)
+        if (IsStructuralGraphPin(Node, Pin) && GuidString(Pin->PinId) == PinId) return Pin;
+    return nullptr;
+}
+
 bool BuildSemanticFingerprint(
     UEdGraph* Graph,
     const TMap<FString, UEdGraphNode*>& NodesByKey,
+    const TSet<FString>& ExpectedExternalLinks,
     FString& OutFingerprint,
     FUnrealMCPError& OutError)
 {
@@ -218,13 +369,8 @@ bool BuildSemanticFingerprint(
         }
         KeysByNode.Add(Pair.Value, Pair.Key);
     }
-    if (KeysByNode.Num() != Graph->Nodes.Num())
-    {
-        OutError = {TEXT("internal_error"),
-            TEXT("The replacement produced nodes outside its complete declared plan")};
-        return false;
-    }
     TArray<FString> Lines;
+    TSet<FString> ActualExternalLinks;
     for (const TPair<FString, UEdGraphNode*>& Pair : NodesByKey)
     {
         UEdGraphNode* Node = Pair.Value;
@@ -243,14 +389,54 @@ bool BuildSemanticFingerprint(
                 const FString* LinkedKey = KeysByNode.Find(LinkedNode);
                 if (LinkedKey == nullptr)
                 {
-                    OutError = {TEXT("internal_error"),
-                        TEXT("The replacement produced a link outside its complete function boundary")};
-                    return false;
+                    if (LinkedNode == nullptr || !LinkedNode->NodeGuid.IsValid() || !Linked->PinId.IsValid())
+                    {
+                        OutError = {TEXT("internal_error"), TEXT("The replacement produced an unstable external link")};
+                        return false;
+                    }
+                    const FString Identity = TEXT("out|") + Pair.Key + TEXT("|") + Pin->PinName.ToString()
+                        + TEXT("|") + GuidString(LinkedNode->NodeGuid) + TEXT("|") + GuidString(Linked->PinId);
+                    ActualExternalLinks.Add(Identity);
+                    Lines.Add(TEXT("external|") + Identity);
+                    continue;
                 }
                 Lines.Add(TEXT("link|") + Pair.Key + TEXT("|") + Pin->PinName.ToString()
                     + TEXT("|") + *LinkedKey + TEXT("|") + Linked->PinName.ToString());
             }
         }
+    }
+    for (UEdGraphNode* External : Graph->Nodes)
+    {
+        if (External == nullptr || KeysByNode.Contains(External)) continue;
+        for (UEdGraphPin* Pin : External->Pins)
+        {
+            if (!IsStructuralGraphPin(External, Pin) || Pin->Direction != EGPD_Output
+                || !External->NodeGuid.IsValid() || !Pin->PinId.IsValid()) continue;
+            for (UEdGraphPin* Linked : Pin->LinkedTo)
+            {
+                UEdGraphNode* LinkedNode = Linked != nullptr ? Linked->GetOwningNodeUnchecked() : nullptr;
+                const FString* LinkedKey = KeysByNode.Find(LinkedNode);
+                if (LinkedKey == nullptr) continue;
+                const FString Identity = TEXT("in|") + GuidString(External->NodeGuid) + TEXT("|")
+                    + GuidString(Pin->PinId) + TEXT("|") + *LinkedKey + TEXT("|") + Linked->PinName.ToString();
+                ActualExternalLinks.Add(Identity);
+                Lines.Add(TEXT("external|") + Identity);
+            }
+        }
+    }
+    bool bExternalLinksMatch = ActualExternalLinks.Num() == ExpectedExternalLinks.Num();
+    if (bExternalLinksMatch)
+        for (const FString& Expected : ExpectedExternalLinks)
+            if (!ActualExternalLinks.Contains(Expected))
+            {
+                bExternalLinksMatch = false;
+                break;
+            }
+    if (!bExternalLinksMatch)
+    {
+        OutError = {TEXT("internal_error"),
+            TEXT("The replacement produced links outside its declared logic-unit boundary")};
+        return false;
     }
     OutFingerprint = HashLines(MoveTemp(Lines));
     return true;
@@ -260,35 +446,48 @@ bool ApplyPlan(
     UBlueprint* Blueprint,
     UEdGraph* Graph,
     const FRequest& Request,
+    const LogicUnit::FBoundary* KnownBoundary,
     const TMap<FString, FUnrealMCPBlueprintActionCatalog::FResolvedAction>& Actions,
     const FUnrealMCPBlueprintBlockReplacementService::FNodeInvoker& NodeInvoker,
     const FUnrealMCPBlueprintBlockReplacementService::FConnectionInvoker& ConnectionInvoker,
     FAppliedPlan& Out,
     FUnrealMCPError& OutError)
 {
-    UnrealMCP::BlueprintFunctionFingerprint::FBoundary Boundary;
+    LogicUnit::FBoundary Boundary = KnownBoundary != nullptr
+        ? *KnownBoundary : LogicUnit::FBoundary();
     const UEdGraphSchema_K2* Schema =
         Cast<UEdGraphSchema_K2>(Graph != nullptr ? Graph->GetSchema() : nullptr);
-    if (!UnrealMCP::BlueprintFunctionFingerprint::Describe(Graph, Boundary) || Schema == nullptr)
+    const bool bBoundaryAvailable = KnownBoundary != nullptr
+        || DescribeBoundary(Blueprint, Graph, Request, Boundary);
+    if (!bBoundaryAvailable || Schema == nullptr)
     {
+        UEdGraphNode* Candidate = FindNode(Graph, Request.EntryNodeId);
         OutError = {TEXT("stale_precondition"),
-            TEXT("The replacement function no longer has one supported entry/result boundary")};
+            FString::Printf(TEXT("The %s replacement target no longer has one supported logic-unit boundary (root=%s, nodes=%d)"),
+                *TargetKindString(Request.TargetKind),
+                Candidate != nullptr ? *Candidate->GetClass()->GetName() : TEXT("missing"),
+                Graph != nullptr ? Graph->Nodes.Num() : -1)};
         return false;
     }
+    const int32 BoundaryNodeCount = 1 + (Boundary.Result != nullptr ? 1 : 0) + Boundary.OwnedNodes.Num();
+    const int32 UnrelatedNodeCount = Graph->Nodes.Num() - BoundaryNodeCount;
     for (UEdGraphNode* Node : Boundary.OwnedNodes)
         FBlueprintEditorUtils::RemoveNode(Blueprint, Node, true);
     Boundary.Entry->Modify();
-    Boundary.Result->Modify();
     for (UEdGraphPin* Pin : Boundary.Entry->Pins)
-        if (Pin != nullptr) Pin->BreakAllPinLinks(true);
-    for (UEdGraphPin* Pin : Boundary.Result->Pins)
         if (Pin != nullptr) Pin->BreakAllPinLinks(true);
     Boundary.Entry->NodePosX = Request.EntryPosition.X;
     Boundary.Entry->NodePosY = Request.EntryPosition.Y;
-    Boundary.Result->NodePosX = Request.ResultPosition.X;
-    Boundary.Result->NodePosY = Request.ResultPosition.Y;
     Out.NodesByKey.Add(TEXT("$entry"), Boundary.Entry);
-    Out.NodesByKey.Add(TEXT("$result"), Boundary.Result);
+    if (Boundary.Result != nullptr)
+    {
+        Boundary.Result->Modify();
+        for (UEdGraphPin* Pin : Boundary.Result->Pins)
+            if (Pin != nullptr) Pin->BreakAllPinLinks(true);
+        Boundary.Result->NodePosX = Request.ResultPosition.X;
+        Boundary.Result->NodePosY = Request.ResultPosition.Y;
+        Out.NodesByKey.Add(TEXT("$result"), Boundary.Result);
+    }
 
     for (const FNodePlan& Plan : Request.Nodes)
     {
@@ -416,15 +615,66 @@ bool ApplyPlan(
         ++ConnectionIndex;
     }
 
+    for (const FExternalConnectionPlan& Plan : Request.ExternalConnections)
+    {
+        UEdGraphNode* const* InternalNode = Out.NodesByKey.Find(Plan.Internal.NodeKey);
+        UEdGraphNode* ExternalNode = FindNode(Graph, Plan.External.NodeId);
+        if (InternalNode == nullptr || ExternalNode == nullptr
+            || Out.NodesByKey.FindKey(ExternalNode) != nullptr)
+        {
+            OutError = {TEXT("invalid_node"), TEXT("A declared external endpoint is unavailable or internal")};
+            return false;
+        }
+        const EEdGraphPinDirection InternalDirection = Plan.bExternalFrom ? EGPD_Input : EGPD_Output;
+        const EEdGraphPinDirection ExternalDirection = Plan.bExternalFrom ? EGPD_Output : EGPD_Input;
+        UEdGraphPin* InternalPin = FindUniquePin(*InternalNode, Plan.Internal.PinName, InternalDirection, OutError);
+        UEdGraphPin* ExternalPin = FindPinById(ExternalNode, Plan.External.PinId);
+        if (InternalPin == nullptr || ExternalPin == nullptr || ExternalPin->Direction != ExternalDirection
+            || ExternalPin->bNotConnectable || InternalPin->bNotConnectable)
+        {
+            if (OutError.Code.IsEmpty())
+                OutError = {TEXT("invalid_connection"), TEXT("A declared external connection endpoint is invalid")};
+            return false;
+        }
+        UEdGraphPin* FromPin = Plan.bExternalFrom ? ExternalPin : InternalPin;
+        UEdGraphPin* ToPin = Plan.bExternalFrom ? InternalPin : ExternalPin;
+        const FPinConnectionResponse Response = Schema->CanCreateConnection(FromPin, ToPin);
+        if (Response.Response != CONNECT_RESPONSE_MAKE
+            && Response.Response != CONNECT_RESPONSE_MAKE_WITH_PROMOTION)
+        {
+            OutError = {TEXT("incompatible_pins"),
+                TEXT("Declared external connections must be direct and context-valid")};
+            OutError.Details->SetStringField(
+                TEXT("schema_message"), Response.Message.ToString().Left(UnrealMCP::MaxDiagnosticChars));
+            return false;
+        }
+        const int32 NodeCountBefore = Graph->Nodes.Num();
+        if (!ConnectionInvoker(Schema, FromPin, ToPin) || Graph->Nodes.Num() != NodeCountBefore
+            || !FromPin->LinkedTo.Contains(ToPin) || !ToPin->LinkedTo.Contains(FromPin))
+        {
+            OutError = {TEXT("invalid_connection"),
+                TEXT("The live K2 schema rejected a prevalidated external connection")};
+            return false;
+        }
+        const FString Identity = Plan.bExternalFrom
+            ? TEXT("in|") + Plan.External.NodeId + TEXT("|") + Plan.External.PinId + TEXT("|")
+                + Plan.Internal.NodeKey + TEXT("|") + Plan.Internal.PinName
+            : TEXT("out|") + Plan.Internal.NodeKey + TEXT("|") + Plan.Internal.PinName + TEXT("|")
+                + Plan.External.NodeId + TEXT("|") + Plan.External.PinId;
+        Out.ExternalLinks.Add(Identity);
+    }
+
     if (Graph->Nodes.Num() > UnrealMCP::MaxGraphNodes
-        || Graph->Nodes.Num() != 2 + Request.Nodes.Num() + Out.ConversionNodeCount)
+        || Graph->Nodes.Num() != UnrelatedNodeCount + (Boundary.Result != nullptr ? 2 : 1)
+            + Request.Nodes.Num() + Out.ConversionNodeCount)
     {
         OutError = {TEXT("graph_limit_exceeded"),
             TEXT("The replacement result does not match its complete bounded node plan")};
         return false;
     }
     FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(Blueprint);
-    return BuildSemanticFingerprint(Graph, Out.NodesByKey, Out.SemanticFingerprint, OutError);
+    return BuildSemanticFingerprint(
+        Graph, Out.NodesByKey, Out.ExternalLinks, Out.SemanticFingerprint, OutError);
 }
 
 bool RollbackAndVerify(
@@ -497,7 +747,7 @@ bool FUnrealMCPBlueprintBlockReplacementService::Execute(
             Blueprint->GeneratedClass, UnrealMCP::BlueprintFamilyPolicy::EOperation::GraphEdit))
     {
         OutError = {TEXT("not_found"),
-            TEXT("The requested Blueprint family is unavailable for function replacement")};
+            TEXT("The requested Blueprint family is unavailable for logic-unit replacement")};
         return false;
     }
     if (Blueprint->bBeingCompiled)
@@ -511,34 +761,39 @@ bool FUnrealMCPBlueprintBlockReplacementService::Execute(
     if (Snapshot != Request.ExpectedSnapshot)
     {
         OutError = {TEXT("stale_precondition"),
-            TEXT("The Blueprint structural snapshot changed before function replacement")};
+            TEXT("The Blueprint structural snapshot changed before logic-unit replacement")};
         OutError.Details->SetStringField(TEXT("current_snapshot"), Snapshot);
         return false;
     }
-    UEdGraph* Graph = FindFunction(Blueprint, Request.FunctionId);
-    UnrealMCP::BlueprintFunctionFingerprint::FBoundary Boundary;
-    if (Graph == nullptr || !IsUserOwnedFunction(Blueprint, Graph)
-        || !UnrealMCP::BlueprintFunctionFingerprint::Describe(Graph, Boundary))
+    UEdGraph* Graph = FindGraph(Blueprint, Request);
+    LogicUnit::FBoundary Boundary;
+    UK2Node_CustomEvent* InitialCustomEvent = Request.TargetKind == ETargetKind::CustomEvent
+        ? Cast<UK2Node_CustomEvent>(FindNode(Graph, Request.EntryNodeId)) : nullptr;
+    if (Graph == nullptr
+        || (Request.TargetKind == ETargetKind::CustomEvent
+            && (InitialCustomEvent == nullptr || InitialCustomEvent->IsOverride()))
+        || !DescribeBoundary(Blueprint, Graph, Request, Boundary))
     {
         OutError = {TEXT("stale_precondition"),
-            TEXT("The exact user-owned function boundary is unavailable or has multiple result nodes")};
+            TEXT("The exact requested logic-unit boundary is unavailable or unsupported")};
         return false;
     }
     if (GuidString(Boundary.Entry->NodeGuid) != Request.EntryNodeId
-        || GuidString(Boundary.Result->NodeGuid) != Request.ResultNodeId
+        || ((Boundary.Result != nullptr ? GuidString(Boundary.Result->NodeGuid) : FString()) != Request.ResultNodeId)
         || !SameStrings(Boundary.OwnedNodeIds, Request.OwnedNodeIds)
         || !SameStrings(Boundary.LocalVariableIds, Request.LocalVariableIds)
-        || Boundary.Fingerprint != Request.ExpectedFunctionFingerprint)
+        || Boundary.Fingerprint != Request.ExpectedLogicUnitFingerprint)
     {
         OutError = {TEXT("stale_precondition"),
-            TEXT("The supplied entry, result, owned-node, local, or function fingerprint boundary is stale")};
-        OutError.Details->SetStringField(TEXT("current_function_fingerprint"), Boundary.Fingerprint);
+            TEXT("The supplied root, terminal, owned-node, local, or logic-unit fingerprint boundary is stale")};
+        OutError.Details->SetStringField(TEXT("current_logic_unit_fingerprint"), Boundary.Fingerprint);
         return false;
     }
-    if (2 + Request.Nodes.Num() + Request.Connections.Num() > UnrealMCP::MaxGraphNodes)
+    if (Graph->Nodes.Num() - Boundary.OwnedNodes.Num() + Request.Nodes.Num()
+            + Request.Connections.Num() > UnrealMCP::MaxGraphNodes)
     {
         OutError = {TEXT("graph_limit_exceeded"),
-            TEXT("The replacement cannot fit within the published function graph limit")};
+            TEXT("The replacement cannot fit within the published graph limit")};
         return false;
     }
 
@@ -546,17 +801,19 @@ bool FUnrealMCPBlueprintBlockReplacementService::Execute(
     for (const FNodePlan& Node : Request.Nodes) ActionIds.AddUnique(Node.ActionId);
     TMap<FString, FUnrealMCPBlueprintActionCatalog::FResolvedAction> Actions;
     if (!ActionCatalog.ResolveManyForReplacement(
-        ActionIds, Blueprint, Graph, Request.AssetPath, Request.FunctionId, Snapshot, Actions, OutError))
+        ActionIds, Blueprint, Graph, Request.AssetPath, Request.GraphId, Snapshot, Actions, OutError))
         return false;
 
     const FString ScratchName =
-        TEXT("UnrealMCPFunctionReplace_") + FGuid::NewGuid().ToString(EGuidFormats::Digits);
+        TEXT("UnrealMCPLogicUnitReplace_") + FGuid::NewGuid().ToString(EGuidFormats::Digits);
     FScratchPackage Scratch;
     Scratch.Package = CreatePackage(*(TEXT("/Temp/") + ScratchName));
     Scratch.Blueprint = Scratch.Package != nullptr
         ? DuplicateObject<UBlueprint>(Blueprint, Scratch.Package, *ScratchName) : nullptr;
-    UEdGraph* ScratchGraph = FindFunction(Scratch.Blueprint, Request.FunctionId);
+    UEdGraph* ScratchGraph = FindGraph(Scratch.Blueprint, Request);
     if (Scratch.Package == nullptr || Scratch.Blueprint == nullptr || ScratchGraph == nullptr
+        || !RebindScratchHandlerRoot(ScratchGraph, Request, Boundary)
+        || !RebindScratchExternalEndpoints(Graph, ScratchGraph, Request)
         || Scratch.Package->HasAnyFlags(RF_Transient) || ScratchGraph->HasAnyFlags(RF_Transient))
     {
         OutError = {TEXT("internal_error"),
@@ -567,9 +824,9 @@ bool FUnrealMCPBlueprintBlockReplacementService::Execute(
     bool bScratchApplied = false;
     {
         FScopedTransaction ScratchTransaction(
-            FText::FromString(TEXT("Unreal MCP scratch function replacement")));
+            FText::FromString(TEXT("Unreal MCP scratch logic-unit replacement")));
         bScratchApplied = ApplyPlan(
-            Scratch.Blueprint, ScratchGraph, Request, Actions, NodeInvoker, ConnectionInvoker,
+            Scratch.Blueprint, ScratchGraph, Request, nullptr, Actions, NodeInvoker, ConnectionInvoker,
             ScratchApplied, OutError);
         ScratchTransaction.Cancel();
     }
@@ -590,12 +847,21 @@ bool FUnrealMCPBlueprintBlockReplacementService::Execute(
         return false;
     }
     if (!BuildSemanticFingerprint(
-        ScratchGraph, ScratchApplied.NodesByKey, SemanticAfterCompile, OutError)
+        ScratchGraph, ScratchApplied.NodesByKey, ScratchApplied.ExternalLinks,
+        SemanticAfterCompile, OutError)
         || SemanticAfterCompile != SemanticBeforeCompile)
     {
         if (OutError.Code.IsEmpty())
             OutError = {TEXT("compile_failed"),
                 TEXT("Candidate compilation changed the planned replacement structure")};
+        return false;
+    }
+    LogicUnit::FBoundary ScratchBoundary;
+    if (!DescribeBoundary(Scratch.Blueprint, ScratchGraph, Request, ScratchBoundary)
+        || ScratchBoundary.OwnedNodeIds.Num() != ScratchApplied.CreatedNodes.Num())
+    {
+        OutError = {TEXT("compile_failed"),
+            TEXT("Candidate compilation changed the complete logic-unit ownership boundary")};
         return false;
     }
     CleanupFailedCreation(Scratch.Package, Scratch.Blueprint, FString(), false);
@@ -604,10 +870,11 @@ bool FUnrealMCPBlueprintBlockReplacementService::Execute(
     ScratchGraph = nullptr;
 
     FString SnapshotAfterPreflight;
+    LogicUnit::FBoundary BoundaryAfterPreflight;
     if (!ReadSnapshot(Inspector, Request.AssetPath, SnapshotAfterPreflight, OutError)
         || SnapshotAfterPreflight != Snapshot
-        || UnrealMCP::BlueprintFunctionFingerprint::Build(Graph)
-            != Request.ExpectedFunctionFingerprint)
+        || !DescribeBoundary(Blueprint, Graph, Request, BoundaryAfterPreflight)
+        || BoundaryAfterPreflight.Fingerprint != Request.ExpectedLogicUnitFingerprint)
     {
         if (OutError.Code.IsEmpty())
             OutError = {TEXT("internal_error"),
@@ -620,13 +887,13 @@ bool FUnrealMCPBlueprintBlockReplacementService::Execute(
     FAppliedPlan LiveApplied;
     bool bApplied = false;
     {
-        FScopedTransaction Transaction(FText::FromString(TEXT("Unreal MCP replace function")));
+        FScopedTransaction Transaction(FText::FromString(TEXT("Unreal MCP replace logic unit")));
         Blueprint->Modify();
         Graph->Modify();
         Boundary.Entry->Modify();
-        Boundary.Result->Modify();
+        if (Boundary.Result != nullptr) Boundary.Result->Modify();
         for (UEdGraphNode* Node : Boundary.OwnedNodes) Node->Modify();
-        bApplied = ApplyPlan(Blueprint, Graph, Request, Actions, NodeInvoker, ConnectionInvoker,
+        bApplied = ApplyPlan(Blueprint, Graph, Request, &Boundary, Actions, NodeInvoker, ConnectionInvoker,
             LiveApplied, OutError);
     }
     if (!bApplied)
@@ -645,17 +912,18 @@ bool FUnrealMCPBlueprintBlockReplacementService::Execute(
     }
 
     FString NewSnapshot;
-    UnrealMCP::BlueprintFunctionFingerprint::FBoundary NewBoundary;
+    LogicUnit::FBoundary NewBoundary;
     if (!ReadSnapshot(Inspector, Request.AssetPath, NewSnapshot, OutError)
         || NewSnapshot == Snapshot
-        || !UnrealMCP::BlueprintFunctionFingerprint::Describe(Graph, NewBoundary)
+        || !DescribeBoundary(Blueprint, Graph, Request, NewBoundary)
         || GuidString(NewBoundary.Entry->NodeGuid) != Request.EntryNodeId
-        || GuidString(NewBoundary.Result->NodeGuid) != Request.ResultNodeId
-        || !SameStrings(NewBoundary.LocalVariableIds, Request.LocalVariableIds))
+        || ((NewBoundary.Result != nullptr ? GuidString(NewBoundary.Result->NodeGuid) : FString()) != Request.ResultNodeId)
+        || !SameStrings(NewBoundary.LocalVariableIds, Request.LocalVariableIds)
+        || NewBoundary.OwnedNodeIds.Num() != LiveApplied.CreatedNodes.Num())
     {
         if (OutError.Code.IsEmpty())
             OutError = {TEXT("internal_error"),
-                TEXT("The live replacement failed authoritative function read-back")};
+                TEXT("The live replacement failed authoritative logic-unit read-back")};
         RollbackAndVerify(
             Inspector, Blueprint, Request.AssetPath, Snapshot, bDirtyBefore, StatusBefore, OutError);
         return false;
@@ -673,16 +941,24 @@ bool FUnrealMCPBlueprintBlockReplacementService::Execute(
     }
 
     const TSharedRef<FJsonObject> Changed = MakeShared<FJsonObject>();
-    Changed->SetStringField(TEXT("function_id"), Request.FunctionId);
-    Changed->SetStringField(TEXT("function_fingerprint"), NewBoundary.Fingerprint);
+    Changed->SetStringField(TEXT("target_kind"), TargetKindString(Request.TargetKind));
+    Changed->SetStringField(TEXT("logic_unit_id"), Request.LogicUnitId);
+    Changed->SetStringField(TEXT("graph_id"), Request.GraphId);
+    Changed->SetStringField(TEXT("logic_unit_fingerprint"), NewBoundary.Fingerprint);
     Changed->SetStringField(TEXT("entry_node_id"), Request.EntryNodeId);
-    Changed->SetStringField(TEXT("result_node_id"), Request.ResultNodeId);
+    if (!Request.ResultNodeId.IsEmpty()) Changed->SetStringField(TEXT("result_node_id"), Request.ResultNodeId);
     Changed->SetStringField(TEXT("semantic_fingerprint"), LiveApplied.SemanticFingerprint);
     Changed->SetBoolField(TEXT("scratch_preflight"), true);
     Changed->SetBoolField(TEXT("compile_succeeded"), true);
     Changed->SetNumberField(TEXT("removed_node_count"), Request.OwnedNodeIds.Num());
     Changed->SetNumberField(TEXT("created_node_count"), LiveApplied.CreatedNodes.Num());
     Changed->SetNumberField(TEXT("conversion_node_count"), LiveApplied.ConversionNodeCount);
+    Changed->SetNumberField(TEXT("external_connection_count"), Request.ExternalConnections.Num());
+    if (Request.TargetKind == ETargetKind::Function)
+    {
+        Changed->SetStringField(TEXT("function_id"), Request.LogicUnitId);
+        Changed->SetStringField(TEXT("function_fingerprint"), NewBoundary.Fingerprint);
+    }
     TArray<TSharedPtr<FJsonValue>> Nodes;
     for (UEdGraphNode* Node : LiveApplied.CreatedNodes)
         Nodes.Add(MakeShared<FJsonValueObject>(
@@ -695,8 +971,12 @@ bool FUnrealMCPBlueprintBlockReplacementService::Execute(
         UnrealMCP::BlueprintFamilyPolicy::Classify(Blueprint->ParentClass).Name);
     OutResult->SetObjectField(TEXT("family_capabilities"),
         UnrealMCP::BlueprintFamilyPolicy::BuildLiveCapabilities(Blueprint));
-    OutResult->SetStringField(TEXT("edit"), TEXT("replace_function"));
-    OutResult->SetStringField(TEXT("function_id"), Request.FunctionId);
+    OutResult->SetStringField(TEXT("edit"), TEXT("replace_") + TargetKindString(Request.TargetKind));
+    OutResult->SetStringField(TEXT("target_kind"), TargetKindString(Request.TargetKind));
+    OutResult->SetStringField(TEXT("logic_unit_id"), Request.LogicUnitId);
+    OutResult->SetStringField(TEXT("graph_id"), Request.GraphId);
+    if (Request.TargetKind == ETargetKind::Function)
+        OutResult->SetStringField(TEXT("function_id"), Request.LogicUnitId);
     OutResult->SetStringField(TEXT("snapshot_id"), NewSnapshot);
     OutResult->SetBoolField(TEXT("package_dirty"), Blueprint->GetOutermost()->IsDirty());
     OutResult->SetObjectField(TEXT("changed"), Changed);

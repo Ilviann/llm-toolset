@@ -135,10 +135,115 @@ def author_blueprint_scenario(
     if not isinstance(function_node_id, str) or len(function_node_id) != 32:
         raise AssertionError(f"function replacement omitted its node identity: {function_replace!r}")
 
+    macro_inspection = collect_inspection(bridge, {
+        "mode": "inspect", "asset_path": asset_path,
+        "sections": ["macros"], "page_size": 100,
+    })
+    macro_records = [record for record in macro_inspection.get("records", [])
+                     if record.get("section") == "macro" and record.get("id") == macro_id]
+    if len(macro_records) != 1:
+        raise AssertionError(f"macro replacement boundary is unavailable: {macro_inspection!r}")
+    macro_boundary = macro_records[0].get("replacement_boundary", {})
+    macro_catalog = bridge.call("blueprint_action_catalog", {
+        "asset_path": asset_path,
+        "graph_id": macro_id,
+        "expected_snapshot": macro_inspection["snapshot_id"],
+        "node_family": "literal",
+        "owner_class": "/Script/Engine.KismetSystemLibrary",
+        "function": "MakeLiteralInt",
+        "limit": 5,
+    })
+    if not macro_catalog.get("actions"):
+        raise AssertionError(f"macro replacement literal action is unavailable: {macro_catalog!r}")
+    macro_replace = bridge.call("blueprint_block_replace", {
+        "operation_id": uuid.uuid4().hex,
+        "asset_path": asset_path,
+        "expected_snapshot": macro_inspection["snapshot_id"],
+        "target_kind": "macro",
+        "logic_unit_id": macro_id,
+        "graph_id": macro_id,
+        "expected_logic_unit_fingerprint": macro_boundary["logic_unit_fingerprint"],
+        "entry_node_id": macro_boundary["entry_node_id"],
+        "result_node_id": macro_boundary["result_node_id"],
+        "owned_node_ids": macro_boundary["owned_node_ids"],
+        "local_variable_ids": [],
+        "entry_position": {"x": -320, "y": 0},
+        "result_position": {"x": 640, "y": 0},
+        "nodes": [{
+            "key": "literal",
+            "action_id": macro_catalog["actions"][0]["action_id"],
+            "position": {"x": 0, "y": 0},
+        }],
+        "pin_defaults": [],
+        "connections": [{
+            "from": {"node_key": "literal", "pin_name": "ReturnValue"},
+            "to": {"node_key": "$result", "pin_name": "Result"},
+        }],
+        "external_connections": [],
+    })
+    macro_replace_node_id = macro_replace.get("changed", {}).get("nodes", [{}])[0].get("id")
+    if not isinstance(macro_replace_node_id, str):
+        raise AssertionError(f"macro replacement omitted its created node: {macro_replace!r}")
+
+    custom_inspection = collect_inspection(bridge, {
+        "mode": "inspect", "asset_path": asset_path,
+        "sections": ["custom_events"], "page_size": 100,
+    })
+    custom_records = [record for record in custom_inspection.get("records", [])
+                      if record.get("section") == "custom_event"
+                      and record.get("id") == custom_event_id]
+    if len(custom_records) != 1:
+        raise AssertionError(
+            f"custom-event replacement boundary is unavailable: {custom_inspection!r}")
+    custom_boundary = custom_records[0].get("replacement_boundary", {})
+    custom_catalog = bridge.call("blueprint_action_catalog", {
+        "asset_path": asset_path,
+        "graph_id": event_graph_id,
+        "expected_snapshot": custom_inspection["snapshot_id"],
+        "text": "Branch",
+        "node_family": "flow_control",
+        "limit": 50,
+    })
+    custom_branch_actions = [action for action in custom_catalog.get("actions", [])
+                             if str(action.get("title", "")).casefold() == "branch"]
+    if not custom_branch_actions:
+        raise AssertionError(
+            f"custom-event replacement Branch action is unavailable: {custom_catalog!r}")
+    custom_replace = bridge.call("blueprint_block_replace", {
+        "operation_id": uuid.uuid4().hex,
+        "asset_path": asset_path,
+        "expected_snapshot": custom_inspection["snapshot_id"],
+        "target_kind": "custom_event",
+        "logic_unit_id": custom_event_id,
+        "graph_id": event_graph_id,
+        "expected_logic_unit_fingerprint": custom_boundary["logic_unit_fingerprint"],
+        "entry_node_id": custom_boundary["entry_node_id"],
+        "owned_node_ids": custom_boundary["owned_node_ids"],
+        "local_variable_ids": [],
+        "entry_position": {"x": -320, "y": 240},
+        "nodes": [{
+            "key": "branch",
+            "action_id": custom_branch_actions[0]["action_id"],
+            "position": {"x": 0, "y": 240},
+        }],
+        "pin_defaults": [{
+            "endpoint": {"node_key": "branch", "pin_name": "Condition"},
+            "value": {"kind": "literal", "value": True},
+        }],
+        "connections": [{
+            "from": {"node_key": "$entry", "pin_name": "then"},
+            "to": {"node_key": "branch", "pin_name": "execute"},
+        }],
+        "external_connections": [],
+    })
+    custom_replace_node_id = custom_replace.get("changed", {}).get("nodes", [{}])[0].get("id")
+    if not isinstance(custom_replace_node_id, str):
+        raise AssertionError(f"custom-event replacement omitted its created node: {custom_replace!r}")
+
     graph_catalog = bridge.call("blueprint_action_catalog", {
         "asset_path": asset_path,
         "graph_id": event_graph_id,
-        "expected_snapshot": function_replace["snapshot_id"],
+        "expected_snapshot": custom_replace["snapshot_id"],
         "member": "Health",
         "node_family": "variable_get",
         "limit": 5,
@@ -149,7 +254,7 @@ def author_blueprint_scenario(
     graph_add_arguments = {
         "operation_id": graph_add_operation,
         "asset_path": asset_path,
-        "expected_snapshot": function_replace["snapshot_id"],
+        "expected_snapshot": custom_replace["snapshot_id"],
         "operation": "add_node",
         "graph_id": event_graph_id,
         "action_id": graph_catalog["actions"][0]["action_id"],
@@ -268,7 +373,9 @@ def author_blueprint_scenario(
         return matches[0]["id"]
     setter_exec_pin_id = exact_pin(setter_node_id, "input", "exec")
     setter_value_pin_id = exact_pin(setter_node_id, "input", "int", "Health")
-    custom_event_exec_pin_id = exact_pin(custom_event_id, "output", "exec")
+    custom_event_exec_source_node_id = custom_replace_node_id
+    custom_event_exec_pin_id = exact_pin(
+        custom_event_exec_source_node_id, "output", "exec", "then")
 
     pin_default_operation = uuid.uuid4().hex
     pin_default_arguments = {
@@ -291,7 +398,7 @@ def author_blueprint_scenario(
         "asset_path": asset_path,
         "operation": "connect_pins",
         "graph_id": event_graph_id,
-        "from_node_id": custom_event_id,
+        "from_node_id": custom_event_exec_source_node_id,
         "from_pin_id": custom_event_exec_pin_id,
         "to_node_id": setter_node_id,
         "to_pin_id": setter_exec_pin_id,
@@ -499,11 +606,48 @@ def author_blueprint_scenario(
     if not isinstance(conversion_node_id, str):
         raise AssertionError(f"conversion node identity is unavailable: {converted!r}")
 
-    begin_play_operation = uuid.uuid4().hex
-    send_without_reading(layout, "blueprint_graph_edit", {
-        "operation_id": begin_play_operation,
+    shared_print_add = add_exact_action(converted["snapshot_id"], {
+        "node_family": "function_call",
+        "owner_class": "/Script/Engine.KismetSystemLibrary",
+        "function": "PrintString",
+    }, {"x": 1840, "y": 480})
+    shared_print_node_id = shared_print_add.get("changed", {}).get("node", {}).get("id")
+    if not isinstance(shared_print_node_id, str):
+        raise AssertionError(f"shared PrintString identity is unavailable: {shared_print_add!r}")
+    shared_pin_inspection = collect_inspection(bridge, {
+        "mode": "inspect", "asset_path": asset_path, "sections": ["pins"],
+        "graph_id": event_graph_id, "page_size": 100,
+    })
+    shared_pin_records = [record for record in shared_pin_inspection.get("records", [])
+                          if record.get("section") == "pin"]
+    conversion_output_matches = [record for record in shared_pin_records
+                                 if record.get("node_id") == conversion_node_id
+                                 and record.get("direction") == "output"
+                                 and record.get("type", {}).get("category") == "string"]
+    shared_text_matches = [record for record in shared_pin_records
+                           if record.get("node_id") == shared_print_node_id
+                           and record.get("direction") == "input"
+                           and record.get("name") == "InString"]
+    if len(conversion_output_matches) != 1 or len(shared_text_matches) != 1:
+        raise AssertionError(
+            f"shared conversion pins are unavailable: {conversion_output_matches!r}, "
+            f"{shared_text_matches!r}")
+    conversion_output_pin_id = conversion_output_matches[0]["id"]
+    shared_data_connected = bridge.call("blueprint_graph_edit", {
+        "operation_id": uuid.uuid4().hex,
         "asset_path": asset_path,
-        "expected_snapshot": converted["snapshot_id"],
+        "expected_snapshot": shared_print_add["snapshot_id"],
+        "operation": "connect_pins",
+        "graph_id": event_graph_id,
+        "from_node_id": conversion_node_id,
+        "from_pin_id": conversion_output_pin_id,
+        "to_node_id": shared_print_node_id,
+        "to_pin_id": shared_text_matches[0]["id"],
+    })
+    begin_play_connected = bridge.call("blueprint_graph_edit", {
+        "operation_id": uuid.uuid4().hex,
+        "asset_path": asset_path,
+        "expected_snapshot": shared_data_connected["snapshot_id"],
         "operation": "connect_pins",
         "graph_id": event_graph_id,
         "from_node_id": begin_play_node_id,
@@ -511,14 +655,61 @@ def author_blueprint_scenario(
         "to_node_id": print_node_id,
         "to_pin_id": print_exec_pin_id,
     })
-    begin_play_status = reconcile_operation(bridge, begin_play_operation, capabilities["bridge_instance_id"])
-    begin_play_connected = begin_play_status.get("result") if begin_play_status.get("state") == "committed" else None
-    if not isinstance(begin_play_connected, dict) or begin_play_connected.get("changed", {}).get("connection", {}).get("direct") is not True:
-        raise AssertionError(f"lost BeginPlay direct-link response did not reconcile: {begin_play_status!r}")
-    compiled = bridge.call("blueprint_compile", {
+    event_inspection = collect_inspection(bridge, {
+        "mode": "inspect", "asset_path": asset_path, "sections": ["nodes", "pins"],
+        "graph_id": event_graph_id, "page_size": 100,
+    })
+    event_records = [record for record in event_inspection.get("records", [])
+                     if record.get("section") == "node"
+                     and record.get("id") == begin_play_node_id]
+    if len(event_records) != 1:
+        raise AssertionError(f"native-event replacement boundary is unavailable: {event_inspection!r}")
+    event_boundary = event_records[0].get("replacement_boundary", {})
+    event_catalog = bridge.call("blueprint_action_catalog", {
+        "asset_path": asset_path,
+        "graph_id": event_graph_id,
+        "expected_snapshot": begin_play_connected["snapshot_id"],
+        "node_family": "function_call",
+        "owner_class": "/Script/Engine.KismetSystemLibrary",
+        "function": "PrintString",
+        "limit": 5,
+    })
+    if not event_catalog.get("actions"):
+        raise AssertionError(f"event replacement PrintString action is unavailable: {event_catalog!r}")
+    event_replace = bridge.call("blueprint_block_replace", {
         "operation_id": uuid.uuid4().hex,
         "asset_path": asset_path,
         "expected_snapshot": begin_play_connected["snapshot_id"],
+        "target_kind": "event",
+        "logic_unit_id": begin_play_node_id,
+        "graph_id": event_graph_id,
+        "expected_logic_unit_fingerprint": event_boundary["logic_unit_fingerprint"],
+        "entry_node_id": event_boundary["entry_node_id"],
+        "owned_node_ids": event_boundary["owned_node_ids"],
+        "local_variable_ids": [],
+        "entry_position": {"x": 1120, "y": 0},
+        "nodes": [{
+            "key": "print",
+            "action_id": event_catalog["actions"][0]["action_id"],
+            "position": {"x": 1840, "y": 240},
+        }],
+        "pin_defaults": [],
+        "connections": [{
+            "from": {"node_key": "$entry", "pin_name": "then"},
+            "to": {"node_key": "print", "pin_name": "execute"},
+        }],
+        "external_connections": [{
+            "from": {"node_id": conversion_node_id, "pin_id": conversion_output_pin_id},
+            "to": {"node_key": "print", "pin_name": "InString"},
+        }],
+    })
+    print_node_id = event_replace.get("changed", {}).get("nodes", [{}])[0].get("id")
+    if not isinstance(print_node_id, str):
+        raise AssertionError(f"event replacement omitted its created node: {event_replace!r}")
+    compiled = bridge.call("blueprint_compile", {
+        "operation_id": uuid.uuid4().hex,
+        "asset_path": asset_path,
+        "expected_snapshot": event_replace["snapshot_id"],
     })
     if compiled.get("compile_succeeded") is not True or compiled.get("saved") is not False:
         raise AssertionError(f"explicit Blueprint compile contract mismatch: {compiled!r}")
@@ -556,6 +747,7 @@ def author_blueprint_scenario(
         "begin_play_node_id": begin_play_node_id,
         "conversion_node_id": conversion_node_id,
         "created_snapshot": created_snapshot,
+        "custom_event_exec_source_node_id": custom_event_exec_source_node_id,
         "custom_event_exec_pin_id": custom_event_exec_pin_id,
         "custom_event_id": custom_event_id,
         "function_id": function_id,
@@ -565,12 +757,15 @@ def author_blueprint_scenario(
         "literal_node_id": literal_node_id,
         "local_id": local_id,
         "macro_id": macro_id,
+        "macro_replace_node_id": macro_replace_node_id,
         "member_id": member_id,
         "notify_id": notify_id,
         "operator_node_id": operator_node_id,
         "print_node_id": print_node_id,
+        "custom_replace_node_id": custom_replace_node_id,
         "setter_exec_pin_id": setter_exec_pin_id,
         "setter_node_id": setter_node_id,
         "setter_value_pin_id": setter_value_pin_id,
+        "shared_print_node_id": shared_print_node_id,
         "temporary_node_id": temporary_node_id,
     }

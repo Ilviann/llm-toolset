@@ -36,6 +36,10 @@ for (const TPair<UBlueprint*, FString>& Owner : Owners)
             const bool bLocalOwner = Owner.Key == Blueprint;
             const bool bOverride = Event->IsOverride();
             const bool bEditable = bLocalOwner && !bOverride && Event->IsEditable() && EventId.Len() == 32;
+            UnrealMCP::BlueprintLogicUnitFingerprint::FBoundary ReplacementBoundary;
+            const bool bReplaceableBoundary =
+                UnrealMCP::BlueprintLogicUnitFingerprint::DescribeEventHandler(
+                    EventGraph, Event, ReplacementBoundary);
             const TSharedRef<FJsonObject> Signature = CustomEventSignature(Event);
             const TSharedRef<FJsonObject> References = CustomEventReferences(Blueprint, Event);
             if (Sections.Contains(TEXT("custom_events")))
@@ -61,6 +65,8 @@ for (const TPair<UBlueprint*, FString>& Owner : Owners)
                 Required->SetBoolField(TEXT("event_node_present"), true);
                 Required->SetBoolField(TEXT("valid"), FBlueprintEditorUtils::IsEventGraph(EventGraph));
                 Value->SetObjectField(TEXT("required_nodes"), Required);
+                Value->SetObjectField(TEXT("replacement_boundary"), ReplacementBoundaryRecord(
+                    ReplacementBoundary, bEditable && bReplaceableBoundary));
                 AddRecord(Sink.Records, Value);
             }
             int32 ParameterIndex = 0;
@@ -163,6 +169,17 @@ for (const TPair<UEdGraph*, FString>& Entry : Graphs)
             Value->SetStringField(TEXT("title"), Node->GetNodeTitle(ENodeTitleType::ListView).ToString().Left(256));
             Value->SetNumberField(TEXT("x"), Node->NodePosX);
             Value->SetNumberField(TEXT("y"), Node->NodePosY);
+            if (OwnerBlueprint == Blueprint && Kind == TEXT("event")
+                && Node->IsA<UK2Node_Event>() && !Node->IsA<UK2Node_CustomEvent>())
+            {
+                UnrealMCP::BlueprintLogicUnitFingerprint::FBoundary ReplacementBoundary;
+                const bool bReplaceableBoundary =
+                    UnrealMCP::BlueprintLogicUnitFingerprint::DescribeEventHandler(
+                        Graph, Node, ReplacementBoundary);
+                Value->SetStringField(TEXT("node_kind"), TEXT("event_root"));
+                Value->SetObjectField(TEXT("replacement_boundary"), ReplacementBoundaryRecord(
+                    ReplacementBoundary, bReplaceableBoundary && NodeId.Len() == 32));
+            }
             AddRecord(Sink.Records, Value);
         }
         Sink.Fingerprint.Add(TEXT("node|") + GraphId + TEXT("|") + NodeId + TEXT("|") + Node->GetClass()->GetPathName()

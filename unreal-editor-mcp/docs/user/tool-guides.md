@@ -2,7 +2,7 @@
 
 This page is the navigation entry point for every released tool family. For installation, first connection, and the concise contract overview, start with the [project README](../../README.md).
 
-Unreal Editor MCP 0.32.2 is an offline-first MCP bridge for Unreal Engine 5.8+. It pairs a dependency-free Python 3.10+ stdio server with an editor-only C++ plugin. Readonly mode is the default and exposes these nine tools in deterministic order:
+Unreal Editor MCP 0.33.0 is an offline-first MCP bridge for Unreal Engine 5.8+. It pairs a dependency-free Python 3.10+ stdio server with an editor-only C++ plugin. Readonly mode is the default and exposes these nine tools in deterministic order:
 
 - `capabilities` always reports the configured project name/hash and Python surface. With an active bridge it also reports exact plugin/Unreal versions, commands, features, listener state, effective limits, and the Blueprint-family matrix; otherwise `native_capabilities_available` and `bridge_ready` are false and native-only fields are absent.
 - `editor_state` reports project identity, bridge readiness, play/simulate/save/GC state, and concise queued-operation state.
@@ -22,7 +22,7 @@ Starting the server with `--writable` is an explicit trust decision and exposes 
 - `level_actor_edit` prevalidates and transactionally applies one bounded stale-safe Actor/component batch without saving.
 - `level_save` explicitly saves the returned current-map package set and verifies requested identities and values by inspection or reload.
 - `blueprint_graph_edit` creates, moves, removes, configures, or connects graph nodes and pins, including wildcard specialization and explicitly requested bounded conversions.
-- `blueprint_block_replace` atomically replaces one complete user-owned function after an isolated scratch compile and exact boundary preconditions.
+- `blueprint_block_replace` atomically replaces one complete user-owned function, local macro, custom-event handler, or native-event-rooted handler after an isolated scratch compile and exact boundary preconditions.
 - `blueprint_create` creates, compiles, saves, and verifies one new supported Blueprint family without overwriting content.
 - `blueprint_compile` explicitly compiles one mutable supported-family Blueprint and returns bounded diagnostics.
 - `blueprint_save` explicitly saves one mutable supported-family Blueprint package without interactive dialogs.
@@ -91,9 +91,9 @@ See [Blueprint graph authoring](graph-authoring.md#blueprint-action-catalog).
 
 See [Blueprint graph authoring](graph-authoring.md#graph-node-lifecycle).
 
-## Complete function replacement
+## Complete logic-unit replacement
 
-See [Blueprint graph authoring](graph-authoring.md#complete-function-replacement).
+See [Blueprint graph authoring](graph-authoring.md#complete-logic-unit-replacement).
 
 ## Complete atomic pin and connection editing
 

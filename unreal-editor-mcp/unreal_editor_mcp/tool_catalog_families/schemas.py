@@ -215,6 +215,28 @@ _BLOCK_CONVERTED_CONNECTION = {
 _BLOCK_CONNECTION = {
     "oneOf": [_BLOCK_DIRECT_CONNECTION, _BLOCK_CONVERTED_CONNECTION],
 }
+_BLOCK_EXTERNAL_ENDPOINT = {
+    "type": "object",
+    "properties": {"node_id": _NODE_ID, "pin_id": _PIN_ID},
+    "required": ["node_id", "pin_id"],
+    "additionalProperties": False,
+}
+_BLOCK_EXTERNAL_CONNECTION = {
+    "oneOf": [
+        {
+            "type": "object",
+            "properties": {"from": _BLOCK_PIN_ENDPOINT, "to": _BLOCK_EXTERNAL_ENDPOINT},
+            "required": ["from", "to"],
+            "additionalProperties": False,
+        },
+        {
+            "type": "object",
+            "properties": {"from": _BLOCK_EXTERNAL_ENDPOINT, "to": _BLOCK_PIN_ENDPOINT},
+            "required": ["from", "to"],
+            "additionalProperties": False,
+        },
+    ],
+}
 _MEMBER_METADATA = {
     "type": "object",
     "properties": {

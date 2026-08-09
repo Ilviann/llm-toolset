@@ -12,7 +12,7 @@ released_in: null
 
 **Depends on:**
 
-- [`event-macro-replace`](event-macro-replace.md)
+- [`event-macro-replace`](../completed/event-macro-replace.md)
 
 ### Implementation
 

@@ -21,8 +21,10 @@ def verify_restarted_blueprints(
     begin_play_node_id = scenario["begin_play_node_id"]
     conversion_node_id = scenario["conversion_node_id"]
     created_snapshot = scenario["created_snapshot"]
+    custom_event_exec_source_node_id = scenario["custom_event_exec_source_node_id"]
     custom_event_exec_pin_id = scenario["custom_event_exec_pin_id"]
     custom_event_id = scenario["custom_event_id"]
+    custom_replace_node_id = scenario["custom_replace_node_id"]
     function_id = scenario["function_id"]
     function_node_id = scenario["function_node_id"]
     graph_node_id = scenario["graph_node_id"]
@@ -30,6 +32,7 @@ def verify_restarted_blueprints(
     literal_node_id = scenario["literal_node_id"]
     local_id = scenario["local_id"]
     macro_id = scenario["macro_id"]
+    macro_replace_node_id = scenario["macro_replace_node_id"]
     member_id = scenario["member_id"]
     notify_id = scenario["notify_id"]
     operator_node_id = scenario["operator_node_id"]
@@ -37,6 +40,7 @@ def verify_restarted_blueprints(
     setter_exec_pin_id = scenario["setter_exec_pin_id"]
     setter_node_id = scenario["setter_node_id"]
     setter_value_pin_id = scenario["setter_value_pin_id"]
+    shared_print_node_id = scenario["shared_print_node_id"]
     temporary_node_id = scenario["temporary_node_id"]
 
     phase_two_reloaded = collect_inspection(reloaded_bridge, {
@@ -224,6 +228,10 @@ def verify_restarted_blueprints(
         raise AssertionError(f"macro shell changed after restart: {macros!r}")
     if macros[0].get("signature", {}).get("pure") is not True:
         raise AssertionError(f"macro signature changed after restart: {macros!r}")
+    macro_boundary = macros[0].get("replacement_boundary", {})
+    if macro_replace_node_id not in macro_boundary.get("owned_node_ids", []) \
+            or not macro_boundary.get("logic_unit_fingerprint"):
+        raise AssertionError(f"macro replacement boundary changed after restart: {macro_boundary!r}")
     custom_events = [
         record for record in reloaded.get("records", [])
         if record.get("section") == "custom_event" and record.get("id") == custom_event_id
@@ -235,6 +243,11 @@ def verify_restarted_blueprints(
     if custom_events[0].get("metadata", {}).get("rpc_mode") != "server" \
             or custom_events[0].get("metadata", {}).get("reliability") != "reliable":
         raise AssertionError(f"custom-event RPC semantics changed after restart: {custom_events!r}")
+    custom_boundary = custom_events[0].get("replacement_boundary", {})
+    if custom_replace_node_id not in custom_boundary.get("owned_node_ids", []) \
+            or not custom_boundary.get("logic_unit_fingerprint"):
+        raise AssertionError(
+            f"custom-event replacement boundary changed after restart: {custom_boundary!r}")
     nodes = {
         record.get("id"): record
         for record in reloaded.get("records", [])
@@ -262,7 +275,7 @@ def verify_restarted_blueprints(
         raise AssertionError(f"Phase 12 pin default changed after restart: {setter_pins.get(setter_value_pin_id)!r}")
     connections = [record for record in reloaded.get("records", []) if record.get("section") == "connection"]
     expected_connection = {
-        "from_node_id": custom_event_id,
+        "from_node_id": custom_event_exec_source_node_id,
         "from_pin_id": custom_event_exec_pin_id,
         "to_node_id": setter_node_id,
         "to_pin_id": setter_exec_pin_id,
@@ -273,6 +286,7 @@ def verify_restarted_blueprints(
         literal_node_id: "literal",
         operator_node_id: "specialized operator",
         print_node_id: "PrintString",
+        shared_print_node_id: "shared PrintString",
         begin_play_node_id: "BeginPlay",
         conversion_node_id: "conversion",
     }.items():
@@ -283,10 +297,20 @@ def verify_restarted_blueprints(
                    for record in connections)
     if not has_connection(literal_node_id, operator_node_id):
         raise AssertionError("Phase 13 wildcard-specialized input link changed after restart")
-    if not has_connection(operator_node_id, conversion_node_id) or not has_connection(conversion_node_id, print_node_id):
+    if not has_connection(operator_node_id, conversion_node_id) \
+            or not has_connection(conversion_node_id, print_node_id) \
+            or not has_connection(conversion_node_id, shared_print_node_id):
         raise AssertionError("Phase 13 explicit conversion path changed after restart")
     if not has_connection(begin_play_node_id, print_node_id):
         raise AssertionError("Phase 13 BeginPlay behavior link changed after restart")
+    begin_play_boundary = nodes[begin_play_node_id].get("replacement_boundary", {})
+    if print_node_id not in begin_play_boundary.get("owned_node_ids", []) \
+            or not begin_play_boundary.get("logic_unit_fingerprint") \
+            or not any(link.get("from_node_id") == conversion_node_id
+                       and link.get("to_node_id") == print_node_id
+                       for link in begin_play_boundary.get("external_links", [])):
+        raise AssertionError(
+            f"native-event replacement boundary changed after restart: {begin_play_boundary!r}")
     event_graphs = [
         record for record in reloaded.get("records", [])
         if record.get("section") == "graph" and record.get("kind") == "event" and record.get("inherited") is False
