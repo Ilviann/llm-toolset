@@ -55,7 +55,7 @@ class ReleaseContractTests(unittest.TestCase):
         native = re.search(r'Version\[\].*TEXT\("([^"]+)"\)', header)
         self.assertIsNotNone(native)
         versions = {project["project"]["version"], plugin["VersionName"], native.group(1), unreal_editor_mcp.__version__}
-        self.assertEqual(versions, {"0.32.0"})
+        self.assertEqual(versions, {"0.32.2"})
 
     def test_companion_api_and_companion_versions_are_internally_consistent(self):
         base = json.loads((ROOT / "plugin/UnrealMCP/UnrealMCP.uplugin").read_text(encoding="utf-8"))
@@ -81,8 +81,17 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertEqual(gas["VersionName"], gas_version.group(1))
         self.assertNotEqual(fixture["VersionName"], base["VersionName"])
         self.assertNotEqual(gas["VersionName"], base["VersionName"])
+        self.assertEqual(base["Modules"][0]["LoadingPhase"], "PostEngineInit")
+        self.assertEqual(fixture["Modules"][0]["LoadingPhase"], "None")
+        self.assertEqual(gas["Modules"][0]["LoadingPhase"], "None")
         self.assertEqual(fixture["unreal_mcp_companion"]["schema_revision"], 1)
         self.assertEqual(gas["unreal_mcp_companion"]["schema_revision"], 1)
+
+        registry = (
+            ROOT
+            / "plugin/UnrealMCP/Source/UnrealMCP/Private/UnrealMCPExtensionRegistry.cpp"
+        ).read_text(encoding="utf-8")
+        self.assertIn("LoadModuleWithFailureReason", registry)
 
     def test_gas_companion_is_read_only_bounded_and_keeps_base_gas_free(self):
         base_build = (ROOT / "plugin/UnrealMCP/Source/UnrealMCP/UnrealMCP.Build.cs").read_text(encoding="utf-8")

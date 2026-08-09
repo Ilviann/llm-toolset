@@ -145,6 +145,42 @@ class WindowsDeploymentScriptTests(unittest.TestCase):
             self.assertIn(f"-Plugin={deploy.package_plugin.GAS_DESCRIPTOR}", command)
             self.assertIn(f"-Dependencies={deploy.package_plugin.PLUGIN_DESCRIPTOR}", command)
 
+    def test_run_packaging_restores_gas_descriptor_contract_before_verification(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary) / "Package"
+            output.mkdir()
+            (output / deploy.package_plugin.GAS_DESCRIPTOR.name).write_text(
+                json.dumps({"Installed": True, "EngineVersion": "5.8.0"}),
+                encoding="utf-8",
+            )
+            binary = output / "Binaries/Win64/UnrealEditor-UnrealMCPGAS.dll"
+            binary.parent.mkdir(parents=True)
+            binary.write_bytes(b"binary")
+            process = mock.Mock()
+            process.stdout = iter(())
+            process.wait.return_value = 0
+            with (
+                mock.patch.object(deploy, "build_command", return_value=["RunUAT.bat"]),
+                mock.patch.object(deploy.subprocess, "Popen", return_value=process),
+            ):
+                deploy.run_packaging(
+                    Path("C:/UE_5.8"), output, lambda message: None, deploy.GAS_PLUGIN
+                )
+
+            descriptor = json.loads(
+                (output / deploy.package_plugin.GAS_DESCRIPTOR.name).read_text(
+                    encoding="utf-8"
+                )
+            )
+            self.assertEqual(descriptor["companion_api_version"], 1)
+            self.assertEqual(
+                descriptor["unreal_mcp_companion"]["owning_module"], "UnrealMCPGAS"
+            )
+            self.assertEqual(descriptor["Modules"][0]["LoadingPhase"], "None")
+            self.assertFalse(descriptor["EnabledByDefault"])
+            self.assertTrue(descriptor["Installed"])
+            self.assertEqual(descriptor["EngineVersion"], "5.8.0")
+
     def test_engine_validation_rejects_unsupported_version(self):
         with tempfile.TemporaryDirectory() as temporary:
             engine = Path(temporary) / "UE_5.7"

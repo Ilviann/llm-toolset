@@ -112,7 +112,7 @@ On Windows, run `python scripts/run_headless_integration.py --readonly-lifecycle
 
 ## Binary plugin packaging
 
-`scripts/package_plugin.py` invokes the configured engine's platform-appropriate `RunUAT` launcher with the standard `BuildPlugin` command. It accepts the engine only through `UE58` or the explicit `--engine-root` override, keeps the plugin descriptor fixed to `plugin/UnrealMCP/UnrealMCP.uplugin`, and passes every UAT argument as a subprocess array. On macOS it also requires `UNREAL_MCP_DEVELOPER_DIR`, `DEVELOPER_DIR`, or `--developer-dir` and exports the resolved value as `DEVELOPER_DIR` for the child build.
+`scripts/package_plugin.py` invokes the configured engine's platform-appropriate `RunUAT` launcher with the standard `BuildPlugin` command. It accepts the engine only through `UE58` or the explicit `--engine-root` override, keeps base and companion descriptors fixed to repository-owned paths, and passes every UAT argument as a subprocess array. After UAT completes, the wrapper restores every source-owned descriptor field while retaining UAT ownership of `Installed` and `EngineVersion`; verification rejects stripped companion API metadata, companion identity, load phase, default enablement, dependencies, or other source contracts. On macOS it also requires `UNREAL_MCP_DEVELOPER_DIR`, `DEVELOPER_DIR`, or `--developer-dir` and exports the resolved value as `DEVELOPER_DIR` for the child build.
 
 From the application directory, package for the host's installed platforms with:
 
@@ -120,7 +120,7 @@ From the application directory, package for the host's installed platforms with:
 python3 scripts/package_plugin.py
 ```
 
-The default destination is the workspace-level `build/unreal-editor-mcp` directory. AutomationTool clears this destination before packaging, so the wrapper rejects broad, source-overlapping, engine-overlapping, and other protected output paths before launch. After a successful UAT exit, the wrapper requires the output descriptor to have `Installed: true` and requires at least one file under `Binaries/`.
+The default destination is the workspace-level `build/unreal-editor-mcp` directory. AutomationTool clears this destination before packaging, so the wrapper rejects broad, source-overlapping, engine-overlapping, and other protected output paths before launch. After a successful UAT exit, the wrapper restores and verifies the complete bounded descriptor contract, requires `Installed: true`, and requires at least one file under `Binaries/`.
 
 Use `--target-platforms` with Unreal's `+`-separated platform names when the installed engine and host toolchain support an explicit target set. Use `--dry-run` to validate paths and show the exact command without changing the output. The workflow must remain offline; prepare every engine platform component and compiler toolchain before packaging.
 

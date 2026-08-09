@@ -4,7 +4,7 @@
 
 namespace UnrealMCPGAS
 {
-inline constexpr TCHAR Version[] = TEXT("0.2.0");
+inline constexpr TCHAR Version[] = TEXT("0.2.1");
 inline constexpr int32 CompanionApiVersion = 1;
 inline constexpr int32 ExtensionSchemaRevision = 1;
 inline constexpr int32 MaxTagsPerContainer = 256;

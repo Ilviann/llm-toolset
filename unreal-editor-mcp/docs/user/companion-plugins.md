@@ -4,7 +4,7 @@ Companion plugins are optional trusted native editor plugins that extend existin
 
 ## Install and enable
 
-Install the base plugin and companion as separate plugin directories, then enable both for the project. The companion descriptor must depend on `UnrealMCP`, declare exact `companion_api_version: 1`, and identify its extension under `unreal_mcp_companion`. Restart Unreal Editor after any enablement or binary change; live enablement and hot replacement are intentionally unsupported.
+Install the base plugin and companion as separate plugin directories, then enable both for the project. The companion descriptor must depend on `UnrealMCP`, declare exact `companion_api_version: 1`, identify its extension under `unreal_mcp_companion`, and set its module `LoadingPhase` to `None` so only the initialized base registry loads it. Restart Unreal Editor after any enablement or binary change; live enablement and hot replacement are intentionally unsupported.
 
 Base and companion semantic versions are independent. Compatibility depends on exact agreement among the base descriptor/compiled API version and the companion descriptor/compiled API version, plus the supported extension-schema revision. Required Engine plugins and modules must already be installed, enabled, and loaded.
 
@@ -22,8 +22,8 @@ With `UE58` set to the Unreal Engine 5.8 installation root, authors can package 
 python scripts/package_plugin.py --target-platforms Win64 --companion-fixture
 ```
 
-Package the released `UnrealMCPGAS` 0.2.0 Gameplay Ability and Gameplay Effect inspection companion with `--gas-companion`; it requires a compatible base package. On Windows, select the GAS checkbox in the graphical deployment helper to build, verify, and install both packages in one transaction.
+Package the released `UnrealMCPGAS` 0.2.1 Gameplay Ability and Gameplay Effect inspection companion with `--gas-companion`; it requires a compatible base package. On Windows, select the GAS checkbox in the graphical deployment helper to build, verify, and install both packages in one transaction.
 
-Released companions use the same UAT `BuildPlugin` contract with their own descriptor, and install their compatible base package separately. If a companion is unavailable, check enablement and restart state, exact descriptor/compiled API/schema values, owning module identity, and required Engine plugin/module state. A companion must not expose runtime schemas, arbitrary property paths, listener settings, or credentials.
+Released companions use the same UAT `BuildPlugin` contract with their own descriptor, and install their compatible base package separately. The packaging wrapper restores and verifies source-owned descriptor fields that UAT may omit. If a companion is unavailable, check enablement and restart state, exact descriptor/compiled API/schema values, owning module identity and load phase, and required Engine plugin/module state. A companion must not expose runtime schemas, arbitrary property paths, listener settings, or credentials.
 
 [Setup](setup-and-operation.md) · [Tool guides](tool-guides.md) · [Native author contract](../types/companion-extension-registry/index.md)

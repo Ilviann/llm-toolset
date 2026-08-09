@@ -1,12 +1,12 @@
 # Unreal Editor MCP
 
-Unreal Editor MCP 0.32.0 is an offline-first MCP bridge for Unreal Engine 5.8+. It pairs a dependency-free Python 3.10+ stdio server with an editor-only C++ plugin.
+Unreal Editor MCP 0.32.2 is an offline-first MCP bridge for Unreal Engine 5.8+. It pairs a dependency-free Python 3.10+ stdio server with an editor-only C++ plugin.
 
 Readonly access is the released default. Project-content mutation requires the explicit `--writable` trust decision; optional editor lifecycle control remains independent.
 
 Optional independently versioned companion plugins can add bounded typed branches to existing tools through companion API v1. Native registrations are intersected with exact Python schemas; readonly mode exposes only inspection contributions and `--writable` remains mandatory for mutations. See the [companion plugin guide](docs/user/companion-plugins.md).
 
-The optional `UnrealMCPGAS` 0.2.0 companion adds bounded read-only discovery and typed inspection of Gameplay Ability and data-only Gameplay Effect Blueprints without adding GAS dependencies to the base plugin. The Windows graphical deployment helper can build and install it alongside the base plugin. See the [Gameplay Ability](docs/user/gameplay-ability-blueprints.md) and [Gameplay Effect](docs/user/gameplay-effects.md) guides.
+The optional `UnrealMCPGAS` 0.2.1 companion adds bounded read-only discovery and typed inspection of Gameplay Ability and data-only Gameplay Effect Blueprints without adding GAS dependencies to the base plugin. The Windows graphical deployment helper can build and install it alongside the base plugin. See the [Gameplay Ability](docs/user/gameplay-ability-blueprints.md) and [Gameplay Effect](docs/user/gameplay-effects.md) guides.
 
 ## Installation
 
@@ -26,7 +26,7 @@ Python 3.10 or newer with tkinter is required. The build and installation are of
 
 1. Copy [`plugin/UnrealMCP`](plugin/UnrealMCP) to `<YourProject>/Plugins/UnrealMCP`, or add this repository's `plugin/` directory to `AdditionalPluginDirectories` in a disposable development `.uproject`.
 2. Enable `UnrealMCP` and compile the project's Editor target with Unreal Engine 5.8 or newer.
-3. Open the project and wait for `Unreal MCP 0.32.0 ready on 127.0.0.1:15485` in the editor log.
+3. Open the project and wait for `Unreal MCP 0.32.2 ready on 127.0.0.1:15485` in the editor log.
 4. Create a virtual environment and install the Python package offline:
 
    ```sh

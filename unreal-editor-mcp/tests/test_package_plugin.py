@@ -1,6 +1,7 @@
 import contextlib
 import importlib.util
 import io
+import json
 import os
 import tempfile
 import unittest
@@ -142,23 +143,80 @@ class PackagePluginScriptTests(unittest.TestCase):
     def test_package_verification_requires_installed_descriptor_and_binary(self):
         with tempfile.TemporaryDirectory() as temporary:
             output = Path(temporary)
+            descriptor = json.loads(
+                package_plugin.PLUGIN_DESCRIPTOR.read_text(encoding="utf-8")
+            )
+            descriptor["Installed"] = True
             (output / package_plugin.PLUGIN_DESCRIPTOR.name).write_text(
-                '{"Installed": true}', encoding="utf-8"
+                json.dumps(descriptor), encoding="utf-8"
             )
             binary = output / "Binaries" / "Mac" / "UnrealEditor-UnrealMCP.dylib"
             binary.parent.mkdir(parents=True)
             binary.write_bytes(b"binary")
             package_plugin.verify_package(output)
 
+    def test_descriptor_restoration_preserves_uat_fields_and_source_contract(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary)
+            packaged_path = output / package_plugin.GAS_DESCRIPTOR.name
+            packaged_path.write_text(
+                json.dumps({"Installed": True, "EngineVersion": "5.8.0"}),
+                encoding="utf-8",
+            )
+
+            package_plugin.restore_source_descriptor_contract(
+                output, package_plugin.GAS_DESCRIPTOR
+            )
+
+            packaged = json.loads(packaged_path.read_text(encoding="utf-8"))
+            source = json.loads(package_plugin.GAS_DESCRIPTOR.read_text(encoding="utf-8"))
+            for field, value in source.items():
+                if field not in package_plugin.PACKAGING_OWNED_DESCRIPTOR_FIELDS:
+                    self.assertEqual(packaged[field], value)
+            self.assertTrue(packaged["Installed"])
+            self.assertEqual(packaged["EngineVersion"], "5.8.0")
+
+    def test_package_verification_rejects_stripped_descriptor_contract(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary)
+            descriptor = json.loads(
+                package_plugin.GAS_DESCRIPTOR.read_text(encoding="utf-8")
+            )
+            descriptor["Installed"] = True
+            descriptor.pop("companion_api_version")
+            (output / package_plugin.GAS_DESCRIPTOR.name).write_text(
+                json.dumps(descriptor), encoding="utf-8"
+            )
+            binary = output / "Binaries" / "Win64" / "UnrealEditor-UnrealMCPGAS.dll"
+            binary.parent.mkdir(parents=True)
+            binary.write_bytes(b"binary")
+
+            with self.assertRaisesRegex(
+                package_plugin.PackagingError, "companion_api_version"
+            ):
+                package_plugin.verify_package(output, package_plugin.GAS_DESCRIPTOR)
+
+    def test_descriptor_reader_rejects_oversized_output(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            descriptor = Path(temporary) / "Oversized.uplugin"
+            descriptor.write_bytes(b" " * (package_plugin.MAX_PLUGIN_DESCRIPTOR_BYTES + 1))
+            with self.assertRaisesRegex(package_plugin.PackagingError, "larger than 1 MiB"):
+                package_plugin.read_plugin_descriptor(descriptor)
+
     def test_package_verification_rejects_non_installed_or_binary_free_output(self):
         with tempfile.TemporaryDirectory() as temporary:
             output = Path(temporary)
             descriptor = output / package_plugin.PLUGIN_DESCRIPTOR.name
-            descriptor.write_text('{"Installed": false}', encoding="utf-8")
+            value = json.loads(
+                package_plugin.PLUGIN_DESCRIPTOR.read_text(encoding="utf-8")
+            )
+            value["Installed"] = False
+            descriptor.write_text(json.dumps(value), encoding="utf-8")
             with self.assertRaises(package_plugin.PackagingError):
                 package_plugin.verify_package(output)
 
-            descriptor.write_text('{"Installed": true}', encoding="utf-8")
+            value["Installed"] = True
+            descriptor.write_text(json.dumps(value), encoding="utf-8")
             with self.assertRaises(package_plugin.PackagingError):
                 package_plugin.verify_package(output)
 

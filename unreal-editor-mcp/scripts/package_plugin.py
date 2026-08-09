@@ -26,6 +26,8 @@ DEFAULT_OUTPUT = WORKSPACE_ROOT / "build" / "unreal-editor-mcp"
 DEFAULT_FIXTURE_OUTPUT = WORKSPACE_ROOT / "build" / "unreal-mcp-test-companion"
 DEFAULT_GAS_OUTPUT = WORKSPACE_ROOT / "build" / "unreal-mcp-gas"
 ENGINE_ROOT_ENV = "UE58"
+MAX_PLUGIN_DESCRIPTOR_BYTES = 1024 * 1024
+PACKAGING_OWNED_DESCRIPTOR_FIELDS = frozenset({"EngineVersion", "Installed"})
 _PLATFORM_NAME = re.compile(r"^[A-Za-z][A-Za-z0-9_]*$")
 
 
@@ -102,6 +104,41 @@ def normalize_target_platforms(value: str | None) -> str | None:
     return "+".join(names)
 
 
+def read_plugin_descriptor(path: Path) -> dict[str, object]:
+    try:
+        size = path.stat().st_size
+    except OSError as error:
+        raise PackagingError(f"plugin descriptor is unavailable: {path}") from error
+    if size > MAX_PLUGIN_DESCRIPTOR_BYTES:
+        raise PackagingError(f"plugin descriptor is larger than 1 MiB: {path}")
+    try:
+        value = json.loads(path.read_text(encoding="utf-8-sig"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        raise PackagingError(f"plugin descriptor is unreadable JSON: {path}: {error}") from error
+    if not isinstance(value, dict):
+        raise PackagingError(f"plugin descriptor must contain one JSON object: {path}")
+    return value
+
+
+def restore_source_descriptor_contract(output: Path, source_descriptor: Path) -> None:
+    """Restore fields UAT may omit while retaining package-owned output metadata."""
+    packaged_path = output / source_descriptor.name
+    packaged = read_plugin_descriptor(packaged_path)
+    source = read_plugin_descriptor(source_descriptor)
+    for field, value in source.items():
+        if field not in PACKAGING_OWNED_DESCRIPTOR_FIELDS:
+            packaged[field] = value
+    try:
+        packaged_path.write_text(
+            json.dumps(packaged, indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+    except OSError as error:
+        raise PackagingError(
+            f"could not restore packaged plugin descriptor: {packaged_path}: {error}"
+        ) from error
+
+
 def build_command(
     run_uat: Path,
     output: Path,
@@ -164,12 +201,17 @@ def verify_package(output: Path, plugin_descriptor: Path = PLUGIN_DESCRIPTOR) ->
     descriptor_path = output / plugin_descriptor.name
     if not descriptor_path.is_file():
         raise PackagingError(f"packaging completed without the plugin descriptor: {descriptor_path}")
-    try:
-        descriptor = json.loads(descriptor_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as error:
-        raise PackagingError(f"packaged plugin descriptor is unreadable: {error}") from error
+    descriptor = read_plugin_descriptor(descriptor_path)
     if descriptor.get("Installed") is not True:
         raise PackagingError("packaged plugin descriptor is not marked Installed")
+    source = read_plugin_descriptor(plugin_descriptor)
+    for field, value in source.items():
+        if field not in PACKAGING_OWNED_DESCRIPTOR_FIELDS and (
+            field not in descriptor or descriptor[field] != value
+        ):
+            raise PackagingError(
+                f"packaged plugin descriptor changed source-owned field: {field}"
+            )
 
     binaries = output / "Binaries"
     if not binaries.is_dir() or not any(path.is_file() for path in binaries.rglob("*")):
@@ -281,6 +323,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if result.returncode != 0:
         return result.returncode
     try:
+        restore_source_descriptor_contract(output, plugin_descriptor)
         verify_package(output, plugin_descriptor)
     except PackagingError as error:
         print(f"Packaging verification failed: {error}", file=sys.stderr)

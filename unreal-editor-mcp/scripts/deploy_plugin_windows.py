@@ -344,6 +344,7 @@ def run_packaging(
     if return_code != 0:
         raise DeploymentError(f"Unreal AutomationTool failed with exit code {return_code}")
     try:
+        package_plugin.restore_source_descriptor_contract(output, plugin.descriptor)
         package_plugin.verify_package(output, plugin.descriptor)
     except package_plugin.PackagingError as error:
         raise DeploymentError(str(error)) from error

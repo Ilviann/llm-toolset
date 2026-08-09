@@ -16,7 +16,7 @@ Magnitudes are decoded only as scalable float, attribute based, custom calculati
 
 The family appears only when the exact companion/API/schema/dependency registration and Python catalog entry are ready. `features.gas_gameplay_effects_inspection` reports read support and `features.gas_gameplay_effects_mutation` remains false. The family matrix enables discovery and inspection only; component, member, graph, action-catalog, create, compile, save, and default-edit operations reject through existing base policy.
 
-`UnrealMCPGAS` is independently versioned at 0.2.0. Global companion API v1 and schema revision 1 are unchanged because the existing registry already supports multiple contributions from one companion.
+`UnrealMCPGAS` is independently versioned at 0.2.1. Global companion API v1 and schema revision 1 are unchanged; 0.2.1 changes only startup ordering and descriptor preservation.
 
 ## Verification
 

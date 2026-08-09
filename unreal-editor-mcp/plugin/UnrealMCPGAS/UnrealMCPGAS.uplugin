@@ -1,7 +1,7 @@
 {
   "FileVersion": 3,
-  "Version": 20000,
-  "VersionName": "0.2.0",
+  "Version": 20001,
+  "VersionName": "0.2.1",
   "companion_api_version": 1,
   "FriendlyName": "Unreal MCP Gameplay Ability System",
   "Description": "Optional read-only Gameplay Ability and Gameplay Effect Blueprint inspection companion for Unreal MCP.",
@@ -32,7 +32,7 @@
     {
       "Name": "UnrealMCPGAS",
       "Type": "Editor",
-      "LoadingPhase": "PostEngineInit"
+      "LoadingPhase": "None"
     }
   ]
 }

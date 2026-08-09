@@ -1,6 +1,6 @@
 # Gameplay Effect inspection
 
-Install and enable the base `UnrealMCP` plugin, optional `UnrealMCPGAS` 0.2.0 companion, and Engine Gameplay Ability System plugin, then restart Unreal Editor. The base and companion versions are independent; companion API v1 and schema revision 1 must match the base and Python catalog exactly.
+Install and enable the base `UnrealMCP` plugin, optional `UnrealMCPGAS` 0.2.1 companion, and Engine Gameplay Ability System plugin, then restart Unreal Editor. The base and companion versions are independent; companion API v1 and schema revision 1 must match the base and Python catalog exactly.
 
 Call `capabilities` first. The `unreal-mcp-gas` companion must report `effective_ready: true`, `features.gas_gameplay_effects_inspection` must be true, and `features.gas_gameplay_effects_mutation` must be false. `blueprint_families` then includes inspection-only `gameplay_effect` alongside `gameplay_ability`.
 
