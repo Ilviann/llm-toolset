@@ -259,7 +259,7 @@ Review and update every detailed PCG contract against the executable tool catalo
 
 ### Release discipline
 
-Increment the minor version after each completed feature and the patch version for fixes or behavior-preserving refactoring. A major-version promotion requires a separate explicit decision. Keep Python metadata, `.uplugin` metadata, runtime capabilities, tests, README, examples, and `HISTORY.md` synchronized after every feature. Feature documents do not repeat version-update tasks.
+For runtime work, increment the minor version after each completed feature and the patch version for fixes or behavior-preserving refactoring. A major-version promotion requires a separate explicit decision. Keep Python metadata, `.uplugin` metadata, runtime capabilities, tests, README, examples, and `HISTORY.md` synchronized after every runtime feature. Feature documents do not repeat version-update tasks.
 
 ## Deferred and excluded scope
 

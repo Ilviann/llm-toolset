@@ -1,14 +1,10 @@
 # Feature workflow
 
-Use this workflow for every feature, fix, or refactor.
+Apply these Unreal-specific rules to every feature, fix, or refactor.
 
-1. Start at [`index.md`](index.md). Read the owning architecture page and affected type indexes, then inspect the relevant source, tests, metadata, examples, history, roadmap, and user documentation. Expand the working set only when evidence reveals another dependency.
-2. Use [`../ROADMAP.md`](../ROADMAP.md) and the relevant feature document under [`features/`](features/index.md) only for intended scope. Assign new responsibility to one component; trace Python/C++ data, commands, errors, limits, versions, operations, Blueprint state, and Game-thread dispatch. Validate bounded schemas on both sides.
-3. Make the smallest coherent change. Add proportional normal, invalid, limit, security, and platform coverage; run focused tests, then the full suite after behavior changes. Run Unreal Automation and headless/command-line checks for editor changes and cross-process tests for bridge changes.
-4. Update changed architecture/type references and their immediate indexes. Update `README.md` for user-visible changes and `HISTORY.md` or `ROADMAP.md` for release/scope changes. From the repository root, run `python internal/tools/lint_docs.py` after Markdown changes.
-5. For a runtime release, synchronize Python and `.uplugin` metadata, runtime capabilities, tests, examples, and history. Support-tooling-only changes do not trigger or require Unreal MCP version changes.
-
-Support tooling means repository scripts, deployment helpers, documentation infrastructure, and development utilities whose behavior does not change the Python MCP server, native plugin, companion API, exposed capabilities, or project-content behavior. Track these features under the separate **Support tooling** section in [`../ROADMAP.md`](../ROADMAP.md), set `release_track: support-tooling`, and retain `released_in: null` after completion. If a tooling change also changes Unreal MCP runtime behavior or contracts, classify it as a runtime feature instead.
+1. Use [`../ROADMAP.md`](../ROADMAP.md) and the relevant feature document under [`features/`](features/index.md) only for intended scope. Trace Python/C++ data, commands, errors, limits, versions, operations, Blueprint state, and Game-thread dispatch. Validate bounded schemas on both sides.
+2. Run Unreal Automation and headless/command-line checks for editor changes and cross-process tests for bridge changes.
+3. For a release, synchronize Python and `.uplugin` metadata, runtime capabilities, tests, examples, and history.
 
 ## Implementation rules
 

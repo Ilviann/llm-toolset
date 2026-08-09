@@ -14,14 +14,16 @@ checklist.
 
 ## Front matter contract
 
-Every feature document begins with YAML front matter containing string `feature_id`, enum `status`, string-list `depends_on`, and nullable string `released_in`. The status must match its containing status directory. Completed features require a release version; unreleased features use `null`. Dependencies name stable feature IDs or explicit issue IDs and must match the document's direct-prerequisite section.
+Every feature document begins with YAML front matter containing string `feature_id`, enum `status`, string-list `depends_on`, and nullable string `released_in`. The status must match its containing status directory. Runtime features omit `release_track` or set it to `runtime`; completed runtime features require a release version, while unreleased runtime features use `null`. Support-tooling features set `release_track: support-tooling` and always use `released_in: null`, including after completion. Dependencies name stable feature IDs or explicit issue IDs and must match the document's direct-prerequisite section.
 
 ## Roadmap workflow
 
 Keep the authoritative checklist in [`ROADMAP.md`](../../ROADMAP.md)
-synchronized with every unfinished feature and each completed feature that is a
-direct prerequisite of unfinished work. Remove other completed checklist
-entries while retaining their feature documents below.
+synchronized with every unfinished runtime feature and each completed runtime
+feature that is a direct prerequisite of unfinished work. Remove other completed
+runtime checklist entries while retaining their feature documents below. Keep
+support-tooling features in a separate **Support tooling** section after
+completion.
 
 Feature identifiers are stable names rather than execution indexes. A feature
 may be implemented and completed whenever every direct dependency listed in its
@@ -84,9 +86,10 @@ and record missing applicable native verification for completed features in the
 - Update affected architecture/type references and their immediate indexes,
   user-visible README guidance, examples, roadmap state, and history with the
   implementation.
-- Increment the minor version after each completed feature, the patch version
-  for fixes, and the major version only when explicitly requested. Synchronize
-  every runtime, package, test, example, and history version source.
+- For runtime work, increment the minor version after each completed feature,
+  the patch version for fixes, and the major version only when explicitly
+  requested. Synchronize every runtime, package, test, example, and history
+  version source.
 - Complete a feature only when its implementation, automated verification,
   documentation, examples where applicable, version synchronization, and
   release history satisfy its documented completion gate.
