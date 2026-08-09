@@ -22,31 +22,28 @@ class HeadlessIntegrationScriptTests(unittest.TestCase):
             blueprint_fixture_preparation,
             blueprint_graph_editing,
             blueprint_restart_verification,
+            blueprint_state,
             blueprints,
+            capability_contract,
             game_data_levels,
             lifecycle,
+            process_lifecycle,
             widgets,
         )
 
         self.assertIs(run_headless_integration.main, lifecycle.main)
         self.assertIs(
             run_headless_integration.resolve_editor_executable,
-            lifecycle.resolve_editor_executable,
+            process_lifecycle.resolve_editor_executable,
         )
+        self.assertIs(lifecycle.resolve_editor_executable, process_lifecycle.resolve_editor_executable)
         self.assertTrue(callable(assets.run_asset_scenario))
         self.assertTrue(callable(blueprint_declarations.author_blueprint_declarations))
-        self.assertIs(
-            blueprints.prepare_blueprint_scenario,
-            blueprint_fixture_preparation.prepare_blueprint_scenario,
-        )
-        self.assertIs(
-            blueprints.author_blueprint_scenario,
-            blueprint_graph_editing.author_blueprint_scenario,
-        )
-        self.assertIs(
-            blueprints.verify_restarted_blueprints,
-            blueprint_restart_verification.verify_restarted_blueprints,
-        )
+        self.assertTrue(callable(blueprints.prepare_blueprint_scenario))
+        self.assertTrue(callable(blueprints.author_blueprint_scenario))
+        self.assertTrue(callable(blueprints.verify_restarted_blueprints))
+        self.assertTrue(issubclass(blueprint_state.BlueprintScenarioState, dict) is False)
+        self.assertTrue(callable(capability_contract.verify_capability_contract))
         self.assertTrue(callable(game_data_levels.open_acceptance_level))
         self.assertTrue(callable(widgets.author_widget_scenario))
 
@@ -283,7 +280,7 @@ class HeadlessIntegrationScriptTests(unittest.TestCase):
             self.assertEqual(set(recording.calls), {"capabilities"})
 
     def test_lost_operation_reconciliation_accepts_terminal_partial_state(self):
-        from headless_integration.lifecycle import reconcile_operation
+        from headless_integration.operations import reconcile_operation
 
         class Bridge:
             def call(self, command, arguments=None):
@@ -295,6 +292,15 @@ class HeadlessIntegrationScriptTests(unittest.TestCase):
         result = reconcile_operation(bridge, "a" * 32, "b" * 32)
         self.assertEqual(result["state"], "partial")
         self.assertEqual(bridge.command, "operation_status")
+
+    def test_cursor_collection_is_bounded_and_rejects_repeated_cursors(self):
+        from headless_integration.pagination import collect_cursor_pages
+
+        with self.assertRaisesRegex(AssertionError, "repeated cursor"):
+            collect_cursor_pages(
+                {"records": [1], "next_cursor": "same"},
+                lambda cursor: {"records": [2], "next_cursor": cursor},
+            )
 
 
 if __name__ == "__main__":

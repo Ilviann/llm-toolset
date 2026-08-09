@@ -7,6 +7,8 @@ import json
 from unreal_editor_mcp.bridge import UnrealBridge
 from unreal_editor_mcp.project import ProjectLayout
 
+from .pagination import collect_cursor_pages
+
 
 def verify_restarted_blueprints(
     reloaded_bridge: UnrealBridge,
@@ -368,15 +370,10 @@ def verify_restarted_blueprints(
 def collect_inspection(bridge: UnrealBridge, arguments: dict[str, object]) -> dict[str, object]:
     """Consume one bounded inspection cursor chain without treating prose as a fixture."""
     result = bridge.call("blueprint_inspect", arguments)
-    records = list(result.get("records", []))
-    cursor = result.get("next_cursor")
-    for _ in range(63):
-        if not isinstance(cursor, str):
-            merged = dict(result)
-            merged["records"] = records
-            merged.pop("next_cursor", None)
-            return merged
-        page = bridge.call("blueprint_inspect", {"cursor": cursor, "page_size": 100})
-        records.extend(page.get("records", []))
-        cursor = page.get("next_cursor")
-    raise AssertionError("inspection exceeded the retained cursor-page bound")
+    merged = dict(result)
+    merged["records"] = collect_cursor_pages(
+        result,
+        lambda cursor: bridge.call("blueprint_inspect", {"cursor": cursor, "page_size": 100}),
+    )
+    merged.pop("next_cursor", None)
+    return merged

@@ -53,3 +53,5 @@ scripts\run_headless_integration.cmd
 ```
 
 The headless runner selects `UnrealEditor` on macOS and Linux and `UnrealEditor-Cmd.exe` on Windows. The prior 0.16.0 native baseline was Unreal 5.8.0 on Apple Silicon macOS 26.5.2 with Xcode 26.1.1. Platform selection and environment requirements are unit-tested without requiring every host.
+
+Repository tooling tests target `scripts/packaging`, `scripts/windows_deployment`, and focused `scripts/headless_integration` owners. The historical `package_plugin.py`, `deploy_plugin_windows.py`, `run_headless_integration.py`, `game_data_levels.py`, and `companions.py` imports remain compatibility facades.

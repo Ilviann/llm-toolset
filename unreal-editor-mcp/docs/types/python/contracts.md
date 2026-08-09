@@ -29,3 +29,13 @@ Every model-facing error is `{code,message,details,retryable}`. Codes are define
 Launch uses the startup-configured executable and resolved project descriptor as a fixed two-element argument array with `shell` disabled. A terminal result reports the operation/project/version, state, bounded timestamps, process ID, and old/new bridge-instance IDs. States include `accepted`, `starting`, `shutdown_preflight`, `shutting_down`, `launching`, `ready`, `already_running`, `stopped`, `already_stopped`, `cancelled`, `timed_out`, `rejected`, `failed`, and `outcome_unknown`.
 
 The durable record is `{version:1,records:[...]}` at `Saved/UnrealMCP/lifecycle.json`. It is at most 32 KiB, contains at most 16 exact records, retains them for 24 hours, rejects symbolic-link targets, and uses same-directory atomic replacement. It is separate from the bridge process's mutation ledger.
+
+## Repository support-tool contracts
+
+`scripts/packaging` owns immutable `PackageRequest`, `PreparedPackage`, and `PackageResult` records. Preparation validates the shared Engine installation, output confinement, target platforms, macOS environment, fixed descriptor/dependencies, and exact UAT argument array before execution. The stable `package_plugin.py` entrypoint re-exports this library and owns only CLI parsing and exit/reporting behavior.
+
+`scripts/windows_deployment` owns immutable `DeploymentRequest`, `DeploymentPlan`, and `DeploymentResult` records. A plan freezes the selected plugin catalog entries, confined destinations, observed existing destinations, optional project-descriptor before/after bytes, and installed-descriptor default state before builds begin. The transaction consumes the plan and rejects destination or descriptor drift before commit.
+
+Headless Blueprint persistence handoffs are frozen mapping-compatible records. `BlueprintFixtureState` owns the loaded fixture, created Blueprint, and `BlueprintFamilyState`; `BlueprintScenarioState` owns assigned classes and snapshot plus `BlueprintDeclarationState`, `BlueprintReplacementState`, `BlueprintNodeState`, and `BlueprintPinState`. Compatibility consumers can use the historical string keys, but new scenario code addresses the typed owners.
+
+`collect_cursor_pages` accepts one page, one cursor fetcher, and a page bound from 1 to 256; it rejects non-list records, invalid/repeated cursors, and exhaustion. `call_when_ready` accepts 1 to 100 attempts and retries only `editor_unavailable`. Lost mutation responses use the separate retained-operation reconciler and retain the caller's original operation and bridge instance IDs.

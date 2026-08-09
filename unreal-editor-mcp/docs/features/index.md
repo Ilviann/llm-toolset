@@ -73,7 +73,7 @@ Keep the authoritative checklist in [`ROADMAP.md`](../../ROADMAP.md) synchronize
 - [`windows-deployment-validation-fixes` — Deployment selection and Engine validation fixes](completed/windows-deployment-validation-fixes.md) — Support the complete three-plugin transaction and enforce Unreal Engine 5.8+ through one packaging validator.
   - Depends on:
     - `windows-deployment-commonui`
-- [`python-tooling-decomposition` — Python support-tool responsibility decomposition](planned/python-tooling-decomposition.md) — Split Unreal-local packaging, deployment, and headless Python tools along narrow reusable responsibility boundaries without behavior changes.
+- [`python-tooling-decomposition` — Python support-tool responsibility decomposition](completed/python-tooling-decomposition.md) — Split Unreal-local packaging, deployment, and headless Python tools along narrow reusable responsibility boundaries without behavior changes.
   - Depends on:
     - `windows-deployment-validation-fixes`
 - [`gas-ability-blueprints` — Gameplay Ability Blueprint creation and updating](planned/gas-ability-blueprints.md) — Add typed Gameplay Ability Blueprint creation and authoring through the GAS companion.

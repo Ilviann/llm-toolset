@@ -289,7 +289,7 @@ class ReleaseContractTests(unittest.TestCase):
         bridge = (root / "UnrealMCPBridge.cpp").read_text(encoding="utf-8")
         service = (root / "UnrealMCPLevelActorEditingService.cpp").read_text(encoding="utf-8")
         native_test = (root / "Tests/UnrealMCPAutomationTestsLevelEdit.cpp").read_text(encoding="utf-8")
-        production = (ROOT / "scripts/headless_integration/game_data_levels.py").read_text(encoding="utf-8")
+        production = (ROOT / "scripts/headless_integration/level_editing.py").read_text(encoding="utf-8")
         for command in ["level_actor_edit", "level_save"]:
             self.assertIn(f'Command == TEXT("{command}")', bridge)
         for feature in [

@@ -5,9 +5,21 @@ from pathlib import Path
 from unittest import mock
 
 from scripts import deploy_plugin_windows as deploy
+from scripts.windows_deployment import discovery, transaction, workflow
 
 
 class WindowsDeploymentScriptTests(unittest.TestCase):
+    def test_entrypoint_reexports_decomposed_owners(self):
+        from scripts import windows_deployment
+        from scripts.windows_deployment.models import DeploymentPlan, DeploymentRequest, DeploymentResult
+
+        self.assertIs(deploy.main, windows_deployment.main)
+        self.assertTrue(all(record is not None for record in (
+            DeploymentRequest, DeploymentPlan, DeploymentResult,
+        )))
+        for module in (discovery, transaction, workflow):
+            self.assertNotIn("tkinter", module.__dict__)
+
     def write_project(self, folder: Path, association: object = "5.8") -> deploy.ProjectInfo:
         descriptor = folder / "Shooter.uproject"
         descriptor.write_text(
@@ -88,7 +100,7 @@ class WindowsDeploymentScriptTests(unittest.TestCase):
 
             descriptor.write_text("{}", encoding="utf-8")
             (folder / "extra.txt").write_text("extra", encoding="utf-8")
-            with mock.patch.object(deploy, "MAX_PROJECT_DIRECTORY_ENTRIES", 1):
+            with mock.patch.object(discovery, "MAX_PROJECT_DIRECTORY_ENTRIES", 1):
                 with self.assertRaisesRegex(deploy.DeploymentError, "more than 1 entries"):
                     deploy.locate_project(folder)
 
@@ -169,10 +181,10 @@ class WindowsDeploymentScriptTests(unittest.TestCase):
             process.stdout = iter(())
             process.wait.return_value = 0
             with (
-                mock.patch.object(deploy, "build_command", return_value=["RunUAT.bat"]),
-                mock.patch.object(deploy.subprocess, "Popen", return_value=process),
+                mock.patch.object(workflow, "build_command", return_value=["RunUAT.bat"]),
+                mock.patch.object(workflow.subprocess, "Popen", return_value=process),
             ):
-                deploy.run_packaging(
+                workflow.run_packaging(
                     Path("C:/UE_5.8"), output, lambda message: None, deploy.GAS_PLUGIN
                 )
 
@@ -308,7 +320,7 @@ class WindowsDeploymentScriptTests(unittest.TestCase):
                 self.write_package(package_root, plugin.name)
 
             with mock.patch.object(
-                deploy,
+                workflow,
                 "run_packaging",
                 side_effect=write_packaged_plugin,
             ):
@@ -484,7 +496,7 @@ class WindowsDeploymentScriptTests(unittest.TestCase):
                 package_root.mkdir()
                 self.write_package(package_root, plugin.name)
 
-            with mock.patch.object(deploy, "run_packaging", side_effect=write_packaged_plugin):
+            with mock.patch.object(workflow, "run_packaging", side_effect=write_packaged_plugin):
                 installed = deploy.deploy(
                     project,
                     root / "UE_5.8",
@@ -523,7 +535,7 @@ class WindowsDeploymentScriptTests(unittest.TestCase):
                 package_root.mkdir()
                 self.write_package(package_root, plugin.name)
 
-            with mock.patch.object(deploy, "run_packaging", side_effect=write_packaged_plugin):
+            with mock.patch.object(workflow, "run_packaging", side_effect=write_packaged_plugin):
                 installed = deploy.deploy(
                     project,
                     root / "UE_5.8",
@@ -563,7 +575,7 @@ class WindowsDeploymentScriptTests(unittest.TestCase):
                 package_root.mkdir()
                 self.write_package(package_root, plugin.name)
 
-            with mock.patch.object(deploy, "run_packaging", side_effect=write_packaged_plugin):
+            with mock.patch.object(workflow, "run_packaging", side_effect=write_packaged_plugin):
                 installed = deploy.deploy(
                     project,
                     engine,
@@ -627,7 +639,7 @@ class WindowsDeploymentScriptTests(unittest.TestCase):
                 )
 
             with mock.patch.object(
-                deploy,
+                workflow,
                 "run_packaging",
                 side_effect=write_package_and_change_project,
             ):
@@ -666,7 +678,7 @@ class WindowsDeploymentScriptTests(unittest.TestCase):
                 (destination / "external.txt").write_text("external", encoding="utf-8")
 
             with mock.patch.object(
-                deploy,
+                workflow,
                 "run_packaging",
                 side_effect=write_package_and_create_destination,
             ):
@@ -746,7 +758,7 @@ class WindowsDeploymentScriptTests(unittest.TestCase):
                     raise deploy.DeploymentError("injected post-install failure")
 
             with mock.patch.object(
-                deploy, "verify_binary_plugin", side_effect=fail_second_verification
+                transaction, "verify_binary_plugin", side_effect=fail_second_verification
             ):
                 with self.assertRaisesRegex(deploy.DeploymentError, "injected"):
                     deploy.install_binary_plugin(package, project, replace_existing=True)
@@ -857,7 +869,7 @@ class WindowsDeploymentScriptTests(unittest.TestCase):
 
     def test_resolve_engine_reports_missing_association(self):
         project = deploy.ProjectInfo(Path("D:/Game"), Path("D:/Game/Game.uproject"), "{missing}")
-        with mock.patch.object(deploy, "engine_candidates", return_value=[]):
+        with mock.patch.object(discovery, "engine_candidates", return_value=[]):
             with self.assertRaisesRegex(deploy.DeploymentError, "select the engine folder manually"):
                 deploy.resolve_engine_root(project)
 

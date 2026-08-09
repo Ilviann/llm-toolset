@@ -46,7 +46,7 @@ def run_asset_scenario(
     game_data: dict[str, object],
 ) -> dict[str, str]:
     """Verify serialized references and reconcile deletion of an unreferenced asset."""
-    from .lifecycle import reconcile_operation, send_without_reading
+    from .operations import reconcile_operation, send_without_reading
 
     reference_asset_path = game_data["struct_path"]
     table_path = game_data["table_path"]

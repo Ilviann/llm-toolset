@@ -1,14 +1,9 @@
 #!/usr/bin/env python3
-"""Launch the disposable editor and coordinate the cross-process scenarios."""
+"""Coordinate decomposed disposable-editor cross-process scenarios."""
 
 from __future__ import annotations
 
-import http.client
-import json
-import os
 import platform
-import signal
-import socket
 import subprocess
 import sys
 import tempfile
@@ -16,202 +11,42 @@ import time
 import uuid
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-from unreal_editor_mcp import __version__  # noqa: E402
-from unreal_editor_mcp.bridge import BRIDGE_PATH, UnrealBridge  # noqa: E402
-from unreal_editor_mcp.discovery import read_discovery, read_token  # noqa: E402
+from unreal_editor_mcp.bridge import UnrealBridge  # noqa: E402
+from unreal_editor_mcp.discovery import read_discovery  # noqa: E402
 from unreal_editor_mcp.errors import BridgeError, ErrorCode  # noqa: E402
 from unreal_editor_mcp.project import ProjectLayout  # noqa: E402
 
 from .assets import run_asset_scenario, verify_restarted_assets
-from .blueprints import (
-    author_blueprint_scenario,
-    prepare_blueprint_scenario,
-    verify_restarted_blueprints,
-)
-from .game_data_levels import (
-    author_level_edit_scenario,
-    author_phase_seventeen_game_data,
-    manage_disposable_level,
-    open_acceptance_level,
-    verify_restarted_game_data_and_level,
-    verify_restarted_level_edit,
-    verify_restarted_level_deletion,
+from .automation import prepare_commonui_widget_fixture, prepare_gas_effect_fixture, prepare_phase_two_fixture, run_automation
+from .blueprints import author_blueprint_scenario, prepare_blueprint_scenario, verify_restarted_blueprints
+from .capability_contract import verify_capability_contract
+from .companions import verify_companion_scenario
+from .game_data import author_phase_seventeen_game_data, verify_restarted_game_data_and_level
+from .level_editing import author_level_edit_scenario, verify_restarted_level_edit
+from .level_management import manage_disposable_level, verify_restarted_level_deletion
+from .level_opening import open_acceptance_level
+from .operations import reconcile_operation, send_without_reading
+from .process_lifecycle import (
+    EditorProcessConfig,
+    configure_editor_environment,
+    launch_editor,
+    reject_bad_token,
+    required_path,
+    resolve_editor_executable,
+    resolve_lifecycle_editor_executable,
+    shutdown_editor,
+    stop_editor,
+    verify_loopback_only,
+    wait_until_ready,
 )
 from .readonly_mode import verify_readonly_mode, verify_windows_readonly_lifecycle
 from .widgets import author_widget_scenario, verify_restarted_widgets
-from .companions import verify_companion_scenario
-
 
 ENGINE_ROOT_ENV = "UE58"
 TEST_PROJECT_ENV = "UNREAL_MCP_TEST_UPROJECT"
-
-
-def required_path(name: str) -> Path:
-    value = os.environ.get(name)
-    if not value:
-        raise SystemExit(f"{name} is required")
-    path = Path(value).expanduser().resolve()
-    if not path.exists():
-        raise SystemExit(f"{name} does not exist: {path}")
-    return path
-
-
-def resolve_editor_executable(engine: Path, host_system: str) -> Path:
-    relative_paths = {
-        "Darwin": Path("Engine/Binaries/Mac/UnrealEditor.app/Contents/MacOS/UnrealEditor"),
-        "Windows": Path("Engine/Binaries/Win64/UnrealEditor-Cmd.exe"),
-        "Linux": Path("Engine/Binaries/Linux/UnrealEditor"),
-    }
-    relative = relative_paths.get(host_system)
-    if relative is None:
-        raise SystemExit(f"unsupported host platform: {host_system}")
-    executable = engine / relative
-    if not executable.is_file():
-        raise SystemExit(f"Unreal Editor executable not found: {executable}")
-    return executable
-
-
-def resolve_lifecycle_editor_executable(engine: Path, host_system: str) -> Path:
-    if host_system != "Windows":
-        raise SystemExit("readonly lifecycle acceptance is required only on Windows")
-    executable = engine / "Engine/Binaries/Win64/UnrealEditor.exe"
-    if not executable.is_file():
-        raise SystemExit(f"Unreal lifecycle executable not found: {executable}")
-    return executable
-
-
-def configure_editor_environment(host_system: str) -> dict[str, str]:
-    environment = dict(os.environ)
-    if host_system == "Darwin":
-        environment["DEVELOPER_DIR"] = str(required_path("UNREAL_MCP_DEVELOPER_DIR"))
-    return environment
-
-
-def wait_until_ready(layout: ProjectLayout, process: subprocess.Popen[bytes], deadline: float) -> None:
-    last_error = "discovery record not created"
-    while time.monotonic() < deadline:
-        if process.poll() is not None:
-            raise RuntimeError(f"Unreal Editor exited before bridge startup ({process.returncode})")
-        try:
-            record = read_discovery(layout)
-            result = UnrealBridge(layout, timeout=2.0).call("capabilities")
-            if result.get("bridge_ready") is True and record.bridge_version == __version__:
-                return
-        except Exception as error:
-            last_error = str(error)
-        time.sleep(0.25)
-    raise TimeoutError(f"Unreal bridge did not become ready: {last_error}")
-
-
-def reject_bad_token(layout: ProjectLayout) -> None:
-    record = read_discovery(layout)
-    connection = http.client.HTTPConnection("127.0.0.1", record.port, timeout=2.0)
-    try:
-        connection.request(
-            "POST",
-            BRIDGE_PATH,
-            body=b'{"command":"capabilities","arguments":{}}',
-            headers={"Authorization": "Bearer " + "0" * 64, "Content-Type": "application/json"},
-        )
-        response = connection.getresponse()
-        payload = json.loads(response.read(4096))
-    finally:
-        connection.close()
-    if response.status != 401 or payload.get("error", {}).get("code") != "authentication_failed":
-        raise AssertionError(f"bad token was not rejected safely: HTTP {response.status} {payload!r}")
-
-
-def verify_loopback_only(port: int) -> None:
-    probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    try:
-        probe.connect(("192.0.2.1", 9))
-        non_loopback = probe.getsockname()[0]
-    finally:
-        probe.close()
-    if non_loopback.startswith("127."):
-        raise RuntimeError("could not resolve a non-loopback local interface")
-    try:
-        peer = socket.create_connection((non_loopback, port), timeout=0.5)
-    except OSError:
-        return
-    else:
-        peer.close()
-        raise AssertionError(f"bridge unexpectedly accepted connections on {non_loopback}:{port}")
-
-
-def send_without_reading(layout: ProjectLayout, command: str, arguments: dict[str, object]) -> None:
-    """Submit a mutation and deliberately discard its HTTP response."""
-    record = read_discovery(layout)
-    connection = http.client.HTTPConnection("127.0.0.1", record.port, timeout=2.0)
-    connection.request(
-        "POST",
-        BRIDGE_PATH,
-        body=json.dumps({"command": command, "arguments": arguments}, separators=(",", ":")).encode(),
-        headers={
-            "Authorization": "Bearer " + read_token(layout),
-            "Content-Type": "application/json",
-            "X-Unreal-MCP-Version": __version__,
-        },
-    )
-    connection.close()
-
-
-def reconcile_operation(bridge: UnrealBridge, operation_id: str, bridge_instance_id: str) -> dict[str, object]:
-    deadline = time.monotonic() + 10.0
-    while time.monotonic() < deadline:
-        status = bridge.call("operation_status", {
-            "operation_id": operation_id,
-            "bridge_instance_id": bridge_instance_id,
-        })
-        if status.get("state") in {
-            "committed", "partial", "rejected", "cancelled", "outcome_unknown",
-        }:
-            return status
-        time.sleep(0.05)
-    raise TimeoutError("lost mutation response did not reach a retained terminal state")
-
-
-def stop_editor(
-    process: subprocess.Popen[bytes],
-    timeout: float = 30.0,
-    bridge: UnrealBridge | None = None,
-) -> None:
-    if process.poll() is not None:
-        return
-    if bridge is not None:
-        try:
-            shutdown_editor(bridge, process, timeout)
-            return
-        except Exception:
-            pass
-    process.send_signal(signal.SIGTERM)
-    try:
-        process.wait(timeout=timeout)
-    except subprocess.TimeoutExpired:
-        process.kill()
-        process.wait(timeout=10)
-        raise RuntimeError("Unreal Editor did not unload cleanly")
-
-
-def shutdown_editor(bridge: UnrealBridge, process: subprocess.Popen[bytes], timeout: float = 30.0) -> None:
-    try:
-        shutdown = bridge.call("editor_shutdown")
-    except BridgeError as error:
-        raise AssertionError(f"graceful shutdown was refused: {error.as_dict()!r}") from error
-    if shutdown.get("accepted") is not True:
-        raise AssertionError(f"graceful shutdown was not accepted: {shutdown!r}")
-    deadline = time.monotonic() + timeout
-    while process.poll() is None and time.monotonic() < deadline:
-        time.sleep(0.1)
-    if process.poll() is None:
-        raise AssertionError("graceful shutdown did not terminate the configured editor")
-    if process.returncode != 0:
-        raise AssertionError(f"graceful shutdown exited with status {process.returncode}")
-
 
 def restore_framework_defaults(
     bridge: UnrealBridge,
@@ -246,6 +81,7 @@ def restore_framework_defaults(
                 raise AssertionError(f"gameplay-framework retry cleanup failed: {result!r}")
 
 
+
 def run_widget_restart_integration(
     executable: Path,
     layout: ProjectLayout,
@@ -257,9 +93,16 @@ def run_widget_restart_integration(
         "-nullrhi", "-nosound", "-nocrashreports", "-NoAssetRegistryCache",
         "-DDC-ForceMemoryCache",
     ]
+    process_config = EditorProcessConfig(
+        executable,
+        layout.descriptor,
+        tuple(command[2:]),
+        ROOT,
+        environment,
+    )
     with tempfile.TemporaryFile() as log:
         bridge = None
-        process = subprocess.Popen(command, cwd=ROOT, env=environment, stdout=log, stderr=subprocess.STDOUT)
+        process = launch_editor(process_config, log)
         try:
             wait_until_ready(layout, process, time.monotonic() + 120.0)
             bridge = UnrealBridge(layout, timeout=3.0)
@@ -273,7 +116,7 @@ def run_widget_restart_integration(
             stop_editor(process, bridge=bridge)
 
         bridge = None
-        process = subprocess.Popen(command, cwd=ROOT, env=environment, stdout=log, stderr=subprocess.STDOUT)
+        process = launch_editor(process_config, log)
         try:
             wait_until_ready(layout, process, time.monotonic() + 120.0)
             bridge = UnrealBridge(layout, timeout=3.0)
@@ -288,200 +131,6 @@ def run_widget_restart_integration(
     print("Integration passed: Widget Blueprint authoring, save, restart, and inspection")
     return 0
 
-
-def run_automation(executable: Path, project: Path, environment: dict[str, str], test_filter: str = "UnrealMCP") -> int:
-    all_expected = (
-        "CompatibilityBranch",
-        "ErrorEnvelope",
-        "GameThreadDispatch",
-        "InvalidTokenFailsClosed",
-        "ProtocolBounds",
-        "RouteGuards",
-        "TokenPersistence",
-        "CursorGuards",
-        "InspectionContracts",
-        "LiveFixture",
-        "CreationContracts",
-        "FailureCleanup",
-        "CreationLiveFixture",
-        "ComponentAndDefaultEdits",
-        "OperationLedger",
-        "PropertyCodec",
-        "K2TypeCodec",
-        "MemberVariables",
-        "FunctionsAndLocals",
-        "MacrosAndCustomEvents",
-        "ActionCatalog",
-        "ExpandedActionCatalog",
-        "GraphNodeLifecycle",
-        "PinDefaultsAndDirectConnections",
-        "WildcardsConversionsAndAtomicGraphEditing",
-        "GameModeAndGameStateFamilies",
-        "GameInstanceFamily",
-        "MultiplayerAuthoring",
-        "FrameworkAssignment",
-        "GameDataAuthoring",
-        "DiscoverySnapshotsAndSafety",
-        "ActorsComponentsPropertiesAndSafety",
-        "CreateConfigurePersistAndDelete",
-        "PreflightPersistenceAndReferences",
-        "RegistryLiveMemoryAndCursors",
-        "FamilyInspectionMutationAndPersistence",
-        "LayoutStyleBindingsAndEvents",
-        "PreflightTransactionPreservation",
-        "DeterministicChangedNodes",
-        "PreservationAcrossReadonlyFlows",
-        "AbilityBlueprintInspection",
-        "GameplayEffectInspection",
-        "GameplayEffectLiveFixture",
-        "WidgetBlueprintInspection",
-        "WidgetBlueprintLiveFixture",
-        "Protocol",
-    )
-    if test_filter == "UnrealMCP":
-        expected = all_expected
-    elif test_filter == "UnrealMCP.Phase4":
-        expected = tuple(name for name in all_expected if name in {
-            "ComponentAndDefaultEdits", "OperationLedger", "PropertyCodec",
-        })
-    elif test_filter == "UnrealMCP.Phase5":
-        expected = tuple(name for name in all_expected if name in {"K2TypeCodec", "MemberVariables"})
-    elif test_filter == "UnrealMCP.Phase6":
-        expected = tuple(name for name in all_expected if name == "FunctionsAndLocals")
-    elif test_filter == "UnrealMCP.Phase7":
-        expected = tuple(name for name in all_expected if name == "MacrosAndCustomEvents")
-    elif test_filter == "UnrealMCP.Phase8":
-        expected = tuple(name for name in all_expected if name == "ActionCatalog")
-    elif test_filter == "UnrealMCP.Phase10":
-        expected = tuple(name for name in all_expected if name == "ExpandedActionCatalog")
-    elif test_filter == "UnrealMCP.Phase11":
-        expected = tuple(name for name in all_expected if name == "GraphNodeLifecycle")
-    elif test_filter == "UnrealMCP.Phase12":
-        expected = tuple(name for name in all_expected if name == "PinDefaultsAndDirectConnections")
-    elif test_filter == "UnrealMCP.Phase13":
-        expected = tuple(name for name in all_expected if name == "WildcardsConversionsAndAtomicGraphEditing")
-    elif test_filter == "UnrealMCP.Phase14":
-        expected = tuple(name for name in all_expected if name == "GameModeAndGameStateFamilies")
-    elif test_filter == "UnrealMCP.Phase15":
-        expected = tuple(name for name in all_expected if name == "GameInstanceFamily")
-    elif test_filter == "UnrealMCP.Phase16":
-        expected = tuple(name for name in all_expected if name in {"MultiplayerAuthoring", "FrameworkAssignment"})
-    elif test_filter == "UnrealMCP.Phase17":
-        expected = tuple(name for name in all_expected if name == "GameDataAuthoring")
-    elif test_filter == "UnrealMCP.AssetReferences":
-        expected = tuple(name for name in all_expected if name == "RegistryLiveMemoryAndCursors")
-    elif test_filter == "UnrealMCP.LevelManagement":
-        expected = tuple(name for name in all_expected if name == "CreateConfigurePersistAndDelete")
-    elif test_filter == "UnrealMCP.CommonUI":
-        expected = tuple(name for name in all_expected if name in {
-            "WidgetBlueprintInspection", "WidgetBlueprintLiveFixture",
-        })
-    else:
-        leaf = test_filter.rsplit(".", 1)[-1]
-        expected = (leaf,) if leaf in all_expected else ()
-    command = [
-        str(executable), str(project), "-unattended", "-nop4", "-nosplash", "-nullrhi",
-        "-stdout", "-FullStdOutLogOutput", "-nocrashreports", "-NoAssetRegistryCache",
-        "-DDC-ForceMemoryCache",
-        f"-ExecCmds=Automation RunTests {test_filter};Quit",
-        "-TestExit=Automation Test Queue Empty",
-    ]
-    with tempfile.TemporaryFile() as log:
-        process = subprocess.Popen(command, cwd=ROOT, env=environment, stdout=log, stderr=subprocess.STDOUT)
-        try:
-            return_code = process.wait(timeout=180.0)
-        except subprocess.TimeoutExpired:
-            stop_editor(process)
-            raise RuntimeError("Unreal Automation Tests exceeded the three-minute deadline")
-        log.seek(0)
-        output = log.read().decode("utf-8", errors="replace")
-    missing = [name for name in expected if f"Result={{Success}} Name={{{name}}}" not in output]
-    if return_code != 0 or "TEST COMPLETE. EXIT CODE: 0" not in output or missing:
-        sys.stderr.write(output[-32_000:])
-        if missing:
-            raise RuntimeError(f"Unreal Automation Tests did not pass: {', '.join(missing)}")
-        raise RuntimeError(f"Unreal Automation Tests exited with status {return_code}")
-    print(f"Unreal Automation Tests passed: {len(expected)} native cases")
-    return 0
-
-
-def prepare_phase_two_fixture(executable: Path, project: Path, environment: dict[str, str]) -> str:
-    command = [
-        str(executable), str(project), "-unattended", "-nop4", "-nosplash", "-nullrhi",
-        "-stdout", "-FullStdOutLogOutput", "-nocrashreports", "-NoAssetRegistryCache",
-        "-DDC-ForceMemoryCache",
-        "-ExecCmds=Automation RunTests UnrealMCP.Phase2.LiveFixture;Quit",
-        "-TestExit=Automation Test Queue Empty",
-    ]
-    with tempfile.TemporaryFile() as log:
-        process = subprocess.Popen(command, cwd=ROOT, env=environment, stdout=log, stderr=subprocess.STDOUT)
-        try:
-            return_code = process.wait(timeout=180.0)
-        except subprocess.TimeoutExpired:
-            stop_editor(process)
-            raise RuntimeError("Phase 2 fixture preparation exceeded the three-minute deadline")
-        log.seek(0)
-        output = log.read().decode("utf-8", errors="replace")
-    marker = "UNREAL_MCP_PHASE2_SNAPSHOT="
-    snapshots = [line.split(marker, 1)[1].split()[0] for line in output.splitlines() if marker in line]
-    if return_code != 0 or "Result={Success} Name={LiveFixture}" not in output or not snapshots:
-        sys.stderr.write(output[-32_000:])
-        raise RuntimeError("Phase 2 saved fixture preparation failed")
-    return snapshots[-1]
-
-
-def prepare_gas_effect_fixture(executable: Path, project: Path, environment: dict[str, str]) -> str:
-    command = [
-        str(executable), str(project), "-unattended", "-nop4", "-nosplash", "-nullrhi",
-        "-stdout", "-FullStdOutLogOutput", "-nocrashreports", "-NoAssetRegistryCache",
-        "-DDC-ForceMemoryCache",
-        "-ExecCmds=Automation RunTests UnrealMCP.GAS.GameplayEffectLiveFixture;Quit",
-        "-TestExit=Automation Test Queue Empty",
-    ]
-    with tempfile.TemporaryFile() as log:
-        process = subprocess.Popen(command, cwd=ROOT, env=environment, stdout=log, stderr=subprocess.STDOUT)
-        try:
-            return_code = process.wait(timeout=180.0)
-        except subprocess.TimeoutExpired:
-            stop_editor(process)
-            raise RuntimeError("Gameplay Effect fixture preparation exceeded the three-minute deadline")
-        log.seek(0)
-        output = log.read().decode("utf-8", errors="replace")
-    marker = "UNREAL_MCP_GAS_EFFECT_FIXTURE="
-    fixtures = [line.split(marker, 1)[1].split()[0] for line in output.splitlines() if marker in line]
-    if return_code != 0 or "Result={Success} Name={GameplayEffectLiveFixture}" not in output or not fixtures:
-        sys.stderr.write(output[-32_000:])
-        raise RuntimeError("Gameplay Effect saved fixture preparation failed")
-    return fixtures[-1]
-
-
-def prepare_commonui_widget_fixture(
-    executable: Path, project: Path, environment: dict[str, str],
-) -> str:
-    command = [
-        str(executable), str(project), "-unattended", "-nop4", "-nosplash", "-nullrhi",
-        "-stdout", "-FullStdOutLogOutput", "-nocrashreports", "-NoAssetRegistryCache",
-        "-DDC-ForceMemoryCache",
-        "-ExecCmds=Automation RunTests UnrealMCP.CommonUI.WidgetBlueprintLiveFixture;Quit",
-        "-TestExit=Automation Test Queue Empty",
-    ]
-    with tempfile.TemporaryFile() as log:
-        process = subprocess.Popen(command, cwd=ROOT, env=environment, stdout=log, stderr=subprocess.STDOUT)
-        try:
-            return_code = process.wait(timeout=180.0)
-        except subprocess.TimeoutExpired:
-            stop_editor(process)
-            raise RuntimeError("CommonUI Widget fixture preparation exceeded the three-minute deadline")
-        log.seek(0)
-        output = log.read().decode("utf-8", errors="replace")
-    marker = "UNREAL_MCP_COMMONUI_FIXTURE="
-    fixtures = [line.split(marker, 1)[1].split()[0] for line in output.splitlines() if marker in line]
-    if return_code != 0 \
-            or "Result={Success} Name={WidgetBlueprintLiveFixture}" not in output \
-            or not fixtures:
-        sys.stderr.write(output[-32_000:])
-        raise RuntimeError("CommonUI Widget saved fixture preparation failed")
-    return fixtures[-1]
 
 
 def main() -> int:
@@ -553,239 +202,23 @@ def main() -> int:
         "-nullrhi", "-nosound", "-nocrashreports", "-NoAssetRegistryCache",
         "-DDC-ForceMemoryCache",
     ]
+    process_config = EditorProcessConfig(
+        executable,
+        layout.descriptor,
+        tuple(command[2:]),
+        ROOT,
+        environment,
+    )
     with tempfile.TemporaryFile() as log:
         bridge = None
-        process = subprocess.Popen(command, cwd=ROOT, env=environment, stdout=log, stderr=subprocess.STDOUT)
+        process = launch_editor(process_config, log)
         try:
             wait_until_ready(layout, process, time.monotonic() + 120.0)
             bridge = UnrealBridge(layout, timeout=3.0)
             capabilities = bridge.call("capabilities")
             restore_framework_defaults(bridge, capabilities["project_hash"])
             state = bridge.call("editor_state")
-            if capabilities.get("commands") != [
-                "capabilities", "editor_state", "editor_shutdown", "operation_status", "operation_cancel",
-                "asset_references", "asset_delete",
-                "level_inspect", "level_open", "level_manage", "level_actor_edit", "level_save",
-                "blueprint_inspect", "blueprint_action_catalog", "blueprint_graph_edit",
-                "blueprint_block_replace",
-                "blueprint_create", "blueprint_compile", "blueprint_save",
-                "blueprint_component_edit", "blueprint_default_edit", "blueprint_member_edit",
-                "widget_tree_edit", "gameplay_framework_edit", "game_data_inspect", "game_data_edit",
-            ]:
-                raise AssertionError("released command catalog mismatch")
-            if capabilities.get("bridge_version") != __version__ or state.get("bridge_ready") is not True:
-                raise AssertionError("capability/state contract mismatch")
-            if capabilities.get("features", {}).get("graceful_editor_shutdown") is not True:
-                raise AssertionError("graceful editor shutdown capability is unavailable")
-            if capabilities.get("features", {}).get("blueprint_mutation") is not True:
-                raise AssertionError("Phase 6 mutation capability is unavailable")
-            for feature in ("blueprint_functions", "blueprint_local_variables", "blueprint_rep_notify"):
-                if capabilities.get("features", {}).get(feature) is not True:
-                    raise AssertionError(f"Phase 6 capability is unavailable: {feature}")
-            for feature in (
-                "blueprint_function_replacement",
-                "blueprint_function_replacement_scratch_preflight",
-                "blueprint_macro_replacement",
-                "blueprint_custom_event_replacement",
-                "blueprint_event_replacement",
-                "blueprint_logic_unit_external_connections",
-                "blueprint_node_layout",
-            ):
-                if capabilities.get("features", {}).get(feature) is not True:
-                    raise AssertionError(f"function replacement capability is unavailable: {feature}")
-            for feature in ("blueprint_macros", "blueprint_custom_events"):
-                if capabilities.get("features", {}).get(feature) is not True:
-                    raise AssertionError(f"Phase 7 capability is unavailable: {feature}")
-            if capabilities.get("features", {}).get("blueprint_action_catalog") is not True:
-                raise AssertionError("Phase 10 action catalog capability is unavailable")
-            for feature in ("blueprint_graph_mutation", "blueprint_graph_node_lifecycle"):
-                if capabilities.get("features", {}).get(feature) is not True:
-                    raise AssertionError(f"Phase 11 graph capability is unavailable: {feature}")
-            for feature in ("blueprint_graph_pin_defaults", "blueprint_graph_direct_connections"):
-                if capabilities.get("features", {}).get(feature) is not True:
-                    raise AssertionError(f"Phase 12 graph capability is unavailable: {feature}")
-            for feature in ("blueprint_graph_wildcard_specialization", "blueprint_graph_automatic_conversion"):
-                if capabilities.get("features", {}).get(feature) is not True:
-                    raise AssertionError(f"Phase 13 graph capability is unavailable: {feature}")
-            for feature in ("blueprint_family_policy", "game_mode_families", "game_state_families"):
-                if capabilities.get("features", {}).get(feature) is not True:
-                    raise AssertionError(f"Phase 14 family capability is unavailable: {feature}")
-            if capabilities.get("features", {}).get("game_instance_family") is not True:
-                raise AssertionError("Phase 15 GameInstance capability is unavailable")
-            if capabilities.get("features", {}).get("widget_blueprint_family") is not True \
-                    or capabilities.get("features", {}).get("widget_tree_authoring") is not True:
-                raise AssertionError("Widget Blueprint capability is unavailable")
-            for feature in (
-                "umg_layout_authoring", "umg_style_authoring",
-                "umg_property_bindings", "umg_designer_events",
-            ):
-                if capabilities.get("features", {}).get(feature) is not True:
-                    raise AssertionError(f"UMG authoring capability is unavailable: {feature}")
-            for feature in ("multiplayer_blueprint_authoring", "custom_event_rpcs",
-                            "typed_replication_settings", "gameplay_framework_assignment"):
-                if capabilities.get("features", {}).get(feature) is not True:
-                    raise AssertionError(f"Phase 16 multiplayer capability is unavailable: {feature}")
-            for feature in ("user_defined_struct_authoring", "typed_data_tables", "game_data_batch_editing"):
-                if capabilities.get("features", {}).get(feature) is not True:
-                    raise AssertionError(f"Phase 17 game-data capability is unavailable: {feature}")
-            for feature in ("level_discovery", "level_open", "level_snapshots"):
-                if capabilities.get("features", {}).get(feature) is not True:
-                    raise AssertionError(f"level-open capability is unavailable: {feature}")
-            for feature in (
-                "level_actor_inspection",
-                "level_world_partition_descriptors",
-                "level_targeted_actor_loading",
-                "level_instance_properties",
-            ):
-                if capabilities.get("features", {}).get(feature) is not True:
-                    raise AssertionError(f"level-inspect capability is unavailable: {feature}")
-            for feature in (
-                "level_management", "level_blank_creation", "level_template_creation",
-                "level_world_settings", "level_map_deletion",
-            ):
-                if capabilities.get("features", {}).get(feature) is not True:
-                    raise AssertionError(f"level-management capability is unavailable: {feature}")
-            for feature in (
-                "level_actor_editing", "level_actor_transactions",
-                "level_package_save_verification",
-            ):
-                if capabilities.get("features", {}).get(feature) is not True:
-                    raise AssertionError(f"level-edit capability is unavailable: {feature}")
-            if capabilities.get("features", {}).get("level_world_partition_conversion") is not False:
-                raise AssertionError("level World Partition conversion must remain unsupported")
-            for feature in ("asset_reference_discovery", "asset_reference_live_memory"):
-                if capabilities.get("features", {}).get(feature) is not True:
-                    raise AssertionError(f"asset-references capability is unavailable: {feature}")
-            if capabilities.get("features", {}).get("asset_delete") is not True \
-                    or capabilities.get("features", {}).get("asset_delete_force") is not False \
-                    or capabilities.get("features", {}).get("asset_delete_undo") is not False:
-                raise AssertionError("asset-delete capability contract mismatch")
-            family_matrix = capabilities.get("blueprint_families", [])
-            base_families = [
-                "actor", "game_mode_base", "game_mode", "game_state_base", "game_state", "game_instance",
-                "widget",
-            ]
-            family_names = [record.get("family") for record in family_matrix]
-            if family_names[:len(base_families)] != base_families \
-                    or len(family_names) != len(set(family_names)):
-                raise AssertionError(f"Phase 15 family matrix mismatch: {family_matrix!r}")
-            for record in family_matrix[:len(base_families)]:
-                operations = record.get("operations", {})
-                assignable = record.get("family") in {"game_mode_base", "game_mode", "game_instance"}
-                if operations.get("graph_edit") is not True or operations.get("parent_change") is not False \
-                        or operations.get("project_settings_assignment") is not assignable:
-                    raise AssertionError(f"Phase 16 operation matrix mismatch: {record!r}")
-                if not isinstance(record.get("multiplayer", {}).get("rpc_modes"), list):
-                    raise AssertionError(f"Phase 16 multiplayer matrix mismatch: {record!r}")
-                family = record.get("family")
-                if operations.get("components") != (family not in {"game_instance", "widget"}) \
-                        or operations.get("widget_tree") != (family == "widget"):
-                    raise AssertionError(f"Blueprint family operation matrix mismatch: {record!r}")
-            for record in family_matrix[len(base_families):]:
-                operations = record.get("operations", {})
-                if not isinstance(record.get("extension_id"), str) \
-                        or operations.get("discover") is not True \
-                        or operations.get("inspect") is not True \
-                        or any(operations.get(name) is not False for name in (
-                            "create", "compile", "save", "class_defaults", "components", "widget_tree",
-                            "member_variables", "functions", "local_variables", "macros", "custom_events",
-                            "action_catalog", "graph_edit", "parent_change", "project_settings_assignment",
-                        )):
-                    raise AssertionError(f"Companion family operation matrix mismatch: {record!r}")
-                if not isinstance(record.get("multiplayer", {}).get("rpc_modes"), list):
-                    raise AssertionError(f"Companion family multiplayer matrix mismatch: {record!r}")
-            expected_graph_limits = {
-                "graph_nodes": 2048, "graph_pins_per_node": 256, "graph_coordinate": 1000000,
-                "graph_links_per_pin": 64, "graph_automatic_conversion_nodes": 1, "pin_default_chars": 512,
-            }
-            if any(capabilities.get("limits", {}).get(name) != value for name, value in expected_graph_limits.items()):
-                raise AssertionError(f"Phase 13 graph limits mismatch: {capabilities.get('limits')!r}")
-            expected_replacement_limits = {
-                "function_replacement_nodes": 64,
-                "function_replacement_owned_nodes": 256,
-                "function_replacement_locals": 64,
-                "function_replacement_defaults": 128,
-                "function_replacement_connections": 256,
-                "logic_unit_replacement_nodes": 64,
-                "logic_unit_replacement_owned_nodes": 256,
-                "logic_unit_replacement_locals": 64,
-                "logic_unit_replacement_defaults": 128,
-                "logic_unit_replacement_connections": 256,
-                "logic_unit_external_connections": 64,
-                "logic_unit_layout_nodes": 322,
-                "logic_unit_layout_edges": 1024,
-                "logic_unit_layout_iterations": 8,
-                "logic_unit_layout_collision_probes": 128,
-                "logic_unit_layout_work": 2000000,
-                "logic_unit_layout_ms": 100,
-            }
-            if any(capabilities.get("limits", {}).get(name) != value
-                   for name, value in expected_replacement_limits.items()):
-                raise AssertionError(
-                    f"function replacement limits mismatch: {capabilities.get('limits')!r}")
-            expected_game_data_limits = {
-                "game_data_fields": 64, "game_data_rows": 2048, "game_data_batch_rows": 64,
-                "game_data_collection_items": 64, "game_data_depth": 4, "game_data_dependencies": 256,
-            }
-            if any(capabilities.get("limits", {}).get(name) != value for name, value in expected_game_data_limits.items()):
-                raise AssertionError(f"Phase 17 game-data limits mismatch: {capabilities.get('limits')!r}")
-            expected_widget_limits = {
-                "widget_tree_widgets": 512,
-                "widget_tree_depth": 32,
-                "widget_named_slots": 256,
-                "widget_defaults_per_widget": 16,
-                "widget_changed_defaults": 1024,
-                "widget_bindings": 256,
-            }
-            if any(capabilities.get("limits", {}).get(name) != value
-                   for name, value in expected_widget_limits.items()):
-                raise AssertionError(f"Widget-tree limits mismatch: {capabilities.get('limits')!r}")
-            if capabilities.get("limits", {}).get("level_discovery_scan") != 2048 \
-                    or capabilities.get("limits", {}).get("level_external_packages") != 2048:
-                raise AssertionError(f"level-open limits mismatch: {capabilities.get('limits')!r}")
-            if capabilities.get("limits", {}).get("level_setup_properties") != 16 \
-                    or capabilities.get("limits", {}).get("level_owned_packages") != 2048:
-                raise AssertionError(f"level-management limits mismatch: {capabilities.get('limits')!r}")
-            expected_level_inspect_limits = {
-                "level_actor_scan": 4096,
-                "level_actor_records": 2048,
-                "level_components": 64,
-                "level_actor_tags": 64,
-                "level_data_layers": 32,
-                "level_targeted_loads": 1,
-            }
-            if any(capabilities.get("limits", {}).get(name) != value
-                   for name, value in expected_level_inspect_limits.items()):
-                raise AssertionError(
-                    f"level-inspect limits mismatch: {capabilities.get('limits')!r}")
-            expected_level_edit_limits = {
-                "level_edit_operations": 32,
-                "level_edit_actors": 64,
-                "level_save_packages": 64,
-            }
-            if any(capabilities.get("limits", {}).get(name) != value
-                   for name, value in expected_level_edit_limits.items()):
-                raise AssertionError(
-                    f"level-edit limits mismatch: {capabilities.get('limits')!r}")
-            expected_asset_reference_limits = {
-                "asset_reference_registry_candidates": 4096,
-                "asset_reference_live_objects": 8192,
-                "asset_reference_records": 2048,
-                "asset_reference_assets_per_package": 64,
-                "asset_reference_properties": 16,
-                "asset_reference_retained_cursors": 8,
-                "asset_reference_traversal_depth": 1,
-            }
-            if any(capabilities.get("limits", {}).get(name) != value
-                   for name, value in expected_asset_reference_limits.items()):
-                raise AssertionError(
-                    f"asset-references limits mismatch: {capabilities.get('limits')!r}"
-                )
-            if capabilities.get("asset_access") != {
-                "read_scope": "all_mounted_content",
-                "mutation_scope": "project_content_and_local_project_plugins",
-            }:
-                raise AssertionError("asset access policy contract mismatch")
+            verify_capability_contract(capabilities, state)
             verify_companion_scenario(bridge, capabilities)
             level_scenario = open_acceptance_level(
                 bridge,
@@ -847,7 +280,7 @@ def main() -> int:
         finally:
             stop_editor(process, bridge=bridge)
         reloaded_bridge = None
-        process = subprocess.Popen(command, cwd=ROOT, env=environment, stdout=log, stderr=subprocess.STDOUT)
+        process = launch_editor(process_config, log)
         try:
             wait_until_ready(layout, process, time.monotonic() + 120.0)
             reloaded_bridge = UnrealBridge(layout, timeout=3.0)

@@ -1,6 +1,6 @@
 ---
 feature_id: python-tooling-decomposition
-status: planned
+status: completed
 depends_on:
   - windows-deployment-validation-fixes
 released_in: null
@@ -11,11 +11,11 @@ release_track: support-tooling
 
 **Outcome:** Repository Python tools under `scripts/` have narrow ownership, thin stable entrypoints, typed scenario state, and reusable Unreal-local support modules without changing runtime, CLI, packaging, deployment, or cross-process behavior.
 
-**Implementation status:** Planned as support tooling. It does not change Unreal MCP or companion semantic versions, the companion API, extension schemas, model-facing tools, or native plugin behavior.
+**Implementation status:** Completed as support tooling. It does not change Unreal MCP or companion semantic versions, the companion API, extension schemas, model-facing tools, or native plugin behavior.
 
 **Depends on:**
 
-- [`windows-deployment-validation-fixes`](../completed/windows-deployment-validation-fixes.md)
+- [`windows-deployment-validation-fixes`](windows-deployment-validation-fixes.md)
 
 ## Scope and ownership
 
@@ -63,14 +63,14 @@ Import direction is entrypoint to owning package to Unreal-local shared primitiv
 
 ## Implementation checklist
 
-- [ ] Add Unreal-local shared tooling and compatibility re-exports without behavior changes.
-- [ ] Extract packaging services and remove deployment's dependency on the packaging CLI module.
-- [ ] Split Windows deployment core, transaction, configuration, view, and controller responsibilities.
-- [ ] Extract headless process, Automation, capability, operation, and pagination infrastructure.
-- [ ] Split level/game-data and companion scenarios behind compatibility facades.
-- [ ] Split Blueprint scenarios and introduce typed scenario state incrementally.
-- [ ] Migrate tests from entrypoint internals and exact old source-file locations to owning module contracts.
-- [ ] Update automated-verification, deployment, packaging, and type documentation for the final boundaries.
+- [x] Add Unreal-local shared tooling and compatibility re-exports without behavior changes.
+- [x] Extract packaging services and remove deployment's dependency on the packaging CLI module.
+- [x] Split Windows deployment core, transaction, configuration, view, and controller responsibilities.
+- [x] Extract headless process, Automation, capability, operation, and pagination infrastructure.
+- [x] Split level/game-data and companion scenarios behind compatibility facades.
+- [x] Split Blueprint scenarios and introduce typed scenario state incrementally.
+- [x] Migrate tests from entrypoint internals and exact old source-file locations to owning module contracts.
+- [x] Update automated-verification, deployment, packaging, and type documentation for the final boundaries.
 
 ## Invariants and completion gates
 
@@ -80,5 +80,12 @@ Import direction is entrypoint to owning package to Unreal-local shared primitiv
 - Run focused packaging, deployment, and headless Python tests after each extraction and the complete Python suite at each coherent phase.
 - Run the documentation linter after Markdown changes. Update the contract test that currently reads `game_data_levels.py` when level editing moves to its owning module.
 - Before completion, run applicable Windows Automation and complete headless cross-process validation against the disposable UE 5.8 project. A native package build is required only if packaging commands, compatibility, or verification behavior changes rather than moving unchanged code.
+
+## Completed boundaries and verification
+
+- `unreal_tooling`, `packaging`, and `windows_deployment` now own the planned shared, package, discovery, verification, transaction, configuration, workflow, view, and controller boundaries. The three public scripts remain thin re-exporting entrypoints.
+- Headless process lifetime, Automation, capability contracts, operations, pagination, level/game-data domains, companion domains, and typed Blueprint handoff records have focused owners. Historical domain imports remain compatibility facades.
+- The complete 157-test Python suite passed on Windows. Unreal Engine 5.8 Automation passed all 46 native cases, and the complete two-process headless workflow passed authoring, lost-response reconciliation/replay, save/restart read-back, and graceful shutdown.
+- A native package build was not required because UAT arguments, descriptor restoration, package verification, deployment filtering, destinations, and compatibility behavior were moved unchanged.
 
 [Back to roadmap](../../../ROADMAP.md) · [Shared roadmap contracts](../index.md)

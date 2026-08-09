@@ -18,7 +18,7 @@ def author_blueprint_declarations(
     created: dict[str, object],
 ) -> dict[str, object]:
     """Author the component, default, member, macro, and custom-event declarations."""
-    from .lifecycle import reconcile_operation, send_without_reading
+    from .operations import reconcile_operation, send_without_reading
 
     asset_path = "/Game/UnrealMCPPhase4/BP_ComponentFixture.BP_ComponentFixture"
     created = bridge.call("blueprint_default_edit", {

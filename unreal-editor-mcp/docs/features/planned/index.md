@@ -15,4 +15,3 @@
 - [`pie-inspect` — Per-world runtime actor inspection and attributed diagnostics](pie-inspect.md).
 - [`pie-test` — Bounded PIE test commands, waits, and multiplayer acceptance](pie-test.md).
 - [`pie-multiprocess` — Multi-process PIE companion and cross-process observation](pie-multiprocess.md).
-- [`python-tooling-decomposition` — Python support-tool responsibility decomposition](python-tooling-decomposition.md).

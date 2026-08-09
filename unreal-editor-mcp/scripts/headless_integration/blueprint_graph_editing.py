@@ -22,7 +22,7 @@ def author_blueprint_scenario(
     phase_fifteen_game_instance: dict[str, object],
 ) -> dict[str, object]:
     """Author, compile, save, and validate the complete Blueprint graph fixture."""
-    from .lifecycle import reconcile_operation, send_without_reading
+    from .operations import reconcile_operation, send_without_reading
 
     def require_layered_layout(result: dict[str, object], label: str) -> None:
         layout_result = result.get("changed", {}).get("layout", {})

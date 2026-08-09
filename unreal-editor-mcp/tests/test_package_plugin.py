@@ -18,6 +18,13 @@ SPEC.loader.exec_module(package_plugin)
 
 
 class PackagePluginScriptTests(unittest.TestCase):
+    def test_entrypoint_reexports_the_packaging_service(self):
+        from scripts import packaging
+
+        self.assertIs(package_plugin.main, packaging.main)
+        self.assertIs(package_plugin.prepare_package, packaging.prepare_package)
+        self.assertTrue(hasattr(packaging, "PackageRequest"))
+
     def write_engine(self, folder: Path, major: int = 5, minor: int = 8) -> None:
         batch_files = folder / "Engine" / "Build" / "BatchFiles"
         batch_files.mkdir(parents=True)
