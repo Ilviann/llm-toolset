@@ -16,6 +16,13 @@ Feature identifiers are stable names, not execution indexes. Unfinished features
 - [ ] [`umg-mvvm` — UMG ViewModel and View Binding authoring](docs/features/planned/umg-mvvm.md) — Add typed MVVM ViewModel creation and Widget View Binding authoring through the MVVM companion.
   - Depends on:
     - `umg-mvvm-inspect`
+- [ ] [`commonui-assets-inspect` — Inspect assets with CommonUI plugin dependencies](docs/features/planned/commonui-assets-inspect.md) — Add bounded typed inspection of supported CommonUI-dependent assets through an optional API-compatible companion plugin.
+  - Depends on:
+    - `umg-authoring`
+    - `companion-plugins`
+- [ ] [`commonui-assets-authoring` — Create/update assets with CommonUI plugin dependencies](docs/features/planned/commonui-assets-authoring.md) — Add stale-safe creation and updating of supported CommonUI-dependent assets through the CommonUI companion.
+  - Depends on:
+    - `commonui-assets-inspect`
 - [x] [`gas-ability-blueprints-inspect` — Gameplay Ability Blueprint inspection](docs/features/completed/gas-ability-blueprints-inspect.md) — Add bounded typed inspection of existing Gameplay Ability Blueprint assets through an optional API-compatible companion plugin.
   - Depends on:
     - `companion-plugins`
