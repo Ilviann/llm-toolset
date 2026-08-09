@@ -334,6 +334,8 @@ def run_automation(executable: Path, project: Path, environment: dict[str, str],
         "AbilityBlueprintInspection",
         "GameplayEffectInspection",
         "GameplayEffectLiveFixture",
+        "WidgetBlueprintInspection",
+        "WidgetBlueprintLiveFixture",
         "Protocol",
     )
     if test_filter == "UnrealMCP":
@@ -370,6 +372,10 @@ def run_automation(executable: Path, project: Path, environment: dict[str, str],
         expected = tuple(name for name in all_expected if name == "RegistryLiveMemoryAndCursors")
     elif test_filter == "UnrealMCP.LevelManagement":
         expected = tuple(name for name in all_expected if name == "CreateConfigurePersistAndDelete")
+    elif test_filter == "UnrealMCP.CommonUI":
+        expected = tuple(name for name in all_expected if name in {
+            "WidgetBlueprintInspection", "WidgetBlueprintLiveFixture",
+        })
     else:
         leaf = test_filter.rsplit(".", 1)[-1]
         expected = (leaf,) if leaf in all_expected else ()
@@ -449,6 +455,35 @@ def prepare_gas_effect_fixture(executable: Path, project: Path, environment: dic
     return fixtures[-1]
 
 
+def prepare_commonui_widget_fixture(
+    executable: Path, project: Path, environment: dict[str, str],
+) -> str:
+    command = [
+        str(executable), str(project), "-unattended", "-nop4", "-nosplash", "-nullrhi",
+        "-stdout", "-FullStdOutLogOutput", "-nocrashreports", "-NoAssetRegistryCache",
+        "-DDC-ForceMemoryCache",
+        "-ExecCmds=Automation RunTests UnrealMCP.CommonUI.WidgetBlueprintLiveFixture;Quit",
+        "-TestExit=Automation Test Queue Empty",
+    ]
+    with tempfile.TemporaryFile() as log:
+        process = subprocess.Popen(command, cwd=ROOT, env=environment, stdout=log, stderr=subprocess.STDOUT)
+        try:
+            return_code = process.wait(timeout=180.0)
+        except subprocess.TimeoutExpired:
+            stop_editor(process)
+            raise RuntimeError("CommonUI Widget fixture preparation exceeded the three-minute deadline")
+        log.seek(0)
+        output = log.read().decode("utf-8", errors="replace")
+    marker = "UNREAL_MCP_COMMONUI_FIXTURE="
+    fixtures = [line.split(marker, 1)[1].split()[0] for line in output.splitlines() if marker in line]
+    if return_code != 0 \
+            or "Result={Success} Name={WidgetBlueprintLiveFixture}" not in output \
+            or not fixtures:
+        sys.stderr.write(output[-32_000:])
+        raise RuntimeError("CommonUI Widget saved fixture preparation failed")
+    return fixtures[-1]
+
+
 def main() -> int:
     engine = required_path(ENGINE_ROOT_ENV)
     project = required_path(TEST_PROJECT_ENV)
@@ -485,6 +520,10 @@ def main() -> int:
     gas_fixture_dir = layout.root / "Content" / "UnrealMCPGAS"
     for name in ("GE_InspectionFixture", "GA_EffectReferenceFixture"):
         (gas_fixture_dir / f"{name}.uasset").unlink(missing_ok=True)
+    commonui_fixture = (
+        layout.root / "Content" / "UnrealMCPCommonUI" / "WBP_InspectionFixture.uasset"
+    )
+    commonui_fixture.unlink(missing_ok=True)
     if sys.argv[1:] == ["--automation-only"]:
         return run_automation(executable, layout.descriptor, environment)
     if len(sys.argv) == 3 and sys.argv[1] == "--automation-filter":
@@ -503,6 +542,12 @@ def main() -> int:
     gas_effect_fixture = prepare_gas_effect_fixture(executable, layout.descriptor, environment)
     if gas_effect_fixture != "/Game/UnrealMCPGAS/GE_InspectionFixture.GE_InspectionFixture":
         raise AssertionError(f"Gameplay Effect fixture path mismatch: {gas_effect_fixture!r}")
+    commonui_widget_fixture = prepare_commonui_widget_fixture(
+        executable, layout.descriptor, environment,
+    )
+    if commonui_widget_fixture \
+            != "/Game/UnrealMCPCommonUI/WBP_InspectionFixture.WBP_InspectionFixture":
+        raise AssertionError(f"CommonUI Widget fixture path mismatch: {commonui_widget_fixture!r}")
     command = [
         str(executable), str(layout.descriptor), "-unattended", "-nop4", "-nosplash",
         "-nullrhi", "-nosound", "-nocrashreports", "-NoAssetRegistryCache",

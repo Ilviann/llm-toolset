@@ -631,6 +631,12 @@ TSharedPtr<FJsonObject> FUnrealMCPBridge::Capabilities() const
     Features->SetBoolField(TEXT("gas_gameplay_effects_mutation"),
         ExtensionRegistry->HasReadyFamilyCapability(
             TEXT("gameplay_effect"), EUnrealMCPExtensionAccess::Mutation));
+    Features->SetBoolField(TEXT("commonui_widget_blueprints_inspection"),
+        ExtensionRegistry->HasReadyFamilyCapability(
+            TEXT("commonui_widget"), EUnrealMCPExtensionAccess::Read));
+    Features->SetBoolField(TEXT("commonui_widget_blueprints_mutation"),
+        ExtensionRegistry->HasReadyFamilyCapability(
+            TEXT("commonui_widget"), EUnrealMCPExtensionAccess::Mutation));
     Result->SetObjectField(TEXT("features"), Features);
     TArray<TSharedPtr<FJsonValue>> BlueprintFamilies =
         UnrealMCP::BlueprintFamilyPolicy::BuildPublishedMatrix();

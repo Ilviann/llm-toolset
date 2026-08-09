@@ -1,0 +1,38 @@
+{
+  "FileVersion": 3,
+  "Version": 10000,
+  "VersionName": "0.1.0",
+  "companion_api_version": 1,
+  "FriendlyName": "Unreal MCP CommonUI",
+  "Description": "Optional read-only CommonUI Widget Blueprint inspection companion for Unreal MCP.",
+  "Category": "Editor",
+  "CreatedBy": "Ilviann Zed",
+  "CreatedByURL": "https://github.com/Ilviann/llm-toolset",
+  "SupportURL": "ilviann.zed@gmail.com",
+  "CanContainContent": false,
+  "EnabledByDefault": false,
+  "Installed": false,
+  "unreal_mcp_companion": {
+    "extension_id": "unreal-mcp-commonui",
+    "schema_revision": 1,
+    "owning_module": "UnrealMCPCommonUI",
+    "required_engine_plugins": ["CommonUI"]
+  },
+  "Plugins": [
+    {
+      "Name": "UnrealMCP",
+      "Enabled": true
+    },
+    {
+      "Name": "CommonUI",
+      "Enabled": true
+    }
+  ],
+  "Modules": [
+    {
+      "Name": "UnrealMCPCommonUI",
+      "Type": "Editor",
+      "LoadingPhase": "None"
+    }
+  ]
+}

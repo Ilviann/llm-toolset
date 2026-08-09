@@ -55,37 +55,48 @@ class ReleaseContractTests(unittest.TestCase):
         native = re.search(r'Version\[\].*TEXT\("([^"]+)"\)', header)
         self.assertIsNotNone(native)
         versions = {project["project"]["version"], plugin["VersionName"], native.group(1), unreal_editor_mcp.__version__}
-        self.assertEqual(versions, {"0.34.0"})
+        self.assertEqual(versions, {"0.35.0"})
 
     def test_companion_api_and_companion_versions_are_internally_consistent(self):
         base = json.loads((ROOT / "plugin/UnrealMCP/UnrealMCP.uplugin").read_text(encoding="utf-8"))
         fixture = json.loads((ROOT / "plugin/UnrealMCPTestCompanion/UnrealMCPTestCompanion.uplugin").read_text(encoding="utf-8"))
         gas = json.loads((ROOT / "plugin/UnrealMCPGAS/UnrealMCPGAS.uplugin").read_text(encoding="utf-8"))
+        commonui = json.loads((ROOT / "plugin/UnrealMCPCommonUI/UnrealMCPCommonUI.uplugin").read_text(encoding="utf-8"))
         base_header = (ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Public/UnrealMCPVersion.h").read_text(encoding="utf-8")
         fixture_header = (ROOT / "plugin/UnrealMCPTestCompanion/Source/UnrealMCPTestCompanion/Public/UnrealMCPTestCompanionVersion.h").read_text(encoding="utf-8")
         gas_header = (ROOT / "plugin/UnrealMCPGAS/Source/UnrealMCPGAS/Public/UnrealMCPGASVersion.h").read_text(encoding="utf-8")
+        commonui_header = (ROOT / "plugin/UnrealMCPCommonUI/Source/UnrealMCPCommonUI/Public/UnrealMCPCommonUIVersion.h").read_text(encoding="utf-8")
         base_api = re.search(r"CompanionApiVersion\s*=\s*(\d+)", base_header)
         fixture_api = re.search(r"CompanionApiVersion\s*=\s*(\d+)", fixture_header)
         gas_api = re.search(r"CompanionApiVersion\s*=\s*(\d+)", gas_header)
+        commonui_api = re.search(r"CompanionApiVersion\s*=\s*(\d+)", commonui_header)
         fixture_version = re.search(r'Version\[\].*TEXT\("([^"]+)"\)', fixture_header)
         gas_version = re.search(r'Version\[\].*TEXT\("([^"]+)"\)', gas_header)
+        commonui_version = re.search(r'Version\[\].*TEXT\("([^"]+)"\)', commonui_header)
         self.assertIsNotNone(base_api)
         self.assertIsNotNone(fixture_api)
         self.assertIsNotNone(gas_api)
+        self.assertIsNotNone(commonui_api)
         self.assertIsNotNone(fixture_version)
         self.assertIsNotNone(gas_version)
+        self.assertIsNotNone(commonui_version)
         self.assertEqual({base["companion_api_version"], fixture["companion_api_version"],
-                          gas["companion_api_version"], int(base_api.group(1)),
-                          int(fixture_api.group(1)), int(gas_api.group(1))}, {1})
+                          gas["companion_api_version"], commonui["companion_api_version"],
+                          int(base_api.group(1)), int(fixture_api.group(1)),
+                          int(gas_api.group(1)), int(commonui_api.group(1))}, {1})
         self.assertEqual(fixture["VersionName"], fixture_version.group(1))
         self.assertEqual(gas["VersionName"], gas_version.group(1))
+        self.assertEqual(commonui["VersionName"], commonui_version.group(1))
         self.assertNotEqual(fixture["VersionName"], base["VersionName"])
         self.assertNotEqual(gas["VersionName"], base["VersionName"])
+        self.assertNotEqual(commonui["VersionName"], base["VersionName"])
         self.assertEqual(base["Modules"][0]["LoadingPhase"], "PostEngineInit")
         self.assertEqual(fixture["Modules"][0]["LoadingPhase"], "None")
         self.assertEqual(gas["Modules"][0]["LoadingPhase"], "None")
+        self.assertEqual(commonui["Modules"][0]["LoadingPhase"], "None")
         self.assertEqual(fixture["unreal_mcp_companion"]["schema_revision"], 1)
         self.assertEqual(gas["unreal_mcp_companion"]["schema_revision"], 1)
+        self.assertEqual(commonui["unreal_mcp_companion"]["schema_revision"], 1)
 
         registry = (
             ROOT
@@ -119,6 +130,33 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertNotIn("EUnrealMCPExtensionAccess::Mutation", gas_source)
         self.assertIn('TEXT("gameplay_effect")', inspection_query)
         self.assertIn('TEXT("gameplay_effect")', inspection_support)
+
+    def test_commonui_companion_is_read_only_bounded_and_keeps_base_commonui_free(self):
+        base_build = (ROOT / "plugin/UnrealMCP/Source/UnrealMCP/UnrealMCP.Build.cs").read_text(encoding="utf-8")
+        inspection_query = (ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private/UnrealMCPBlueprintInspectionQuery.h").read_text(encoding="utf-8")
+        inspection_support = (ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private/UnrealMCPBlueprintInspectionSupport.h").read_text(encoding="utf-8")
+        commonui_build = (ROOT / "plugin/UnrealMCPCommonUI/Source/UnrealMCPCommonUI/UnrealMCPCommonUI.Build.cs").read_text(encoding="utf-8")
+        commonui_source = "\n".join(
+            path.read_text(encoding="utf-8")
+            for path in sorted((ROOT / "plugin/UnrealMCPCommonUI/Source/UnrealMCPCommonUI/Private").glob("*.cpp"))
+        )
+        self.assertNotIn('"CommonUI"', base_build)
+        for dependency in ["CommonUI", "CommonInput", "UMG", "UMGEditor"]:
+            self.assertIn(f'"{dependency}"', commonui_build)
+        for contract in [
+            "commonui_widget", "commonui_activation", "commonui_references",
+            "UCommonUserWidget", "UCommonActivatableWidget", "ActionDomainOverride",
+            "MaxInspectionRecords", "MaxInspectedProperties",
+            "EUnrealMCPExtensionAccess::Read", "WBP_InspectionFixture",
+        ]:
+            self.assertIn(contract, commonui_source)
+        self.assertNotIn("EUnrealMCPExtensionAccess::Mutation", commonui_source)
+        for section in ["commonui_widget", "commonui_activation", "commonui_references"]:
+            self.assertIn(f'TEXT("{section}")', inspection_query)
+            self.assertIn(f'TEXT("{section}")', inspection_support)
+        bridge = (ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private/UnrealMCPBridge.cpp").read_text(encoding="utf-8")
+        self.assertIn("commonui_widget_blueprints_inspection", bridge)
+        self.assertIn("commonui_widget_blueprints_mutation", bridge)
 
     def test_public_companion_api_does_not_expose_bridge_or_credentials(self):
         public = "\n".join(

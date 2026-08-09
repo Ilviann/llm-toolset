@@ -67,7 +67,8 @@ const TSet<FString> InspectSections = {
     TEXT("parameters"), TEXT("local_variables"),
     TEXT("graphs"), TEXT("nodes"), TEXT("pins"), TEXT("connections"),
     TEXT("widget_tree"), TEXT("widget_defaults"), TEXT("widget_bindings"),
-    TEXT("gameplay_ability"), TEXT("gameplay_effect")};
+    TEXT("gameplay_ability"), TEXT("gameplay_effect"),
+    TEXT("commonui_widget"), TEXT("commonui_activation"), TEXT("commonui_references")};
 
 const TSet<FString> SupportedPinCategories = {
     TEXT("exec"), TEXT("boolean"), TEXT("byte"), TEXT("int"), TEXT("int64"), TEXT("real"),

@@ -38,7 +38,8 @@ static bool DecodeInspectionQuery(const FJsonObject& Arguments, FInspectionQuery
     if (!ReadOptionalBool(Arguments, TEXT("include_inherited"), false, Out.bIncludeInherited, OutError)) return false;
     Out.Sections = {TEXT("summary"), TEXT("parent_class"), TEXT("compile_state"), TEXT("components"),
         TEXT("variables"), TEXT("functions"), TEXT("macros"), TEXT("custom_events"), TEXT("local_variables"),
-        TEXT("graphs"), TEXT("widget_tree"), TEXT("gameplay_ability"), TEXT("gameplay_effect")};
+        TEXT("graphs"), TEXT("widget_tree"), TEXT("gameplay_ability"), TEXT("gameplay_effect"),
+        TEXT("commonui_widget"), TEXT("commonui_activation"), TEXT("commonui_references")};
     if (Arguments.HasField(TEXT("sections")))
     {
         const TArray<TSharedPtr<FJsonValue>>* Values = nullptr;

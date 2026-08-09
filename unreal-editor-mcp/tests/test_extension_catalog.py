@@ -55,6 +55,25 @@ def gas_capabilities(*, ready=True, schema=EXTENSION_SCHEMA_REVISION, api=COMPAN
     }
 
 
+def commonui_capabilities(
+    *, ready=True, schema=EXTENSION_SCHEMA_REVISION, api=COMPANION_API_VERSION,
+):
+    return {
+        "companion_api_version": api,
+        "companions": [{
+            "extension_id": "unreal-mcp-commonui",
+            "companion_api_version": api,
+            "schema_revision": schema,
+            "ready": ready,
+            "contributions": [{
+                "tool_family": "blueprint_inspect",
+                "operation": "inspect_commonui_widget",
+                "access": "read",
+            }],
+        }],
+    }
+
+
 class ExtensionCatalogTests(unittest.TestCase):
     def tool(self, writable, name, native=None):
         base = tools_for_configuration(writable=writable, lifecycle_enabled=False)
@@ -152,6 +171,42 @@ class ExtensionCatalogTests(unittest.TestCase):
                 validate_tool_arguments(
                     valid, self.tool(False, "blueprint_inspect", native)["inputSchema"],
                 )
+
+    def test_commonui_companion_extends_widget_inspection_only_when_ready(self):
+        valid = {
+            "mode": "inspect",
+            "asset_path": "/Game/UI/WBP_Menu.WBP_Menu",
+            "sections": [
+                "summary", "widget_tree", "commonui_widget",
+                "commonui_activation", "commonui_references",
+            ],
+        }
+        validate_tool_arguments(
+            valid,
+            self.tool(False, "blueprint_inspect", commonui_capabilities())["inputSchema"],
+        )
+        for native in (
+            {}, commonui_capabilities(ready=False), commonui_capabilities(schema=2),
+            commonui_capabilities(api=2),
+        ):
+            with self.subTest(native=native), self.assertRaises(SchemaValidationError):
+                validate_tool_arguments(
+                    valid, self.tool(False, "blueprint_inspect", native)["inputSchema"],
+                )
+
+    def test_commonui_companion_never_adds_a_mutation_branch(self):
+        tools = compose_extension_tools(
+            tools_for_configuration(writable=True, lifecycle_enabled=False),
+            commonui_capabilities(), writable=True,
+        )
+        inspect = next(tool for tool in tools if tool["name"] == "blueprint_inspect")
+        validate_tool_arguments({
+            "mode": "inspect", "asset_path": "/Game/UI/WBP_Menu.WBP_Menu",
+            "sections": ["commonui_widget"],
+        }, inspect["inputSchema"])
+        for tool in tools:
+            if tool["name"] != "blueprint_inspect":
+                self.assertNotIn("unreal-mcp-commonui", json.dumps(tool))
 
     def test_server_rejects_forged_extensions_before_dispatch_and_routes_known_exact_schema(self):
         class Bridge:

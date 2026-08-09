@@ -145,6 +145,15 @@ class WindowsDeploymentScriptTests(unittest.TestCase):
             self.assertIn(f"-Plugin={deploy.package_plugin.GAS_DESCRIPTOR}", command)
             self.assertIn(f"-Dependencies={deploy.package_plugin.PLUGIN_DESCRIPTOR}", command)
 
+    def test_commonui_build_command_uses_companion_descriptor_and_base_dependency(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            engine = root / "UE_5.8"
+            self.write_engine(engine)
+            command = deploy.build_command(engine, root / "Package", deploy.COMMONUI_PLUGIN)
+            self.assertIn(f"-Plugin={deploy.package_plugin.COMMONUI_DESCRIPTOR}", command)
+            self.assertIn(f"-Dependencies={deploy.package_plugin.PLUGIN_DESCRIPTOR}", command)
+
     def test_run_packaging_restores_gas_descriptor_contract_before_verification(self):
         with tempfile.TemporaryDirectory() as temporary:
             output = Path(temporary) / "Package"
@@ -346,6 +355,37 @@ class WindowsDeploymentScriptTests(unittest.TestCase):
             }
             self.assertEqual(references, {"UnrealMCP": True, "UnrealMCPGAS": True})
 
+    def test_project_install_destinations_include_selected_commonui_companion(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            project_folder = root / "Game"
+            project_folder.mkdir()
+            project = self.write_project(project_folder)
+            destinations = deploy.deployment_destinations(
+                project,
+                root / "UE_5.8",
+                deploy.INSTALL_IN_PROJECT,
+                include_gas=False,
+                include_commonui=True,
+            )
+            self.assertEqual(
+                destinations,
+                (
+                    project_folder / "Plugins" / "UnrealMCP",
+                    project_folder / "Plugins" / "UnrealMCPCommonUI",
+                ),
+            )
+
+    def test_gas_and_commonui_companion_selections_are_independent_and_ordered(self):
+        self.assertEqual(
+            deploy.selected_plugins(include_gas=False, include_commonui=False),
+            (deploy.BASE_PLUGIN,),
+        )
+        self.assertEqual(
+            deploy.selected_plugins(include_gas=True, include_commonui=True),
+            (deploy.BASE_PLUGIN, deploy.GAS_PLUGIN, deploy.COMMONUI_PLUGIN),
+        )
+
     def test_project_descriptor_enable_rejects_duplicate_owned_reference(self):
         with tempfile.TemporaryDirectory() as temporary:
             folder = Path(temporary)
@@ -467,6 +507,45 @@ class WindowsDeploymentScriptTests(unittest.TestCase):
                 ],
             )
 
+    def test_deploy_builds_and_enables_commonui_with_base_for_project_install(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            project_folder = root / "Game"
+            project_folder.mkdir()
+            project = self.write_project(project_folder)
+            built: list[str] = []
+
+            def write_packaged_plugin(
+                engine_root: Path,
+                package_root: Path,
+                log: object,
+                plugin: deploy.PluginBuild,
+            ) -> None:
+                built.append(plugin.name)
+                package_root.mkdir()
+                self.write_package(package_root, plugin.name)
+
+            with mock.patch.object(deploy, "run_packaging", side_effect=write_packaged_plugin):
+                installed = deploy.deploy(
+                    project,
+                    root / "UE_5.8",
+                    replace_existing=False,
+                    include_commonui=True,
+                    install_method=deploy.INSTALL_IN_PROJECT,
+                    log=lambda message: None,
+                )
+
+            self.assertEqual(built, ["UnrealMCP", "UnrealMCPCommonUI"])
+            self.assertEqual([path.name for path in installed], ["UnrealMCP", "UnrealMCPCommonUI"])
+            references = json.loads(project.descriptor.read_text(encoding="utf-8"))["Plugins"]
+            self.assertEqual(
+                references,
+                [
+                    {"Name": "UnrealMCP", "Enabled": True},
+                    {"Name": "UnrealMCPCommonUI", "Enabled": True},
+                ],
+            )
+
     def test_engine_install_without_default_enablement_sets_false_and_leaves_project_unchanged(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -519,6 +598,14 @@ class WindowsDeploymentScriptTests(unittest.TestCase):
                 Path("D:/UE_5.8"),
                 deploy.INSTALL_IN_PROJECT,
                 include_gas=1,  # type: ignore[arg-type]
+            )
+        with self.assertRaisesRegex(deploy.DeploymentError, "include_commonui must be Boolean"):
+            deploy.deployment_destinations(
+                project,
+                Path("D:/UE_5.8"),
+                deploy.INSTALL_IN_PROJECT,
+                include_gas=False,
+                include_commonui=1,  # type: ignore[arg-type]
             )
 
     def test_project_install_rolls_back_if_descriptor_changes_during_build(self):

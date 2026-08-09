@@ -28,6 +28,7 @@ SERVER_ENTRY = APPLICATION_ROOT / "server.py"
 SERVER_NAME = "unreal-editor"
 PLUGIN_NAME = "UnrealMCP"
 GAS_PLUGIN_NAME = "UnrealMCPGAS"
+COMMONUI_PLUGIN_NAME = "UnrealMCPCommonUI"
 INSTALL_IN_PROJECT = "project"
 INSTALL_IN_ENGINE_ENABLED = "engine_enabled"
 INSTALL_IN_ENGINE_DISABLED = "engine_disabled"
@@ -71,6 +72,11 @@ BASE_PLUGIN = PluginBuild(PLUGIN_NAME, package_plugin.PLUGIN_DESCRIPTOR)
 GAS_PLUGIN = PluginBuild(
     GAS_PLUGIN_NAME,
     package_plugin.GAS_DESCRIPTOR,
+    (package_plugin.PLUGIN_DESCRIPTOR,),
+)
+COMMONUI_PLUGIN = PluginBuild(
+    COMMONUI_PLUGIN_NAME,
+    package_plugin.COMMONUI_DESCRIPTOR,
     (package_plugin.PLUGIN_DESCRIPTOR,),
 )
 
@@ -552,20 +558,32 @@ def validate_install_method(install_method: str) -> str:
     return install_method
 
 
+def selected_plugins(*, include_gas: bool, include_commonui: bool) -> tuple[PluginBuild, ...]:
+    if type(include_gas) is not bool:
+        raise DeploymentError("include_gas must be Boolean")
+    if type(include_commonui) is not bool:
+        raise DeploymentError("include_commonui must be Boolean")
+    plugins = [BASE_PLUGIN]
+    if include_gas:
+        plugins.append(GAS_PLUGIN)
+    if include_commonui:
+        plugins.append(COMMONUI_PLUGIN)
+    return tuple(plugins)
+
+
 def deployment_destinations(
     project: ProjectInfo,
     engine_root: Path,
     install_method: str,
     *,
     include_gas: bool,
+    include_commonui: bool = False,
 ) -> tuple[Path, ...]:
     validate_install_method(install_method)
-    if type(include_gas) is not bool:
-        raise DeploymentError("include_gas must be Boolean")
-    names = (PLUGIN_NAME, GAS_PLUGIN_NAME) if include_gas else (PLUGIN_NAME,)
+    plugins = selected_plugins(include_gas=include_gas, include_commonui=include_commonui)
     if install_method == INSTALL_IN_PROJECT:
-        return tuple(plugin_destination(project, name) for name in names)
-    return tuple(engine_plugin_destination(engine_root, name) for name in names)
+        return tuple(plugin_destination(project, plugin.name) for plugin in plugins)
+    return tuple(engine_plugin_destination(engine_root, plugin.name) for plugin in plugins)
 
 
 def project_descriptor_update(
@@ -836,20 +854,20 @@ def deploy(
     replace_existing: bool,
     include_pdb: bool = False,
     include_gas: bool = False,
+    include_commonui: bool = False,
     install_method: str = INSTALL_IN_PROJECT,
     log: Callable[[str], None],
 ) -> tuple[Path, ...]:
     if type(replace_existing) is not bool:
         raise DeploymentError("replace_existing must be Boolean")
     validate_install_method(install_method)
-    if type(include_gas) is not bool:
-        raise DeploymentError("include_gas must be Boolean")
-    plugins = (BASE_PLUGIN, GAS_PLUGIN) if include_gas else (BASE_PLUGIN,)
+    plugins = selected_plugins(include_gas=include_gas, include_commonui=include_commonui)
     destinations = deployment_destinations(
         project,
         engine_root,
         install_method,
         include_gas=include_gas,
+        include_commonui=include_commonui,
     )
     existing_before_build = tuple(destination for destination in destinations if destination.exists())
     if existing_before_build and not replace_existing:
@@ -915,12 +933,13 @@ class DeploymentWindow:
         self.ttk = ttk
         self.root = tk.Tk()
         self.root.title("Unreal MCP — Windows Deployment")
-        self.root.geometry("820x830")
-        self.root.minsize(680, 730)
+        self.root.geometry("820x860")
+        self.root.minsize(680, 760)
         self.events: queue.Queue[tuple[str, object]] = queue.Queue()
         self.project_value = tk.StringVar()
         self.engine_value = tk.StringVar(value=default_engine_root())
         self.include_gas_value = tk.BooleanVar(value=False)
+        self.include_commonui_value = tk.BooleanVar(value=False)
         self.include_pdb_value = tk.BooleanVar(value=False)
         self.install_method_value = tk.StringVar(value=INSTALL_IN_PROJECT)
         self.writable_value = tk.BooleanVar(value=False)
@@ -941,8 +960,8 @@ class DeploymentWindow:
         frame = self.ttk.Frame(self.root, padding=14)
         frame.pack(fill="both", expand=True)
         frame.columnconfigure(1, weight=1)
-        frame.rowconfigure(10, weight=1)
-        frame.rowconfigure(12, weight=1)
+        frame.rowconfigure(11, weight=1)
+        frame.rowconfigure(13, weight=1)
 
         self.ttk.Label(frame, text="Unreal project folder").grid(row=0, column=0, sticky="w")
         self.project_entry = self.ttk.Entry(frame, textvariable=self.project_value)
@@ -975,13 +994,25 @@ class DeploymentWindow:
             sticky="w",
             pady=(10, 0),
         )
+        self.include_commonui_checkbox = self.ttk.Checkbutton(
+            frame,
+            text="Build and install Unreal MCP CommonUI companion plugin",
+            variable=self.include_commonui_value,
+        )
+        self.include_commonui_checkbox.grid(
+            row=4,
+            column=0,
+            columnspan=3,
+            sticky="w",
+            pady=(8, 0),
+        )
         self.include_pdb_checkbox = self.ttk.Checkbutton(
             frame,
             text="Include matching PDB crash symbols (larger installation)",
             variable=self.include_pdb_value,
         )
         self.include_pdb_checkbox.grid(
-            row=4,
+            row=5,
             column=0,
             columnspan=3,
             sticky="w",
@@ -989,7 +1020,7 @@ class DeploymentWindow:
         )
 
         install_methods = self.ttk.LabelFrame(frame, text="Install method", padding=8)
-        install_methods.grid(row=5, column=0, columnspan=3, sticky="ew", pady=(10, 0))
+        install_methods.grid(row=6, column=0, columnspan=3, sticky="ew", pady=(10, 0))
         self.install_method_buttons = (
             self.ttk.Radiobutton(
                 install_methods,
@@ -1017,31 +1048,31 @@ class DeploymentWindow:
             text="Enable writable MCP tools in the generated LM Studio entry",
             variable=self.writable_value,
         )
-        self.writable_checkbox.grid(row=6, column=0, columnspan=3, sticky="w", pady=(8, 0))
+        self.writable_checkbox.grid(row=7, column=0, columnspan=3, sticky="w", pady=(8, 0))
         self.lifecycle_checkbox = self.ttk.Checkbutton(
             frame,
             text="Enable editor lifecycle control using the selected Engine",
             variable=self.lifecycle_value,
         )
-        self.lifecycle_checkbox.grid(row=7, column=0, columnspan=3, sticky="w", pady=(8, 0))
+        self.lifecycle_checkbox.grid(row=8, column=0, columnspan=3, sticky="w", pady=(8, 0))
         self.install_button = self.ttk.Button(
             frame,
             text="Build and install selected plugins",
             command=self._install,
         )
-        self.install_button.grid(row=8, column=0, columnspan=3, sticky="ew", pady=12)
+        self.install_button.grid(row=9, column=0, columnspan=3, sticky="ew", pady=12)
         self.ttk.Label(frame, textvariable=self.status_value, wraplength=760).grid(
-            row=9, column=0, columnspan=3, sticky="w"
+            row=10, column=0, columnspan=3, sticky="w"
         )
 
         self.log_text = scrolledtext.ScrolledText(frame, height=12, state="disabled", wrap="word")
-        self.log_text.grid(row=10, column=0, columnspan=3, sticky="nsew", pady=(8, 12))
+        self.log_text.grid(row=11, column=0, columnspan=3, sticky="nsew", pady=(8, 12))
 
         self.ttk.Label(frame, text="MCP configuration preview").grid(
-            row=11, column=0, columnspan=3, sticky="w"
+            row=12, column=0, columnspan=3, sticky="w"
         )
         previews = self.ttk.Notebook(frame)
-        previews.grid(row=12, column=0, columnspan=3, sticky="nsew", pady=(8, 0))
+        previews.grid(row=13, column=0, columnspan=3, sticky="nsew", pady=(8, 0))
 
         lm_studio = self.ttk.Frame(previews, padding=10)
         lm_studio.columnconfigure(0, weight=1)
@@ -1171,6 +1202,7 @@ class DeploymentWindow:
             self.engine_entry,
             self.engine_button,
             self.include_gas_checkbox,
+            self.include_commonui_checkbox,
             self.include_pdb_checkbox,
             self.writable_checkbox,
             self.lifecycle_checkbox,
@@ -1198,12 +1230,14 @@ class DeploymentWindow:
                 else None
             )
             include_gas = bool(self.include_gas_value.get())
+            include_commonui = bool(self.include_commonui_value.get())
             install_method = validate_install_method(self.install_method_value.get())
             destinations = deployment_destinations(
                 project,
                 engine,
                 install_method,
                 include_gas=include_gas,
+                include_commonui=include_commonui,
             )
         except DeploymentError as error:
             messagebox.showerror("Cannot install Unreal MCP", str(error))
@@ -1236,6 +1270,7 @@ class DeploymentWindow:
                     replace_existing=replace_existing,
                     include_pdb=include_pdb,
                     include_gas=include_gas,
+                    include_commonui=include_commonui,
                     install_method=install_method,
                     log=lambda message: self.events.put(("log", message)),
                 )

@@ -16,7 +16,7 @@ Feature identifiers are stable names, not execution indexes. Unfinished features
 - [ ] [`umg-mvvm` — UMG ViewModel and View Binding authoring](docs/features/planned/umg-mvvm.md) — Add typed MVVM ViewModel creation and Widget View Binding authoring through the MVVM companion.
   - Depends on:
     - `umg-mvvm-inspect`
-- [ ] [`commonui-assets-inspect` — Inspect assets with CommonUI plugin dependencies](docs/features/planned/commonui-assets-inspect.md) — Add bounded typed inspection of supported CommonUI-dependent assets through an optional API-compatible companion plugin.
+- [x] [`commonui-assets-inspect` — Inspect assets with CommonUI plugin dependencies](docs/features/completed/commonui-assets-inspect.md) — Add bounded typed inspection of supported CommonUI-dependent assets through an optional API-compatible companion plugin.
   - Depends on:
     - `umg-authoring`
     - `companion-plugins`
@@ -97,6 +97,10 @@ Feature identifiers are stable names, not execution indexes. Unfinished features
 Support-tooling features change repository utilities without changing Unreal MCP runtime functionality or triggering plugin version changes.
 
 - [x] [`windows-deployment-install-modes` — Windows deployment companion and install modes](docs/features/completed/windows-deployment-install-modes.md) — Build and install the base plugin alone or with `UnrealMCPGAS` into a selected project or Engine.
+- [x] [`windows-deployment-commonui` — CommonUI companion deployment option](docs/features/completed/windows-deployment-commonui.md) — Add an independent checkbox that builds and installs `UnrealMCPCommonUI` with the compatible base plugin.
+  - Depends on:
+    - `windows-deployment-install-modes`
+    - `commonui-assets-inspect`
 - [x] [`windows-deployment-codex-preview` — Codex deployment configuration preview](docs/features/completed/windows-deployment-codex-preview.md) — Show one shared launch definition as LM Studio JSON and separately copyable ChatGPT Codex STDIO fields.
   - Depends on:
     - `windows-deployment-install-modes`
@@ -114,5 +118,6 @@ Feature checkboxes record implementation completion after mandatory Windows veri
   - `gas-gameplay-effects-inspect`
   - `event-macro-replace`
   - `node-layout`
+  - `commonui-assets-inspect`
 - Windows:
   - None

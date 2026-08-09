@@ -22,9 +22,13 @@ FIXTURE_DESCRIPTOR = (
     APPLICATION_ROOT / "plugin" / "UnrealMCPTestCompanion" / "UnrealMCPTestCompanion.uplugin"
 )
 GAS_DESCRIPTOR = APPLICATION_ROOT / "plugin" / "UnrealMCPGAS" / "UnrealMCPGAS.uplugin"
+COMMONUI_DESCRIPTOR = (
+    APPLICATION_ROOT / "plugin" / "UnrealMCPCommonUI" / "UnrealMCPCommonUI.uplugin"
+)
 DEFAULT_OUTPUT = WORKSPACE_ROOT / "build" / "unreal-editor-mcp"
 DEFAULT_FIXTURE_OUTPUT = WORKSPACE_ROOT / "build" / "unreal-mcp-test-companion"
 DEFAULT_GAS_OUTPUT = WORKSPACE_ROOT / "build" / "unreal-mcp-gas"
+DEFAULT_COMMONUI_OUTPUT = WORKSPACE_ROOT / "build" / "unreal-mcp-commonui"
 ENGINE_ROOT_ENV = "UE58"
 MAX_PLUGIN_DESCRIPTOR_BYTES = 1024 * 1024
 PACKAGING_OWNED_DESCRIPTOR_FIELDS = frozenset({"EngineVersion", "Installed"})
@@ -233,6 +237,11 @@ def create_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="package the optional UnrealMCPGAS companion instead of the base plugin",
     )
+    plugin_selection.add_argument(
+        "--commonui-companion",
+        action="store_true",
+        help="package the optional UnrealMCPCommonUI companion instead of the base plugin",
+    )
     parser.add_argument(
         "--engine-root",
         type=Path,
@@ -290,12 +299,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         plugin_descriptor = (
             FIXTURE_DESCRIPTOR if arguments.companion_fixture
             else GAS_DESCRIPTOR if arguments.gas_companion
+            else COMMONUI_DESCRIPTOR if arguments.commonui_companion
             else PLUGIN_DESCRIPTOR
         )
         if arguments.companion_fixture and arguments.output == DEFAULT_OUTPUT:
             arguments.output = DEFAULT_FIXTURE_OUTPUT
         if arguments.gas_companion and arguments.output == DEFAULT_OUTPUT:
             arguments.output = DEFAULT_GAS_OUTPUT
+        if arguments.commonui_companion and arguments.output == DEFAULT_OUTPUT:
+            arguments.output = DEFAULT_COMMONUI_OUTPUT
         output = validate_output(arguments.output, engine_root, plugin_descriptor)
         target_platforms = normalize_target_platforms(arguments.target_platforms)
         environment = configure_environment(host_system, arguments.developer_dir)
@@ -308,6 +320,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             plugin_descriptor=plugin_descriptor,
             dependency_plugins=(PLUGIN_DESCRIPTOR,) if (
                 arguments.companion_fixture or arguments.gas_companion
+                or arguments.commonui_companion
             ) else (),
         )
     except PackagingError as error:

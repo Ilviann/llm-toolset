@@ -12,7 +12,7 @@ released_in: null
 
 **Depends on:**
 
-- [`commonui-assets-inspect`](commonui-assets-inspect.md)
+- [`commonui-assets-inspect`](../completed/commonui-assets-inspect.md)
 
 **Planning note:** Before implementation, freeze creation and mutation operations separately for each inspected asset family against the supported Unreal Engine build and public CommonUI editor APIs. Inspection support does not imply that a family is safe to create or update.
 

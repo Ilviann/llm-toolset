@@ -3,6 +3,13 @@
 ## Unreleased
 
 - Standardized Unreal Engine 5.8 development tooling on the `UE58` environment variable and moved the disposable integration project to `ue-test/ue58/`.
+- Added an independent CommonUI companion checkbox to the Windows deployment helper, including fixed base-dependent packaging, project/Engine installation, and transactional multi-plugin handling without changing runtime or plugin versions.
+
+## 0.35.0 — 2026-08-09
+
+- Added the independently versioned optional `UnrealMCPCommonUI` 0.1.0 editor companion with all CommonUI dependencies isolated from the base plugin and unchanged companion API v1/schema revision 1.
+- Added bounded read-only `UCommonUserWidget` Widget Blueprint inspection through ordinary `blueprint_inspect`, with typed widget-input, activation, and reference records, local/inherited ownership, unresolved-safe identities, and one combined snapshot.
+- Added exact read/mutation capabilities, dynamic Python section admission, focused native and production-socket fixtures, independent Win64 packaging, release contracts, and CommonUI user/architecture/type documentation. macOS verification remains preferred follow-up work.
 
 ## 0.34.0 — 2026-08-09
 

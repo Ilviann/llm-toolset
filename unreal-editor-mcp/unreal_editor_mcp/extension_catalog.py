@@ -79,6 +79,15 @@ EXTENSION_CATALOG: Final = {
                 ("gameplay_effect",),
         },
     },
+    "unreal-mcp-commonui": {
+        "schema_revision": EXTENSION_SCHEMA_REVISION,
+        "contributions": {},
+        "integrated_sections": {
+            ("blueprint_inspect", "inspect_commonui_widget", "read"): (
+                "commonui_widget", "commonui_activation", "commonui_references",
+            ),
+        },
+    },
 }
 
 

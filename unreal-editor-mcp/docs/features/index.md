@@ -53,7 +53,7 @@ Keep the authoritative checklist in [`ROADMAP.md`](../../ROADMAP.md) synchronize
 - [`umg-mvvm` — UMG ViewModel and View Binding authoring](planned/umg-mvvm.md) — Add typed MVVM ViewModel creation and Widget View Binding authoring through the MVVM companion.
   - Depends on:
     - `umg-mvvm-inspect`
-- [`commonui-assets-inspect` — Inspect assets with CommonUI plugin dependencies](planned/commonui-assets-inspect.md) — Add bounded typed inspection of supported CommonUI-dependent assets through an optional API-compatible companion plugin.
+- [`commonui-assets-inspect` — Inspect assets with CommonUI plugin dependencies](completed/commonui-assets-inspect.md) — Add bounded typed inspection of supported CommonUI-dependent assets through an optional API-compatible companion plugin.
   - Depends on:
     - `umg-authoring`
     - `companion-plugins`
@@ -66,6 +66,10 @@ Keep the authoritative checklist in [`ROADMAP.md`](../../ROADMAP.md) synchronize
 - [`windows-deployment-codex-preview` — Codex deployment configuration preview](completed/windows-deployment-codex-preview.md) — Show one shared launch definition as LM Studio JSON and separately copyable ChatGPT Codex STDIO fields.
   - Depends on:
     - `windows-deployment-install-modes`
+- [`windows-deployment-commonui` — CommonUI companion deployment option](completed/windows-deployment-commonui.md) — Add an independent checkbox that builds and installs `UnrealMCPCommonUI` with the compatible base plugin.
+  - Depends on:
+    - `windows-deployment-install-modes`
+    - `commonui-assets-inspect`
 - [`gas-ability-blueprints` — Gameplay Ability Blueprint creation and updating](planned/gas-ability-blueprints.md) — Add typed Gameplay Ability Blueprint creation and authoring through the GAS companion.
   - Depends on:
     - `phase-13`
@@ -204,7 +208,7 @@ The GAS features extend the existing Blueprint tools when the companion capabili
 
 The MVVM features extend existing Blueprint and Widget tools rather than adding a separate model-facing MVVM tool. `umg-mvvm-inspect` adds bounded typed inspection for ViewModel Blueprints, Widget Blueprint ViewModel contexts, and View Bindings while keeping those records distinct from legacy property bindings and Designer events. `umg-mvvm` then adds ViewModel Blueprint creation and editing plus typed `widget_tree_edit` mutations for contexts and bindings. Capabilities distinguish read support from mutation support so an inspection-only release cannot advertise or execute create/update operations.
 
-The CommonUI features extend existing asset, Blueprint, and Widget tools rather than adding a separate model-facing CommonUI tool. `commonui-assets-inspect` adds bounded typed inspection for an explicit capability-advertised allowlist of CommonUI-dependent asset families; `commonui-assets-authoring` then adds creation and updating for the inspected families that public editor APIs can mutate safely. Capabilities distinguish read support from mutation support so an inspection-only release cannot advertise or execute create/update operations.
+The CommonUI features extend existing asset, Blueprint, and Widget tools rather than adding a separate model-facing CommonUI tool. `commonui-assets-inspect` initially allowlists `UCommonUserWidget`-derived Widget Blueprints and adds bounded typed widget, activation, and reference records while retaining the ordinary `widget` family. `commonui-assets-authoring` can later add creation and updating only for inspected records that public editor APIs can mutate safely. Capabilities distinguish read support from mutation support so the inspection contribution advertises no CommonUI-specific create/update operation.
 
 Review and update every detailed PCG contract against the executable tool catalog, companion foundation, and supported Unreal public APIs before implementation. The only stable functional scope is inspection and authoring of PCG Graph assets plus inspection and authoring of PCG-related level actors, components, and other supported level objects. Current tool mappings, operation shapes, snapshots, validation, asynchronous lifecycle, persistence, limits, and verification details are provisional.
 

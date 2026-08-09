@@ -36,6 +36,35 @@ def verify_companion_scenario(bridge: UnrealBridge, capabilities: dict[str, obje
             or features.get("gas_gameplay_effects_inspection") is not True \
             or features.get("gas_gameplay_effects_mutation") is not False:
         raise AssertionError(f"GAS read/mutation capabilities are incorrect: {features!r}")
+    commonui = next(
+        (item for item in companions if isinstance(item, dict)
+         and item.get("extension_id") == "unreal-mcp-commonui"),
+        None,
+    )
+    if commonui is None or commonui.get("ready") is not True \
+            or commonui.get("read_support") is not True \
+            or commonui.get("mutation_support") is not False \
+            or len(commonui.get("contributions", [])) != 1:
+        raise AssertionError(f"CommonUI inspection companion is not exactly registered: {commonui!r}")
+    if features.get("commonui_widget_blueprints_inspection") is not True \
+            or features.get("commonui_widget_blueprints_mutation") is not False:
+        raise AssertionError(f"CommonUI read/mutation capabilities are incorrect: {features!r}")
+    commonui_family = next(
+        (item for item in capabilities.get("blueprint_families", [])
+         if isinstance(item, dict) and item.get("family") == "commonui_widget"),
+        None,
+    )
+    commonui_operations = (
+        commonui_family.get("operations", {}) if isinstance(commonui_family, dict) else {}
+    )
+    if commonui_operations.get("discover") is not True \
+            or commonui_operations.get("inspect") is not True \
+            or any(commonui_operations.get(name) is not False for name in (
+                "create", "compile", "save", "class_defaults", "components",
+                "widget_tree", "member_variables", "functions", "macros",
+                "custom_events", "action_catalog", "graph_edit",
+            )):
+        raise AssertionError(f"CommonUI family is not inspection-only: {commonui_family!r}")
     gas_family = next(
         (item for item in capabilities.get("blueprint_families", [])
          if isinstance(item, dict) and item.get("family") == "gameplay_ability"),
@@ -61,6 +90,59 @@ def verify_companion_scenario(bridge: UnrealBridge, capabilities: dict[str, obje
                 "action_catalog", "graph_edit",
             )):
         raise AssertionError(f"Gameplay Effect family is not inspection-only: {effect_family!r}")
+
+    commonui_path = "/Game/UnrealMCPCommonUI/WBP_InspectionFixture.WBP_InspectionFixture"
+    commonui_inspection = bridge.call("blueprint_inspect", {
+        "mode": "inspect",
+        "asset_path": commonui_path,
+        "sections": [
+            "summary", "parent_class", "widget_tree", "commonui_widget",
+            "commonui_activation", "commonui_references",
+        ],
+        "include_inherited": True,
+        "page_size": 100,
+    })
+    commonui_snapshot = commonui_inspection.get("snapshot_id")
+    commonui_records = {
+        record.get("section"): record
+        for record in commonui_inspection.get("records", [])
+        if isinstance(record, dict)
+    }
+    expected_commonui_sections = {
+        "summary", "parent_class", "commonui_widget",
+        "commonui_activation", "commonui_references",
+    }
+    activation = commonui_records.get("commonui_activation", {})
+    references = commonui_records.get("commonui_references", {})
+    if not isinstance(commonui_snapshot, str) or len(commonui_snapshot) != 40 \
+            or commonui_inspection.get("blueprint_family") != "widget" \
+            or not expected_commonui_sections.issubset(commonui_records) \
+            or activation.get("auto_activate", {}).get("value") is not True \
+            or activation.get("is_back_handler", {}).get("value") is not True \
+            or references.get("action_domain_override", {}).get("resolved") is not False \
+            or references.get("action_domain_override", {}).get("object_path") \
+            != "/Game/UnrealMCPCommonUI/DA_UnresolvedDomain.DA_UnresolvedDomain":
+        raise AssertionError(f"CommonUI inspection is incomplete: {commonui_inspection!r}")
+    repeated_commonui = bridge.call("blueprint_inspect", {
+        "mode": "inspect", "asset_path": commonui_path,
+        "sections": [
+            "summary", "parent_class", "widget_tree", "commonui_widget",
+            "commonui_activation", "commonui_references",
+        ],
+        "include_inherited": True,
+        "page_size": 100,
+    })
+    typed_commonui_records = [
+        record for record in commonui_inspection.get("records", [])
+        if isinstance(record, dict) and str(record.get("section", "")).startswith("commonui_")
+    ]
+    repeated_typed_commonui_records = [
+        record for record in repeated_commonui.get("records", [])
+        if isinstance(record, dict) and str(record.get("section", "")).startswith("commonui_")
+    ]
+    if repeated_commonui.get("snapshot_id") != commonui_snapshot \
+            or repeated_typed_commonui_records != typed_commonui_records:
+        raise AssertionError("CommonUI inspection is not deterministic")
 
     effect_path = "/Game/UnrealMCPGAS/GE_InspectionFixture.GE_InspectionFixture"
     effect = bridge.call("blueprint_inspect", {
