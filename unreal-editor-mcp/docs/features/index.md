@@ -70,6 +70,7 @@ Keep the authoritative checklist in [`ROADMAP.md`](../../ROADMAP.md) synchronize
 - [`commonui-assets-authoring` — Create/update assets with CommonUI plugin dependencies](planned/commonui-assets-authoring.md) — Add stale-safe creation and updating of supported CommonUI-dependent assets through the CommonUI companion.
   - Depends on:
     - `commonui-assets-inspect`
+- [`gameplay-tag-properties` — Gameplay Tag property values](planned/gameplay-tag-properties.md) — Read and set exact `FGameplayTag` and `FGameplayTagContainer` values through existing asset property workflows.
 - [`gas-ability-blueprints-inspect` — Gameplay Ability Blueprint inspection](completed/gas-ability-blueprints-inspect.md) — Add bounded typed inspection of existing Gameplay Ability Blueprint assets through an optional API-compatible companion plugin.
   - Depends on:
     - `companion-plugins`
