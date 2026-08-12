@@ -1,13 +1,20 @@
 ---
 feature_id: gameplay-tag-properties
 status: planned
-depends_on: []
+depends_on:
+  - native-wire-contracts
+  - asset-authoring-kernel
 released_in: null
 ---
 
 # `gameplay-tag-properties` — Gameplay Tag property values
 
 **Outcome:** Agents can read and set existing asset properties whose exact reflected type is `FGameplayTag` or `FGameplayTagContainer` through Unreal MCP's supported property workflows.
+
+**Depends on:**
+
+- [`native-wire-contracts`](native-wire-contracts.md)
+- [`asset-authoring-kernel`](asset-authoring-kernel.md)
 
 ### Implementation
 

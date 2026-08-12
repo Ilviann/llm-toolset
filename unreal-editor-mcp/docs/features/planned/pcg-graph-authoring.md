@@ -3,6 +3,8 @@ feature_id: pcg-graph-authoring
 status: planned
 depends_on:
   - pcg-graph-inspect
+  - asset-authoring-kernel
+  - companion-api-v2
 released_in: null
 ---
 
@@ -13,12 +15,14 @@ released_in: null
 **Depends on:**
 
 - [`pcg-graph-inspect`](pcg-graph-inspect.md)
+- [`asset-authoring-kernel`](asset-authoring-kernel.md)
+- [`companion-api-v2`](companion-api-v2.md)
 
 **Planning note:** Review and update this detailed contract against the current executable tool catalog, companion foundation, and supported Unreal public PCG APIs immediately before implementation. Only authoring of PCG Graph assets is stable functional scope for this feature. The tool mapping, operation shapes, identities, snapshots, validation, lifecycle, persistence, limits, and verification details below are provisional and are not implementation authority until that review is complete.
 
 ### Graph creation and mutation
 
-- Reuse the independently versioned optional `UnrealMCPPCG` companion, its effective project-enablement and strict companion API requirements, foundation registry, shared authenticated bridge, Game-thread dispatch, operation ledger, errors, limits, packaging, and inspection capability established by `pcg-graph-inspect`. Never edit the project descriptor, install or enable PCG, or create another listener, credential, Python package, or extension API.
+- Reuse the independently versioned optional `UnrealMCPPCG` companion, its effective project-enablement and strict companion API v2 requirements, family registry, shared authoring kernel, authenticated bridge, Game-thread dispatch, operation ledger, errors, limits, packaging, and inspection capability established by `pcg-graph-inspect`. Never edit the project descriptor, install or enable PCG, or create another listener, credential, Python package, or extension API.
 - Add PCG graph mutation capability only when Unreal reports the Engine plugin named `PCG` effectively enabled for the configured project, the editor has loaded it successfully, and the companion and prerequisite inspection capability are verified live. Reject every create or mutation request before asset loading when any required state is unavailable or stale.
 - Create exact project-owned PCG Graph assets and support bounded transactional operations for nodes, settings, parameters, connections, subgraph references, comments, and positions. Require stable record identities plus the latest authoritative graph snapshot for every existing-content mutation.
 - Resolve node types, settings, typed values, and pin compatibility through Unreal's live public PCG APIs and the prerequisite capability-advertised allowlist. Reject unknown settings, invalid connections, recursive subgraphs, unsafe asset references, custom HLSL, arbitrary Blueprint execution, and supplied code.

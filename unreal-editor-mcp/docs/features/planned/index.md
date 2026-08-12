@@ -1,5 +1,15 @@
 # Planned features
 
+- [`native-wire-contracts` — Typed native request and result records](native-wire-contracts.md).
+- [`native-command-catalog` — Fixed native command routing and capabilities](native-command-catalog.md).
+- [`asset-family-foundation` — Built-in asset-family adapter contracts](asset-family-foundation.md).
+- [`asset-inspection-adapters` — Asset inspection service decomposition](asset-inspection-adapters.md).
+- [`asset-authoring-kernel` — Shared asset creation and editing lifecycle](asset-authoring-kernel.md).
+- [`python-asset-family-catalog` — Static Python asset-family catalog](python-asset-family-catalog.md).
+- [`asset-family-conformance` — Reusable asset-family verification](asset-family-conformance.md).
+- [`native-domain-modules` — Native domain module boundaries](native-domain-modules.md).
+- [`companion-api-v2` — Typed asset-family companion API](companion-api-v2.md).
+- [`companion-asset-adapters` — Unified companion asset integration](companion-asset-adapters.md).
 - [`asset-inspect-data` — Data Asset and Data Table inspection](asset-inspect-data.md).
 - [`asset-inspect-umg` — Base UMG Widget Blueprint inspection](asset-inspect-umg.md).
 - [`asset-inspect-animation` — Animation Blueprint semantic inspection](asset-inspect-animation.md).

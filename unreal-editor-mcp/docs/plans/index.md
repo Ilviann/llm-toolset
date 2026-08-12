@@ -5,3 +5,4 @@ These plans preserve incremental feature-design work across sessions and bounded
 ## Active plans
 
 - [`asset-inspect-core-implementation.md`](asset-inspect-core-implementation.md) — implementation decisions, discovered constraints, and validation evidence for the accepted core asset-inspection feature.
+- [`asset-family-extensibility-refactoring.md`](asset-family-extensibility-refactoring.md) — accepted cross-feature direction for typed native contracts, family adapters, shared authoring, Python publication, conformance, domain modules, and companion API v2.

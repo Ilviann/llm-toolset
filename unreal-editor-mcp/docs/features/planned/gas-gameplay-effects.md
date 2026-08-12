@@ -3,6 +3,8 @@ feature_id: gas-gameplay-effects
 status: planned
 depends_on:
   - gas-gameplay-effects-inspect
+  - asset-authoring-kernel
+  - companion-asset-adapters
 released_in: null
 ---
 
@@ -13,10 +15,12 @@ released_in: null
 **Depends on:**
 
 - [`gas-gameplay-effects-inspect`](../completed/gas-gameplay-effects-inspect.md)
+- [`asset-authoring-kernel`](asset-authoring-kernel.md)
+- [`companion-asset-adapters`](companion-asset-adapters.md)
 
 ### Creation and update implementation
 
-- Reuse the independently versioned optional `UnrealMCPGAS` companion, its strict companion API requirement, foundation registry, shared authenticated bridge, Game-thread dispatch, operation ledger, errors, limits, packaging, and inspection capability established by `gas-gameplay-effects-inspect`. Do not add Gameplay Ability System dependencies to `UnrealMCP` or create another listener, credential, Python package, or extension API.
+- Reuse the independently versioned optional `UnrealMCPGAS` companion, its strict companion API v2 requirement, family registry, shared authoring kernel, authenticated bridge, Game-thread dispatch, operation ledger, errors, limits, packaging, and unified inspection capability established by `companion-asset-adapters`. Do not add Gameplay Ability System dependencies to `UnrealMCP` or create another listener, credential, Python package, or extension API.
 - Add the `gameplay_effect` mutation capability only when the companion and prerequisite inspection capability are verified live. Accept native or Blueprint-generated parents for creation and updates only when they resolve to usable `UGameplayEffect` subclasses and pass the established class, package, mount, stale-state, and mutation-target policies.
 - Reuse `blueprint_create`, `blueprint_default_edit`, `blueprint_compile`, and `blueprint_save`; define a redesigned GAS read-back and snapshot contract before exposing authoring because the former shared inspection route was removed in 0.36.0. Continue rejecting Actor components, variables, functions, macros, events, action cataloging, graph editing, and every supplied graph or member operation.
 - Add exact `blueprint_default_edit` Gameplay Effect operation discriminators for adding, updating, removing, and, where semantically meaningful, reordering one supported nested record. Require the current authoritative inspection snapshot plus stable record identity for existing entries; never retarget by array index after a stale change.

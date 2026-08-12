@@ -2,7 +2,7 @@
 feature_id: pcg-graph-inspect
 status: planned
 depends_on:
-  - companion-plugins
+  - companion-api-v2
 released_in: null
 ---
 
@@ -12,7 +12,7 @@ released_in: null
 
 **Depends on:**
 
-- [`companion-plugins`](../completed/companion-plugins.md)
+- [`companion-api-v2`](companion-api-v2.md)
 
 **Planning note:** Review and update this detailed contract against the current executable tool catalog, companion foundation, and supported Unreal public PCG APIs immediately before implementation. Only inspection of PCG Graph assets is stable functional scope for this feature. The tool mapping, operation shapes, identities, snapshots, validation, lifecycle, persistence, limits, and verification details below are provisional and are not implementation authority until that review is complete.
 
@@ -22,7 +22,7 @@ released_in: null
 - Never edit the project descriptor, install the Engine plugin, enable it, restart the editor, or infer a different plugin state on the user's behalf. When Unreal reports `PCG` disabled or unavailable for the configured project, publish PCG as unavailable with a stable reason and reject every PCG operation before asset discovery or loading.
 - Add a separate editor-only `UnrealMCPPCG` companion plugin that owns all direct dependencies on the Engine's PCG plugin and only the public PCG and PCG editor modules required by compiled probes and native behavior.
 - Keep `UnrealMCP` independent of PCG headers, modules, plugin enablement, and transitive Engine-plugin dependencies. The base plugin must build, package, load, and retain its complete non-PCG capabilities when `UnrealMCPPCG` is absent or the Engine PCG plugin is missing, disabled, or unloaded.
-- Reuse the base-owned extension registry and companion lifecycle established by `companion-plugins` rather than adding another listener or credential. The companion may register only its PCG asset policy, typed inspection handlers, and bounded capability data; it must reuse base authentication, Game-thread dispatch, errors, limits, and shutdown.
+- Reuse the typed asset-family registry and companion lifecycle established by `companion-api-v2` rather than adding another listener or credential. The companion may register only its PCG asset policy, typed inspection adapters, and bounded capability data; it must reuse base authentication, Game-thread dispatch, errors, limits, and shutdown.
 - Version `UnrealMCPPCG` independently from `UnrealMCP` under the shared semantic-version policy. Require both descriptors to declare the same global `companion_api_version` and require the compiled base and companion constants to match each other and their descriptors before registration; do not pin the companion's required `UnrealMCP` plugin reference to the base semantic version.
 - Extend release-contract tests to validate Python/base version pairing, each plugin's internal semantic-version sources, descriptor and compiled companion API values, and extension-schema compatibility. Publish companion semantic version, `companion_api_version`, readiness, effective project enablement, Engine-plugin load state, inspection support, supported graph settings families, and effective limits through `capabilities`; fail closed and expose no PCG inspection when any required state or compatibility value is absent or mismatched.
 

@@ -8,6 +8,7 @@ Apply these Unreal-specific rules to every feature, fix, or refactor.
 
 ## Implementation rules
 
+- For new asset inspection, creation, or editing support, begin with the accepted [`asset-family extensibility refactoring`](plans/asset-family-extensibility-refactoring.md), then follow the dependencies and completion gates in the relevant feature documents. Treat the plan as future-state design guidance, not as evidence of current runtime behavior.
 - Before developing, building, packaging, or running native tests for `UnrealMCP` or a companion, inspect the selected Unreal Engine's `Engine/Plugins/` tree for installed copies of `UnrealMCP`, `UnrealMCPGAS`, `UnrealMCPTestCompanion`, and any other repository-owned companion involved in the work. If any are present, stop and ask the user to delete them first; do not rename, move, disable, or otherwise work around the installed copies. Continue only after verifying that they have been removed.
 - Use ignored `ue-test/ue58/` only as the disposable Unreal Engine 5.8 build and integration-test project; never treat its generated state as a committed contract.
 - Build changes from small typed mutations. Prevalidate targets, types, limits, and stale state; use editor transactions where supported; expose bounded compile, save, and read-back results; preserve unrelated Blueprint content.

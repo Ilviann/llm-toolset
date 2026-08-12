@@ -4,6 +4,8 @@ status: planned
 depends_on:
   - phase-13
   - gas-ability-blueprints-inspect
+  - asset-authoring-kernel
+  - companion-asset-adapters
 released_in: null
 ---
 
@@ -15,10 +17,12 @@ released_in: null
 
 - [`phase-13`](../completed/phase-13.md)
 - [`gas-ability-blueprints-inspect`](../completed/gas-ability-blueprints-inspect.md)
+- [`asset-authoring-kernel`](asset-authoring-kernel.md)
+- [`companion-asset-adapters`](companion-asset-adapters.md)
 
 ### Creation and update implementation
 
-- Reuse the independently versioned optional `UnrealMCPGAS` companion, its strict companion API requirement, foundation registry, shared authenticated bridge, Game-thread dispatch, operation ledger, errors, limits, packaging, and inspection capability established by `gas-ability-blueprints-inspect`. Do not add Gameplay Ability System dependencies to `UnrealMCP` or create another listener, credential, Python package, or extension API.
+- Reuse the independently versioned optional `UnrealMCPGAS` companion, its strict companion API v2 requirement, family registry, shared authoring kernel, authenticated bridge, Game-thread dispatch, operation ledger, errors, limits, packaging, and unified inspection capability established by `companion-asset-adapters`. Do not add Gameplay Ability System dependencies to `UnrealMCP` or create another listener, credential, Python package, or extension API.
 - Add the `gameplay_ability` mutation capability only when the companion and prerequisite inspection capability are verified live. Accept native or Blueprint-generated parents for creation and updates only when they resolve to usable `UGameplayAbility` subclasses and pass the established stale-class, compilation, package, mount, and mutation-target policies.
 - Reuse `blueprint_create`, `blueprint_default_edit`, `blueprint_member_edit`, `blueprint_action_catalog`, `blueprint_graph_edit`, `blueprint_compile`, and `blueprint_save`; define a redesigned GAS read-back and snapshot contract before exposing authoring because the former shared inspection route was removed in 0.36.0. Do not publish a general UObject or reflection editor.
 - Mutate only a small explicit allowlist of Gameplay Ability configuration proven against Unreal Engine 5.8 public APIs, including supported activation, instancing, and network policies; Gameplay Tag and trigger containers; and compatible cost and cooldown Gameplay Effect class references. Require the authoritative inspection snapshot and stable nested identity for every update to existing data.

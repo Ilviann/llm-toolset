@@ -3,7 +3,8 @@ feature_id: umg-mvvm-inspect
 status: planned
 depends_on:
   - umg-authoring
-  - companion-plugins
+  - asset-inspect-umg
+  - companion-api-v2
 released_in: null
 ---
 
@@ -14,13 +15,14 @@ released_in: null
 **Depends on:**
 
 - [`umg-authoring`](../completed/umg-authoring.md)
-- [`companion-plugins`](../completed/companion-plugins.md)
+- [`asset-inspect-umg`](asset-inspect-umg.md)
+- [`companion-api-v2`](companion-api-v2.md)
 
 ### Companion and version contract
 
 - Add a separate editor-only `UnrealMCPMVVM` companion plugin that owns all direct dependencies on the Engine's `ModelViewViewModel` plugin and the public `ModelViewViewModel`, `ModelViewViewModelBlueprint`, and `ModelViewViewModelEditor` modules actually required by compiled probes and native behavior. Do not depend on `ModelViewViewModelDebugger` in production code.
 - Keep `UnrealMCP` independent of UMG Viewmodel headers, modules, plugin enablement, and transitive Engine-plugin dependencies. The base plugin must build, package, load, and retain Widget Blueprint creation, UMG authoring, legacy property bindings, and Designer events when `UnrealMCPMVVM` or the Engine plugin is absent.
-- Reuse the base-owned extension registry and companion lifecycle established by `companion-plugins` rather than adding another listener or credential. The companion may register only its ViewModel family policy, FieldNotify and inspection contributors, Widget MVVM inspection handlers, and bounded capability data; it must reuse base authentication, dispatch, errors, snapshots, limits, and shutdown.
+- Reuse the typed asset-family registry and companion lifecycle established by `companion-api-v2` rather than adding another listener or credential. The companion may register only its ViewModel family policy, FieldNotify and inspection adapters, Widget MVVM selectors, and bounded capability data; it must reuse base authentication, dispatch, errors, snapshots, limits, and shutdown.
 - Version `UnrealMCPMVVM` independently from `UnrealMCP` under the shared semantic-version policy. Require both descriptors to declare the same global `companion_api_version` and require the compiled base and companion constants to match each other and their descriptors before registration; do not pin the companion's required `UnrealMCP` plugin reference to the base semantic version.
 - Reference the Engine plugin by descriptor name `ModelViewViewModel` without an `UnrealMCP`-defined `RequestedVersion`; establish compatibility by building and testing against the exact supported Unreal Engine distribution. Never download, install, or enable it at runtime.
 - Extend release-contract tests to validate Python/base version pairing, each plugin's internal semantic-version sources, descriptor and compiled companion API values, and extension-schema compatibility. Publish companion semantic version, `companion_api_version`, readiness, Engine-plugin state, inspection support, supported initialization and binding modes, conversion policy, and effective limits through `capabilities`; fail closed and expose no MVVM family when any required component or compatibility value is absent or mismatched.

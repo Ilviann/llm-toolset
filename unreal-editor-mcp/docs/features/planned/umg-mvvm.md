@@ -3,6 +3,8 @@ feature_id: umg-mvvm
 status: planned
 depends_on:
   - umg-mvvm-inspect
+  - asset-authoring-kernel
+  - companion-api-v2
 released_in: null
 ---
 
@@ -13,10 +15,12 @@ released_in: null
 **Depends on:**
 
 - [`umg-mvvm-inspect`](umg-mvvm-inspect.md)
+- [`asset-authoring-kernel`](asset-authoring-kernel.md)
+- [`companion-api-v2`](companion-api-v2.md)
 
 ### ViewModel Blueprint authoring
 
-- Reuse the independently versioned optional `UnrealMCPMVVM` companion, strict companion API requirement, foundation registry, shared authenticated bridge, Game-thread dispatch, operation ledger, errors, limits, packaging, and inspection capability established by `umg-mvvm-inspect`. Do not add UMG Viewmodel dependencies to `UnrealMCP` or create another listener, credential, Python package, or extension API.
+- Reuse the independently versioned optional `UnrealMCPMVVM` companion, strict companion API v2 requirement, family registry, shared authoring kernel, authenticated bridge, Game-thread dispatch, operation ledger, errors, limits, packaging, and inspection capability established by `umg-mvvm-inspect`. Do not add UMG Viewmodel dependencies to `UnrealMCP` or create another listener, credential, Python package, or extension API.
 - Add the `viewmodel` mutation capability only when the companion and prerequisite inspection capability are verified live. Accept native or Blueprint-generated parents for creation and updates only when they resolve to usable `UMVVMViewModelBase` subclasses, or another explicitly supported `INotifyFieldValueChanged` base proven safe by public APIs, and pass established class, package, mount, compilation, and stale-state policies.
 - Reuse `blueprint_create`, `blueprint_member_edit`, `blueprint_action_catalog`, `blueprint_graph_edit`, `blueprint_compile`, and `blueprint_save`; obtain stale-safe read-back through the redesigned MVVM inspection contract built on `asset-inspect-umg`. Preserve the exact non-Actor family capability matrix and reject Actor components, Actor replication settings, and unrelated specialized-family operations.
 - Inspect and edit supported Blueprint variables and functions with FieldNotify state, access, getter and setter availability, dependent FieldNotify relationships, types, defaults, and stable member identities. Do not infer notification support from naming conventions or expose arbitrary metadata mutation.

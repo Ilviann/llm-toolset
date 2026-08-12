@@ -3,6 +3,7 @@ feature_id: asset-inspect-data
 status: planned
 depends_on:
   - asset-inspect-core
+  - native-domain-modules
 released_in: null
 ---
 
@@ -13,6 +14,7 @@ released_in: null
 **Depends on:**
 
 - [`asset-inspect-core`](../completed/asset-inspect-core.md)
+- [`native-domain-modules`](native-domain-modules.md)
 
 ### Family scope
 

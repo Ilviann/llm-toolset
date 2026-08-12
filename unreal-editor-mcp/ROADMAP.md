@@ -10,22 +10,53 @@ Feature identifiers are stable names, not execution indexes. Unfinished features
   - Depends on:
     - `readonly-mode`
 - [x] [`asset-inspect-core` — General asset inspection foundation and gameplay Blueprints](docs/features/completed/asset-inspect-core.md) — Add the common read-only facade and deep inspection for gameplay-framework and Interface Blueprints.
+- [ ] [`native-wire-contracts` — Typed native request and result records](docs/features/planned/native-wire-contracts.md) — Move native domain request/result contracts behind explicit JSON codecs.
+- [ ] [`native-command-catalog` — Fixed native command routing and capabilities](docs/features/planned/native-command-catalog.md) — Route fixed typed commands and capabilities without domain-specific bridge composition.
+  - Depends on:
+    - `native-wire-contracts`
+- [ ] [`asset-family-foundation` — Built-in asset-family adapter contracts](docs/features/planned/asset-family-foundation.md) — Add deterministic inspection, creation, and editing adapter contracts.
+  - Depends on:
+    - `asset-inspect-core`
+    - `native-command-catalog`
+- [ ] [`asset-inspection-adapters` — Asset inspection service decomposition](docs/features/planned/asset-inspection-adapters.md) — Move existing core asset semantics into focused adapters.
+  - Depends on:
+    - `asset-family-foundation`
+- [ ] [`asset-authoring-kernel` — Shared asset creation and editing lifecycle](docs/features/planned/asset-authoring-kernel.md) — Centralize bounded admission, transactions, persistence, read-back, cleanup, and rollback.
+  - Depends on:
+    - `asset-family-foundation`
+- [ ] [`python-asset-family-catalog` — Static Python asset-family catalog](docs/features/planned/python-asset-family-catalog.md) — Compose approved schemas, access gates, mappings, and capabilities from one shipped catalog.
+  - Depends on:
+    - `asset-family-foundation`
+- [ ] [`native-domain-modules` — Native domain module boundaries](docs/features/planned/native-domain-modules.md) — Isolate host, asset-core, Blueprint, UMG, and content ownership behind fixed registries.
+  - Depends on:
+    - `asset-family-conformance`
+- [ ] [`companion-api-v2` — Typed asset-family companion API](docs/features/planned/companion-api-v2.md) — Add typed inspection, creation, editing, read-back, persistence, and capability seams.
+  - Depends on:
+    - `companion-plugins`
+    - `native-domain-modules`
+    - `python-asset-family-catalog`
 - [ ] [`asset-inspect-data` — Data Asset and Data Table inspection](docs/features/planned/asset-inspect-data.md) — Extend the facade to structured Data Assets and Data Tables.
   - Depends on:
     - `asset-inspect-core`
+    - `native-domain-modules`
 - [ ] [`asset-inspect-umg` — Base UMG Widget Blueprint inspection](docs/features/planned/asset-inspect-umg.md) — Extend the facade to base UMG logic, hierarchy, layout and bindings.
   - Depends on:
     - `asset-inspect-core`
+    - `native-domain-modules`
 - [ ] [`asset-inspect-animation` — Animation Blueprint semantic inspection](docs/features/planned/asset-inspect-animation.md) — Extend the facade to pose graphs, layers and state machines.
   - Depends on:
     - `asset-inspect-core`
+    - `native-domain-modules`
 - [ ] [`umg-mvvm-inspect` — UMG ViewModel and View Binding inspection](docs/features/planned/umg-mvvm-inspect.md) — Add bounded typed inspection of existing MVVM ViewModel Blueprints and Widget View Bindings through an optional API-compatible companion plugin.
   - Depends on:
     - `umg-authoring`
-    - `companion-plugins`
+    - `asset-inspect-umg`
+    - `companion-api-v2`
 - [ ] [`umg-mvvm` — UMG ViewModel and View Binding authoring](docs/features/planned/umg-mvvm.md) — Add typed MVVM ViewModel creation and Widget View Binding authoring through the MVVM companion.
   - Depends on:
     - `umg-mvvm-inspect`
+    - `asset-authoring-kernel`
+    - `companion-api-v2`
 - [x] [`commonui-assets-inspect` — Inspect assets with CommonUI plugin dependencies](docs/features/completed/commonui-assets-inspect.md) — Add bounded typed inspection of supported CommonUI-dependent assets through an optional API-compatible companion plugin.
   - Depends on:
     - `umg-authoring`
@@ -33,7 +64,12 @@ Feature identifiers are stable names, not execution indexes. Unfinished features
 - [ ] [`commonui-assets-authoring` — Create/update assets with CommonUI plugin dependencies](docs/features/planned/commonui-assets-authoring.md) — Add stale-safe creation and updating of supported CommonUI-dependent assets through the CommonUI companion.
   - Depends on:
     - `commonui-assets-inspect`
+    - `asset-authoring-kernel`
+    - `companion-asset-adapters`
 - [ ] [`gameplay-tag-properties` — Gameplay Tag property values](docs/features/planned/gameplay-tag-properties.md) — Read and set exact `FGameplayTag` and `FGameplayTagContainer` values through existing asset property workflows.
+  - Depends on:
+    - `native-wire-contracts`
+    - `asset-authoring-kernel`
 - [x] [`gas-ability-blueprints-inspect` — Gameplay Ability Blueprint inspection](docs/features/completed/gas-ability-blueprints-inspect.md) — Add bounded typed inspection of existing Gameplay Ability Blueprint assets through an optional API-compatible companion plugin.
   - Depends on:
     - `companion-plugins`
@@ -41,12 +77,22 @@ Feature identifiers are stable names, not execution indexes. Unfinished features
   - Depends on:
     - `phase-13`
     - `gas-ability-blueprints-inspect`
+    - `asset-authoring-kernel`
+    - `companion-asset-adapters`
 - [x] [`gas-gameplay-effects-inspect` — Gameplay Effect inspection](docs/features/completed/gas-gameplay-effects-inspect.md) — Add bounded typed inspection of existing data-only Gameplay Effect Blueprint assets through the GAS companion.
   - Depends on:
     - `gas-ability-blueprints-inspect`
+- [ ] [`companion-asset-adapters` — Unified companion asset integration](docs/features/planned/companion-asset-adapters.md) — Route approved GAS and CommonUI families through common asset infrastructure.
+  - Depends on:
+    - `companion-api-v2`
+    - `commonui-assets-inspect`
+    - `gas-ability-blueprints-inspect`
+    - `gas-gameplay-effects-inspect`
 - [ ] [`gas-gameplay-effects` — Gameplay Effect creation and updating](docs/features/planned/gas-gameplay-effects.md) — Add typed creation and data-only updating of Gameplay Effect Blueprint assets through the GAS companion.
   - Depends on:
     - `gas-gameplay-effects-inspect`
+    - `asset-authoring-kernel`
+    - `companion-asset-adapters`
 - [x] [`function-replace` — Complete function replacement](docs/features/completed/function-replace.md) — Add transactional replacement of one complete user-owned function.
 - [x] [`event-macro-replace` — Event, custom-event, and macro replacement](docs/features/completed/event-macro-replace.md) — Extend bounded replacement to events, custom events, and macros.
   - Depends on:
@@ -56,10 +102,12 @@ Feature identifiers are stable names, not execution indexes. Unfinished features
     - `event-macro-replace`
 - [ ] [`pcg-graph-inspect` — Procedural Content Generation graph inspection](docs/features/planned/pcg-graph-inspect.md) — Inspect PCG Graph assets; review and update the detailed contract before implementation.
   - Depends on:
-    - `companion-plugins`
+    - `companion-api-v2`
 - [ ] [`pcg-graph-authoring` — Procedural Content Generation graph authoring](docs/features/planned/pcg-graph-authoring.md) — Author PCG Graph assets; review and update the detailed contract before implementation.
   - Depends on:
     - `pcg-graph-inspect`
+    - `asset-authoring-kernel`
+    - `companion-api-v2`
 - [x] [`editor-restart` — Optional durable editor restart](docs/features/completed/editor-restart.md) — Add optional durable editor restart.
   - Depends on:
     - `editor-launch`
@@ -107,6 +155,11 @@ Feature identifiers are stable names, not execution indexes. Unfinished features
 
 Support-tooling features change repository utilities without changing Unreal MCP runtime functionality or triggering plugin version changes.
 
+- [ ] [`asset-family-conformance` — Reusable asset-family verification](docs/features/planned/asset-family-conformance.md) — Parameterize common inspection, authoring, unavailable-state, persistence, and recovery checks.
+  - Depends on:
+    - `asset-inspection-adapters`
+    - `asset-authoring-kernel`
+    - `python-asset-family-catalog`
 - [x] [`windows-deployment-install-modes` — Windows deployment companion and install modes](docs/features/completed/windows-deployment-install-modes.md) — Build and install the base plugin alone or with `UnrealMCPGAS` into a selected project or Engine.
 - [x] [`windows-deployment-commonui` — CommonUI companion deployment option](docs/features/completed/windows-deployment-commonui.md) — Add an independent checkbox that builds and installs `UnrealMCPCommonUI` with the compatible base plugin.
   - Depends on:
