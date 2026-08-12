@@ -6,11 +6,17 @@ from typing import Any, Protocol
 
 from . import __version__
 from .errors import DomainError, ErrorCode
-from .extension_catalog import compose_companion_capabilities, compose_extension_tools
+from .asset_family_catalog import (
+    ASSET_FAMILY_CATALOG,
+    CAPABILITIES_HANDLER,
+    LIFECYCLE_HANDLER,
+    SAFE_YAML_RESULT,
+    compose_companion_capabilities,
+)
 from .project import ProjectIdentity
 from .schema_validation import SchemaValidationError, validate_tool_arguments
 from .stdio import error, result, tool_result
-from .tool_catalog import LATEST_PROTOCOL, SUPPORTED_PROTOCOLS, tools_for_configuration
+from .tool_catalog import LATEST_PROTOCOL, SUPPORTED_PROTOCOLS
 from .yaml_renderer import render_safe_yaml
 
 
@@ -40,10 +46,15 @@ class MCPServer:
         self.project_identity = project_identity
         self.lifecycle = lifecycle
         self.writable = writable
-        self.tools = tools_for_configuration(
+        composition = ASSET_FAMILY_CATALOG.compose(
             writable=writable,
             lifecycle_enabled=lifecycle is not None,
         )
+        self.tools = composition.tools
+        self.publications = composition.publications
+        self._capabilities_command = composition.publications["capabilities"].native_command
+        if self._capabilities_command is None:
+            raise RuntimeError("Python asset-family catalog has no capabilities command")
         self.tool_by_name = {tool["name"]: tool for tool in self.tools}
         self._notifications: list[dict[str, Any]] = []
         self.negotiated_protocol_version: str | None = None
@@ -90,7 +101,8 @@ class MCPServer:
         except SchemaValidationError as exc:
             return error(request_id, -32602, f"Invalid tool arguments: {exc}")
         try:
-            if name == "editor_lifecycle":
+            publication = self.publications[name]
+            if publication.handler == LIFECYCLE_HANDLER:
                 if self.lifecycle is None:
                     raise DomainError(
                         "Editor lifecycle is unavailable in this server configuration",
@@ -98,20 +110,27 @@ class MCPServer:
                     )
                 output = self.lifecycle.execute(arguments)
                 self._refresh_extension_tools(notify=True)
-            elif name == "capabilities":
-                output = self._capabilities(arguments)
+            elif publication.handler == CAPABILITIES_HANDLER:
+                output = self._capabilities(arguments, publication.native_command)
             else:
-                output = self.bridge.call(name, arguments)
+                output = self.bridge.call(publication.native_command, arguments)
             return result(request_id, tool_result(
-                render_safe_yaml(output) if name == "asset_inspect" else output
+                render_safe_yaml(output)
+                if publication.result_handler == SAFE_YAML_RESULT else output
             ))
         except DomainError as exc:
             return result(request_id, tool_result(exc.as_dict(), is_error=True))
 
-    def _capabilities(self, arguments: dict[str, Any]) -> Any:
+    def _capabilities(
+        self,
+        arguments: dict[str, Any],
+        native_command: str | None,
+    ) -> Any:
+        if native_command is None:
+            raise RuntimeError("Capabilities publication has no native command")
         native_available = True
         try:
-            output = self.bridge.call("capabilities", arguments)
+            output = self.bridge.call(native_command, arguments)
         except DomainError as exc:
             if exc.code != ErrorCode.EDITOR_UNAVAILABLE or self.project_identity is None:
                 raise
@@ -142,24 +161,26 @@ class MCPServer:
             self._set_extension_tools(output, notify=True)
         else:
             local["bridge_ready"] = False
-            self._set_extension_tools({}, notify=True)
+            self._set_extension_tools(None, notify=True)
         return {**output, **local}
 
     def _refresh_extension_tools(self, *, notify: bool = False) -> None:
         try:
-            native = self.bridge.call("capabilities", {})
+            native = self.bridge.call(self._capabilities_command, {})
         except DomainError:
-            native = {}
+            native = None
         self._set_extension_tools(native, notify=notify)
 
     def _set_extension_tools(self, native: object, *, notify: bool) -> None:
-        base = tools_for_configuration(
+        composition = ASSET_FAMILY_CATALOG.compose(
             writable=self.writable,
             lifecycle_enabled=self.lifecycle is not None,
+            native_capabilities=native,
         )
-        updated = compose_extension_tools(base, native, writable=self.writable)
+        updated = composition.tools
         changed = updated != self.tools
         self.tools = updated
+        self.publications = composition.publications
         self.tool_by_name = {tool["name"]: tool for tool in self.tools}
         if changed and notify:
             self._notifications.append({"jsonrpc": "2.0", "method": "notifications/tools/list_changed"})

@@ -6,6 +6,11 @@
 - Added an independent CommonUI companion checkbox to the Windows deployment helper, including fixed base-dependent packaging, project/Engine installation, and transactional multi-plugin handling without changing runtime or plugin versions.
 - Decomposed Python packaging, Windows deployment, and headless integration support tools behind stable entrypoints, with shared Unreal-local primitives, typed deployment and Blueprint scenario state, focused domain modules, and unchanged runtime/plugin versions.
 
+## 0.42.0 — 2026-08-13
+
+- Added one immutable Python asset-family publication catalog for exact schemas, readonly/writable gates, native command requirements, bridge/local operation mappings, result rendering, and companion schema intersection while preserving all public tool names, ordering, schemas, and MCP initialization/list/call behavior.
+- Added fail-closed catalog validation and deterministic composition coverage for duplicate/conflicting entries, unavailable native commands, readonly filtering, companion capability mismatches, and safe-YAML result handling.
+
 ## 0.41.0 — 2026-08-13
 
 - Added a transport-neutral asset-authoring kernel for exact writable targets, bounded operation identities, collision refusal, unsafe editor-state admission, transactions, persistence, registry publication, snapshot read-back, failed-creation cleanup, and verified rollback.

@@ -84,7 +84,7 @@ adding an optional Engine-plugin dependency to the base module.
    migrates built-in inspection behind the family seam.
 5. [`asset-authoring-kernel`](../features/completed/asset-authoring-kernel.md)
    centralizes target-independent creation and stale-safe editing lifecycles.
-6. [`python-asset-family-catalog`](../features/planned/python-asset-family-catalog.md)
+6. [`python-asset-family-catalog`](../features/completed/python-asset-family-catalog.md)
    makes Python publication data-driven and consistent with native capabilities.
 7. [`asset-family-conformance`](../features/planned/asset-family-conformance.md)
    supplies reusable inspection, authoring, persistence, and unavailable-state

@@ -10,7 +10,7 @@ The base remains usable when a companion is absent or rejected. `capabilities` p
 
 ## Dispatch boundary
 
-The Python server owns an exact-version allowlist in `unreal_editor_mcp/extension_catalog.py`. It intersects those schemas with ready native contributions and the immutable startup access mode. Read contributions may augment existing inspection tools in readonly mode; mutation branches appear only with `--writable`. Unknown, stale, mismatched, or forged extension operations fail schema validation before target dispatch.
+The Python server owns an exact-version allowlist in `unreal_editor_mcp/asset_family_catalog.py`; `extension_catalog.py` retains compatibility exports only. The shared catalog intersects shipped schemas with ready native contributions and the immutable startup access mode. Read contributions may augment existing inspection tools in readonly mode; mutation branches appear only with `--writable`. Unknown, stale, mismatched, or forged extension operations fail schema validation before target dispatch.
 
 Accepted requests still use the base authenticated route, bounded queue, Game-thread dispatch, mutation ledger, target and mount checks, stale snapshots, editor transactions, postcondition read-back, rollback verification, and stable protocol errors. The companion handler may narrow validation and operate only on its declared target; it cannot broaden base policy.
 

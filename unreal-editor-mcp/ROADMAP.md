@@ -24,7 +24,7 @@ Feature identifiers are stable names, not execution indexes. Unfinished features
 - [x] [`asset-authoring-kernel` — Shared asset creation and editing lifecycle](docs/features/completed/asset-authoring-kernel.md) — Centralize bounded admission, transactions, persistence, read-back, cleanup, and rollback.
   - Depends on:
     - `asset-family-foundation`
-- [ ] [`python-asset-family-catalog` — Static Python asset-family catalog](docs/features/planned/python-asset-family-catalog.md) — Compose approved schemas, access gates, mappings, and capabilities from one shipped catalog.
+- [x] [`python-asset-family-catalog` — Static Python asset-family catalog](docs/features/completed/python-asset-family-catalog.md) — Compose approved schemas, access gates, mappings, and capabilities from one shipped catalog.
   - Depends on:
     - `asset-family-foundation`
 - [ ] [`native-domain-modules` — Native domain module boundaries](docs/features/planned/native-domain-modules.md) — Isolate host, asset-core, Blueprint, UMG, and content ownership behind fixed registries.
@@ -183,5 +183,6 @@ Feature checkboxes record implementation completion after mandatory Windows veri
   - `readonly-mode` — lifecycle-only acceptance is blocked by [`issue-4`](docs/issues/issue-4.md).
   - `asset-inspection-adapters`
   - `asset-authoring-kernel`
+  - `python-asset-family-catalog`
 - Windows:
   - None
