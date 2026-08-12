@@ -65,6 +65,11 @@ bool FUnrealMCPAssetReferenceTargetResolver::Resolve(
     }
 
     UObject* LoadedObject = FindObject<UObject>(nullptr, *AssetPath);
+    if (LoadedObject != nullptr && !LoadedObject->IsAsset())
+    {
+        OutError = {TEXT("not_found"), TEXT("The requested mounted asset was not found")};
+        return false;
+    }
     if (LoadedObject != nullptr
         && (LoadedObject->HasAnyFlags(RF_Transient)
             || LoadedObject->GetOutermost() == GetTransientPackage()))

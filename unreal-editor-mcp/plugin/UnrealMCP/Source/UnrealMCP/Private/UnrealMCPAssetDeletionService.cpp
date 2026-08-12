@@ -748,7 +748,9 @@ bool FUnrealMCPAssetDeletionService::Delete(
     ObjectTools::CleanupAfterSuccessfulDelete({Package}, false);
 
     const bool bRegistryAbsent =
-        !Registry.GetAssetByObjectPath(FSoftObjectPath(AssetPath)).IsValid()
+        !Registry.GetAssetByObjectPath(
+            FSoftObjectPath(AssetPath),
+            true).IsValid()
         && [&Registry, &Asset]()
         {
             TArray<FAssetData> Remaining;

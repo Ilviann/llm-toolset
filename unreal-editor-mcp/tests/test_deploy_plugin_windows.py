@@ -352,8 +352,8 @@ class WindowsDeploymentScriptTests(unittest.TestCase):
             self.assertEqual(
                 destinations,
                 (
-                    project_folder / "Plugins" / "UnrealMCP",
-                    project_folder / "Plugins" / "UnrealMCPGAS",
+                    project_folder.resolve() / "Plugins" / "UnrealMCP",
+                    project_folder.resolve() / "Plugins" / "UnrealMCPGAS",
                 ),
             )
             encoded = deploy.configured_project_descriptor(
@@ -383,8 +383,8 @@ class WindowsDeploymentScriptTests(unittest.TestCase):
             self.assertEqual(
                 destinations,
                 (
-                    project_folder / "Plugins" / "UnrealMCP",
-                    project_folder / "Plugins" / "UnrealMCPCommonUI",
+                    project_folder.resolve() / "Plugins" / "UnrealMCP",
+                    project_folder.resolve() / "Plugins" / "UnrealMCPCommonUI",
                 ),
             )
 

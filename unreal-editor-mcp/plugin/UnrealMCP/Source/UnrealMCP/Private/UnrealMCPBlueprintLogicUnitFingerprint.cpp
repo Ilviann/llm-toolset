@@ -108,12 +108,8 @@ bool CollectExternalLinks(const TSet<UEdGraphNode*>& UnitNodes, TArray<FExternal
     // Incoming links are owned by an external output pin and therefore need a second pass.
     if (!UnitNodes.IsEmpty())
     {
-        UEdGraph* Graph = nullptr;
-        for (UEdGraphNode* Node : UnitNodes)
-        {
-            Graph = Node != nullptr ? Node->GetGraph() : nullptr;
-            break;
-        }
+        UEdGraphNode* FirstNode = *UnitNodes.CreateConstIterator();
+        UEdGraph* Graph = FirstNode != nullptr ? FirstNode->GetGraph() : nullptr;
         if (Graph != nullptr) for (UEdGraphNode* External : Graph->Nodes)
         {
             if (External == nullptr || UnitNodes.Contains(External)) continue;

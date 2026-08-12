@@ -43,16 +43,26 @@ def run_automation(executable: Path, project: Path, environment: dict[str, str],
         "MultiplayerAuthoring",
         "FrameworkAssignment",
         "GameDataAuthoring",
+        "FixedCompositionAndRejection",
+        "CapabilitiesAndRemovedInspectionRoute",
+        "AdmissionAndLifecycleFailures",
+        "BlueprintFamilyInspectionIntegration",
         "DiscoverySnapshotsAndSafety",
         "ActorsComponentsPropertiesAndSafety",
         "CreateConfigurePersistAndDelete",
+        "TransactionalActorBatchAndPackageSave",
         "PreflightPersistenceAndReferences",
         "RegistryLiveMemoryAndCursors",
         "FamilyInspectionMutationAndPersistence",
         "LayoutStyleBindingsAndEvents",
+        "CoreFamiliesSelectorsPagingAndLimits",
         "PreflightTransactionPreservation",
+        "LogicUnitsAndExternalLinks",
         "DeterministicChangedNodes",
         "PreservationAcrossReadonlyFlows",
+        "RoundTrip",
+        "InvalidInput",
+        "EnvelopeFixtures",
         "AbilityBlueprintInspection",
         "GameplayEffectInspection",
         "GameplayEffectLiveFixture",
@@ -204,6 +214,5 @@ def prepare_commonui_widget_fixture(
         sys.stderr.write(output[-32_000:])
         raise RuntimeError("CommonUI Widget saved fixture preparation failed")
     return fixtures[-1]
-
 
 

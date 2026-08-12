@@ -140,6 +140,7 @@ bool FUnrealMCPAssetDeleteTest::RunTest(const FString& Parameters)
         AddError(Error.Code + TEXT(": ") + Error.Message);
         return false;
     }
+    const FString ReferencerPath = Result->GetStringField(TEXT("asset_path"));
     const TSharedRef<FUnrealMCPRecord> InspectReferenced = MakeShared<FUnrealMCPRecord>();
     InspectReferenced->SetStringField(TEXT("asset_path"), ReferencedPath);
     InspectReferenced->SetNumberField(TEXT("page_size"), 100);
@@ -171,6 +172,37 @@ bool FUnrealMCPAssetDeleteTest::RunTest(const FString& Parameters)
     TestTrue(
         TEXT("reference rejection preserves storage"),
         IFileManager::Get().FileExists(*ReferencedFilename));
+
+    const TSharedRef<FUnrealMCPRecord> InspectReferencer = MakeShared<FUnrealMCPRecord>();
+    InspectReferencer->SetStringField(TEXT("asset_path"), ReferencerPath);
+    InspectReferencer->SetNumberField(TEXT("page_size"), 100);
+    if (!TestTrue(
+        TEXT("Data Table deletion snapshot succeeds"),
+        References.Inspect(InspectReferencer, Result, Error)))
+    {
+        AddError(Error.Code + TEXT(": ") + Error.Message);
+        return false;
+    }
+    if (!TestTrue(
+        TEXT("clean Data Table deletes"),
+        Deletion.Delete(
+            DeleteArguments(
+                ReferencerPath,
+                Result->GetStringField(TEXT("snapshot_id"))),
+            Result,
+            Error)))
+    {
+        AddError(Error.Code + TEXT(": ") + Error.Message);
+        return false;
+    }
+    TestTrue(TEXT("Data Table delete result is verified"), Result->GetBoolField(TEXT("deleted")));
+    TestFalse(
+        TEXT("deleted Data Table no longer resolves before restart"),
+        References.Inspect(InspectReferencer, Result, Error));
+    TestEqual(
+        TEXT("deleted Data Table reports not found"),
+        Error.Code,
+        FString(TEXT("not_found")));
 
     if (!TestTrue(
         TEXT("fresh reference snapshot succeeds"),
