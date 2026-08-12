@@ -8,9 +8,9 @@ from unreal_editor_mcp import __version__
 def verify_capability_contract(capabilities: dict[str, object], state: dict[str, object]) -> None:
     if capabilities.get("commands") != [
         "capabilities", "editor_state", "editor_shutdown", "operation_status", "operation_cancel",
-        "asset_references", "asset_delete",
+        "asset_inspect", "asset_references", "asset_delete",
         "level_inspect", "level_open", "level_manage", "level_actor_edit", "level_save",
-        "blueprint_inspect", "blueprint_action_catalog", "blueprint_graph_edit",
+        "blueprint_action_catalog", "blueprint_graph_edit",
         "blueprint_block_replace",
         "blueprint_create", "blueprint_compile", "blueprint_save",
         "blueprint_component_edit", "blueprint_default_edit", "blueprint_member_edit",
@@ -21,6 +21,16 @@ def verify_capability_contract(capabilities: dict[str, object], state: dict[str,
         raise AssertionError("capability/state contract mismatch")
     if capabilities.get("features", {}).get("graceful_editor_shutdown") is not True:
         raise AssertionError("graceful editor shutdown capability is unavailable")
+    if capabilities.get("features", {}).get("asset_inspection_core") is not True:
+        raise AssertionError("asset inspection core capability is unavailable")
+    expected_asset_inspect_limits = {
+        "asset_inspect_page_size": 100,
+        "asset_inspect_selector_bytes": 1024,
+        "asset_inspect_complete_graph_bytes": 65536,
+    }
+    if any(capabilities.get("limits", {}).get(name) != value
+           for name, value in expected_asset_inspect_limits.items()):
+        raise AssertionError(f"asset inspection limits mismatch: {capabilities.get('limits')!r}")
     if capabilities.get("features", {}).get("blueprint_mutation") is not True:
         raise AssertionError("Phase 6 mutation capability is unavailable")
     for feature in ("blueprint_functions", "blueprint_local_variables", "blueprint_rep_notify"):
@@ -230,4 +240,3 @@ def verify_capability_contract(capabilities: dict[str, object], state: dict[str,
         "mutation_scope": "project_content_and_local_project_plugins",
     }:
         raise AssertionError("asset access policy contract mismatch")
-

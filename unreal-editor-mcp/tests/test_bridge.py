@@ -70,10 +70,10 @@ class BridgeTests(unittest.TestCase):
     @patch("unreal_editor_mcp.bridge.read_token", return_value="b" * 64)
     @patch("unreal_editor_mcp.bridge.read_discovery", return_value=RECORD)
     def test_sends_bounded_inspection_arguments(self, _discovery, _token):
-        arguments = {"mode": "discover", "package_path": "/Game", "page_size": 5}
-        self._bridge().call("blueprint_inspect", arguments)
+        arguments = {"asset_path": "/Game/Actors/BP_Light", "selector": "functions/BeginPlay", "page_size": 5}
+        self._bridge().call("asset_inspect", arguments)
         body = json.loads(FakeConnection.instances[-1].request_data[2])
-        self.assertEqual(body, {"command": "blueprint_inspect", "arguments": arguments})
+        self.assertEqual(body, {"command": "asset_inspect", "arguments": arguments})
 
     @patch("unreal_editor_mcp.bridge.read_token", return_value="b" * 64)
     @patch("unreal_editor_mcp.bridge.read_discovery", return_value=RECORD)

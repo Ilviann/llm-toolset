@@ -10,6 +10,14 @@ from typing import Any, Protocol, TextIO
 MAX_MCP_MESSAGE_CHARS = 1024 * 1024
 
 
+def configure_standard_streams() -> None:
+    """Force strict UTF-8 on inherited stdio streams when the runtime supports it."""
+    for stream in (sys.stdin, sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if callable(reconfigure):
+            reconfigure(encoding="utf-8", errors="strict")
+
+
 class RequestHandler(Protocol):
     def handle(self, message: dict[str, Any]) -> dict[str, Any] | None: ...
 

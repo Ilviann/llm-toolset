@@ -17,10 +17,10 @@ READONLY_TOOL_NAMES = [
     "capabilities",
     "editor_state",
     "operation_status",
+    "asset_inspect",
     "asset_references",
     "level_inspect",
     "level_open",
-    "blueprint_inspect",
     "blueprint_action_catalog",
     "game_data_inspect",
 ]
@@ -77,6 +77,33 @@ def _call(server: MCPServer, name: str, arguments: dict[str, Any]) -> dict[str, 
     if not isinstance(payload, dict):
         raise AssertionError(f"readonly MCP payload is not an object: {name}: {payload!r}")
     return payload
+
+
+def _call_text(server: MCPServer, name: str, arguments: dict[str, Any]) -> str:
+    response = server.handle({
+        "jsonrpc": "2.0", "id": uuid.uuid4().hex, "method": "tools/call",
+        "params": {"name": name, "arguments": arguments},
+    })
+    if not isinstance(response, dict) or "error" in response:
+        raise AssertionError(f"readonly MCP call failed before dispatch: {name}: {response!r}")
+    tool_result = response.get("result")
+    if not isinstance(tool_result, dict) or tool_result.get("isError") is True:
+        raise AssertionError(f"readonly MCP tool returned an error: {name}: {tool_result!r}")
+    content = tool_result.get("content", [])
+    if len(content) != 1 or content[0].get("type") != "text" or not isinstance(content[0].get("text"), str):
+        raise AssertionError(f"readonly MCP result shape is invalid: {name}: {tool_result!r}")
+    return content[0]["text"]
+
+
+def _yaml_string_field(document: str, field: str) -> str:
+    prefix = f'"{field}": '
+    matches = [line.strip()[len(prefix):] for line in document.splitlines() if line.strip().startswith(prefix)]
+    if len(matches) != 1:
+        raise AssertionError(f"asset_inspect YAML field is missing or ambiguous: {field}: {document!r}")
+    value = json.loads(matches[0])
+    if not isinstance(value, str):
+        raise AssertionError(f"asset_inspect YAML field is not a string: {field}")
+    return value
 
 
 def _continue_once(server: MCPServer, name: str, result: dict[str, Any]) -> None:
@@ -252,34 +279,15 @@ def verify_readonly_mode(
         "map_path": map_path,
     })
 
-    blueprint = _call(server, "blueprint_inspect", {
-        "mode": "inspect",
+    inspected = _call_text(server, "asset_inspect", {
         "asset_path": blueprint_path,
-        "sections": ["summary", "graphs"],
-        "page_size": 1,
+        "selector": "event_graphs/EventGraph",
+        "verbose": True,
     })
-    _continue_once(server, "blueprint_inspect", blueprint)
-    graph = next(
-        (record for record in blueprint.get("records", []) if record.get("section") == "graph"),
-        None,
-    )
-    if not isinstance(graph, dict):
-        graph_page = _call(server, "blueprint_inspect", {
-            "mode": "inspect",
-            "asset_path": blueprint_path,
-            "sections": ["graphs"],
-            "page_size": 100,
-        })
-        graph = next(
-            (record for record in graph_page.get("records", []) if record.get("section") == "graph"),
-            None,
-        )
-    if not isinstance(graph, dict):
-        raise AssertionError(f"readonly Blueprint graph fixture is unavailable: {blueprint!r}")
     _call(server, "blueprint_action_catalog", {
         "asset_path": blueprint_path,
-        "graph_id": graph["id"],
-        "expected_snapshot": blueprint["snapshot_id"],
+        "graph_id": _yaml_string_field(inspected, "graph_guid"),
+        "expected_snapshot": _yaml_string_field(inspected, "snapshot_id"),
         "limit": 1,
     })
 

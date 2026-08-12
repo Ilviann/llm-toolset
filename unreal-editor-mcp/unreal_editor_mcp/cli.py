@@ -10,7 +10,7 @@ from .lifecycle import EditorLifecycle, resolve_editor_executable
 from .platforms import DEFAULT_PLATFORM
 from .project import ProjectLayout
 from .server import MCPServer
-from .stdio import serve
+from .stdio import configure_standard_streams, serve
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -41,6 +41,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main() -> None:
+    configure_standard_streams()
     parser = build_parser()
     args = parser.parse_args()
     try:

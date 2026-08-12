@@ -12,6 +12,8 @@ released_in: "0.31.0"
 
 **Implementation status:** Completed in 0.31.0 with `UnrealMCPGAS` 0.2.0 on unchanged companion API v1 and schema revision 1. Mandatory Windows verification covers Python/static contracts, adaptive/forced-unity/non-unity builds, native Automation, production-socket headless integration, and separate base/GAS packaging. macOS remains preferred non-blocking follow-up work; Linux is out of scope.
 
+The native companion and API v1 registration remain installed, but 0.36.0 removed the shared model-facing Blueprint inspection route. Gameplay Effect records are dormant until a redesigned companion read contract is approved and are not routed into `asset-inspect-core`.
+
 **Depends on:**
 
 - [`gas-ability-blueprints-inspect`](gas-ability-blueprints-inspect.md)

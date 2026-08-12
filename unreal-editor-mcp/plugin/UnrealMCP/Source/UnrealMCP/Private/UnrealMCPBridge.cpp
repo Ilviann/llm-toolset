@@ -30,6 +30,7 @@
 #include "UnrealMCPLevelActorEditingService.h"
 #include "UnrealMCPAssetReferenceService.h"
 #include "UnrealMCPAssetDeletionService.h"
+#include "UnrealMCPAssetInspectionService.h"
 #include "UnrealMCPProtocol.h"
 #include "UnrealMCPOperationLedger.h"
 #include "UnrealMCPVersion.h"
@@ -237,11 +238,11 @@ bool FUnrealMCPBridge::HandleRequest(const FHttpServerRequest& Request, const FH
         return true;
     }
     if (Command != TEXT("capabilities") && Command != TEXT("editor_state") && Command != TEXT("editor_shutdown")
-        && Command != TEXT("operation_status") && Command != TEXT("operation_cancel") && Command != TEXT("asset_references")
+        && Command != TEXT("operation_status") && Command != TEXT("operation_cancel") && Command != TEXT("asset_inspect") && Command != TEXT("asset_references")
         && Command != TEXT("asset_delete")
         && Command != TEXT("level_inspect") && Command != TEXT("level_open") && Command != TEXT("level_manage")
         && Command != TEXT("level_actor_edit") && Command != TEXT("level_save")
-        && Command != TEXT("blueprint_inspect") && Command != TEXT("blueprint_create") && Command != TEXT("blueprint_compile")
+        && Command != TEXT("blueprint_create") && Command != TEXT("blueprint_compile")
         && Command != TEXT("blueprint_save") && Command != TEXT("blueprint_component_edit") && Command != TEXT("blueprint_default_edit")
         && Command != TEXT("blueprint_member_edit") && Command != TEXT("blueprint_action_catalog")
         && Command != TEXT("blueprint_graph_edit") && Command != TEXT("blueprint_block_replace")
@@ -465,6 +466,11 @@ bool FUnrealMCPBridge::Execute(const FString& Command, const TSharedPtr<FJsonObj
         if (!GameplayFrameworkEditor) GameplayFrameworkEditor = MakeUnique<FUnrealMCPGameplayFrameworkEditor>(ProjectHash);
         return GameplayFrameworkEditor->Execute(Arguments, OutResult, OutError);
     }
+    if (Command == TEXT("asset_inspect"))
+    {
+        if (!AssetInspectionService) AssetInspectionService = MakeUnique<FUnrealMCPAssetInspectionService>();
+        return AssetInspectionService->Execute(Arguments, OutResult, OutError);
+    }
     if (Command == TEXT("game_data_inspect") || Command == TEXT("game_data_edit"))
     {
         if (!GameDataService) GameDataService = MakeUnique<FUnrealMCPGameDataService>();
@@ -475,10 +481,6 @@ bool FUnrealMCPBridge::Execute(const FString& Command, const TSharedPtr<FJsonObj
     if (!BlueprintInspector)
     {
         BlueprintInspector = MakeUnique<FUnrealMCPBlueprintInspector>(*ExtensionRegistry);
-    }
-    if (Command == TEXT("blueprint_inspect"))
-    {
-        return BlueprintInspector->Execute(Arguments, OutResult, OutError);
     }
     if (Command == TEXT("blueprint_action_catalog"))
     {
@@ -540,16 +542,16 @@ TSharedPtr<FJsonObject> FUnrealMCPBridge::Capabilities() const
     Result->SetStringField(TEXT("platform"), FPlatformProperties::PlatformName());
     Result->SetStringField(TEXT("mode"), TEXT("blueprint_family_authoring"));
     Result->SetBoolField(TEXT("bridge_ready"), bReady);
-    Result->SetArrayField(TEXT("commands"), Strings({TEXT("capabilities"), TEXT("editor_state"), TEXT("editor_shutdown"), TEXT("operation_status"), TEXT("operation_cancel"), TEXT("asset_references"), TEXT("asset_delete"),
+    Result->SetArrayField(TEXT("commands"), Strings({TEXT("capabilities"), TEXT("editor_state"), TEXT("editor_shutdown"), TEXT("operation_status"), TEXT("operation_cancel"), TEXT("asset_inspect"), TEXT("asset_references"), TEXT("asset_delete"),
         TEXT("level_inspect"), TEXT("level_open"), TEXT("level_manage"), TEXT("level_actor_edit"), TEXT("level_save"),
-        TEXT("blueprint_inspect"), TEXT("blueprint_action_catalog"), TEXT("blueprint_graph_edit"),
+        TEXT("blueprint_action_catalog"), TEXT("blueprint_graph_edit"),
         TEXT("blueprint_block_replace"), TEXT("blueprint_create"), TEXT("blueprint_compile"),
         TEXT("blueprint_save"), TEXT("blueprint_component_edit"), TEXT("blueprint_default_edit"), TEXT("blueprint_member_edit"),
         TEXT("widget_tree_edit"),
         TEXT("gameplay_framework_edit"), TEXT("game_data_inspect"), TEXT("game_data_edit")}));
 
     const TSharedRef<FJsonObject> Features = MakeShared<FJsonObject>();
-    Features->SetBoolField(TEXT("blueprint_inspection"), true);
+    Features->SetBoolField(TEXT("asset_inspection_core"), true);
     Features->SetBoolField(TEXT("blueprint_mutation"), true);
     Features->SetBoolField(TEXT("blueprint_creation"), true);
     Features->SetBoolField(TEXT("blueprint_compile"), true);
@@ -668,6 +670,9 @@ TSharedPtr<FJsonObject> FUnrealMCPBridge::Capabilities() const
     Limits->SetNumberField(TEXT("string_chars"), UnrealMCP::MaxStringLength);
     Limits->SetNumberField(TEXT("command_deadline_ms"), static_cast<int32>(UnrealMCP::CommandDeadlineSeconds * 1000.0));
     Limits->SetNumberField(TEXT("inspect_page_size"), UnrealMCP::MaxInspectPageSize);
+    Limits->SetNumberField(TEXT("asset_inspect_page_size"), UnrealMCP::MaxAssetInspectPageSize);
+    Limits->SetNumberField(TEXT("asset_inspect_selector_bytes"), UnrealMCP::MaxAssetInspectSelectorBytes);
+    Limits->SetNumberField(TEXT("asset_inspect_complete_graph_bytes"), UnrealMCP::MaxAssetInspectCompleteGraphBytes);
     Limits->SetNumberField(TEXT("discovery_scan"), UnrealMCP::MaxDiscoveryScan);
     Limits->SetNumberField(TEXT("inspect_records"), UnrealMCP::MaxInspectRecords);
     Limits->SetNumberField(TEXT("retained_cursors"), UnrealMCP::MaxRetainedCursors);

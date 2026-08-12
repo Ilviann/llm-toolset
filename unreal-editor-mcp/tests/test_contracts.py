@@ -55,7 +55,7 @@ class ReleaseContractTests(unittest.TestCase):
         native = re.search(r'Version\[\].*TEXT\("([^"]+)"\)', header)
         self.assertIsNotNone(native)
         versions = {project["project"]["version"], plugin["VersionName"], native.group(1), unreal_editor_mcp.__version__}
-        self.assertEqual(versions, {"0.35.0"})
+        self.assertEqual(versions, {"0.36.0"})
 
     def test_companion_api_and_companion_versions_are_internally_consistent(self):
         base = json.loads((ROOT / "plugin/UnrealMCP/UnrealMCP.uplugin").read_text(encoding="utf-8"))
@@ -175,9 +175,9 @@ class ReleaseContractTests(unittest.TestCase):
         names = [tool["name"] for tool in TOOLS]
         self.assertEqual(names, [
             "capabilities", "editor_state", "operation_status", "operation_cancel",
-            "asset_references", "asset_delete",
+            "asset_inspect", "asset_references", "asset_delete",
             "level_inspect", "level_open", "level_manage", "level_actor_edit", "level_save",
-            "blueprint_inspect", "blueprint_action_catalog", "blueprint_graph_edit",
+            "blueprint_action_catalog", "blueprint_graph_edit",
             "blueprint_block_replace",
             "blueprint_create", "blueprint_compile", "blueprint_save",
             "blueprint_component_edit", "blueprint_default_edit",

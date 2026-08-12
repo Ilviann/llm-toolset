@@ -10,7 +10,7 @@ Each `FUnrealMCPExtensionContribution` has one stable ID, category (`AssetFamily
 
 `IUnrealMCPExtensionHandler` provides readiness, exact target support, argument validation, inspection, companion-owned fingerprint material, mutation, and read-back callbacks. Handlers receive loaded objects only after base validation and always run on the Game thread. Model input remains untrusted even though companions are trusted native project code.
 
-For a read-only Blueprint `AssetFamily`, the base may use the existing target family/class policy, handler, and stable limits to integrate the family into ordinary `blueprint_inspect`. The handler receives the verified generated-class default object, returns bounded records plus nested family capabilities, and supplies fingerprint material included in the base snapshot. This does not enable any base mutation surface.
+Companion API v1 retains its historical read-only Blueprint `AssetFamily` contribution records and handlers, but 0.36.0 no longer publishes their former model-facing inspection route. They remain dormant internal registrations until a separately approved companion API/read-facade design integrates them without changing `asset-inspect-core`. Mutation contributions remain independently admitted under their existing contracts.
 
 ## Descriptor and capability records
 

@@ -4,7 +4,7 @@
 
 `plugin/UnrealMCPGAS/` owns every direct dependency on the Engine Gameplay Ability System plugin and the `GameplayAbilities`, `GameplayTags`, and `GameplayTasks` modules. Its editor module registers one read-only `gameplay_ability` Blueprint asset-family contribution through companion API v1. The base `UnrealMCP` plugin remains GAS-free and owns discovery, authentication, Game-thread dispatch, Blueprint structure collection, pagination, snapshots, limits, and capability composition.
 
-The companion reads only `UGameplayAbility` class default objects reached from verified Gameplay Ability Blueprints. It uses public policy getters plus an exact allowlist of typed GAS properties; it does not accept property paths or unrestricted reflection. `blueprint_inspect` remains the only model-facing tool.
+The companion reads only `UGameplayAbility` class default objects reached from verified Gameplay Ability Blueprints. It uses public policy getters plus an exact allowlist of typed GAS properties; it does not accept property paths or unrestricted reflection. In 0.36.0 the handler is registered but has no model-facing read route and is not part of `asset-inspect-core`.
 
 ## Inspection flow
 

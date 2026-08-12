@@ -4,7 +4,7 @@
 
 An admitted `unreal-mcp-gas` schema-revision-1 contribution adds the `gameplay_ability` family for usable native or Blueprint-generated `UGameplayAbility` descendants. Discovery remains non-loading and uses the native-parent Asset Registry tag; exact inspection validates the loaded generated class and class default object.
 
-Selecting `gameplay_ability` adds four records to the ordinary `blueprint_inspect` page:
+The retained native `gameplay_ability` handler produces four internal records. They are dormant in 0.36.0 pending a redesigned model-facing read contract:
 
 - `gameplay_ability_policies` contains instancing, replication, network execution/security, remote-cancellation, retrigger, and input-replication values.
 - `gameplay_ability_tags` contains sorted effective asset, cancel, block, activation, source, and target tag containers.

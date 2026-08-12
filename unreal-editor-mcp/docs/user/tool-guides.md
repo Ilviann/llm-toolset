@@ -2,15 +2,15 @@
 
 This page is the navigation entry point for every released tool family. For installation, first connection, and the concise contract overview, start with the [project README](../../README.md).
 
-Unreal Editor MCP 0.35.0 is an offline-first MCP bridge for Unreal Engine 5.8+. It pairs a dependency-free Python 3.10+ stdio server with an editor-only C++ plugin. Readonly mode is the default and exposes these nine tools in deterministic order:
+Unreal Editor MCP 0.36.0 is an offline-first MCP bridge for Unreal Engine 5.8+. It pairs a dependency-free Python 3.10+ stdio server with an editor-only C++ plugin. Readonly mode is the default and exposes these nine tools in deterministic order:
 
 - `capabilities` always reports the configured project name/hash and Python surface. With an active bridge it also reports exact plugin/Unreal versions, commands, features, listener state, effective limits, and the Blueprint-family matrix; otherwise `native_capabilities_available` and `bridge_ready` are false and native-only fields are absent.
 - `editor_state` reports project identity, bridge readiness, play/simulate/save/GC state, and concise queued-operation state.
 - `operation_status` looks up one retained operation by operation and bridge identity without cancelling it.
+- `asset_inspect` returns deterministic safe YAML for one exact `/Game` asset, with compact semantic roots and hierarchical selectors for supported core Blueprint families.
 - `asset_references` finds bounded Asset Registry and live-memory referencers for one exact mounted asset without loading candidate packages.
 - `level_inspect` discovers mounted World assets, reports the current map snapshot, pages World Partition actor descriptors, and inspects exact actor/component properties.
 - `level_open` safely opens one exact mounted World asset through the retained operation ledger without saving, discarding, or dirtying project content.
-- `blueprint_inspect` discovers every published Blueprint family across mounted content and returns bounded pages of one selected Blueprint's structure.
 - `blueprint_action_catalog` discovers bounded context-valid function, variable, event, flow-control, cast, literal, and operator actions for one exact Blueprint graph snapshot.
 - `game_data_inspect` reads one user-defined struct schema or bounded page of typed Data Table rows from an exact asset snapshot.
 
@@ -38,7 +38,7 @@ Starting the server with `--writable` is an explicit trust decision and exposes 
 
 - [Setup and operation](setup-and-operation.md)
 - [Levels and assets](levels-and-assets.md)
-- [Blueprint inspection](blueprint-inspection.md)
+- [Asset inspection](asset-inspection.md)
 - [Blueprint graph authoring](graph-authoring.md)
 - [Blueprint mutation](blueprint-mutation.md)
 - [Gameplay frameworks and data](gameplay-and-data.md)
@@ -79,9 +79,9 @@ See [Levels and assets](levels-and-assets.md#asset-references).
 
 See [Levels and assets](levels-and-assets.md#asset-deletion).
 
-## Blueprint-family inspection
+## Asset inspection
 
-See [Blueprint inspection](blueprint-inspection.md#blueprint-family-inspection).
+See [Asset inspection](asset-inspection.md).
 
 ## Blueprint action catalog
 

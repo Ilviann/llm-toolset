@@ -136,10 +136,10 @@ class HeadlessIntegrationScriptTests(unittest.TestCase):
                 (self.layout.state_dir / "allowed.json").write_text("generated", encoding="utf-8")
                 if command == "capabilities":
                     return {"bridge_version": __version__, "bridge_instance_id": "b" * 32}
-                if command == "blueprint_inspect":
+                if command == "asset_inspect":
                     return {
                         "snapshot_id": "c" * 40,
-                        "records": [{"section": "graph", "id": "d" * 32}],
+                        "graph": {"debug": {"graph_guid": "d" * 32}},
                     }
                 return {}
 
@@ -181,10 +181,10 @@ class HeadlessIntegrationScriptTests(unittest.TestCase):
                     self.changed = True
                 if command == "capabilities":
                     return {"bridge_version": __version__, "bridge_instance_id": "b" * 32}
-                if command == "blueprint_inspect":
+                if command == "asset_inspect":
                     return {
                         "snapshot_id": "c" * 40,
-                        "records": [{"section": "graph", "id": "d" * 32}],
+                        "graph": {"debug": {"graph_guid": "d" * 32}},
                     }
                 return {}
 

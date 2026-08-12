@@ -46,7 +46,7 @@ Keep the authoritative checklist in [`ROADMAP.md`](../../ROADMAP.md) synchronize
 - [`companion-plugins` — Companion plugin extension foundation](completed/companion-plugins.md) — Discover API-compatible independently versioned companion plugins and safely register bounded support for additional asset types, component types, and operations on existing assets.
   - Depends on:
     - `readonly-mode`
-- [`asset-inspect-core` — General asset inspection foundation and gameplay Blueprints](planned/asset-inspect-core.md) — Add the common read-only facade and deep inspection for gameplay-framework and Interface Blueprints.
+- [`asset-inspect-core` — General asset inspection foundation and gameplay Blueprints](completed/asset-inspect-core.md) — Add the common read-only facade and deep inspection for gameplay-framework and Interface Blueprints.
 - [`asset-inspect-data` — Data Asset and Data Table inspection](planned/asset-inspect-data.md) — Extend the facade to structured Data Assets and Data Tables.
   - Depends on:
     - `asset-inspect-core`

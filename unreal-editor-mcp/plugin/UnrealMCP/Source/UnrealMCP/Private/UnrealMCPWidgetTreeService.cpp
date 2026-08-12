@@ -21,7 +21,7 @@ using namespace UnrealMCP::WidgetTreePrivate;
 
 bool HasExactFields(const FJsonObject& Arguments, std::initializer_list<const TCHAR*> Fields)
 {
-    return HasOnlyFields(Arguments, Fields);
+    return UnrealMCP::BlueprintMutationPrivate::HasOnlyFields(Arguments, Fields);
 }
 
 bool ResolveWidgetBlueprint(
@@ -202,7 +202,8 @@ bool ReadTarget(
     }
     if (Kind == TEXT("panel"))
     {
-        if (!HasOnlyFields(**Target, {TEXT("kind"), TEXT("parent_id"), TEXT("index")}))
+        if (!UnrealMCP::BlueprintMutationPrivate::HasOnlyFields(
+            **Target, {TEXT("kind"), TEXT("parent_id"), TEXT("index")}))
         {
             OutError = {TEXT("invalid_argument"), TEXT("A panel target accepts only kind, parent_id, and index")};
             return false;
@@ -235,7 +236,8 @@ bool ReadTarget(
     }
     if (Kind == TEXT("named_slot"))
     {
-        if (!HasOnlyFields(**Target, {TEXT("kind"), TEXT("slot_id")}))
+        if (!UnrealMCP::BlueprintMutationPrivate::HasOnlyFields(
+            **Target, {TEXT("kind"), TEXT("slot_id")}))
         {
             OutError = {TEXT("invalid_argument"), TEXT("A named-slot target accepts only kind and slot_id")};
             return false;

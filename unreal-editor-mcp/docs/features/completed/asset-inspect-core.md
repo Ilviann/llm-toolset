@@ -1,13 +1,15 @@
 ---
 feature_id: asset-inspect-core
-status: planned
+status: completed
 depends_on: []
-released_in: null
+released_in: "0.36.0"
 ---
 
 # `asset-inspect-core` — General asset inspection foundation and gameplay Blueprints
 
 **Outcome:** Agents can analyze ordinary Blueprint logic and framework configuration encapsulated in one exact Unreal asset through the small read-only `asset_inspect` API.
+
+**Implementation status:** Completed in 0.36.0. Windows passed focused and full Python tests, adaptive/forced-unity/non-unity UE 5.8 builds, the full native Automation suite, complete headless cross-process lifecycle and restart validation, and isolated Win64 base-plugin packaging. macOS verification remains preferred follow-up work; Linux is out of scope.
 
 The accepted shared request, YAML response, selector, graph, collection, inheritance, and family contracts are under [Asset inspection contracts](../../types/asset-inspection/index.md).
 
@@ -17,7 +19,7 @@ The accepted shared request, YAML response, selector, graph, collection, inherit
 - Return successful results as deterministic safe YAML 1.2-compatible text while retaining MCP JSON-RPC framing and shared structured tool errors. Keep native and Python records typed and JSON-compatible; render YAML only at the final model-facing boundary.
 - Implement canonical percent-encoded hierarchical selectors, query-independent asset snapshots, zero-based deterministic collection paging, complete normalized graphs, verbose graph identities and coordinates, and the explicitly opted-in coherent oversized-graph fallback.
 - Always return stable asset type identity. Include meaningful represented `parent_type` only when applicable, return type-only results for raw media families, and never emit media, bulk data, thumbnails, or media-retrieval paths.
-- Keep `blueprint_inspect` and `game_data_inspect` published for compatibility and reuse existing typed collectors instead of producing divergent semantic records.
+- Keep `game_data_inspect` published. Remove the reconstruction-oriented Blueprint inspection tool after this semantic core covers its analysis role; retain only internal fingerprint support required by authoring preconditions.
 
 ### Core family scope
 
@@ -32,12 +34,12 @@ The accepted shared request, YAML response, selector, graph, collection, inherit
 
 - Keep path validation, mounted-content confinement, classification, selector routing, bounds, snapshots, errors, capabilities, and YAML rendering base-owned. Traverse live typed Unreal editor structures rather than reparsing clipboard export text.
 - Preserve package dirty state, open editors, selection, transactions, loaded-world state, compile state, and project content.
-- Test MCP schema/framing, deterministic YAML and quoting, selectors, paging, snapshots, errors, limits, security, media exclusion, unknown classes, inheritance, every core family, Blueprint Interface declarations, normal/verbose graphs, complete/oversized graphs, compatibility tools, and read-only preservation.
+- Test MCP schema/framing, deterministic YAML and quoting, selectors, paging, snapshots, errors, limits, security, media exclusion, unknown classes, inheritance, every core family, Blueprint Interface declarations, normal/verbose graphs, complete/oversized graphs, removed-tool behavior, and read-only preservation.
 - Run the full Python suite, mandatory Windows adaptive/unity and non-unity builds, native Automation, headless and production-socket integration, and base-plugin packaging. Track unavailable macOS verification as preferred follow-up; Linux remains outside support.
 
 ### Documentation and completion gate
 
 - Document the tool schema, exact paths, YAML envelope, selectors, paging, graph fallback, supported core families, limits, errors, exclusions, and representative multi-call analysis workflows.
-- Complete only when every advertised core family returns deterministic bounded semantic results, graph completeness is explicit, media and live runtime state cannot leak, compatibility tools remain stable, capabilities match dispatch, read-only preservation passes, and mandatory Windows verification succeeds.
+- Complete only when every advertised core family returns deterministic bounded semantic results, graph completeness is explicit, media and live runtime state cannot leak, capabilities match dispatch, read-only preservation passes, and mandatory Windows verification succeeds.
 
 [Back to roadmap](../../../ROADMAP.md) · [Shared roadmap contracts](../index.md)

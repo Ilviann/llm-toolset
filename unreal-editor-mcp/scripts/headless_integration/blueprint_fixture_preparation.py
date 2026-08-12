@@ -14,28 +14,16 @@ from .blueprint_declarations import (
 
 def prepare_blueprint_scenario(bridge: UnrealBridge) -> dict[str, object]:
     """Inspect the prepared fixture and create the authored Blueprint families."""
-    discovery = bridge.call("blueprint_inspect", {
-        "mode": "discover",
-        "package_path": "/Game/UnrealMCPPhase2",
-        "asset_name": "BP_InspectionFixture",
-    })
-    if not any(record.get("section") == "asset" for record in discovery.get("records", [])):
-        raise AssertionError("saved Actor Blueprint was not discoverable after editor restart")
-    inspection = bridge.call("blueprint_inspect", {
-        "mode": "inspect",
+    inspection = bridge.call("asset_inspect", {
         "asset_path": "/Game/UnrealMCPPhase2/BP_InspectionFixture.BP_InspectionFixture",
-        "sections": [
-            "summary", "parent_class", "compile_state", "components", "variables",
-            "graphs", "nodes", "pins", "connections",
-        ],
-        "page_size": 100,
     })
     loaded_snapshot = inspection.get("snapshot_id")
     if not isinstance(loaded_snapshot, str) or len(loaded_snapshot) != 40:
         raise AssertionError("reloaded Phase 2 fixture did not report a structural snapshot")
-    found = {record.get("section") for record in inspection.get("records", [])}
-    if not {"summary", "component", "variable", "graph", "node", "pin"}.issubset(found):
-        raise AssertionError(f"live inspection omitted required structure: {sorted(found)!r}")
+    if inspection.get("asset", {}).get("type") != "actor_blueprint" \
+            or not inspection.get("event_graphs") or not inspection.get("variables") \
+            or not inspection.get("components"):
+        raise AssertionError(f"live semantic inspection omitted required structure: {inspection!r}")
 
     created = bridge.call("blueprint_create", {
         "operation_id": uuid.uuid4().hex,

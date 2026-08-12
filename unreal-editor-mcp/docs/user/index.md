@@ -10,7 +10,7 @@ Start with the [project README](../../README.md) for installation, first connect
 - [Gameplay Effect inspection](gameplay-effects.md) — data-only GAS effect discovery, typed configuration records, chained references, limits, and read-only examples.
 - [CommonUI Widget Blueprint inspection](commonui-widget-blueprints.md) — optional CommonUI companion setup, typed Widget/activation/reference records, limits, and read-only examples.
 - [Levels and assets](levels-and-assets.md) — level discovery, inspection, opening, management, transactional actor editing, verified saving, asset references, and safe deletion.
-- [Blueprint inspection](blueprint-inspection.md) — families, snapshots, identities, pagination, and mutation scope.
+- [Asset inspection](asset-inspection.md) — exact paths, semantic roots, selectors, graphs, paging, YAML, and exclusions.
 - [Blueprint graph authoring](graph-authoring.md) — action discovery, node lifecycle, complete logic-unit replacement, pin defaults, and connections.
 - [Blueprint mutation](blueprint-mutation.md) — reliable mutations, creation, components, defaults, members, functions, locals, macros, and custom events.
 - [Gameplay frameworks and data](gameplay-and-data.md) — GameMode, GameState, GameInstance, multiplayer assignment, structs, and Data Tables.

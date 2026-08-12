@@ -6,6 +6,12 @@
 - Added an independent CommonUI companion checkbox to the Windows deployment helper, including fixed base-dependent packaging, project/Engine installation, and transactional multi-plugin handling without changing runtime or plugin versions.
 - Decomposed Python packaging, Windows deployment, and headless integration support tools behind stable entrypoints, with shared Unreal-local primitives, typed deployment and Blueprint scenario state, focused domain modules, and unchanged runtime/plugin versions.
 
+## 0.36.0 — 2026-08-12
+
+- Added `asset_inspect`, a read-only exact-asset facade with canonical `/Game` object paths, compact semantic roots, hierarchical UTF-8 selectors, zero-based paging, stable snapshots, direct normalized `UEdGraph` traversal, atomic graph bounds, and explicit coherent partial-graph fallback for gameplay-framework, Actor Component, and Interface Blueprints.
+- Added dependency-free deterministic safe-YAML success rendering while retaining JSON-RPC/native JSON and structured MCP errors, strict UTF-8 standard streams, neutral unsupported/media-safe identities, published capabilities and limits, and complete schema, native, cross-process, and packaging coverage.
+- Removed the public reconstruction-oriented `blueprint_inspect` tool while retaining its internal fingerprint support for authoring preconditions. `game_data_inspect` remains published; GAS and CommonUI companion read registrations remain dormant on unchanged companion API v1 pending redesigned contracts. macOS verification remains preferred follow-up work; Linux is out of scope.
+
 ## 0.35.0 — 2026-08-09
 
 - Added the independently versioned optional `UnrealMCPCommonUI` 0.1.0 editor companion with all CommonUI dependencies isolated from the base plugin and unchanged companion API v1/schema revision 1.

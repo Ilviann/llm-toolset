@@ -20,17 +20,18 @@ class FakeBridge:
         if command == "capabilities":
             return {"bridge_version": unreal_editor_mcp.__version__, "commands": [
                 "capabilities", "editor_state", "operation_status", "operation_cancel",
-                "asset_references", "asset_delete",
+                "asset_inspect", "asset_references", "asset_delete",
                 "level_inspect", "level_open", "level_manage", "level_actor_edit", "level_save",
-                "blueprint_inspect", "blueprint_action_catalog", "blueprint_graph_edit",
+                "blueprint_action_catalog", "blueprint_graph_edit",
                 "blueprint_block_replace",
                 "blueprint_create", "blueprint_compile", "blueprint_save",
                 "blueprint_component_edit", "blueprint_default_edit",
                 "blueprint_member_edit", "widget_tree_edit",
                 "gameplay_framework_edit", "game_data_inspect", "game_data_edit",
             ]}
-        if command == "blueprint_inspect":
-            return {"mode": "discover", "snapshot_id": "a" * 40, "records": []}
+        if command == "asset_inspect":
+            return {"asset": {"path": "/Game/Actors/BP_Light.BP_Light", "type": "actor_blueprint"},
+                    "snapshot_id": "a" * 40, "schema_version": 1}
         if command.startswith("blueprint_") or command == "widget_tree_edit":
             return {"asset_path": "/Game/Actors/BP_Light.BP_Light", "snapshot_id": "a" * 40}
         return {"bridge_ready": True}
@@ -62,8 +63,8 @@ class ServerStdioTests(unittest.TestCase):
         self.assertEqual(initialized["result"]["serverInfo"]["version"], unreal_editor_mcp.__version__)
         listed = server.handle({"jsonrpc": "2.0", "id": 2, "method": "tools/list"})
         self.assertEqual([tool["name"] for tool in listed["result"]["tools"]], [
-            "capabilities", "editor_state", "operation_status", "asset_references",
-            "level_inspect", "level_open", "blueprint_inspect", "blueprint_action_catalog",
+            "capabilities", "editor_state", "operation_status", "asset_inspect",
+            "asset_references", "level_inspect", "level_open", "blueprint_action_catalog",
             "game_data_inspect",
         ])
         called = server.handle({"jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": {"name": "capabilities", "arguments": {}}})
@@ -78,14 +79,14 @@ class ServerStdioTests(unittest.TestCase):
 
     def test_exact_catalogs_and_internal_access_classification(self):
         readonly = [
-            "capabilities", "editor_state", "operation_status", "asset_references",
-            "level_inspect", "level_open", "blueprint_inspect", "blueprint_action_catalog",
+            "capabilities", "editor_state", "operation_status", "asset_inspect",
+            "asset_references", "level_inspect", "level_open", "blueprint_action_catalog",
             "game_data_inspect",
         ]
         writable = [
             "capabilities", "editor_state", "operation_status", "operation_cancel",
-            "asset_references", "asset_delete", "level_inspect", "level_open",
-            "level_manage", "level_actor_edit", "level_save", "blueprint_inspect",
+            "asset_inspect", "asset_references", "asset_delete", "level_inspect", "level_open",
+            "level_manage", "level_actor_edit", "level_save",
             "blueprint_action_catalog", "blueprint_graph_edit", "blueprint_block_replace",
             "blueprint_create", "blueprint_compile", "blueprint_save",
             "blueprint_component_edit", "blueprint_default_edit", "blueprint_member_edit",
@@ -420,40 +421,35 @@ class ServerStdioTests(unittest.TestCase):
             response = server.handle({"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": params})
             self.assertEqual(response["error"]["code"], -32602)
 
-    def test_blueprint_inspect_schema_accepts_exact_modes_and_cursor(self):
+    def test_asset_inspect_schema_accepts_exact_selectors_and_bounds(self):
         server = MCPServer(FakeBridge(), writable=True)
         valid = (
-            {"mode": "discover", "package_path": "/Game/Actors", "asset_name": "BP_Light", "page_size": 10},
-            {"mode": "discover", "package_path": "/Engine", "asset_name": "BP_Light"},
-            {"mode": "inspect", "asset_path": "/Game/Actors/BP_Light.BP_Light", "sections": ["summary", "nodes"], "include_inherited": True},
-            {"mode": "inspect", "asset_path": "/Game/Actors/BP_Light.BP_Light", "sections": ["variables"], "member_id": "e" * 32},
-            {"mode": "inspect", "asset_path": "/Game/Actors/BP_Light.BP_Light", "sections": ["functions", "parameters"], "function_id": "f" * 32},
-            {"mode": "inspect", "asset_path": "/Game/Actors/BP_Light.BP_Light", "sections": ["local_variables"], "local_id": "d" * 32},
-            {"mode": "inspect", "asset_path": "/Game/Actors/BP_Light.BP_Light", "sections": ["macros", "parameters"], "macro_id": "c" * 32},
-            {"mode": "inspect", "asset_path": "/Game/Actors/BP_Light.BP_Light", "sections": ["custom_events", "parameters"], "custom_event_id": "9" * 32},
-            {"mode": "inspect", "asset_path": "/ProjectPlugin/BP_Light.BP_Light"},
-            {"mode": "inspect", "asset_path": "/Game/UI/WBP_HUD.WBP_HUD",
-             "sections": ["widget_tree", "widget_defaults"], "widget_id": "7" * 32,
-             "property_names": ["RenderOpacity"]},
-            {"cursor": "a" * 32, "page_size": 25},
+            {"asset_path": "/Game/Actors/BP_Light"},
+            {"asset_path": "/Game/Actors/BP_Light.BP_Light", "verbose": True},
+            {"asset_path": "/Game/Actors/BP_Light", "selector": "properties/tags", "page_size": 10, "page_index": 2},
+            {"asset_path": "/Game/Actors/BP_Light", "selector": "functions/%D0%A2%D0%B5%D1%81%D1%82", "allow_partial_graph": True},
         )
         for arguments in valid:
             with self.subTest(arguments=arguments):
-                response = server.handle({"jsonrpc": "2.0", "id": 4, "method": "tools/call", "params": {"name": "blueprint_inspect", "arguments": arguments}})
+                response = server.handle({"jsonrpc": "2.0", "id": 4, "method": "tools/call", "params": {"name": "asset_inspect", "arguments": arguments}})
                 self.assertNotIn("error", response)
+                self.assertTrue(response["result"]["content"][0]["text"].startswith('"asset":'))
         invalid = (
             {},
-            {"mode": "discover", "asset_path": "/Game/A.A"},
-            {"mode": "inspect", "asset_path": "Engine/A.A"},
-            {"mode": "inspect", "asset_path": "/Game/../Engine/A.A"},
-            {"cursor": "short"},
-            {"cursor": "a" * 32, "mode": "discover"},
-            {"mode": "inspect", "asset_path": "/Game/A.A", "page_size": 101},
+            {"asset_path": "Game/A.A"},
+            {"asset_path": "/Game/../Engine/A.A"},
+            {"asset_path": "/Game/A.A", "selector": "functions/lower%2fescape"},
+            {"asset_path": "/Game/A.A", "page_size": 101},
+            {"asset_path": "/Game/A.A", "page_index": -1},
         )
         for arguments in invalid:
             with self.subTest(arguments=arguments):
-                response = server.handle({"jsonrpc": "2.0", "id": 5, "method": "tools/call", "params": {"name": "blueprint_inspect", "arguments": arguments}})
+                response = server.handle({"jsonrpc": "2.0", "id": 5, "method": "tools/call", "params": {"name": "asset_inspect", "arguments": arguments}})
                 self.assertEqual(response["error"]["code"], -32602)
+
+        removed = server.handle({"jsonrpc": "2.0", "id": 6, "method": "tools/call",
+                                 "params": {"name": "blueprint_inspect", "arguments": {}}})
+        self.assertEqual(removed["error"]["code"], -32602)
 
     def test_released_mutation_schemas_are_exact(self):
         server = MCPServer(FakeBridge(), writable=True)

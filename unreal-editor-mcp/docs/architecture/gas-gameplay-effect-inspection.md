@@ -8,7 +8,7 @@ The companion reads only verified `UGameplayEffect` class default objects. It us
 
 ## Inspection flow
 
-The frozen extension registry classifies usable native and Blueprint-generated `UGameplayEffect` descendants as `gameplay_effect`. Ordinary `blueprint_inspect` supplies the summary and one authoritative snapshot; selecting `gameplay_effect` adds eleven fixed records for duration and period, modifiers, executions, stacking, cues, tags, granted abilities, additional-effect references, requirements, components, and cross-field relationships.
+The frozen extension registry classifies usable native and Blueprint-generated `UGameplayEffect` descendants as `gameplay_effect` and retains eleven typed record collectors. In 0.36.0 their former shared model-facing route is removed; the collectors remain dormant pending a redesigned companion read contract.
 
 Magnitudes are decoded only as scalable float, attribute based, custom calculation class, or set by caller. Components are accepted through an explicit public-class allowlist; unknown classes become typed unsupported records. Class, attribute, tag, curve, and asset references report resolution and compatibility without loading unrelated assets. Local/inherited ownership, stable nested identities, sorted values, duplicate detection, scan/output bounds, and bounded chained-effect traversal feed the same snapshot fingerprint even when output is paged or omitted.
 

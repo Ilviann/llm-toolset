@@ -81,19 +81,14 @@ class ExtensionCatalogTests(unittest.TestCase):
         return next(tool for tool in tools if tool["name"] == name)
 
     def test_readonly_intersection_adds_only_exact_read_contributions(self):
-        inspect = self.tool(False, "blueprint_inspect")
-        valid = {
-            "extension_id": "unreal-mcp-test",
-            "extension_schema_revision": 1,
-            "operation": "inspect_test_asset",
-            "asset_path": "/Game/Test.Asset",
-        }
-        validate_tool_arguments(valid, inspect["inputSchema"])
+        tools = compose_extension_tools(
+            tools_for_configuration(writable=False, lifecycle_enabled=False),
+            capabilities(), writable=False,
+        )
+        self.assertNotIn("blueprint_inspect", {tool["name"] for tool in tools})
+        self.assertNotIn("unreal-mcp-test", json.dumps(tools))
         self.assertNotIn("blueprint_default_edit", {
-            tool["name"] for tool in compose_extension_tools(
-                tools_for_configuration(writable=False, lifecycle_enabled=False),
-                capabilities(), writable=False,
-            )
+            tool["name"] for tool in tools
         })
 
     def test_writable_intersection_adds_exact_mutation_shape(self):
@@ -121,92 +116,47 @@ class ExtensionCatalogTests(unittest.TestCase):
         cases = ({}, capabilities(ready=False), capabilities(schema=2), capabilities(api=2))
         request = {
             "extension_id": "unreal-mcp-test", "extension_schema_revision": 1,
-            "operation": "inspect_test_asset", "asset_path": "/Game/Test.Asset",
+            "operation": "set_test_asset_value", "operation_id": "a" * 32,
+            "asset_path": "/Game/Test.Asset", "expected_snapshot": "b" * 40, "value": 7,
         }
         for native in cases:
             with self.subTest(native=native):
-                tool = self.tool(False, "blueprint_inspect", native)
+                tool = self.tool(True, "blueprint_default_edit", native)
                 with self.assertRaises(SchemaValidationError):
                     validate_tool_arguments(request, tool["inputSchema"])
 
-    def test_gas_companion_extends_standard_inspection_sections_only_when_ready(self):
-        valid = {
-            "mode": "inspect",
-            "asset_path": "/Game/Abilities/GA_Test.GA_Test",
-            "sections": ["summary", "gameplay_ability"],
-        }
-        validate_tool_arguments(
-            valid, self.tool(False, "blueprint_inspect", gas_capabilities())["inputSchema"],
-        )
-        for native in ({}, gas_capabilities(ready=False), gas_capabilities(schema=2), gas_capabilities(api=2)):
-            with self.subTest(native=native), self.assertRaises(SchemaValidationError):
-                validate_tool_arguments(
-                    valid, self.tool(False, "blueprint_inspect", native)["inputSchema"],
-                )
+    def test_gas_companion_inspection_contributions_are_not_published(self):
+        for native in (gas_capabilities(), gas_capabilities(ready=False), gas_capabilities(schema=2)):
+            tools = compose_extension_tools(
+                tools_for_configuration(writable=False, lifecycle_enabled=False), native, writable=False,
+            )
+            self.assertNotIn("blueprint_inspect", {tool["name"] for tool in tools})
+            self.assertNotIn("unreal-mcp-gas", json.dumps(tools))
 
     def test_gas_companion_never_adds_a_mutation_branch(self):
         tools = compose_extension_tools(
             tools_for_configuration(writable=True, lifecycle_enabled=False),
             gas_capabilities(), writable=True,
         )
-        inspect = next(tool for tool in tools if tool["name"] == "blueprint_inspect")
-        validate_tool_arguments({
-            "mode": "inspect", "asset_path": "/Game/GA.GA",
-            "sections": ["gameplay_ability"],
-        }, inspect["inputSchema"])
+        self.assertNotIn("blueprint_inspect", {tool["name"] for tool in tools})
         default_edit = next(tool for tool in tools if tool["name"] == "blueprint_default_edit")
         self.assertNotIn("unreal-mcp-gas", json.dumps(default_edit))
 
-    def test_gas_companion_adds_gameplay_effect_inspection_only_when_ready(self):
-        valid = {
-            "mode": "inspect",
-            "asset_path": "/Game/Effects/GE_Damage.GE_Damage",
-            "sections": ["summary", "gameplay_effect"],
-        }
-        validate_tool_arguments(
-            valid, self.tool(False, "blueprint_inspect", gas_capabilities())["inputSchema"],
-        )
-        for native in ({}, gas_capabilities(ready=False), gas_capabilities(schema=2), gas_capabilities(api=2)):
-            with self.subTest(native=native), self.assertRaises(SchemaValidationError):
-                validate_tool_arguments(
-                    valid, self.tool(False, "blueprint_inspect", native)["inputSchema"],
-                )
+    def test_gas_gameplay_effect_inspection_is_outside_asset_inspect_core(self):
+        tool = self.tool(False, "asset_inspect", gas_capabilities())
+        self.assertNotIn("gameplay_effect", json.dumps(tool))
 
-    def test_commonui_companion_extends_widget_inspection_only_when_ready(self):
-        valid = {
-            "mode": "inspect",
-            "asset_path": "/Game/UI/WBP_Menu.WBP_Menu",
-            "sections": [
-                "summary", "widget_tree", "commonui_widget",
-                "commonui_activation", "commonui_references",
-            ],
-        }
-        validate_tool_arguments(
-            valid,
-            self.tool(False, "blueprint_inspect", commonui_capabilities())["inputSchema"],
-        )
-        for native in (
-            {}, commonui_capabilities(ready=False), commonui_capabilities(schema=2),
-            commonui_capabilities(api=2),
-        ):
-            with self.subTest(native=native), self.assertRaises(SchemaValidationError):
-                validate_tool_arguments(
-                    valid, self.tool(False, "blueprint_inspect", native)["inputSchema"],
-                )
+    def test_commonui_companion_inspection_is_outside_asset_inspect_core(self):
+        tool = self.tool(False, "asset_inspect", commonui_capabilities())
+        self.assertNotIn("commonui_widget", json.dumps(tool))
 
     def test_commonui_companion_never_adds_a_mutation_branch(self):
         tools = compose_extension_tools(
             tools_for_configuration(writable=True, lifecycle_enabled=False),
             commonui_capabilities(), writable=True,
         )
-        inspect = next(tool for tool in tools if tool["name"] == "blueprint_inspect")
-        validate_tool_arguments({
-            "mode": "inspect", "asset_path": "/Game/UI/WBP_Menu.WBP_Menu",
-            "sections": ["commonui_widget"],
-        }, inspect["inputSchema"])
         for tool in tools:
-            if tool["name"] != "blueprint_inspect":
-                self.assertNotIn("unreal-mcp-commonui", json.dumps(tool))
+            self.assertNotIn("unreal-mcp-commonui", json.dumps(tool))
 
     def test_server_rejects_forged_extensions_before_dispatch_and_routes_known_exact_schema(self):
         class Bridge:
@@ -227,23 +177,24 @@ class ExtensionCatalogTests(unittest.TestCase):
         server.handle({"jsonrpc": "2.0", "id": 1, "method": "tools/list"})
         valid = {
             "extension_id": "unreal-mcp-test", "extension_schema_revision": 1,
-            "operation": "inspect_test_asset", "asset_path": "/Game/Test.Asset",
+            "operation": "set_test_asset_value", "operation_id": "a" * 32,
+            "asset_path": "/Game/Test.Asset", "expected_snapshot": "b" * 40, "value": 7,
         }
         response = server.handle({
             "jsonrpc": "2.0", "id": 2, "method": "tools/call",
-            "params": {"name": "blueprint_inspect", "arguments": valid},
+            "params": {"name": "blueprint_default_edit", "arguments": valid},
         })
         payload = json.loads(response["result"]["content"][0]["text"])
-        self.assertEqual(payload["operation"], "inspect_test_asset")
-        dispatched = len([call for call in bridge.calls if call[0] == "blueprint_inspect"])
+        self.assertEqual(payload["operation"], "set_test_asset_value")
+        dispatched = len([call for call in bridge.calls if call[0] == "blueprint_default_edit"])
         forged = {**valid, "extension_id": "forged"}
         rejected = server.handle({
             "jsonrpc": "2.0", "id": 3, "method": "tools/call",
-            "params": {"name": "blueprint_inspect", "arguments": forged},
+            "params": {"name": "blueprint_default_edit", "arguments": forged},
         })
         self.assertEqual(rejected["error"]["code"], -32602)
         self.assertEqual(
-            len([call for call in bridge.calls if call[0] == "blueprint_inspect"]), dispatched,
+            len([call for call in bridge.calls if call[0] == "blueprint_default_edit"]), dispatched,
         )
 
     def test_capability_transition_emits_one_bounded_tool_list_notification(self):
@@ -259,7 +210,7 @@ class ExtensionCatalogTests(unittest.TestCase):
                 pass
 
         bridge = Bridge()
-        server = MCPServer(bridge, project_identity=ProjectIdentity("Fixture", "a" * 40))
+        server = MCPServer(bridge, project_identity=ProjectIdentity("Fixture", "a" * 40), writable=True)
         server.handle({
             "jsonrpc": "2.0", "id": 4, "method": "tools/call",
             "params": {"name": "capabilities", "arguments": {}},

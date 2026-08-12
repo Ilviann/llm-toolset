@@ -135,7 +135,7 @@ public:
             CheckResponse();
             ++State->Step;
         }
-        if (State->Step >= 8) return true;
+        if (State->Step >= 2) return true;
         SendCurrent();
         return false;
     }
@@ -147,13 +147,7 @@ private:
         switch (State->Step)
         {
         case 0: Json = TEXT("{\"command\":\"capabilities\",\"arguments\":{}}"); break;
-        case 1: Json = RequestJson(TEXT("blueprint_inspect"), TEXT("inspect_test_asset"), State->AssetPath); break;
-        case 2: Json = RequestJson(TEXT("blueprint_default_edit"), TEXT("set_test_asset_value"), State->AssetPath, State->AssetSnapshot, 11); break;
-        case 3: Json = RequestJson(TEXT("blueprint_inspect"), TEXT("inspect_test_component"), State->BlueprintPath); break;
-        case 4: Json = RequestJson(TEXT("blueprint_component_edit"), TEXT("set_test_component_value"), State->BlueprintPath, State->ComponentSnapshot, 22); break;
-        case 5: Json = RequestJson(TEXT("blueprint_inspect"), TEXT("inspect_test_contribution"), State->BlueprintPath); break;
-        case 6: Json = RequestJson(TEXT("blueprint_default_edit"), TEXT("set_test_contribution_value"), State->BlueprintPath, State->ExistingSnapshot, 33); break;
-        default: Json = RequestJson(TEXT("blueprint_default_edit"), TEXT("set_test_asset_value"), State->AssetPath, State->AssetSnapshot, 44); break;
+        default: Json = RequestJson(TEXT("blueprint_inspect"), TEXT("inspect_test_asset"), State->AssetPath); break;
         }
         State->Envelope.Reset();
         State->ResponseCode = 0;
@@ -181,16 +175,16 @@ private:
         Test.TestTrue(TEXT("companion response is valid JSON"), State->Envelope.IsValid());
         if (!State->Envelope.IsValid()) return;
         const TSharedPtr<FJsonObject>* Object = nullptr;
-        if (State->Step == 7)
+        if (State->Step == 1)
         {
-            Test.TestEqual(TEXT("stale companion mutation rejects"), State->ResponseCode,
+            Test.TestEqual(TEXT("removed companion inspection route rejects"), State->ResponseCode,
                 static_cast<int32>(EHttpServerResponseCodes::BadRequest));
-            Test.TestTrue(TEXT("stale companion response has an error"),
+            Test.TestTrue(TEXT("removed companion inspection response has an error"),
                 State->Envelope->TryGetObjectField(TEXT("error"), Object) && Object != nullptr);
             if (Object != nullptr)
             {
-                Test.TestEqual(TEXT("stale companion error is stable"),
-                    (*Object)->GetStringField(TEXT("code")), FString(TEXT("stale_precondition")));
+                Test.TestEqual(TEXT("removed tool error is stable"),
+                    (*Object)->GetStringField(TEXT("code")), FString(TEXT("invalid_argument")));
             }
             return;
         }
@@ -229,17 +223,6 @@ private:
                     Companion->GetArrayField(TEXT("contributions")).Num(), 6);
             }
         }
-        else if (State->Step == 1) State->AssetSnapshot = (*Object)->GetStringField(TEXT("snapshot"));
-        else if (State->Step == 3) State->ComponentSnapshot = (*Object)->GetStringField(TEXT("snapshot"));
-        else if (State->Step == 5) State->ExistingSnapshot = (*Object)->GetStringField(TEXT("snapshot"));
-        else if (State->Step == 2 || State->Step == 4 || State->Step == 6)
-        {
-            const int32 Expected = State->Step == 2 ? 11 : (State->Step == 4 ? 22 : 33);
-            Test.TestEqual(TEXT("companion mutation read-back value"),
-                static_cast<int32>((*Object)->GetNumberField(TEXT("value"))), Expected);
-            Test.TestEqual(TEXT("companion mutation commits through the operation ledger"),
-                (*Object)->GetStringField(TEXT("operation_state")), FString(TEXT("committed")));
-        }
     }
 
     FAutomationTestBase& Test;
@@ -248,7 +231,7 @@ private:
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FUnrealMCPCompanionBridgeTest,
-    "UnrealMCP.Companions.AuthenticatedBridgeRoundTrip",
+    "UnrealMCP.Companions.CapabilitiesAndRemovedInspectionRoute",
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FUnrealMCPCompanionBridgeTest::RunTest(const FString& Parameters)
 {

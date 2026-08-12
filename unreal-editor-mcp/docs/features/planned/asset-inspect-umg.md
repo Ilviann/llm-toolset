@@ -12,7 +12,7 @@ released_in: null
 
 **Depends on:**
 
-- [`asset-inspect-core`](asset-inspect-core.md)
+- [`asset-inspect-core`](../completed/asset-inspect-core.md)
 
 ### Family scope
 

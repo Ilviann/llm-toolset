@@ -2,7 +2,7 @@
 
 ## Family and request
 
-The admitted family is `gameplay_effect`, its native operation is `inspect_gameplay_effect`, and its required live capability is `gas_gameplay_effects_inspection`. Callers still use `blueprint_inspect` with `mode: "discover"` or `mode: "inspect"`; exact inspection selects `gameplay_effect` in `sections`. The contribution is read-only and never publishes a model-facing GAS tool.
+The admitted family is `gameplay_effect`, its native operation is `inspect_gameplay_effect`, and its retained live capability is `gas_gameplay_effects_inspection`. In 0.36.0 the contribution is capability-visible but has no model-facing read route; it remains read-only and is not routed into `asset_inspect-core`.
 
 ## Typed records
 

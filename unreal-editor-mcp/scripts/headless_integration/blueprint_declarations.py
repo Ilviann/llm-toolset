@@ -8,9 +8,6 @@ from unreal_editor_mcp.bridge import UnrealBridge
 from unreal_editor_mcp.errors import BridgeError, ErrorCode
 from unreal_editor_mcp.project import ProjectLayout
 
-from .blueprint_restart_verification import collect_inspection
-
-
 def author_blueprint_declarations(
     bridge: UnrealBridge,
     layout: ProjectLayout,
@@ -18,7 +15,7 @@ def author_blueprint_declarations(
     created: dict[str, object],
 ) -> dict[str, object]:
     """Author the component, default, member, macro, and custom-event declarations."""
-    from .operations import reconcile_operation, send_without_reading
+    from .operations import call_when_ready, reconcile_operation, send_without_reading
 
     asset_path = "/Game/UnrealMCPPhase4/BP_ComponentFixture.BP_ComponentFixture"
     created = bridge.call("blueprint_default_edit", {
@@ -56,7 +53,7 @@ def author_blueprint_declarations(
     if replay.get("request_digest") != root_result.get("request_digest") or replay.get("snapshot_id") != root_result.get("snapshot_id"):
         raise AssertionError("same-ID replay did not return the retained component result")
 
-    rooted = bridge.call("blueprint_component_edit", {
+    rooted = call_when_ready(bridge, "blueprint_component_edit", {
         "operation_id": uuid.uuid4().hex,
         "asset_path": asset_path,
         "expected_snapshot": root_result["snapshot_id"],
@@ -168,18 +165,14 @@ def author_blueprint_declarations(
     })
     if notified_member.get("member", {}).get("replication", {}).get("rep_notify_function_id") != notify_id:
         raise AssertionError(f"RepNotify relationship did not bind the function identity: {notified_member!r}")
-    graph_inspection = bridge.call("blueprint_inspect", {
-        "mode": "inspect",
+    graph_inspection = bridge.call("asset_inspect", {
         "asset_path": asset_path,
-        "sections": ["graphs"],
-        "page_size": 100,
+        "selector": "event_graphs/EventGraph",
+        "verbose": True,
     })
-    event_graphs = [
-        record for record in graph_inspection.get("records", [])
-        if record.get("section") == "graph" and record.get("kind") == "event" and record.get("inherited") is False
-    ]
-    if not event_graphs or not isinstance(event_graphs[0].get("id"), str):
-        raise AssertionError(f"local event graph identity is unavailable: {event_graphs!r}")
+    event_graph_id = graph_inspection.get("graph", {}).get("debug", {}).get("graph_guid")
+    if not isinstance(event_graph_id, str):
+        raise AssertionError(f"local event graph identity is unavailable: {graph_inspection!r}")
     macro = bridge.call("blueprint_member_edit", {
         "operation_id": uuid.uuid4().hex,
         "asset_path": asset_path,
@@ -206,7 +199,7 @@ def author_blueprint_declarations(
         "expected_snapshot": macro["snapshot_id"],
         "target": "custom_event",
         "operation": "add",
-        "graph_id": event_graphs[0]["id"],
+        "graph_id": event_graph_id,
         "name": "OnHealthChanged",
         "signature": {
             "parameters": [
@@ -220,7 +213,6 @@ def author_blueprint_declarations(
     custom_event_id = custom_event.get("custom_event", {}).get("id")
     if not isinstance(custom_event_id, str) or len(custom_event_id) != 32:
         raise AssertionError(f"custom-event mutation omitted its stable identity: {custom_event!r}")
-    event_graph_id = event_graphs[0]["id"]
     return {
         "asset_path": asset_path,
         "custom_event": custom_event,
@@ -297,21 +289,20 @@ def author_phase_fourteen_families(bridge: UnrealBridge) -> dict[str, dict[str, 
             "type": {"category": "int", "container": "none"},
             "default": {"kind": "literal", "value": 14},
         })
-        inspection = collect_inspection(bridge, {
-            "mode": "inspect",
-            "asset_path": asset_path,
-            "sections": ["summary", "components", "class_defaults", "functions", "local_variables", "graphs"],
-            "property_names": [property_name],
-            "page_size": 100,
+        inspection = bridge.call("asset_inspect", {"asset_path": asset_path})
+        graph = bridge.call("asset_inspect", {
+            "asset_path": asset_path, "selector": "event_graphs/EventGraph", "verbose": True,
         })
-        event_graphs = [record for record in inspection.get("records", [])
-                        if record.get("section") == "graph" and record.get("kind") == "event"
-                        and record.get("inherited") is False]
-        if inspection.get("blueprint_family") != family or not event_graphs:
+        event_graph_id = graph.get("graph", {}).get("debug", {}).get("graph_guid")
+        expected_type = {
+            "game_mode_base": "game_mode_base_blueprint", "game_mode": "game_mode_blueprint",
+            "game_state_base": "game_state_base_blueprint", "game_state": "game_state_blueprint",
+        }[family]
+        if inspection.get("asset", {}).get("type") != expected_type or not isinstance(event_graph_id, str):
             raise AssertionError(f"{family} inspection contract mismatch: {inspection!r}")
         catalog = bridge.call("blueprint_action_catalog", {
             "asset_path": asset_path,
-            "graph_id": event_graphs[0]["id"],
+            "graph_id": event_graph_id,
             "expected_snapshot": inspection["snapshot_id"],
             "node_family": "function_call",
             "owner_class": callable_owner,
@@ -379,9 +370,7 @@ def author_phase_fifteen_game_instance(bridge: UnrealBridge) -> dict[str, object
             raise AssertionError(f"GameInstance component rejection changed: {error.as_dict()!r}") from error
     else:
         raise AssertionError("GameInstance unexpectedly accepted a component mutation")
-    unchanged = bridge.call("blueprint_inspect", {
-        "mode": "inspect", "asset_path": asset_path, "sections": ["summary"], "page_size": 10,
-    })
+    unchanged = bridge.call("asset_inspect", {"asset_path": asset_path})
     if unchanged.get("snapshot_id") != created.get("snapshot_id"):
         raise AssertionError("GameInstance component rejection changed the structural snapshot")
 
@@ -430,22 +419,14 @@ def author_phase_fifteen_game_instance(bridge: UnrealBridge) -> dict[str, object
         "type": {"category": "string", "container": "none"},
         "default": {"kind": "literal", "value": ""},
     })
-    inspection = collect_inspection(bridge, {
-        "mode": "inspect",
-        "asset_path": asset_path,
-        "sections": ["summary", "components", "class_defaults", "functions", "local_variables", "graphs"],
-        "property_names": ["SessionRegion"],
-        "page_size": 100,
+    inspection = bridge.call("asset_inspect", {"asset_path": asset_path})
+    graph = bridge.call("asset_inspect", {
+        "asset_path": asset_path, "selector": "event_graphs/EventGraph", "verbose": True,
     })
-    records = inspection.get("records", [])
-    summaries = [record for record in records if record.get("section") == "summary"]
-    event_graphs = [record for record in records if record.get("section") == "graph"
-                    and record.get("kind") == "event" and record.get("inherited") is False]
-    if (inspection.get("blueprint_family") != "game_instance" or not event_graphs or len(summaries) != 1
-            or summaries[0].get("actor_blueprint") is not False
-            or any(record.get("section") == "component" for record in records)):
+    event_graph_id = graph.get("graph", {}).get("debug", {}).get("graph_guid")
+    if inspection.get("asset", {}).get("type") != "game_instance_blueprint" \
+            or not isinstance(event_graph_id, str) or inspection.get("components"):
         raise AssertionError(f"GameInstance inspection contract mismatch: {inspection!r}")
-    event_graph_id = event_graphs[0]["id"]
     callback_catalog = bridge.call("blueprint_action_catalog", {
         "asset_path": asset_path,
         "graph_id": event_graph_id,

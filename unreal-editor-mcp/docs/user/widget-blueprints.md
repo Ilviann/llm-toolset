@@ -24,4 +24,4 @@ The existing live action catalog remains authoritative for Widget Blueprint cons
 
 Compile and save explicitly. Limits are 512 widgets, tree depth 32, 256 named slots, 256 widget bindings, recursive value depth 4, 64 struct fields or collection entries, and the shared request/response/ledger bounds. Animations, visual screenshots, raw Slate/C++, runtime instance mutation, input-mode setup, and gameplay-state mutation remain outside this feature.
 
-See [`../../examples/widget-tree-workflow.json`](../../examples/widget-tree-workflow.json) for basic hierarchy creation and [`../../examples/umg-authoring-workflow.json`](../../examples/umg-authoring-workflow.json) for layout, styling, property binding, and Designer-event wiring.
+See [`../../examples/widget-tree-workflow.json`](../../examples/widget-tree-workflow.json) for basic hierarchy creation. Deep UMG read-back is deferred to `asset-inspect-umg`; core `asset_inspect` currently returns bounded identity and limitations for Widget Blueprints.

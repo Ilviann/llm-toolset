@@ -1,6 +1,6 @@
 # Widget trees and edits
 
-`blueprint_inspect` accepts `widget_tree` and targeted `widget_defaults` sections for the `widget` family. A `widget` record contains stable `id`, name, class path, ownership/editability, root and variable flags, parent/slot identities, child index, supported style properties, changed defaults, and truncation state. A panel `widget_slot` adds supported layout properties and encoded layout values; named slots identify host, slot name, child, and inherited/tree-host state.
+The internal Widget Blueprint collector retains `widget_tree` and targeted `widget_defaults` records used by native authoring and preservation tests. They are not model-facing in 0.36.0; deep UMG semantic read-back belongs to planned `asset-inspect-umg`. A `widget` record contains stable `id`, name, class path, ownership/editability, root and variable flags, parent/slot identities, child index, supported style properties, changed defaults, and truncation state. A panel `widget_slot` adds supported layout properties and encoded layout values; named slots identify host, slot name, child, and inherited/tree-host state.
 
 Widget IDs are 32 lowercase hexadecimal characters backed by `WidgetVariableNameToGuidMap`, including non-variable widgets. Panel-slot IDs hash the stable parent/child pair. Named-slot IDs hash the stable host plus exact slot name. The 40-character Blueprint snapshot fingerprints names, classes, hierarchy, slot relationships, variable flags, changed defaults, layout values, and property/event bindings.
 

@@ -23,6 +23,7 @@ class FUnrealMCPLevelManagementService;
 class FUnrealMCPLevelActorEditingService;
 class FUnrealMCPAssetReferenceService;
 class FUnrealMCPAssetDeletionService;
+class FUnrealMCPAssetInspectionService;
 class FUnrealMCPOperationLedger;
 class FUnrealMCPExtensionRegistry;
 class IHttpRouter;
@@ -73,6 +74,7 @@ private:
     TUniquePtr<FUnrealMCPLevelActorEditingService> LevelActorEditingService;
     TUniquePtr<FUnrealMCPAssetReferenceService> AssetReferenceService;
     TUniquePtr<FUnrealMCPAssetDeletionService> AssetDeletionService;
+    TUniquePtr<FUnrealMCPAssetInspectionService> AssetInspectionService;
     TUniquePtr<FUnrealMCPOperationLedger> OperationLedger;
     TSharedRef<FUnrealMCPExtensionRegistry> ExtensionRegistry;
     FString BridgeInstanceId;

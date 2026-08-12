@@ -31,10 +31,10 @@ READONLY_TOOL_NAMES: Final = frozenset({
     "capabilities",
     "editor_state",
     "operation_status",
+    "asset_inspect",
     "asset_references",
     "level_inspect",
     "level_open",
-    "blueprint_inspect",
     "blueprint_action_catalog",
     "game_data_inspect",
 })

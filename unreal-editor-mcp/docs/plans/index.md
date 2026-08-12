@@ -4,4 +4,4 @@ These plans preserve incremental feature-design work across sessions and bounded
 
 ## Active plans
 
-None. The accepted `asset_inspect` design is now a canonical planned feature set with one shared [type contract](../types/asset-inspection/index.md).
+- [`asset-inspect-core-implementation.md`](asset-inspect-core-implementation.md) — implementation decisions, discovered constraints, and validation evidence for the accepted core asset-inspection feature.

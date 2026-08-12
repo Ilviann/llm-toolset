@@ -2,7 +2,7 @@
 
 ## Ownership
 
-`FUnrealMCPBlueprintInspector` remains the read-only `blueprint_inspect` facade and owns only paging/cursor retention plus orchestration into the private builder. `FInspectionQuery` normalizes and validates initial requests. Discovery, overview/component/default, member, function/local, macro, custom-event, graph, and widget-tree collectors feed one bounded record/fingerprint sink so every requested section is emitted from one structural snapshot.
+`FUnrealMCPBlueprintInspector` is an internal reconstruction-oriented collector retained for Blueprint authoring fingerprints and native companion internals. Its former model-facing command was removed in 0.36.0. `FInspectionQuery`, discovery, overview/component/default, member, function/local, macro, custom-event, graph, and widget-tree collectors remain implementation support; new model-facing read work belongs to the semantic [`asset-inspection-service`](asset-inspection-service.md).
 
 ## Dependency direction
 

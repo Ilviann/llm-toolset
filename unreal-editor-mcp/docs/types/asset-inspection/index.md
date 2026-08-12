@@ -4,7 +4,7 @@ This component contract defines the accepted design for bounded semantic inspect
 
 ## Owning features
 
-1. [`asset-inspect-core`](../../features/planned/asset-inspect-core.md) owns the tool, shared contracts, neutral classification, gameplay-framework Blueprints, Actor Components, and Blueprint Interfaces.
+1. [`asset-inspect-core`](../../features/completed/asset-inspect-core.md) owns the tool, shared contracts, neutral classification, gameplay-framework Blueprints, Actor Components, and Blueprint Interfaces.
 2. [`asset-inspect-data`](../../features/planned/asset-inspect-data.md) adds Data Assets and Data Tables.
 3. [`asset-inspect-umg`](../../features/planned/asset-inspect-umg.md) adds base UMG Widget Blueprint inspection.
 4. [`asset-inspect-animation`](../../features/planned/asset-inspect-animation.md) adds Animation Blueprint inspection.
@@ -28,7 +28,7 @@ The numbered list is the preferred delivery order. The three extension features 
 - Treat raw content-bearing assets as media for the initial type-only policy, including textures, raw audio or video, mesh geometry, animation clips, thumbnails, and similar bulk content. Do not classify an asset as media merely because it belongs to an artistic system: logic-bearing Materials, Niagara Systems or Emitters, Animation Blueprints, Sound Cues, Control Rigs, and similar graph or configuration assets require deep semantic inspection.
 - Require one exact project-content asset path as an `asset_inspect` parameter. The tool does not discover or search by folder, name, class, or family.
 - Accept either exact Unreal package form such as `/Game/Folder/Asset` or object form such as `/Game/Folder/Asset.Asset`, and normalize both to the canonical object path before loading, inspection, response generation, snapshot calculation, and page selection.
-- Reuse the existing Blueprint and game-data inspection collectors for deep results. Keep `blueprint_inspect` and `game_data_inspect` published throughout staged delivery for compatibility; `asset_inspect` returns reused information directly rather than redirecting the caller to another tool.
+- Reuse safe codecs and structural fingerprinting where their semantics match. `game_data_inspect` remains published; the reconstruction-oriented Blueprint facade was removed when `asset_inspect` covered its core analysis role.
 - Add base UMG Widget Blueprint logic and layout through `asset-inspect-umg`. Exclude CommonUI companion records and MVVM-specific features.
 - Exclude Widget Animation timeline inspection from `asset-inspect-umg`. Animation variables and calls may still appear as ordinary references or call nodes in Widget Blueprint logic graphs, but the tool does not inspect animation bindings, MovieScene tracks, sections, or keyframes.
 - Exclude GAS Gameplay Ability and Gameplay Effect integration from this planned feature set so `asset_inspect` does not require a GAS companion or change the companion API.
@@ -78,19 +78,19 @@ Add or expand `asset_inspect` coverage for:
 
 - The released Blueprint family policy already deeply inspects Actor, GameMode/GameModeBase, GameState/GameStateBase, and GameInstance Blueprints. PlayerController and PlayerState descendants currently travel through the general Actor family.
 - Actor-owned components are already records within supported Actor-family Blueprint inspection. `asset-inspect-core` also includes standalone Actor Component Blueprint assets, which are not a published Blueprint family and therefore need a new classification and collector path.
-- Animation Blueprints, Blueprint Interfaces, and Data Assets are not currently published inspection families and require new family-specific work.
+- Blueprint Interfaces are declarations-only core families. Animation Blueprints and Data Assets are not deeply inspected and require their separately planned family work.
 - Data Tables and user-defined structs already have the separate game-data inspector; Data Assets do not use that contract.
 - Ordinary Widget Blueprint logic and tree inspection is already in the base and will be reused by `asset-inspect-umg`. CommonUI inspection is an optional companion contribution and is explicitly outside this feature set; MVVM inspection remains a separate planned feature.
 - GAS Ability and GAS Effect collectors already exist as optional companion contributions, but this feature set deliberately does not route or expose them through `asset_inspect`. This keeps the staged work independent of the GAS companion and avoids a companion API change.
 
 ## Current repository evidence
 
-- On the current `main` branch, the published tool catalog contains no exact `inspect-asset`, `inspect_asset`, or `asset_inspect` name, so there is no direct name collision.
-- Existing public tools use lowercase snake case and generally follow `<domain>_<operation>`, including `level_inspect`, `blueprint_inspect`, and `game_data_inspect`.
-- Nearby asset capabilities are currently split across `asset_references`, `blueprint_inspect`, `game_data_inspect`, and `level_inspect`.
-- `blueprint_inspect` already provides bounded typed records, stable snapshots, pagination, targeted sections, and companion-owned specialized sections. A general asset inspector should reuse those contracts or route to them instead of independently reimplementing Blueprint extraction.
-- The MCP transport and native bridge currently use JSON. Python serializes each tool result as compact JSON inside one MCP text-content item, and existing tests parse that text as JSON.
-- The Python package has no runtime dependencies and neither the Python nor native implementation currently contains a YAML serializer.
+- The published catalog uses the approved exact `asset_inspect` name; no legacy `inspect-asset` or `inspect_asset` alias is accepted.
+- Public tools use lowercase snake case and generally follow `<domain>_<operation>`, including `asset_inspect`, `level_inspect`, and `game_data_inspect`.
+- Nearby asset capabilities remain split across exact semantic inspection, inbound references, game-data-specific reads, and level inspection.
+- The internal reconstruction-oriented Blueprint collector still supplies authoring fingerprints, but `asset_inspect` owns the model-facing semantic hierarchy and direct `UEdGraph` traversal.
+- The MCP transport and native bridge use JSON. Python renders successful `asset_inspect` results as deterministic safe YAML inside one MCP text-content item; structured errors retain the shared JSON-shaped contract.
+- The Python package has no runtime dependencies. Its dedicated renderer accepts only JSON-compatible values and emits the documented safe YAML subset.
 - The existing Blueprint inspector already traverses live `UEdGraph`, node, pin, and connection objects directly. It does not depend on `FEdGraphUtilities::ExportNodesToText`, although its current mutation-oriented records expose GUIDs and coordinates that the new semantic view should hide.
 
 ## Naming rationale
@@ -184,7 +184,7 @@ Prefer records that explain control flow, data flow, ordering, conditions, depen
 
 Media payloads are outside this goal even when technically readable. Do not emit texture pixels, audio or video content, mesh geometry buffers, thumbnails, source-art bytes, encoded media, or filesystem paths intended to retrieve those payloads.
 
-Existing specialized inspectors remain authoritative during initial adoption. `asset_inspect` is a common presentation and routing facade over their internal collectors, snapshots, bounds, and typed records, not an independent duplicate implementation. The specialized model-facing tools remain published throughout the staged feature set.
+Internal specialized collectors remain authoritative where authoring preconditions or family codecs depend on them. `asset_inspect` owns the model-facing semantic contract; `game_data_inspect` remains published, while the former reconstruction-oriented Blueprint tool was removed in 0.36.0. Companion inspection registrations remain dormant until a redesigned read contract is approved.
 
 ### Output implementation
 
@@ -336,6 +336,6 @@ Requirements gathering is complete. Implementation discoveries that materially c
 
 ## Verification evidence
 
-- Repository-wide exact-name search found no current tool or documented feature named `inspect-asset`, `inspect_asset`, or `asset_inspect`.
-- The current Python catalog definitions confirm the established `asset_references`, `level_inspect`, `blueprint_inspect`, and `game_data_inspect` names.
-- Current tool results are compact JSON strings inside MCP text content; adopting YAML only for this tool therefore requires an explicit, tested presentation contract rather than a native bridge change.
+- The Python catalog publishes `asset_inspect` beside `asset_references`, `level_inspect`, and `game_data_inspect`; it publishes no legacy asset-inspection alias and no `blueprint_inspect` tool.
+- Successful asset responses are rendered through the dependency-free deterministic safe-YAML boundary; native bridge records and structured errors remain JSON-shaped.
+- Native and cross-process coverage verifies canonical paths, selectors, paging, snapshots, family classification, graph bounds, and removal of the former public Blueprint route.

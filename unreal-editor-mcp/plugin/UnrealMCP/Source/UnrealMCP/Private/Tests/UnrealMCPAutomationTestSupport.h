@@ -64,6 +64,7 @@
 #include "UnrealMCPGameDataService.h"
 #include "UnrealMCPCompatibility.h"
 #include "UnrealMCPProtocol.h"
+#include "UnrealMCPAssetInspectionService.h"
 #include "UnrealMCPOperationLedger.h"
 #include "UnrealMCPPropertyCodec.h"
 #include "UnrealMCPK2TypeCodec.h"

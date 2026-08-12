@@ -17,12 +17,6 @@ def manage_disposable_level(
     """Create, configure, reload, leave, and safely delete one exact map closure."""
     from .operations import reconcile_operation, send_without_reading
 
-    current = bridge.call("level_inspect", {"mode": "current"})
-    current_record = current.get("records", [{}])[0]
-    original_path = current_record.get("map_path")
-    map_name = f"L_Managed_{uuid.uuid4().hex[:8]}"
-    map_path = f"/Game/UnrealMCPLevelManagement/{map_name}.{map_name}"
-
     def call_when_ready(command: str, arguments: dict[str, object]) -> dict[str, object]:
         deadline = time.monotonic() + 10.0
         while True:
@@ -32,6 +26,12 @@ def manage_disposable_level(
                 if error.code is not ErrorCode.EDITOR_UNAVAILABLE or time.monotonic() >= deadline:
                     raise
                 time.sleep(0.1)
+
+    current = call_when_ready("level_inspect", {"mode": "current"})
+    current_record = current.get("records", [{}])[0]
+    original_path = current_record.get("map_path")
+    map_name = f"L_Managed_{uuid.uuid4().hex[:8]}"
+    map_path = f"/Game/UnrealMCPLevelManagement/{map_name}.{map_name}"
 
     # Reconcile fixtures retained by an interrupted earlier integration run through
     # the same reference-aware map deletion contract exercised below.

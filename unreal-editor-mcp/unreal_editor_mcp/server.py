@@ -11,6 +11,7 @@ from .project import ProjectIdentity
 from .schema_validation import SchemaValidationError, validate_tool_arguments
 from .stdio import error, result, tool_result
 from .tool_catalog import LATEST_PROTOCOL, SUPPORTED_PROTOCOLS, tools_for_configuration
+from .yaml_renderer import render_safe_yaml
 
 
 class BridgeClient(Protocol):
@@ -101,7 +102,9 @@ class MCPServer:
                 output = self._capabilities(arguments)
             else:
                 output = self.bridge.call(name, arguments)
-            return result(request_id, tool_result(output))
+            return result(request_id, tool_result(
+                render_safe_yaml(output) if name == "asset_inspect" else output
+            ))
         except DomainError as exc:
             return result(request_id, tool_result(exc.as_dict(), is_error=True))
 

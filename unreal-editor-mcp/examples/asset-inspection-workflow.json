@@ -1,0 +1,22 @@
+[
+  {
+    "tool": "asset_inspect",
+    "arguments": {"asset_path": "/Game/Actors/BP_Door"}
+  },
+  {
+    "tool": "asset_inspect",
+    "arguments": {
+      "asset_path": "/Game/Actors/BP_Door.BP_Door",
+      "selector": "event_graphs/EventGraph"
+    }
+  },
+  {
+    "tool": "asset_inspect",
+    "arguments": {
+      "asset_path": "/Game/Actors/BP_Door",
+      "selector": "properties/actor/tags",
+      "page_size": 10,
+      "page_index": 0
+    }
+  }
+]

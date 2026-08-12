@@ -4,7 +4,7 @@ Use the index to retrieve only the contract section relevant to the task.
 
 ## Queries, records, and pages
 
-`blueprint_inspect` accepts exactly one of these argument families:
+The former public Blueprint inspection command was removed in 0.36.0. The internal collector retains these query families only for native fingerprinting, mutation support, and focused internal tests:
 
 - Discovery: `mode: "discover"`, optional normalized mounted-content `package_path`, optional exact `asset_name`, and optional `page_size`.
 - Inspection: `mode: "inspect"`, one exact mounted-content `asset_path`, optional `sections`, optional exact 32-character `graph_id`, `component_id`, `member_id`, `function_id`, `local_id`, `macro_id`, `custom_event_id`, or `widget_id`, optional one-to-32 exact `property_names`, optional `include_inherited`, and optional `page_size`.

@@ -14,7 +14,7 @@ The Python server owns an exact-version allowlist in `unreal_editor_mcp/extensio
 
 Accepted requests still use the base authenticated route, bounded queue, Game-thread dispatch, mutation ledger, target and mount checks, stale snapshots, editor transactions, postcondition read-back, rollback verification, and stable protocol errors. The companion handler may narrow validation and operate only on its declared target; it cannot broaden base policy.
 
-An admitted read-only `AssetFamily` contribution for `blueprint_inspect` may classify a new Blueprint family through its existing target-family/class policy. The base inspector still owns discovery and ordinary Blueprint collection, calls the typed handler on the generated-class default object, incorporates the companion fingerprint into its snapshot, and appends only bounded companion records. This integration uses companion API v1 unchanged.
+An admitted companion API v1 read-only `AssetFamily` contribution retains its target-family/class policy, typed handler, and fingerprint contract, but 0.36.0 no longer exposes the former Blueprint inspection route. These registrations remain capability-visible and dormant until a separately approved companion read-facade design. The API version and registration contract are unchanged.
 
 ## Implementation and verification
 
