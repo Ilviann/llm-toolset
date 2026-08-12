@@ -11,7 +11,7 @@ Feature identifiers are stable names, not execution indexes. Unfinished features
     - `readonly-mode`
 - [x] [`asset-inspect-core` — General asset inspection foundation and gameplay Blueprints](docs/features/completed/asset-inspect-core.md) — Add the common read-only facade and deep inspection for gameplay-framework and Interface Blueprints.
 - [x] [`native-wire-contracts` — Typed native request and result records](docs/features/completed/native-wire-contracts.md) — Move native domain request/result contracts behind explicit JSON codecs.
-- [ ] [`native-command-catalog` — Fixed native command routing and capabilities](docs/features/planned/native-command-catalog.md) — Route fixed typed commands and capabilities without domain-specific bridge composition.
+- [x] [`native-command-catalog` — Fixed native command routing and capabilities](docs/features/completed/native-command-catalog.md) — Route fixed typed commands and capabilities without domain-specific bridge composition.
   - Depends on:
     - `native-wire-contracts`
 - [ ] [`asset-family-foundation` — Built-in asset-family adapter contracts](docs/features/planned/asset-family-foundation.md) — Add deterministic inspection, creation, and editing adapter contracts.
@@ -191,5 +191,6 @@ Feature checkboxes record implementation completion after mandatory Windows veri
   - `commonui-assets-inspect`
   - `asset-inspect-core`
   - `native-wire-contracts`
+  - `native-command-catalog`
 - Windows:
   - None

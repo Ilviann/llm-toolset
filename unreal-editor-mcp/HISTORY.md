@@ -6,6 +6,10 @@
 - Added an independent CommonUI companion checkbox to the Windows deployment helper, including fixed base-dependent packaging, project/Engine installation, and transactional multi-plugin handling without changing runtime or plugin versions.
 - Decomposed Python packaging, Windows deployment, and headless integration support tools behind stable entrypoints, with shared Unreal-local primitives, typed deployment and Blueprint scenario state, focused domain modules, and unchanged runtime/plugin versions.
 
+## 0.38.0 — 2026-08-12
+
+- Replaced bridge-owned native command branching, retained-operation classification, domain composition, and hand-built feature/limit publication with a frozen typed command catalog that preserves exact released command, access, ledger, capability, limit, and error contracts while rejecting duplicate, conflicting, late, runtime, or schema registration.
+
 ## 0.37.0 — 2026-08-12
 
 - Replaced base native domain JSON coupling with bounded JSON-neutral request, result, error, value, capability, identity, selector, paging, diagnostic, mutation, and persistence records plus explicit protocol codecs, while preserving every released wire schema and retaining companion API v1 through one compatibility adapter.

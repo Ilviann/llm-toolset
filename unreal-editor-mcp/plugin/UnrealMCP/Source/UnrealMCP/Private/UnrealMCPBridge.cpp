@@ -16,21 +16,7 @@
 #include "Misc/SecureHash.h"
 #include "UnrealMCPDiscovery.h"
 #include "UnrealMCPExtensionRegistry.h"
-#include "UnrealMCPBlueprintInspector.h"
-#include "UnrealMCPBlueprintActionCatalog.h"
-#include "UnrealMCPBlueprintGraphEditor.h"
-#include "UnrealMCPBlueprintBlockReplacementService.h"
-#include "UnrealMCPBlueprintFamilyPolicy.h"
-#include "UnrealMCPBlueprintMutator.h"
-#include "UnrealMCPWidgetTreeService.h"
-#include "UnrealMCPGameplayFrameworkEditor.h"
-#include "UnrealMCPGameDataService.h"
-#include "UnrealMCPLevelService.h"
-#include "UnrealMCPLevelManagementService.h"
-#include "UnrealMCPLevelActorEditingService.h"
-#include "UnrealMCPAssetReferenceService.h"
-#include "UnrealMCPAssetDeletionService.h"
-#include "UnrealMCPAssetInspectionService.h"
+#include "UnrealMCPCommandCatalog.h"
 #include "UnrealMCPProtocol.h"
 #include "UnrealMCPOperationLedger.h"
 #include "UnrealMCPVersion.h"
@@ -43,33 +29,10 @@ namespace
 {
 const FHttpPath RoutePath(TEXT("/unreal-mcp/v1/command"));
 
-TArray<TSharedPtr<FUnrealMCPValue>> Strings(std::initializer_list<const TCHAR*> Values)
-{
-    TArray<TSharedPtr<FUnrealMCPValue>> Result;
-    Result.Reserve(static_cast<int32>(Values.size()));
-    for (const TCHAR* Value : Values)
-    {
-        Result.Add(MakeShared<FUnrealMCPValueString>(Value));
-    }
-    return Result;
-}
-
 FString Header(const FHttpServerRequest& Request, const TCHAR* LowercaseName)
 {
     const TArray<FString>* Values = Request.Headers.Find(LowercaseName);
     return Values != nullptr && Values->Num() == 1 ? (*Values)[0] : FString();
-}
-
-bool IsRetainedOperationCommand(const FString& Command)
-{
-    return Command == TEXT("asset_delete") || Command == TEXT("level_open") || Command == TEXT("level_manage")
-        || Command == TEXT("level_actor_edit") || Command == TEXT("level_save")
-        || Command == TEXT("blueprint_create") || Command == TEXT("blueprint_compile") || Command == TEXT("blueprint_save")
-        || Command == TEXT("blueprint_component_edit") || Command == TEXT("blueprint_default_edit")
-        || Command == TEXT("blueprint_member_edit") || Command == TEXT("blueprint_graph_edit")
-        || Command == TEXT("blueprint_block_replace")
-        || Command == TEXT("widget_tree_edit")
-        || Command == TEXT("gameplay_framework_edit") || Command == TEXT("game_data_edit");
 }
 
 FString AuthenticationBinding(const FString& ProjectHash, const FString& BridgeInstanceId, const FString& Token)
@@ -93,6 +56,12 @@ FUnrealMCPBridge::FUnrealMCPBridge(
 {
     BridgeInstanceId = FGuid::NewGuid().ToString(EGuidFormats::Digits).ToLower();
     OperationLedger = MakeUnique<FUnrealMCPOperationLedger>(BridgeInstanceId, AuthenticationBinding(ProjectHash, BridgeInstanceId, Token));
+    FUnrealMCPCommandHostHandlers HostHandlers;
+    HostHandlers.Capabilities = [this](const auto&, auto& Result, auto&) { Result = Capabilities(); return true; };
+    HostHandlers.EditorState = [this](const auto&, auto& Result, auto&) { Result = EditorState(); return true; };
+    HostHandlers.EditorShutdown = [this](const auto&, auto& Result, auto& Error) { return EditorShutdown(Result, Error); };
+    CommandCatalog = MakeUnique<FUnrealMCPCommandCatalog>(
+        ProjectHash, BridgeInstanceId, *OperationLedger, ExtensionRegistry, MoveTemp(HostHandlers));
 }
 
 FUnrealMCPBridge::~FUnrealMCPBridge()
@@ -106,6 +75,11 @@ bool FUnrealMCPBridge::Start(FString& OutError)
     if (bReady)
     {
         OutError = TEXT("bridge is already running");
+        return false;
+    }
+    if (!CommandCatalog || !CommandCatalog->IsValid())
+    {
+        OutError = CommandCatalog ? CommandCatalog->GetInitializationError() : TEXT("Native command catalog is unavailable");
         return false;
     }
     bStopping = false;
@@ -184,19 +158,7 @@ void FUnrealMCPBridge::Stop()
     }
     Route.Reset();
     Router.Reset();
-    BlueprintGraphEditor.Reset();
-    BlueprintBlockReplacementService.Reset();
-    BlueprintMutator.Reset();
-    WidgetTreeService.Reset();
-    GameplayFrameworkEditor.Reset();
-    GameDataService.Reset();
-    LevelActorEditingService.Reset();
-    LevelManagementService.Reset();
-    LevelService.Reset();
-    AssetDeletionService.Reset();
-    AssetReferenceService.Reset();
-    BlueprintActionCatalog.Reset();
-    BlueprintInspector.Reset();
+    CommandCatalog.Reset();
     Token.Reset();
 }
 
@@ -238,30 +200,17 @@ bool FUnrealMCPBridge::HandleRequest(const FHttpServerRequest& Request, const FH
     }
     FString Command = MoveTemp(WireRequest.Command);
     TSharedPtr<FUnrealMCPRecord> Arguments = MoveTemp(WireRequest.Arguments);
-    if (Command != TEXT("capabilities") && Command != TEXT("editor_state") && Command != TEXT("editor_shutdown")
-        && Command != TEXT("operation_status") && Command != TEXT("operation_cancel") && Command != TEXT("asset_inspect") && Command != TEXT("asset_references")
-        && Command != TEXT("asset_delete")
-        && Command != TEXT("level_inspect") && Command != TEXT("level_open") && Command != TEXT("level_manage")
-        && Command != TEXT("level_actor_edit") && Command != TEXT("level_save")
-        && Command != TEXT("blueprint_create") && Command != TEXT("blueprint_compile")
-        && Command != TEXT("blueprint_save") && Command != TEXT("blueprint_component_edit") && Command != TEXT("blueprint_default_edit")
-        && Command != TEXT("blueprint_member_edit") && Command != TEXT("blueprint_action_catalog")
-        && Command != TEXT("blueprint_graph_edit") && Command != TEXT("blueprint_block_replace")
-        && Command != TEXT("gameplay_framework_edit")
-        && Command != TEXT("widget_tree_edit")
-        && Command != TEXT("game_data_inspect") && Command != TEXT("game_data_edit"))
+    const FUnrealMCPCommandDescriptor* Descriptor = CommandCatalog->Find(Command);
+    if (Descriptor == nullptr)
     {
         Complete(UnrealMCP::Protocol::Error(EHttpServerResponseCodes::BadRequest, TEXT("invalid_argument"), TEXT("Unknown or unavailable command")));
         return true;
     }
-    if (Command == TEXT("operation_status") || Command == TEXT("operation_cancel"))
+    if (Descriptor->Dispatch == EUnrealMCPCommandDispatch::RequestThread)
     {
         TSharedPtr<FUnrealMCPRecord> Status;
         FUnrealMCPError Error;
-        const bool bResolved = OperationLedger
-            && (Command == TEXT("operation_status")
-                ? OperationLedger->Status(Arguments, Status, Error)
-                : OperationLedger->Cancel(Arguments, Status, Error));
+        const bool bResolved = Descriptor->Handler(Arguments, Status, Error);
         if (!bResolved)
         {
             Complete(UnrealMCP::Protocol::Error(EHttpServerResponseCodes::BadRequest, Error));
@@ -279,7 +228,7 @@ bool FUnrealMCPBridge::HandleRequest(const FHttpServerRequest& Request, const FH
     }
     FString OperationId;
     FString RequestDigest;
-    if (IsRetainedOperationCommand(Command))
+    if (Descriptor->RetainedOperation == EUnrealMCPRetainedOperationPolicy::Retained)
     {
         const FUnrealMCPOperationAdmission Admission = OperationLedger->Admit(Command, Arguments);
         OperationId = Admission.OperationId;
@@ -372,165 +321,7 @@ void FUnrealMCPBridge::DispatchOnGameThread(
 bool FUnrealMCPBridge::Execute(const FString& Command, const TSharedPtr<FUnrealMCPRecord>& Arguments, TSharedPtr<FUnrealMCPRecord>& OutResult, FUnrealMCPError& OutError)
 {
     check(IsInGameThread());
-    if (Command == TEXT("capabilities"))
-    {
-        OutResult = Capabilities();
-        return true;
-    }
-    if (Command == TEXT("editor_state"))
-    {
-        OutResult = EditorState();
-        return true;
-    }
-    if (Command == TEXT("editor_shutdown"))
-    {
-        return EditorShutdown(OutResult, OutError);
-    }
-    if (ExtensionRegistry->HasExtensionRequest(Arguments))
-    {
-        return ExtensionRegistry->Execute(Command, Arguments, OutResult, OutError);
-    }
-    if (Command == TEXT("asset_references"))
-    {
-        if (!AssetReferenceService)
-        {
-            AssetReferenceService = MakeUnique<FUnrealMCPAssetReferenceService>();
-        }
-        return AssetReferenceService->Inspect(Arguments, OutResult, OutError);
-    }
-    if (Command == TEXT("asset_delete"))
-    {
-        if (!AssetReferenceService)
-        {
-            AssetReferenceService = MakeUnique<FUnrealMCPAssetReferenceService>();
-        }
-        if (!AssetDeletionService)
-        {
-            AssetDeletionService =
-                MakeUnique<FUnrealMCPAssetDeletionService>(*AssetReferenceService);
-        }
-        if (OperationLedger)
-        {
-            const TSharedPtr<FUnrealMCPRecord> State = OperationLedger->CurrentState();
-            if (static_cast<int32>(State->GetNumberField(TEXT("queued"))) > 0
-                || static_cast<int32>(State->GetNumberField(TEXT("executing"))) > 1)
-            {
-                OutError = {
-                    TEXT("busy"),
-                    TEXT("Asset deletion refused while another retained operation is queued or executing"),
-                    MakeShared<FUnrealMCPRecord>(),
-                    true};
-                return false;
-            }
-        }
-        return AssetDeletionService->Delete(Arguments, OutResult, OutError);
-    }
-    if (Command == TEXT("level_inspect") || Command == TEXT("level_open") || Command == TEXT("level_manage")
-        || Command == TEXT("level_actor_edit") || Command == TEXT("level_save"))
-    {
-        if (!LevelService)
-        {
-            LevelService = MakeUnique<FUnrealMCPLevelService>(ProjectHash);
-        }
-        if (Command != TEXT("level_inspect") && OperationLedger)
-        {
-            const TSharedPtr<FUnrealMCPRecord> State = OperationLedger->CurrentState();
-            if (static_cast<int32>(State->GetNumberField(TEXT("queued"))) > 0
-                || static_cast<int32>(State->GetNumberField(TEXT("executing"))) > 1)
-            {
-                OutError = {
-                    TEXT("busy"),
-                    TEXT("Level operation refused while another retained operation is queued or executing"),
-                    MakeShared<FUnrealMCPRecord>(),
-                    true};
-                return false;
-            }
-        }
-        if (Command == TEXT("level_inspect")) return LevelService->Inspect(Arguments, OutResult, OutError);
-        if (Command == TEXT("level_open")) return LevelService->Open(Arguments, OutResult, OutError);
-        if (Command == TEXT("level_actor_edit") || Command == TEXT("level_save"))
-        {
-            if (!LevelActorEditingService)
-                LevelActorEditingService = MakeUnique<FUnrealMCPLevelActorEditingService>(*LevelService);
-            return Command == TEXT("level_actor_edit")
-                ? LevelActorEditingService->Edit(Arguments, OutResult, OutError)
-                : LevelActorEditingService->Save(Arguments, OutResult, OutError);
-        }
-        if (!LevelManagementService)
-        {
-            LevelManagementService = MakeUnique<FUnrealMCPLevelManagementService>(ProjectHash, *LevelService);
-        }
-        return LevelManagementService->Manage(Arguments, OutResult, OutError);
-    }
-    if (Command == TEXT("gameplay_framework_edit"))
-    {
-        if (!GameplayFrameworkEditor) GameplayFrameworkEditor = MakeUnique<FUnrealMCPGameplayFrameworkEditor>(ProjectHash);
-        return GameplayFrameworkEditor->Execute(Arguments, OutResult, OutError);
-    }
-    if (Command == TEXT("asset_inspect"))
-    {
-        if (!AssetInspectionService) AssetInspectionService = MakeUnique<FUnrealMCPAssetInspectionService>();
-        return AssetInspectionService->Execute(Arguments, OutResult, OutError);
-    }
-    if (Command == TEXT("game_data_inspect") || Command == TEXT("game_data_edit"))
-    {
-        if (!GameDataService) GameDataService = MakeUnique<FUnrealMCPGameDataService>();
-        return Command == TEXT("game_data_inspect")
-            ? GameDataService->Inspect(Arguments, OutResult, OutError)
-            : GameDataService->Edit(Arguments, OutResult, OutError);
-    }
-    if (!BlueprintInspector)
-    {
-        BlueprintInspector = MakeUnique<FUnrealMCPBlueprintInspector>(*ExtensionRegistry);
-    }
-    if (Command == TEXT("blueprint_action_catalog"))
-    {
-        if (!BlueprintActionCatalog)
-        {
-            BlueprintActionCatalog = MakeUnique<FUnrealMCPBlueprintActionCatalog>(*BlueprintInspector, BridgeInstanceId);
-        }
-        return BlueprintActionCatalog->Execute(Arguments, OutResult, OutError);
-    }
-    if (Command == TEXT("blueprint_graph_edit"))
-    {
-        if (!BlueprintActionCatalog)
-        {
-            BlueprintActionCatalog = MakeUnique<FUnrealMCPBlueprintActionCatalog>(*BlueprintInspector, BridgeInstanceId);
-        }
-        if (!BlueprintGraphEditor)
-        {
-            BlueprintGraphEditor = MakeUnique<FUnrealMCPBlueprintGraphEditor>(*BlueprintInspector, *BlueprintActionCatalog);
-        }
-        return BlueprintGraphEditor->Execute(Arguments, OutResult, OutError);
-    }
-    if (Command == TEXT("blueprint_block_replace"))
-    {
-        if (!BlueprintActionCatalog)
-        {
-            BlueprintActionCatalog = MakeUnique<FUnrealMCPBlueprintActionCatalog>(
-                *BlueprintInspector, BridgeInstanceId);
-        }
-        if (!BlueprintBlockReplacementService)
-        {
-            BlueprintBlockReplacementService =
-                MakeUnique<FUnrealMCPBlueprintBlockReplacementService>(
-                    *BlueprintInspector, *BlueprintActionCatalog);
-        }
-        return BlueprintBlockReplacementService->Execute(Arguments, OutResult, OutError);
-    }
-    if (Command == TEXT("widget_tree_edit"))
-    {
-        if (!WidgetTreeService)
-        {
-            WidgetTreeService = MakeUnique<FUnrealMCPWidgetTreeService>(*BlueprintInspector);
-        }
-        return WidgetTreeService->Execute(Arguments, OutResult, OutError);
-    }
-    if (!BlueprintMutator)
-    {
-        BlueprintMutator = MakeUnique<FUnrealMCPBlueprintMutator>(*BlueprintInspector);
-    }
-    return BlueprintMutator->Execute(Command, Arguments, OutResult, OutError);
+    return CommandCatalog->Execute(Command, Arguments, OutResult, OutError);
 }
 
 TSharedPtr<FUnrealMCPRecord> FUnrealMCPBridge::Capabilities() const
@@ -543,108 +334,10 @@ TSharedPtr<FUnrealMCPRecord> FUnrealMCPBridge::Capabilities() const
     Result->SetStringField(TEXT("platform"), FPlatformProperties::PlatformName());
     Result->SetStringField(TEXT("mode"), TEXT("blueprint_family_authoring"));
     Result->SetBoolField(TEXT("bridge_ready"), bReady);
-    Result->SetArrayField(TEXT("commands"), Strings({TEXT("capabilities"), TEXT("editor_state"), TEXT("editor_shutdown"), TEXT("operation_status"), TEXT("operation_cancel"), TEXT("asset_inspect"), TEXT("asset_references"), TEXT("asset_delete"),
-        TEXT("level_inspect"), TEXT("level_open"), TEXT("level_manage"), TEXT("level_actor_edit"), TEXT("level_save"),
-        TEXT("blueprint_action_catalog"), TEXT("blueprint_graph_edit"),
-        TEXT("blueprint_block_replace"), TEXT("blueprint_create"), TEXT("blueprint_compile"),
-        TEXT("blueprint_save"), TEXT("blueprint_component_edit"), TEXT("blueprint_default_edit"), TEXT("blueprint_member_edit"),
-        TEXT("widget_tree_edit"),
-        TEXT("gameplay_framework_edit"), TEXT("game_data_inspect"), TEXT("game_data_edit")}));
+    Result->SetArrayField(TEXT("commands"), CommandCatalog->BuildCommandNames());
 
-    const TSharedRef<FUnrealMCPRecord> Features = MakeShared<FUnrealMCPRecord>();
-    Features->SetBoolField(TEXT("asset_inspection_core"), true);
-    Features->SetBoolField(TEXT("blueprint_mutation"), true);
-    Features->SetBoolField(TEXT("blueprint_creation"), true);
-    Features->SetBoolField(TEXT("blueprint_compile"), true);
-    Features->SetBoolField(TEXT("blueprint_save"), true);
-    Features->SetBoolField(TEXT("reliable_mutations"), true);
-    Features->SetBoolField(TEXT("blueprint_components"), true);
-    Features->SetBoolField(TEXT("blueprint_defaults"), true);
-    Features->SetBoolField(TEXT("blueprint_member_variables"), true);
-    Features->SetBoolField(TEXT("blueprint_functions"), true);
-    Features->SetBoolField(TEXT("blueprint_local_variables"), true);
-    Features->SetBoolField(TEXT("blueprint_rep_notify"), true);
-    Features->SetBoolField(TEXT("blueprint_macros"), true);
-    Features->SetBoolField(TEXT("blueprint_custom_events"), true);
-    Features->SetBoolField(TEXT("blueprint_action_catalog"), true);
-    Features->SetBoolField(TEXT("blueprint_graph_mutation"), true);
-    Features->SetBoolField(TEXT("blueprint_graph_node_lifecycle"), true);
-    Features->SetBoolField(TEXT("blueprint_graph_pin_defaults"), true);
-    Features->SetBoolField(TEXT("blueprint_graph_direct_connections"), true);
-    Features->SetBoolField(TEXT("blueprint_graph_wildcard_specialization"), true);
-    Features->SetBoolField(TEXT("blueprint_graph_automatic_conversion"), true);
-    Features->SetBoolField(TEXT("blueprint_function_replacement"), true);
-    Features->SetBoolField(TEXT("blueprint_function_replacement_scratch_preflight"), true);
-    Features->SetBoolField(TEXT("blueprint_macro_replacement"), true);
-    Features->SetBoolField(TEXT("blueprint_custom_event_replacement"), true);
-    Features->SetBoolField(TEXT("blueprint_event_replacement"), true);
-    Features->SetBoolField(TEXT("blueprint_logic_unit_external_connections"), true);
-    Features->SetBoolField(TEXT("blueprint_node_layout"), true);
-    Features->SetBoolField(TEXT("blueprint_family_policy"), true);
-    Features->SetBoolField(TEXT("game_mode_families"), true);
-    Features->SetBoolField(TEXT("game_state_families"), true);
-    Features->SetBoolField(TEXT("game_instance_family"), true);
-    Features->SetBoolField(TEXT("widget_blueprint_family"), true);
-    Features->SetBoolField(TEXT("widget_tree_authoring"), true);
-    Features->SetBoolField(TEXT("umg_layout_authoring"), true);
-    Features->SetBoolField(TEXT("umg_style_authoring"), true);
-    Features->SetBoolField(TEXT("umg_property_bindings"), true);
-    Features->SetBoolField(TEXT("umg_designer_events"), true);
-    Features->SetBoolField(TEXT("multiplayer_blueprint_authoring"), true);
-    Features->SetBoolField(TEXT("custom_event_rpcs"), true);
-    Features->SetBoolField(TEXT("typed_replication_settings"), true);
-    Features->SetBoolField(TEXT("gameplay_framework_assignment"), true);
-    Features->SetBoolField(TEXT("user_defined_struct_authoring"), true);
-    Features->SetBoolField(TEXT("typed_data_tables"), true);
-    Features->SetBoolField(TEXT("game_data_batch_editing"), true);
-    Features->SetBoolField(TEXT("asset_reference_discovery"), true);
-    Features->SetBoolField(TEXT("asset_reference_live_memory"), true);
-    Features->SetBoolField(TEXT("asset_delete"), true);
-    Features->SetBoolField(TEXT("asset_delete_force"), false);
-    Features->SetBoolField(TEXT("asset_delete_undo"), false);
-    Features->SetBoolField(TEXT("level_discovery"), true);
-    Features->SetBoolField(TEXT("level_open"), true);
-    Features->SetBoolField(TEXT("level_snapshots"), true);
-    Features->SetBoolField(TEXT("level_management"), true);
-    Features->SetBoolField(TEXT("level_blank_creation"), true);
-    Features->SetBoolField(TEXT("level_template_creation"), true);
-    Features->SetBoolField(TEXT("level_world_settings"), true);
-    Features->SetBoolField(TEXT("level_world_partition_conversion"), false);
-    Features->SetBoolField(TEXT("level_map_deletion"), true);
-    Features->SetBoolField(TEXT("level_actor_inspection"), true);
-    Features->SetBoolField(TEXT("level_world_partition_descriptors"), true);
-    Features->SetBoolField(TEXT("level_targeted_actor_loading"), true);
-    Features->SetBoolField(TEXT("level_instance_properties"), true);
-    Features->SetBoolField(TEXT("level_actor_editing"), true);
-    Features->SetBoolField(TEXT("level_actor_transactions"), true);
-    Features->SetBoolField(TEXT("level_package_save_verification"), true);
-    Features->SetBoolField(TEXT("editor_lifecycle"), true);
-    Features->SetBoolField(TEXT("graceful_editor_shutdown"), true);
-    Features->SetBoolField(TEXT("project_build"), false);
-    Features->SetBoolField(TEXT("companion_plugins"), true);
-    Features->SetBoolField(TEXT("gas_ability_blueprints_inspection"),
-        ExtensionRegistry->HasReadyFamilyCapability(
-            TEXT("gameplay_ability"), EUnrealMCPExtensionAccess::Read));
-    Features->SetBoolField(TEXT("gas_ability_blueprints_mutation"),
-        ExtensionRegistry->HasReadyFamilyCapability(
-            TEXT("gameplay_ability"), EUnrealMCPExtensionAccess::Mutation));
-    Features->SetBoolField(TEXT("gas_gameplay_effects_inspection"),
-        ExtensionRegistry->HasReadyFamilyCapability(
-            TEXT("gameplay_effect"), EUnrealMCPExtensionAccess::Read));
-    Features->SetBoolField(TEXT("gas_gameplay_effects_mutation"),
-        ExtensionRegistry->HasReadyFamilyCapability(
-            TEXT("gameplay_effect"), EUnrealMCPExtensionAccess::Mutation));
-    Features->SetBoolField(TEXT("commonui_widget_blueprints_inspection"),
-        ExtensionRegistry->HasReadyFamilyCapability(
-            TEXT("commonui_widget"), EUnrealMCPExtensionAccess::Read));
-    Features->SetBoolField(TEXT("commonui_widget_blueprints_mutation"),
-        ExtensionRegistry->HasReadyFamilyCapability(
-            TEXT("commonui_widget"), EUnrealMCPExtensionAccess::Mutation));
-    Result->SetObjectField(TEXT("features"), Features);
-    TArray<TSharedPtr<FUnrealMCPValue>> BlueprintFamilies =
-        UnrealMCP::BlueprintFamilyPolicy::BuildPublishedMatrix();
-    BlueprintFamilies.Append(ExtensionRegistry->BuildBlueprintFamilyCapabilities());
-    Result->SetArrayField(TEXT("blueprint_families"), BlueprintFamilies);
+    Result->SetObjectField(TEXT("features"), CommandCatalog->BuildFeatures());
+    Result->SetArrayField(TEXT("blueprint_families"), CommandCatalog->BuildBlueprintFamilyCapabilities());
     const TSharedPtr<FUnrealMCPRecord> CompanionCapabilities = ExtensionRegistry->BuildCapabilities();
     Result->SetNumberField(TEXT("companion_api_version"), CompanionCapabilities->GetNumberField(TEXT("companion_api_version")));
     Result->SetNumberField(TEXT("extension_schema_revision"), CompanionCapabilities->GetNumberField(TEXT("extension_schema_revision")));
@@ -657,97 +350,7 @@ TSharedPtr<FUnrealMCPRecord> FUnrealMCPBridge::Capabilities() const
     AssetAccess->SetStringField(TEXT("mutation_scope"), TEXT("project_content_and_local_project_plugins"));
     Result->SetObjectField(TEXT("asset_access"), AssetAccess);
 
-    const TSharedRef<FUnrealMCPRecord> Limits = MakeShared<FUnrealMCPRecord>();
-    Limits->SetNumberField(TEXT("request_bytes"), UnrealMCP::MaxRequestBytes);
-    Limits->SetNumberField(TEXT("companion_descriptors"), UnrealMCP::MaxDiscoveredCompanions);
-    Limits->SetNumberField(TEXT("companions"), UnrealMCP::MaxAcceptedCompanions);
-    Limits->SetNumberField(TEXT("companion_contributions"), UnrealMCP::MaxCompanionContributions);
-    Limits->SetNumberField(TEXT("companion_capability_records"), UnrealMCP::MaxCompanionCapabilityRecords);
-    Limits->SetNumberField(TEXT("companion_diagnostics"), UnrealMCP::MaxCompanionDiagnostics);
-    Limits->SetNumberField(TEXT("extension_id_chars"), UnrealMCP::MaxExtensionIdChars);
-    Limits->SetNumberField(TEXT("response_bytes"), UnrealMCP::MaxResponseBytes);
-    Limits->SetNumberField(TEXT("queued_requests"), UnrealMCP::MaxQueuedRequests);
-    Limits->SetNumberField(TEXT("json_depth"), UnrealMCP::MaxJsonDepth);
-    Limits->SetNumberField(TEXT("string_chars"), UnrealMCP::MaxStringLength);
-    Limits->SetNumberField(TEXT("command_deadline_ms"), static_cast<int32>(UnrealMCP::CommandDeadlineSeconds * 1000.0));
-    Limits->SetNumberField(TEXT("inspect_page_size"), UnrealMCP::MaxInspectPageSize);
-    Limits->SetNumberField(TEXT("asset_inspect_page_size"), UnrealMCP::MaxAssetInspectPageSize);
-    Limits->SetNumberField(TEXT("asset_inspect_selector_bytes"), UnrealMCP::MaxAssetInspectSelectorBytes);
-    Limits->SetNumberField(TEXT("asset_inspect_complete_graph_bytes"), UnrealMCP::MaxAssetInspectCompleteGraphBytes);
-    Limits->SetNumberField(TEXT("discovery_scan"), UnrealMCP::MaxDiscoveryScan);
-    Limits->SetNumberField(TEXT("inspect_records"), UnrealMCP::MaxInspectRecords);
-    Limits->SetNumberField(TEXT("retained_cursors"), UnrealMCP::MaxRetainedCursors);
-    Limits->SetNumberField(TEXT("cursor_lifetime_ms"), static_cast<int32>(UnrealMCP::CursorLifetimeSeconds * 1000.0));
-    Limits->SetNumberField(TEXT("compiler_diagnostics"), UnrealMCP::MaxCompilerDiagnostics);
-    Limits->SetNumberField(TEXT("diagnostic_chars"), UnrealMCP::MaxDiagnosticChars);
-    Limits->SetNumberField(TEXT("retained_operations"), UnrealMCP::MaxRetainedOperations);
-    Limits->SetNumberField(TEXT("operation_lifetime_ms"), static_cast<int32>(UnrealMCP::OperationLifetimeSeconds * 1000.0));
-    Limits->SetNumberField(TEXT("property_names"), UnrealMCP::MaxPropertyNames);
-    Limits->SetNumberField(TEXT("variable_references"), UnrealMCP::MaxVariableReferences);
-    Limits->SetNumberField(TEXT("action_results"), UnrealMCP::MaxActionResults);
-    Limits->SetNumberField(TEXT("action_scan"), UnrealMCP::MaxActionScan);
-    Limits->SetNumberField(TEXT("retained_actions"), UnrealMCP::MaxRetainedActions);
-    Limits->SetNumberField(TEXT("retained_catalogs"), UnrealMCP::MaxRetainedCatalogs);
-    Limits->SetNumberField(TEXT("action_lifetime_ms"), static_cast<int32>(UnrealMCP::ActionLifetimeSeconds * 1000.0));
-    Limits->SetNumberField(TEXT("action_scan_ms"), static_cast<int32>(UnrealMCP::ActionScanSeconds * 1000.0));
-    Limits->SetNumberField(TEXT("concurrent_catalogs"), UnrealMCP::MaxConcurrentCatalogs);
-    Limits->SetNumberField(TEXT("graph_nodes"), UnrealMCP::MaxGraphNodes);
-    Limits->SetNumberField(TEXT("graph_pins_per_node"), UnrealMCP::MaxGraphPinsPerNode);
-    Limits->SetNumberField(TEXT("graph_coordinate"), UnrealMCP::MaxGraphCoordinate);
-    Limits->SetNumberField(TEXT("graph_links_per_pin"), UnrealMCP::MaxGraphLinksPerPin);
-    Limits->SetNumberField(TEXT("graph_automatic_conversion_nodes"), UnrealMCP::MaxAutomaticConversionNodes);
-    Limits->SetNumberField(TEXT("pin_default_chars"), UnrealMCP::MaxPinDefaultChars);
-    Limits->SetNumberField(TEXT("function_replacement_nodes"), UnrealMCP::MaxFunctionReplacementNodes);
-    Limits->SetNumberField(TEXT("function_replacement_owned_nodes"), UnrealMCP::MaxFunctionReplacementOwnedNodes);
-    Limits->SetNumberField(TEXT("function_replacement_locals"), UnrealMCP::MaxFunctionReplacementLocals);
-    Limits->SetNumberField(TEXT("function_replacement_defaults"), UnrealMCP::MaxFunctionReplacementDefaults);
-    Limits->SetNumberField(TEXT("function_replacement_connections"), UnrealMCP::MaxFunctionReplacementConnections);
-    Limits->SetNumberField(TEXT("logic_unit_replacement_nodes"), UnrealMCP::MaxLogicUnitReplacementNodes);
-    Limits->SetNumberField(TEXT("logic_unit_replacement_owned_nodes"), UnrealMCP::MaxLogicUnitOwnedNodes);
-    Limits->SetNumberField(TEXT("logic_unit_replacement_locals"), UnrealMCP::MaxLogicUnitLocals);
-    Limits->SetNumberField(TEXT("logic_unit_replacement_defaults"), UnrealMCP::MaxLogicUnitDefaults);
-    Limits->SetNumberField(TEXT("logic_unit_replacement_connections"), UnrealMCP::MaxLogicUnitConnections);
-    Limits->SetNumberField(TEXT("logic_unit_external_connections"), UnrealMCP::MaxLogicUnitExternalConnections);
-    Limits->SetNumberField(TEXT("logic_unit_layout_nodes"), UnrealMCP::MaxLogicUnitLayoutNodes);
-    Limits->SetNumberField(TEXT("logic_unit_layout_edges"), UnrealMCP::MaxLogicUnitLayoutEdges);
-    Limits->SetNumberField(TEXT("logic_unit_layout_iterations"), UnrealMCP::MaxLogicUnitLayoutIterations);
-    Limits->SetNumberField(TEXT("logic_unit_layout_collision_probes"), UnrealMCP::MaxLogicUnitLayoutCollisionProbes);
-    Limits->SetNumberField(TEXT("logic_unit_layout_work"), UnrealMCP::MaxLogicUnitLayoutWork);
-    Limits->SetNumberField(TEXT("logic_unit_layout_ms"), static_cast<int32>(UnrealMCP::MaxLogicUnitLayoutSeconds * 1000.0));
-    Limits->SetNumberField(TEXT("game_data_fields"), UnrealMCP::MaxGameDataFields);
-    Limits->SetNumberField(TEXT("game_data_rows"), UnrealMCP::MaxGameDataRows);
-    Limits->SetNumberField(TEXT("game_data_batch_rows"), UnrealMCP::MaxGameDataBatchRows);
-    Limits->SetNumberField(TEXT("game_data_collection_items"), UnrealMCP::MaxGameDataCollectionItems);
-    Limits->SetNumberField(TEXT("game_data_depth"), UnrealMCP::MaxGameDataDepth);
-    Limits->SetNumberField(TEXT("game_data_dependencies"), UnrealMCP::MaxGameDataDependencies);
-    Limits->SetNumberField(TEXT("asset_reference_registry_candidates"), UnrealMCP::MaxAssetReferenceRegistryCandidates);
-    Limits->SetNumberField(TEXT("asset_reference_live_objects"), UnrealMCP::MaxAssetReferenceLiveObjects);
-    Limits->SetNumberField(TEXT("asset_reference_records"), UnrealMCP::MaxAssetReferenceRecords);
-    Limits->SetNumberField(TEXT("asset_reference_assets_per_package"), UnrealMCP::MaxAssetReferenceAssetsPerPackage);
-    Limits->SetNumberField(TEXT("asset_reference_properties"), UnrealMCP::MaxAssetReferenceProperties);
-    Limits->SetNumberField(TEXT("asset_reference_retained_cursors"), UnrealMCP::MaxAssetReferenceRetainedCursors);
-    Limits->SetNumberField(TEXT("asset_reference_traversal_depth"), 1);
-    Limits->SetNumberField(TEXT("level_discovery_scan"), UnrealMCP::MaxLevelDiscoveryScan);
-    Limits->SetNumberField(TEXT("level_external_packages"), UnrealMCP::MaxLevelExternalPackages);
-    Limits->SetNumberField(TEXT("level_actor_scan"), UnrealMCP::MaxLevelActorScan);
-    Limits->SetNumberField(TEXT("level_actor_records"), UnrealMCP::MaxLevelActorRecords);
-    Limits->SetNumberField(TEXT("level_components"), UnrealMCP::MaxLevelComponents);
-    Limits->SetNumberField(TEXT("level_actor_tags"), UnrealMCP::MaxLevelActorTags);
-    Limits->SetNumberField(TEXT("level_data_layers"), UnrealMCP::MaxLevelDataLayers);
-    Limits->SetNumberField(TEXT("level_targeted_loads"), UnrealMCP::MaxLevelTargetedLoads);
-    Limits->SetNumberField(TEXT("level_setup_properties"), UnrealMCP::MaxLevelSetupProperties);
-    Limits->SetNumberField(TEXT("level_owned_packages"), UnrealMCP::MaxLevelOwnedPackages);
-    Limits->SetNumberField(TEXT("level_edit_operations"), UnrealMCP::MaxLevelEditOperations);
-    Limits->SetNumberField(TEXT("level_edit_actors"), UnrealMCP::MaxLevelEditActors);
-    Limits->SetNumberField(TEXT("level_save_packages"), UnrealMCP::MaxLevelSavePackages);
-    Limits->SetNumberField(TEXT("dirty_package_summary"), UnrealMCP::MaxDirtyPackageSummary);
-    Limits->SetNumberField(TEXT("widget_tree_widgets"), UnrealMCP::MaxWidgetTreeWidgets);
-    Limits->SetNumberField(TEXT("widget_tree_depth"), UnrealMCP::MaxWidgetTreeDepth);
-    Limits->SetNumberField(TEXT("widget_named_slots"), UnrealMCP::MaxWidgetNamedSlots);
-    Limits->SetNumberField(TEXT("widget_defaults_per_widget"), UnrealMCP::MaxWidgetDefaultsPerWidget);
-    Limits->SetNumberField(TEXT("widget_changed_defaults"), UnrealMCP::MaxWidgetChangedDefaults);
-    Limits->SetNumberField(TEXT("widget_bindings"), UnrealMCP::MaxWidgetBindings);
-    Result->SetObjectField(TEXT("limits"), Limits);
+    Result->SetObjectField(TEXT("limits"), CommandCatalog->BuildLimits());
 
     const TSharedRef<FUnrealMCPRecord> Listener = MakeShared<FUnrealMCPRecord>();
     Listener->SetStringField(TEXT("host"), TEXT("127.0.0.1"));

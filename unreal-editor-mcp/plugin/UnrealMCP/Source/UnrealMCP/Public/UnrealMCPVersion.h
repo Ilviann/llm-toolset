@@ -4,7 +4,7 @@
 
 namespace UnrealMCP
 {
-inline constexpr TCHAR Version[] = TEXT("0.37.0");
+inline constexpr TCHAR Version[] = TEXT("0.38.0");
 inline constexpr int32 CompanionApiVersion = 1;
 inline constexpr int32 ExtensionSchemaRevision = 1;
 inline constexpr int32 MaxDiscoveredCompanions = 64;

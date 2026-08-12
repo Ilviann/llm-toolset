@@ -14,7 +14,7 @@ released_in: null
 **Depends on:**
 
 - [`asset-inspect-core`](../completed/asset-inspect-core.md)
-- [`native-command-catalog`](native-command-catalog.md)
+- [`native-command-catalog`](../completed/native-command-catalog.md)
 
 ### Implementation
 

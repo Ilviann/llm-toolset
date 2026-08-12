@@ -48,7 +48,7 @@ Keep the authoritative checklist in [`ROADMAP.md`](../../ROADMAP.md) synchronize
     - `readonly-mode`
 - [`asset-inspect-core` — General asset inspection foundation and gameplay Blueprints](completed/asset-inspect-core.md) — Add the common read-only facade and deep inspection for gameplay-framework and Interface Blueprints.
 - [`native-wire-contracts` — Typed native request and result records](completed/native-wire-contracts.md) — Move native domain request/result contracts behind explicit JSON codecs.
-- [`native-command-catalog` — Fixed native command routing and capabilities](planned/native-command-catalog.md) — Route fixed typed commands and capabilities without domain-specific bridge composition.
+- [`native-command-catalog` — Fixed native command routing and capabilities](completed/native-command-catalog.md) — Route fixed typed commands and capabilities without domain-specific bridge composition.
   - Depends on:
     - `native-wire-contracts`
 - [`asset-family-foundation` — Built-in asset-family adapter contracts](planned/asset-family-foundation.md) — Add deterministic inspection, creation, and editing adapter contracts.

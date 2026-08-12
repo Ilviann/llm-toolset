@@ -1,6 +1,5 @@
 # Planned features
 
-- [`native-command-catalog` — Fixed native command routing and capabilities](native-command-catalog.md).
 - [`asset-family-foundation` — Built-in asset-family adapter contracts](asset-family-foundation.md).
 - [`asset-inspection-adapters` — Asset inspection service decomposition](asset-inspection-adapters.md).
 - [`asset-authoring-kernel` — Shared asset creation and editing lifecycle](asset-authoring-kernel.md).

@@ -76,7 +76,7 @@ adding an optional Engine-plugin dependency to the base module.
 
 1. [`native-wire-contracts`](../features/completed/native-wire-contracts.md) moves
    JSON conversion to explicit transport codecs.
-2. [`native-command-catalog`](../features/planned/native-command-catalog.md)
+2. [`native-command-catalog`](../features/completed/native-command-catalog.md)
    replaces centralized command branching with deterministic typed registration.
 3. [`asset-family-foundation`](../features/planned/asset-family-foundation.md)
    defines descriptors, registries, and inspection/creation/edit adapter seams.
