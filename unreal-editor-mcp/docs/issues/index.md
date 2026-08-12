@@ -4,6 +4,7 @@ This directory tracks confirmed errors through investigation and resolution. Eac
 
 ## Open issues
 
+- [`issue-4.md`](issue-4.md) — macOS lifecycle-only acceptance consistently times out on the first authenticated bridge readiness check after launching the editor.
 - [`issue-3.md`](issue-3.md) — `blueprint_action_catalog` consistently rejects the unchanged snapshot returned by `blueprint_inspect` for a native-parent Actor Blueprint on Unreal Engine 5.8.0.
 - [`issue-2.md`](issue-2.md) — Unreal Editor can intermittently crash during an `editor_lifecycle` restart; investigation is awaiting crash logs and reproduction details.
 

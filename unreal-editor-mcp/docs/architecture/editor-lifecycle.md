@@ -20,4 +20,4 @@ The CLI validates the optional absolute editor executable and injects one `Edito
 
 ## Verification
 
-Run `python -m unittest tests.test_lifecycle -v`, the full Python suite, compile the disposable Editor target, run `UnrealMCP.Lifecycle`, then run `python scripts/run_headless_integration.py --readonly-lifecycle-only` against the disposable project on Windows. Repeat on macOS when available as non-blocking follow-up; no Linux verification is required.
+Run `python -m unittest tests.test_lifecycle -v`, the full Python suite, compile the disposable Editor target, run `UnrealMCP.Lifecycle`, then run `python scripts/run_headless_integration.py --readonly-lifecycle-only` against the disposable project on Windows. Repeat on macOS when available as non-blocking follow-up; that macOS follow-up is currently blocked by [`issue-4`](../issues/issue-4.md). No Linux verification is required.

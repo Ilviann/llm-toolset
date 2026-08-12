@@ -180,18 +180,6 @@ Support-tooling features change repository utilities without changing Unreal MCP
 Feature checkboxes record implementation completion after mandatory Windows verification. This section separately tracks preferred macOS verification that may occur after a feature is completed and released. Linux is outside the current support and verification scope and is not tracked.
 
 - macOS:
-  - `level-management`
-  - `level-edit`
-  - `readonly-mode`
-  - `companion-plugins`
-  - `gas-ability-blueprints-inspect`
-  - `gas-gameplay-effects-inspect`
-  - `event-macro-replace`
-  - `node-layout`
-  - `commonui-assets-inspect`
-  - `asset-inspect-core`
-  - `native-wire-contracts`
-  - `native-command-catalog`
-  - `asset-family-foundation`
+  - `readonly-mode` — lifecycle-only acceptance is blocked by [`issue-4`](docs/issues/issue-4.md).
 - Windows:
   - None
