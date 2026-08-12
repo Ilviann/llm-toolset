@@ -51,7 +51,7 @@ Keep the authoritative checklist in [`ROADMAP.md`](../../ROADMAP.md) synchronize
 - [`native-command-catalog` — Fixed native command routing and capabilities](completed/native-command-catalog.md) — Route fixed typed commands and capabilities without domain-specific bridge composition.
   - Depends on:
     - `native-wire-contracts`
-- [`asset-family-foundation` — Built-in asset-family adapter contracts](planned/asset-family-foundation.md) — Add deterministic inspection, creation, and editing adapter contracts.
+- [`asset-family-foundation` — Built-in asset-family adapter contracts](completed/asset-family-foundation.md) — Add deterministic inspection, creation, and editing adapter contracts.
   - Depends on:
     - `asset-inspect-core`
     - `native-command-catalog`

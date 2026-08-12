@@ -1,5 +1,7 @@
 #include "UnrealMCPBridge.h"
 
+#include "UnrealMCPAssetFamilyRegistry.h"
+
 #include "Async/Async.h"
 #include "AssetCompilingManager.h"
 #include "UnrealMCPWireTypes.h"
@@ -50,9 +52,11 @@ FUnrealMCPBridge::FUnrealMCPBridge(
     FString InStateDirectory,
     FString InProjectHash,
     uint32 InPort,
+    TSharedRef<FUnrealMCPAssetFamilyRegistry> InAssetFamilyRegistry,
     TSharedRef<FUnrealMCPExtensionRegistry> InExtensionRegistry)
     : Token(MoveTemp(InToken)), StateDirectory(MoveTemp(InStateDirectory)),
-      ProjectHash(MoveTemp(InProjectHash)), Port(InPort), ExtensionRegistry(MoveTemp(InExtensionRegistry))
+      ProjectHash(MoveTemp(InProjectHash)), Port(InPort),
+      AssetFamilyRegistry(MoveTemp(InAssetFamilyRegistry)), ExtensionRegistry(MoveTemp(InExtensionRegistry))
 {
     BridgeInstanceId = FGuid::NewGuid().ToString(EGuidFormats::Digits).ToLower();
     OperationLedger = MakeUnique<FUnrealMCPOperationLedger>(BridgeInstanceId, AuthenticationBinding(ProjectHash, BridgeInstanceId, Token));
@@ -61,7 +65,7 @@ FUnrealMCPBridge::FUnrealMCPBridge(
     HostHandlers.EditorState = [this](const auto&, auto& Result, auto&) { Result = EditorState(); return true; };
     HostHandlers.EditorShutdown = [this](const auto&, auto& Result, auto& Error) { return EditorShutdown(Result, Error); };
     CommandCatalog = MakeUnique<FUnrealMCPCommandCatalog>(
-        ProjectHash, BridgeInstanceId, *OperationLedger, ExtensionRegistry, MoveTemp(HostHandlers));
+        ProjectHash, BridgeInstanceId, *OperationLedger, AssetFamilyRegistry, ExtensionRegistry, MoveTemp(HostHandlers));
 }
 
 FUnrealMCPBridge::~FUnrealMCPBridge()

@@ -78,7 +78,7 @@ adding an optional Engine-plugin dependency to the base module.
    JSON conversion to explicit transport codecs.
 2. [`native-command-catalog`](../features/completed/native-command-catalog.md)
    replaces centralized command branching with deterministic typed registration.
-3. [`asset-family-foundation`](../features/planned/asset-family-foundation.md)
+3. [`asset-family-foundation`](../features/completed/asset-family-foundation.md)
    defines descriptors, registries, and inspection/creation/edit adapter seams.
 4. [`asset-inspection-adapters`](../features/planned/asset-inspection-adapters.md)
    migrates built-in inspection behind the family seam.

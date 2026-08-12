@@ -5,6 +5,7 @@
 #include "UnrealMCPWireTypes.h"
 
 class FUnrealMCPAssetDeletionService;
+class FUnrealMCPAssetFamilyRegistry;
 class FUnrealMCPAssetInspectionService;
 class FUnrealMCPAssetReferenceService;
 class FUnrealMCPBlueprintActionCatalog;
@@ -115,6 +116,7 @@ public:
         FString InProjectHash,
         FString InBridgeInstanceId,
         FUnrealMCPOperationLedger& InOperationLedger,
+        TSharedRef<FUnrealMCPAssetFamilyRegistry> InAssetFamilyRegistry,
         TSharedRef<FUnrealMCPExtensionRegistry> InExtensionRegistry,
         FUnrealMCPCommandHostHandlers InHostHandlers);
     ~FUnrealMCPCommandCatalog();
@@ -158,6 +160,7 @@ private:
     FString ProjectHash;
     FString BridgeInstanceId;
     FUnrealMCPOperationLedger& OperationLedger;
+    TSharedRef<FUnrealMCPAssetFamilyRegistry> AssetFamilyRegistry;
     TSharedRef<FUnrealMCPExtensionRegistry> ExtensionRegistry;
     FString InitializationError;
     TUniquePtr<FUnrealMCPBlueprintInspector> BlueprintInspector;

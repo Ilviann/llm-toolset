@@ -5,6 +5,7 @@ References in this directory are grouped by the component that owns the contract
 - [`python/`](python/index.md) — Python project, discovery, error, schema, bridge-client, and editor-lifecycle contracts.
 - [`editor-bridge/`](editor-bridge/index.md) — native request, error, capability, state, discovery, and limit contracts.
 - [`native-command-catalog/`](native-command-catalog/index.md) — fixed command identities, access, dispatch, retained-operation policies, handlers, capabilities, limits, and registration lifecycle.
+- [`asset-family-registry/`](asset-family-registry/index.md) — built-in family descriptors, typed adapter contexts, independent capabilities, semantic builders, selection, bounds, and freeze lifecycle.
 - [`companion-extension-registry/`](companion-extension-registry/index.md) — public native registration, contribution handlers, descriptor metadata, capability records, bounds, and errors.
 - [`asset-inspection/`](asset-inspection/index.md) — general asset-inspection request, YAML response, selector, graph, collection, inheritance, and asset-family contracts.
 - [`gas-ability-inspection/`](gas-ability-inspection/index.md) — Gameplay Ability family, typed policy/tag/trigger/effect records, inheritance, bounds, capabilities, and exclusions.

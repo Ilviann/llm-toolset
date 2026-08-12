@@ -12,7 +12,7 @@ released_in: null
 
 **Depends on:**
 
-- [`asset-family-foundation`](asset-family-foundation.md)
+- [`asset-family-foundation`](../completed/asset-family-foundation.md)
 
 ### Implementation
 

@@ -14,7 +14,7 @@ Feature identifiers are stable names, not execution indexes. Unfinished features
 - [x] [`native-command-catalog` — Fixed native command routing and capabilities](docs/features/completed/native-command-catalog.md) — Route fixed typed commands and capabilities without domain-specific bridge composition.
   - Depends on:
     - `native-wire-contracts`
-- [ ] [`asset-family-foundation` — Built-in asset-family adapter contracts](docs/features/planned/asset-family-foundation.md) — Add deterministic inspection, creation, and editing adapter contracts.
+- [x] [`asset-family-foundation` — Built-in asset-family adapter contracts](docs/features/completed/asset-family-foundation.md) — Add deterministic inspection, creation, and editing adapter contracts.
   - Depends on:
     - `asset-inspect-core`
     - `native-command-catalog`
@@ -192,5 +192,6 @@ Feature checkboxes record implementation completion after mandatory Windows veri
   - `asset-inspect-core`
   - `native-wire-contracts`
   - `native-command-catalog`
+  - `asset-family-foundation`
 - Windows:
   - None

@@ -7,6 +7,7 @@
 #include "Misc/ConfigCacheIni.h"
 #include "Misc/Paths.h"
 #include "Misc/SecureHash.h"
+#include "UnrealMCPAssetFamilyRegistry.h"
 #include "UnrealMCPBridge.h"
 #include "UnrealMCPCompatibility.h"
 #include "UnrealMCPExtensionRegistry.h"
@@ -88,11 +89,20 @@ public:
             return;
         }
         ConfigureLoopbackListener(Port);
+        AssetFamilyRegistry = MakeShared<FUnrealMCPAssetFamilyRegistry>();
+        FUnrealMCPError RegistryError;
+        if (!AssetFamilyRegistry->Freeze(RegistryError))
+        {
+            UE_LOG(LogUnrealMCP, Error, TEXT("Unreal MCP disabled: %s"), *RegistryError.Message);
+            AssetFamilyRegistry.Reset();
+            return;
+        }
         ExtensionRegistry = MakeShared<FUnrealMCPExtensionRegistry>();
         ExtensionRegistry->DiscoverAndLoad();
         ExtensionRegistry->Freeze();
         Bridge = MakeShared<FUnrealMCPBridge>(
-            MoveTemp(Token), StateDirectory, ProjectHash(), Port, ExtensionRegistry.ToSharedRef());
+            MoveTemp(Token), StateDirectory, ProjectHash(), Port,
+            AssetFamilyRegistry.ToSharedRef(), ExtensionRegistry.ToSharedRef());
         if (!Bridge->Start(Error))
         {
             UE_LOG(LogUnrealMCP, Error, TEXT("Unreal MCP disabled: %s"), *Error);
@@ -114,6 +124,7 @@ public:
             Bridge.Reset();
         }
         ExtensionRegistry.Reset();
+        AssetFamilyRegistry.Reset();
     }
 
     virtual int32 GetCompanionApiVersion() const override
@@ -142,6 +153,7 @@ public:
 
 private:
     TSharedPtr<FUnrealMCPBridge> Bridge;
+    TSharedPtr<FUnrealMCPAssetFamilyRegistry> AssetFamilyRegistry;
     TSharedPtr<FUnrealMCPExtensionRegistry> ExtensionRegistry;
 };
 

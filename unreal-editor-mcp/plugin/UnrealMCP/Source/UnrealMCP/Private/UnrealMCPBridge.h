@@ -11,6 +11,7 @@ struct FUnrealMCPError;
 class FUnrealMCPRecord;
 class FUnrealMCPDiscovery;
 class FUnrealMCPCommandCatalog;
+class FUnrealMCPAssetFamilyRegistry;
 class FUnrealMCPOperationLedger;
 class FUnrealMCPExtensionRegistry;
 class IHttpRouter;
@@ -23,6 +24,7 @@ public:
         FString InStateDirectory,
         FString InProjectHash,
         uint32 InPort,
+        TSharedRef<FUnrealMCPAssetFamilyRegistry> InAssetFamilyRegistry,
         TSharedRef<FUnrealMCPExtensionRegistry> InExtensionRegistry);
     ~FUnrealMCPBridge();
 
@@ -50,6 +52,7 @@ private:
     TUniquePtr<FUnrealMCPDiscovery> Discovery;
     TUniquePtr<FUnrealMCPOperationLedger> OperationLedger;
     TUniquePtr<FUnrealMCPCommandCatalog> CommandCatalog;
+    TSharedRef<FUnrealMCPAssetFamilyRegistry> AssetFamilyRegistry;
     TSharedRef<FUnrealMCPExtensionRegistry> ExtensionRegistry;
     FString BridgeInstanceId;
     FTSTicker::FDelegateHandle HeartbeatHandle;

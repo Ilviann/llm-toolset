@@ -60,6 +60,7 @@
 #include "WorldPartition/WorldPartitionHelpers.h"
 #include "IUnrealMCPModule.h"
 #include "UnrealMCPCompanionApi.h"
+#include "UnrealMCPAssetFamilyRegistry.h"
 
 namespace UnrealMCP::ApiProbe
 {
@@ -155,6 +156,10 @@ void RequirePublicTypes()
     (void)static_cast<FCleanupAfterDelete>(&ObjectTools::CleanupAfterSuccessfulDelete);
     static_assert(sizeof(FThreadSafeObjectIterator) > 0);
     static_assert(sizeof(FUnrealMCPCompanionRegistration) > 0);
+    static_assert(sizeof(FUnrealMCPAssetFamilyDescriptor) > 0);
+    static_assert(sizeof(FUnrealMCPAssetFamilyInspectionContext) > 0);
+    static_assert(sizeof(FUnrealMCPAssetFamilyCreationContext) > 0);
+    static_assert(sizeof(FUnrealMCPAssetFamilyEditContext) > 0);
     static_assert(TIsDerivedFrom<IUnrealMCPExtensionHandler, IUnrealMCPExtensionHandler>::Value);
     (void)&FBlueprintActionDatabase::Get;
     (void)&UEdGraphSchema_K2::CanCreateConnection;

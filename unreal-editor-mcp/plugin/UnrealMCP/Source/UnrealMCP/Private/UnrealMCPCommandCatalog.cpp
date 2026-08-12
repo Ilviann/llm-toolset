@@ -1,6 +1,7 @@
 #include "UnrealMCPCommandCatalog.h"
 
 #include "UnrealMCPAssetDeletionService.h"
+#include "UnrealMCPAssetFamilyRegistry.h"
 #include "UnrealMCPAssetInspectionService.h"
 #include "UnrealMCPAssetReferenceService.h"
 #include "UnrealMCPBlueprintActionCatalog.h"
@@ -169,11 +170,18 @@ FUnrealMCPCommandCatalog::FUnrealMCPCommandCatalog(
     FString InProjectHash,
     FString InBridgeInstanceId,
     FUnrealMCPOperationLedger& InOperationLedger,
+    TSharedRef<FUnrealMCPAssetFamilyRegistry> InAssetFamilyRegistry,
     TSharedRef<FUnrealMCPExtensionRegistry> InExtensionRegistry,
     FUnrealMCPCommandHostHandlers InHostHandlers)
     : ProjectHash(MoveTemp(InProjectHash)), BridgeInstanceId(MoveTemp(InBridgeInstanceId)),
-      OperationLedger(InOperationLedger), ExtensionRegistry(MoveTemp(InExtensionRegistry))
+      OperationLedger(InOperationLedger), AssetFamilyRegistry(MoveTemp(InAssetFamilyRegistry)),
+      ExtensionRegistry(MoveTemp(InExtensionRegistry))
 {
+    if (!AssetFamilyRegistry->IsFrozen())
+    {
+        InitializationError = TEXT("Built-in asset-family registry must be frozen before command composition");
+        return;
+    }
     Build(MoveTemp(InHostHandlers));
 }
 
