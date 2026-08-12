@@ -22,6 +22,9 @@ Uses package version, immutable settings, `RootedFilesystem`, and safe configura
 - Notifications receive no response; malformed JSON/requests/params use JSON-RPC errors.
 - Expected file/type/missing-argument failures become MCP tool errors without terminating the process.
 - Unexpected request failures are reported on stderr and become bounded internal errors.
+- Standard input, output, and error are explicitly configured as strict UTF-8
+  so host locale encodings cannot corrupt protocol messages or terminate the
+  server when valid file content contains Unicode.
 - Each output line is compact JSON and stdout contains no diagnostics.
 
 ## Known pressure

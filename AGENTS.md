@@ -48,6 +48,11 @@ Keep responsibilities narrow and interfaces explicit. Do not include unrelated r
 - Confine filesystem access to configured roots and reject traversal and symlink escapes.
 - Keep tools few, schemas compact, results bounded, and errors stable.
 - Write protocol messages only to stdout; send diagnostics to stderr.
+- Configure stdio MCP stdin, stdout, and stderr explicitly as strict UTF-8.
+  On Windows, an inherited locale encoding can raise `UnicodeEncodeError` while
+  writing valid Unicode content, terminate the server, and appear to the host
+  as a hanging tool call. Cover this with a subprocess test that forces a
+  non-UTF-8 inherited encoding and returns an otherwise unencodable character.
 - Never commit secrets, tokens, or machine-specific paths.
 - Test MCP initialization, `tools/list`, and `tools/call` with LM Studio-compatible framing.
 

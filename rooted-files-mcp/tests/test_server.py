@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -33,7 +34,7 @@ class MCPServerTests(unittest.TestCase):
         initialized = self.request("initialize", {"protocolVersion": "2025-06-18"})
         self.assertEqual(initialized["result"]["protocolVersion"], "2025-06-18")
         self.assertEqual(
-            initialized["result"]["serverInfo"]["version"], "0.5.1"
+            initialized["result"]["serverInfo"]["version"], "0.5.2"
         )
         tools = self.request("tools/list")["result"]["tools"]
         self.assertEqual([tool["name"] for tool in tools], [
@@ -216,13 +217,19 @@ class StdioStartupTests(unittest.TestCase):
             "params": params or {},
         }) + "\n"
 
-    def launch(self, *args: str, stdin: str = "") -> subprocess.CompletedProcess[str]:
+    def launch(
+        self,
+        *args: str,
+        stdin: str = "",
+        env: dict[str, str] | None = None,
+    ) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
             [sys.executable, str(self.script), *args],
             input=stdin,
-            text=True,
+            encoding="utf-8",
             capture_output=True,
             check=False,
+            env=env,
         )
 
     def test_legacy_positional_root_stdio_launch(self) -> None:
@@ -341,6 +348,36 @@ class StdioStartupTests(unittest.TestCase):
         self.assertEqual(
             names, ["list_dir", "tree", "read_text", "write_text", "write_lines"]
         )
+
+    def test_stdio_forces_utf8_when_host_encoding_cannot_encode_content(self) -> None:
+        root = self.base / "unicode root"
+        root.mkdir()
+        expected = "# Unicode\narrow →\n"
+        (root / "unicode.md").write_text(
+            expected, encoding="utf-8", newline="\n"
+        )
+        env = os.environ.copy()
+        env["PYTHONIOENCODING"] = "ascii"
+
+        result = self.launch(
+            str(root),
+            "--mode",
+            "markdown",
+            stdin=self.message(
+                "tools/call",
+                {
+                    "name": "read_text",
+                    "arguments": {"path": "unicode.md#unicode"},
+                },
+            ),
+            env=env,
+        )
+
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(result.stderr, "")
+        response = json.loads(result.stdout)
+        self.assertNotIn("isError", response["result"])
+        self.assertEqual(response["result"]["content"][0]["text"], expected)
 
     def test_mcp_configuration_is_never_exposed_by_file_tools(self) -> None:
         workspace = self.base / "protected workspace"

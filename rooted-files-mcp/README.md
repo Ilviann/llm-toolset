@@ -284,7 +284,9 @@ The configuration must be a regular UTF-8 file no larger than 64 KiB. NUL
 bytes, malformed or duplicate INI entries, invalid booleans, unknown sections
 or keys, inaccessible roots, and configuration or root symlink escapes fail at
 startup. Diagnostics go to stderr; stdout remains reserved for JSON-RPC. A
-missing configuration file is allowed when a positional root is present.
+missing configuration file is allowed when a positional root is present. MCP
+stdin, stdout, and stderr are always strict UTF-8, independent of the host
+console or locale encoding.
 
 Example LM Studio MCP configuration for macOS or Linux:
 

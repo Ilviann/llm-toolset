@@ -83,6 +83,19 @@ WRITE_TOOLS = {"write_text", "write_lines"}
 KNOWN_TOOLS = READ_TOOLS | WRITE_TOOLS
 
 
+def _configure_stdio() -> None:
+    """Use MCP's UTF-8 text contract regardless of the host locale."""
+
+    for stream, newline in (
+        (sys.stdin, None),
+        (sys.stdout, "\n"),
+        (sys.stderr, "\n"),
+    ):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            reconfigure(encoding="utf-8", errors="strict", newline=newline)
+
+
 def build_tools(settings: Settings) -> list[dict[str, Any]]:
     """Build the compact catalog from immutable effective permissions."""
 
@@ -198,6 +211,7 @@ class MCPServer:
 
 
 def run(settings: Settings | str) -> None:
+    _configure_stdio()
     if not isinstance(settings, Settings):
         try:
             settings = Settings.for_root(settings)
@@ -221,6 +235,7 @@ def run(settings: Settings | str) -> None:
 
 
 def main() -> None:
+    _configure_stdio()
     parser = argparse.ArgumentParser(description="Root-confined text file MCP server")
     parser.add_argument("root", nargs="?", help="Folder exposed as MCP root")
     parser.add_argument(

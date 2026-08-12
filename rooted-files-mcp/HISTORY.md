@@ -3,6 +3,13 @@
 This file records released changes. Planned work is tracked separately in
 [`ROADMAP.md`](ROADMAP.md).
 
+## 0.5.2 — 2026-08-12
+
+- Fixed stdio responses terminating the server on Windows when valid file
+  content contained characters unavailable in the inherited console encoding.
+- Made MCP stdin, stdout, and stderr explicitly strict UTF-8 and added a
+  subprocess regression test under a forced ASCII inherited encoding.
+
 ## 0.5.1 — 2026-08-01
 
 - Added a Windows CMD launcher for the MCP definition helper.
