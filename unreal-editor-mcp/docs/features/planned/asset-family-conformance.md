@@ -16,7 +16,7 @@ release_track: support-tooling
 **Depends on:**
 
 - [`asset-inspection-adapters`](../completed/asset-inspection-adapters.md)
-- [`asset-authoring-kernel`](asset-authoring-kernel.md)
+- [`asset-authoring-kernel`](../completed/asset-authoring-kernel.md)
 - [`python-asset-family-catalog`](python-asset-family-catalog.md)
 
 ### Implementation

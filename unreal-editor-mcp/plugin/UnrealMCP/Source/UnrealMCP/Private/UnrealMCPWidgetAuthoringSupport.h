@@ -33,12 +33,16 @@ bool ResolveWidget(
     FUnrealMCPError& OutError);
 
 bool ApplyProperty(
+    FUnrealMCPBlueprintInspector& Inspector,
+    const FUnrealMCPRecord& Arguments,
     UWidgetBlueprint* Blueprint,
+    const FString& ObjectPath,
     UObject* Target,
     FProperty* Property,
     const TSharedPtr<FUnrealMCPValue>& Value,
     const FString& TransactionLabel,
     TSharedPtr<FUnrealMCPRecord>& OutChanged,
+    FString& OutSnapshot,
     FUnrealMCPError& OutError);
 
 TSharedRef<FUnrealMCPRecord> EncodeProperty(UObject* Target, FProperty* Property);

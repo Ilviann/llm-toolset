@@ -58,7 +58,7 @@ Keep the authoritative checklist in [`ROADMAP.md`](../../ROADMAP.md) synchronize
 - [`asset-inspection-adapters` — Asset inspection service decomposition](completed/asset-inspection-adapters.md) — Move existing core asset semantics into focused adapters.
   - Depends on:
     - `asset-family-foundation`
-- [`asset-authoring-kernel` — Shared asset creation and editing lifecycle](planned/asset-authoring-kernel.md) — Centralize bounded admission, transactions, persistence, read-back, cleanup, and rollback.
+- [`asset-authoring-kernel` — Shared asset creation and editing lifecycle](completed/asset-authoring-kernel.md) — Centralize bounded admission, transactions, persistence, read-back, cleanup, and rollback.
   - Depends on:
     - `asset-family-foundation`
 - [`python-asset-family-catalog` — Static Python asset-family catalog](planned/python-asset-family-catalog.md) — Compose approved schemas, access gates, mappings, and capabilities from one shipped catalog.

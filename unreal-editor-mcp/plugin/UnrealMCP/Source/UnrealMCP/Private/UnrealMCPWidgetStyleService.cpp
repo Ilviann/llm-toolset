@@ -206,17 +206,16 @@ bool FUnrealMCPWidgetStyleService::Execute(
     FProperty* Property =
         Widget->GetClass()->FindPropertyByName(FName(*PropertyName));
     TSharedPtr<FUnrealMCPRecord> Changed;
+    FString Snapshot;
     if (!ApplyProperty(
-            Blueprint, Widget, Property, *Value,
-            TEXT("Unreal MCP set widget presentation"), Changed, OutError))
+            Inspector, *Arguments, Blueprint, ObjectPath, Widget, Property, *Value,
+            TEXT("Unreal MCP set widget presentation"), Changed, Snapshot, OutError))
     {
         return false;
     }
 
     const FString Id = WidgetId(Blueprint, Widget);
-    FString Snapshot;
-    if (Id.IsEmpty()
-        || !ReadSnapshot(Inspector, ObjectPath, Snapshot, OutError))
+    if (Id.IsEmpty())
     {
         if (OutError.Code.IsEmpty())
         {

@@ -1,4 +1,5 @@
 #include "UnrealMCPGameDataService.h"
+#include "UnrealMCPAssetAuthoringKernel.h"
 #include "UnrealMCPGameDataInspectionBuilder.h"
 #include "UnrealMCPGameDataRequestValidation.h"
 
@@ -6,17 +7,13 @@
 #include "AssetRegistry/IAssetRegistry.h"
 #include "DataTableEditorUtils.h"
 #include "UnrealMCPWireTypes.h"
-#include "Editor.h"
 #include "EdGraphSchema_K2.h"
 #include "Engine/DataTable.h"
 #include "Factories/DataTableFactory.h"
 #include "HAL/FileManager.h"
-#include "HAL/PlatformFileManager.h"
 #include "Kismet2/StructureEditorUtils.h"
 #include "Misc/PackageName.h"
-#include "Misc/Paths.h"
 #include "Misc/SecureHash.h"
-#include "ScopedTransaction.h"
 #include "StructUtils/UserDefinedStruct.h"
 #include "UnrealMCPGameDataValueCodec.h"
 #include "UnrealMCPK2TypeCodec.h"
@@ -39,77 +36,6 @@ struct FStagedRow
     TSharedPtr<FStructOnScope> Data;
 };
 
-bool ContainsSymlink(const FString& Root, const FString& Candidate)
-{
-    IPlatformFile& Platform = FPlatformFileManager::Get().GetPlatformFile();
-    FString Current = Root; FPaths::NormalizeDirectoryName(Current);
-    if (Platform.IsSymlink(*Current) == ESymlinkResult::Symlink) return true;
-    FString Relative = Candidate; FPaths::NormalizeDirectoryName(Relative);
-    if (!FPaths::MakePathRelativeTo(Relative, *(Current + TEXT("/")))) return true;
-    TArray<FString> Segments; Relative.ParseIntoArray(Segments, TEXT("/"), true);
-    for (const FString& Segment : Segments)
-    {
-        Current /= Segment;
-        if ((Platform.FileExists(*Current) || Platform.DirectoryExists(*Current))
-            && Platform.IsSymlink(*Current) == ESymlinkResult::Symlink) return true;
-    }
-    return false;
-}
-
-bool ValidateMutationScope(const FString& PackageName, FUnrealMCPError& OutError)
-{
-    FString Target;
-    if (!FPackageName::TryConvertLongPackageNameToFilename(PackageName, Target))
-    { OutError = {TEXT("mutation_scope_denied"), TEXT("The content mount is unavailable")}; return false; }
-    Target = FPaths::ConvertRelativePathToFull(FPaths::GetPath(Target)); FPaths::NormalizeDirectoryName(Target);
-    if (PackageName.StartsWith(TEXT("/Game/")))
-    {
-        FString Root = FPaths::ConvertRelativePathToFull(FPaths::ProjectContentDir()); FPaths::NormalizeDirectoryName(Root);
-        if ((FPaths::IsSamePath(Target, Root) || FPaths::IsUnderDirectory(Target, Root)) && !ContainsSymlink(Root, Target)) return true;
-        OutError = {TEXT("mutation_scope_denied"), TEXT("Project content resolves outside its physical mount")}; return false;
-    }
-    const int32 Slash = PackageName.Find(TEXT("/"), ESearchCase::CaseSensitive, ESearchDir::FromStart, 1);
-    FString MountDirectory;
-    if (Slash == INDEX_NONE || !FPackageName::TryConvertLongPackageNameToFilename(PackageName.Left(Slash + 1), MountDirectory))
-    { OutError = {TEXT("mutation_scope_denied"), TEXT("Only project content and local project-plugin content are mutable")}; return false; }
-    FString PluginRoot = FPaths::ConvertRelativePathToFull(FPaths::ProjectPluginsDir()); FPaths::NormalizeDirectoryName(PluginRoot);
-    FString Mount = FPaths::ConvertRelativePathToFull(MountDirectory); FPaths::NormalizeDirectoryName(Mount);
-    if (!FPaths::IsUnderDirectory(Mount, PluginRoot) || !FPaths::IsUnderDirectory(Target, PluginRoot) || ContainsSymlink(PluginRoot, Target))
-    { OutError = {TEXT("mutation_scope_denied"), TEXT("Only symlink-free local project-plugin mounts are mutable")}; return false; }
-    FString Candidate = Mount;
-    while (FPaths::IsUnderDirectory(Candidate, PluginRoot))
-    {
-        TArray<FString> Descriptors; IFileManager::Get().FindFiles(Descriptors, *(Candidate / TEXT("*.uplugin")), true, false);
-        if (!Descriptors.IsEmpty()) return true;
-        const FString Parent = FPaths::GetPath(Candidate); if (Parent == Candidate) break; Candidate = Parent;
-    }
-    OutError = {TEXT("mutation_scope_denied"), TEXT("The content mount is not owned by a local project plugin")}; return false;
-}
-
-bool WritableFilename(const FString& PackageName, FString& OutFilename, FUnrealMCPError& OutError)
-{
-    if (!FPackageName::TryConvertLongPackageNameToFilename(PackageName, OutFilename, FPackageName::GetAssetPackageExtension()))
-    { OutError = {TEXT("mutation_scope_denied"), TEXT("The package does not resolve to mounted content")}; return false; }
-    FString Directory = FPaths::GetPath(OutFilename);
-    while (!Directory.IsEmpty() && !IFileManager::Get().DirectoryExists(*Directory))
-    { const FString Parent = FPaths::GetPath(Directory); if (Parent == Directory) break; Directory = Parent; }
-    if (Directory.IsEmpty() || IFileManager::Get().IsReadOnly(*Directory)
-        || (IFileManager::Get().FileExists(*OutFilename) && IFileManager::Get().IsReadOnly(*OutFilename)))
-    { OutError = {TEXT("write_conflict"), TEXT("The package destination is read-only or unavailable")}; return false; }
-    return true;
-}
-
-bool PackageExists(const FString& PackageName)
-{
-    if (FindPackage(nullptr, *PackageName) != nullptr
-        || FindObject<UObject>(nullptr, *RequestValidation::ObjectPathForPackage(PackageName)) != nullptr) return true;
-    FString Filename;
-    if (FPackageName::DoesPackageExist(PackageName, &Filename) || IFileManager::Get().FileExists(*Filename)) return true;
-    const FAssetData Existing = FModuleManager::LoadModuleChecked<FAssetRegistryModule>(TEXT("AssetRegistry"))
-        .Get().GetAssetByObjectPath(FSoftObjectPath(RequestValidation::ObjectPathForPackage(PackageName)));
-    return Existing.IsValid();
-}
-
 bool SaveAsset(UObject* Asset)
 {
     if (Asset == nullptr) return false;
@@ -118,18 +44,6 @@ bool SaveAsset(UObject* Asset)
     if (!UPackage::SavePackage(Asset->GetOutermost(), Asset, *Filename, Args)) return false;
     FModuleManager::LoadModuleChecked<FAssetRegistryModule>(TEXT("AssetRegistry")).Get().ScanModifiedAssetFiles({Filename});
     return true;
-}
-
-void CleanupCreation(UPackage* Package, UObject* Asset, const FString& Filename, bool bPublished)
-{
-    if (Asset != nullptr)
-    {
-        if (bPublished) FModuleManager::LoadModuleChecked<FAssetRegistryModule>(TEXT("AssetRegistry")).Get().AssetDeleted(Asset);
-        Asset->ClearFlags(RF_Public | RF_Standalone); Asset->Rename(nullptr, GetTransientPackage(), REN_DontCreateRedirectors | REN_NonTransactional);
-        Asset->MarkAsGarbage();
-    }
-    if (Package != nullptr) { Package->ClearFlags(RF_Public | RF_Standalone); Package->SetDirtyFlag(false); }
-    if (!Filename.IsEmpty() && IFileManager::Get().FileExists(*Filename)) IFileManager::Get().Delete(*Filename, false, true, true);
 }
 
 bool ResolveStruct(const FString& Path, UScriptStruct*& Out, FUnrealMCPError& OutError)
@@ -169,20 +83,6 @@ bool ReadStructMember(const TSharedPtr<FUnrealMCPRecord>& Object, FString& OutNa
             || !UnrealMCP::K2TypeCodec::DecodeDefault(OutType, *Default, OutDefault, OutError)) return false;
     }
     return true;
-}
-
-bool ValidateExpected(const FUnrealMCPRecord& Arguments, const FString& Actual, FUnrealMCPError& OutError)
-{
-    FString Expected;
-    if (!Arguments.TryGetStringField(TEXT("expected_snapshot"), Expected) || Expected.Len() != 40 || Expected != Actual)
-    { OutError = {TEXT("stale_precondition"), TEXT("The game-data structural snapshot changed")}; return false; }
-    return true;
-}
-
-bool RestoreAfterFailure(UObject* Asset, FUnrealMCPError& OutError)
-{
-    if (GEditor != nullptr && GEditor->UndoTransaction() && (Asset == nullptr || SaveAsset(Asset))) return true;
-    OutError = {TEXT("internal_error"), TEXT("The game-data mutation failed and explicit restoration was unavailable")}; return false;
 }
 
 bool StageRows(const UScriptStruct* Struct, const TArray<TSharedPtr<FUnrealMCPValue>>& Items, const UDataTable* Existing,
@@ -230,88 +130,113 @@ bool FUnrealMCPGameDataService::Edit(const TSharedPtr<FUnrealMCPRecord>& Argumen
         FString PackageName;
         if (!RequestValidation::NormalizePackagePath(InputPath, PackageName))
         { OutError = {TEXT("invalid_argument"), TEXT("create asset_path must be one exact bounded Unreal package path")}; return false; }
-        if (!ValidateMutationScope(PackageName, OutError)) return false;
-        if (PackageExists(PackageName))
-        { OutError = {TEXT("already_exists"), TEXT("The destination package or asset already exists")}; return false; }
-        FString Filename; if (!WritableFilename(PackageName, Filename, OutError)) return false;
-        const FString AssetName = FPackageName::GetLongPackageAssetName(PackageName); UPackage* Package = CreatePackage(*PackageName); UObject* Asset = nullptr;
-        if (Target == TEXT("user_defined_struct"))
+        const FString AssetName = FPackageName::GetLongPackageAssetName(PackageName);
+        FString OperationId;
+        Arguments->TryGetStringField(TEXT("operation_id"), OperationId);
+        FUnrealMCPAssetCreationRequest Request{
+            OperationId,
+            PackageName,
+            FUnrealMCPAssetAuthoringKernel::ObjectPathForPackage(PackageName)};
+        TArray<TSharedPtr<FUnrealMCPValue>> Records;
+        FUnrealMCPAssetCreationHooks Hooks;
+        Hooks.Create = [&](UPackage* Package, UObject*& OutAsset, FUnrealMCPError& Error)
         {
-            const TArray<TSharedPtr<FUnrealMCPValue>>* Items = nullptr;
-            if (!RequestValidation::HasOnlyFields(*Arguments, {TEXT("operation_id"), TEXT("target"), TEXT("operation"), TEXT("asset_path"), TEXT("members")})
-                || !Arguments->TryGetArrayField(TEXT("members"), Items) || Items == nullptr || Items->IsEmpty() || Items->Num() > UnrealMCP::MaxGameDataFields)
-            { CleanupCreation(Package, nullptr, Filename, false); OutError = {TEXT("invalid_schema"), TEXT("Struct creation requires one bounded non-empty members array")}; return false; }
-            struct FMember { FString Name; FEdGraphPinType Type; FString Default; FString Tooltip; };
-            TArray<FMember> Members; TSet<FString> Folded;
-            for (const TSharedPtr<FUnrealMCPValue>& Item : *Items)
+            if (Target == TEXT("user_defined_struct"))
             {
-                const TSharedPtr<FUnrealMCPRecord>* Object = nullptr; FMember Member;
-                if (!Item->TryGetObject(Object) || Object == nullptr || !ReadStructMember(*Object, Member.Name, Member.Type, Member.Default, Member.Tooltip, OutError)
-                    || Folded.Contains(Member.Name.ToLower()))
-                { CleanupCreation(Package, nullptr, Filename, false); if (OutError.Code.IsEmpty()) OutError = {TEXT("invalid_schema"), TEXT("Struct member names must be unique ignoring case")}; return false; }
-                Folded.Add(Member.Name.ToLower()); Members.Add(MoveTemp(Member));
+                const TArray<TSharedPtr<FUnrealMCPValue>>* Items = nullptr;
+                if (!RequestValidation::HasOnlyFields(*Arguments, {TEXT("operation_id"), TEXT("target"), TEXT("operation"), TEXT("asset_path"), TEXT("members")})
+                    || !Arguments->TryGetArrayField(TEXT("members"), Items) || Items == nullptr || Items->IsEmpty() || Items->Num() > UnrealMCP::MaxGameDataFields)
+                { Error = {TEXT("invalid_schema"), TEXT("Struct creation requires one bounded non-empty members array")}; return false; }
+                struct FMember { FString Name; FEdGraphPinType Type; FString Default; FString Tooltip; };
+                TArray<FMember> Members; TSet<FString> Folded;
+                for (const TSharedPtr<FUnrealMCPValue>& Item : *Items)
+                {
+                    const TSharedPtr<FUnrealMCPRecord>* Object = nullptr; FMember Member;
+                    if (!Item->TryGetObject(Object) || Object == nullptr || !ReadStructMember(*Object, Member.Name, Member.Type, Member.Default, Member.Tooltip, Error)
+                        || Folded.Contains(Member.Name.ToLower()))
+                    { if (Error.Code.IsEmpty()) Error = {TEXT("invalid_schema"), TEXT("Struct member names must be unique ignoring case")}; return false; }
+                    Folded.Add(Member.Name.ToLower()); Members.Add(MoveTemp(Member));
+                }
+                UUserDefinedStruct* Struct = FStructureEditorUtils::CreateUserDefinedStruct(Package, FName(*AssetName), RF_Public | RF_Standalone | RF_Transactional);
+                OutAsset = Struct;
+                if (Struct == nullptr) { Error = {TEXT("internal_error"), TEXT("Unreal could not create the user-defined struct")}; return false; }
+                const FGuid FirstId = FStructureEditorUtils::GetVarDesc(Struct)[0].VarGuid;
+                if (!FStructureEditorUtils::RenameVariable(Struct, FirstId, Members[0].Name)
+                    || !FStructureEditorUtils::ChangeVariableType(Struct, FirstId, Members[0].Type))
+                { Error = {TEXT("invalid_schema"), TEXT("Unreal rejected the first struct member")}; return false; }
+                if ((!Members[0].Default.IsEmpty() && !FStructureEditorUtils::ChangeVariableDefaultValue(Struct, FirstId, Members[0].Default))
+                    || (!Members[0].Tooltip.IsEmpty() && !FStructureEditorUtils::ChangeVariableTooltip(Struct, FirstId, Members[0].Tooltip)))
+                { Error = {TEXT("invalid_schema"), TEXT("Unreal rejected the first struct member default or tooltip")}; return false; }
+                for (int32 Index = 1; Index < Members.Num(); ++Index)
+                {
+                    if (!FStructureEditorUtils::AddVariable(Struct, Members[Index].Type)) { Error = {TEXT("invalid_schema"), TEXT("Unreal rejected a struct member type")}; return false; }
+                    FStructVariableDescription& Added = FStructureEditorUtils::GetVarDesc(Struct).Last();
+                    if (!FStructureEditorUtils::RenameVariable(Struct, Added.VarGuid, Members[Index].Name)
+                        || (!Members[Index].Default.IsEmpty() && !FStructureEditorUtils::ChangeVariableDefaultValue(Struct, Added.VarGuid, Members[Index].Default))
+                        || (!Members[Index].Tooltip.IsEmpty() && !FStructureEditorUtils::ChangeVariableTooltip(Struct, Added.VarGuid, Members[Index].Tooltip)))
+                    { Error = {TEXT("invalid_schema"), TEXT("Unreal rejected a struct member name, default, or tooltip")}; return false; }
+                }
+                FStructureEditorUtils::CompileStructure(Struct);
+                if (Struct->Status != UDSS_UpToDate) { Error = {TEXT("compile_failed"), TEXT("The new user-defined struct did not compile")}; return false; }
             }
-            UUserDefinedStruct* Struct = FStructureEditorUtils::CreateUserDefinedStruct(Package, FName(*AssetName), RF_Public | RF_Standalone | RF_Transactional);
-            Asset = Struct;
-            if (Struct == nullptr) { CleanupCreation(Package, nullptr, Filename, false); OutError = {TEXT("internal_error"), TEXT("Unreal could not create the user-defined struct")}; return false; }
-            const FGuid FirstId = FStructureEditorUtils::GetVarDesc(Struct)[0].VarGuid;
-            if (!FStructureEditorUtils::RenameVariable(Struct, FirstId, Members[0].Name)
-                || !FStructureEditorUtils::ChangeVariableType(Struct, FirstId, Members[0].Type))
-            { CleanupCreation(Package, Asset, Filename, false); OutError = {TEXT("invalid_schema"), TEXT("Unreal rejected the first struct member")}; return false; }
-            if ((!Members[0].Default.IsEmpty() && !FStructureEditorUtils::ChangeVariableDefaultValue(Struct, FirstId, Members[0].Default))
-                || (!Members[0].Tooltip.IsEmpty() && !FStructureEditorUtils::ChangeVariableTooltip(Struct, FirstId, Members[0].Tooltip)))
-            { CleanupCreation(Package, Asset, Filename, false); OutError = {TEXT("invalid_schema"), TEXT("Unreal rejected the first struct member default or tooltip")}; return false; }
-            for (int32 Index = 1; Index < Members.Num(); ++Index)
+            else
             {
-                if (!FStructureEditorUtils::AddVariable(Struct, Members[Index].Type)) { CleanupCreation(Package, Asset, Filename, false); OutError = {TEXT("invalid_schema"), TEXT("Unreal rejected a struct member type")}; return false; }
-                FStructVariableDescription& Added = FStructureEditorUtils::GetVarDesc(Struct).Last();
-                if (!FStructureEditorUtils::RenameVariable(Struct, Added.VarGuid, Members[Index].Name)
-                    || (!Members[Index].Default.IsEmpty() && !FStructureEditorUtils::ChangeVariableDefaultValue(Struct, Added.VarGuid, Members[Index].Default))
-                    || (!Members[Index].Tooltip.IsEmpty() && !FStructureEditorUtils::ChangeVariableTooltip(Struct, Added.VarGuid, Members[Index].Tooltip)))
-                { CleanupCreation(Package, Asset, Filename, false); OutError = {TEXT("invalid_schema"), TEXT("Unreal rejected a struct member name, default, or tooltip")}; return false; }
+                const TArray<TSharedPtr<FUnrealMCPValue>>* Rows = nullptr; FString RowStructPath; UScriptStruct* RowStruct = nullptr;
+                if (!RequestValidation::HasOnlyFields(*Arguments, {TEXT("operation_id"), TEXT("target"), TEXT("operation"), TEXT("asset_path"), TEXT("row_struct"), TEXT("rows")})
+                    || !Arguments->TryGetStringField(TEXT("row_struct"), RowStructPath) || !ResolveStruct(RowStructPath, RowStruct, Error)
+                    || (Arguments->HasField(TEXT("rows")) && !Arguments->TryGetArrayField(TEXT("rows"), Rows)))
+                { return false; }
+                TArray<TSharedPtr<FUnrealMCPValue>> Empty; TArray<FStagedRow> Staged;
+                if (!StageRows(RowStruct, Rows != nullptr ? *Rows : Empty, nullptr, Staged, Error)) { return false; }
+                UDataTableFactory* Factory = NewObject<UDataTableFactory>(); Factory->Struct = RowStruct;
+                UDataTable* Table = Cast<UDataTable>(Factory->FactoryCreateNew(UDataTable::StaticClass(), Package, FName(*AssetName), RF_Public | RF_Standalone | RF_Transactional, nullptr, GWarn)); OutAsset = Table;
+                if (Table == nullptr) { Error = {TEXT("internal_error"), TEXT("Unreal could not create the Data Table")}; return false; }
+                for (const FStagedRow& Row : Staged)
+                {
+                    uint8* Added = FDataTableEditorUtils::AddRow(Table, FName(*Row.Name));
+                    if (Added == nullptr) { Error = {TEXT("invalid_row"), TEXT("Unreal rejected a staged Data Table row")}; return false; }
+                    RowStruct->CopyScriptStruct(Added, Row.Data->GetStructMemory());
+                }
+                Table->HandleDataTableChanged();
             }
-            FStructureEditorUtils::CompileStructure(Struct);
-            if (Struct->Status != UDSS_UpToDate) { CleanupCreation(Package, Asset, Filename, false); OutError = {TEXT("compile_failed"), TEXT("The new user-defined struct did not compile")}; return false; }
-        }
-        else
+            return true;
+        };
+        Hooks.Persist = [](UObject* Asset, FUnrealMCPError& Error)
         {
-            const TArray<TSharedPtr<FUnrealMCPValue>>* Rows = nullptr; FString RowStructPath; UScriptStruct* RowStruct = nullptr;
-            if (!RequestValidation::HasOnlyFields(*Arguments, {TEXT("operation_id"), TEXT("target"), TEXT("operation"), TEXT("asset_path"), TEXT("row_struct"), TEXT("rows")})
-                || !Arguments->TryGetStringField(TEXT("row_struct"), RowStructPath) || !ResolveStruct(RowStructPath, RowStruct, OutError)
-                || (Arguments->HasField(TEXT("rows")) && !Arguments->TryGetArrayField(TEXT("rows"), Rows)))
-            { CleanupCreation(Package, nullptr, Filename, false); return false; }
-            TArray<TSharedPtr<FUnrealMCPValue>> Empty; TArray<FStagedRow> Staged;
-            if (!StageRows(RowStruct, Rows != nullptr ? *Rows : Empty, nullptr, Staged, OutError)) { CleanupCreation(Package, nullptr, Filename, false); return false; }
-            UDataTableFactory* Factory = NewObject<UDataTableFactory>(); Factory->Struct = RowStruct;
-            UDataTable* Table = Cast<UDataTable>(Factory->FactoryCreateNew(UDataTable::StaticClass(), Package, FName(*AssetName), RF_Public | RF_Standalone | RF_Transactional, nullptr, GWarn)); Asset = Table;
-            if (Table == nullptr) { CleanupCreation(Package, nullptr, Filename, false); OutError = {TEXT("internal_error"), TEXT("Unreal could not create the Data Table")}; return false; }
-            for (const FStagedRow& Row : Staged)
+            if (SaveAsset(Asset))
             {
-                uint8* Added = FDataTableEditorUtils::AddRow(Table, FName(*Row.Name));
-                if (Added == nullptr) { CleanupCreation(Package, Asset, Filename, false); OutError = {TEXT("invalid_row"), TEXT("Unreal rejected a staged Data Table row")}; return false; }
-                RowStruct->CopyScriptStruct(Added, Row.Data->GetStructMemory());
+                return true;
             }
-            Table->HandleDataTableChanged();
+            Error = {TEXT("save_failed"), TEXT("The new game-data package could not be saved")};
+            return false;
+        };
+        Hooks.ReadBack = [&](UObject* Asset, FString& OutSnapshot, FUnrealMCPError& Error)
+        {
+            const TSharedRef<FUnrealMCPRecord> InspectArgs = MakeShared<FUnrealMCPRecord>();
+            InspectArgs->SetStringField(TEXT("target"), Target);
+            InspectArgs->SetStringField(TEXT("asset_path"), Asset->GetPathName());
+            FString ActualTarget, ObjectPath, PackagePath; TArray<TSharedPtr<FUnrealMCPValue>> Schema; TSharedPtr<FUnrealMCPRecord> Metadata;
+            const bool bBuilt = UnrealMCP::GameDataInspectionBuilder::Build(
+                *InspectArgs, ActualTarget, ObjectPath, PackagePath, Records, Schema,
+                OutSnapshot, Metadata, Error);
+            return bBuilt;
+        };
+        FUnrealMCPAssetCreationResult Creation;
+        if (!FUnrealMCPAssetAuthoringKernel::ExecuteCreation(
+                Request, Hooks, Creation, OutError))
+        {
+            return false;
         }
-        if (!SaveAsset(Asset)) { CleanupCreation(Package, Asset, Filename, false); OutError = {TEXT("save_failed"), TEXT("The new game-data package could not be saved")}; return false; }
-        FModuleManager::LoadModuleChecked<FAssetRegistryModule>(TEXT("AssetRegistry")).Get().AssetCreated(Asset);
-        const TSharedRef<FUnrealMCPRecord> InspectArgs = MakeShared<FUnrealMCPRecord>(); InspectArgs->SetStringField(TEXT("target"), Target); InspectArgs->SetStringField(TEXT("asset_path"), Asset->GetPathName());
-        FString ActualTarget, ObjectPath, PackagePath, Snapshot; TArray<TSharedPtr<FUnrealMCPValue>> Records, Schema; TSharedPtr<FUnrealMCPRecord> Metadata;
-        if (!UnrealMCP::GameDataInspectionBuilder::Build(
-            *InspectArgs, ActualTarget, ObjectPath, PackagePath, Records, Schema, Snapshot, Metadata, OutError))
-        { CleanupCreation(Package, Asset, Filename, true); return false; }
-        const TSharedRef<FUnrealMCPRecord> Result = InspectionBuilder::BuildEditResult(Target, ObjectPath, Snapshot); Result->SetStringField(TEXT("operation"), TEXT("create"));
+        const TSharedRef<FUnrealMCPRecord> Result = InspectionBuilder::BuildEditResult(Target, Creation.ObjectPath, Creation.SnapshotId); Result->SetStringField(TEXT("operation"), TEXT("create"));
         Result->SetNumberField(TEXT("changed_count"), Records.Num()); OutResult = Result; return true;
     }
 
     FString ObjectPath, PackageName;
     if (!RequestValidation::NormalizeAssetPath(InputPath, ObjectPath, PackageName)) { OutError = {TEXT("invalid_argument"), TEXT("asset_path must be one exact bounded Unreal asset path")}; return false; }
-    if (!ValidateMutationScope(PackageName, OutError)) return false;
     const TSharedRef<FUnrealMCPRecord> InspectArgs = MakeShared<FUnrealMCPRecord>(); InspectArgs->SetStringField(TEXT("target"), Target); InspectArgs->SetStringField(TEXT("asset_path"), ObjectPath);
     FString ActualTarget, ActualObject, ActualPackage, BeforeSnapshot; TArray<TSharedPtr<FUnrealMCPValue>> BeforeRecords, BeforeSchema; TSharedPtr<FUnrealMCPRecord> BeforeMetadata;
     if (!UnrealMCP::GameDataInspectionBuilder::Build(
-            *InspectArgs, ActualTarget, ActualObject, ActualPackage, BeforeRecords, BeforeSchema, BeforeSnapshot, BeforeMetadata, OutError)
-        || !ValidateExpected(*Arguments, BeforeSnapshot, OutError)) return false;
+            *InspectArgs, ActualTarget, ActualObject, ActualPackage, BeforeRecords, BeforeSchema, BeforeSnapshot, BeforeMetadata, OutError)) return false;
     UObject* Asset = StaticLoadObject(UObject::StaticClass(), nullptr, *ObjectPath, nullptr, LOAD_NoWarn | LOAD_Quiet);
     if (Target == TEXT("user_defined_struct") && Operation != TEXT("add_member"))
     {
@@ -346,150 +271,171 @@ bool FUnrealMCPGameDataService::Edit(const TSharedPtr<FUnrealMCPRecord>& Argumen
             }
         }
     }
-    FScopedTransaction Transaction(NSLOCTEXT("UnrealMCP", "GameDataEdit", "Unreal MCP Game Data Edit")); Asset->Modify();
     TArray<FString> ChangedNames;
-    if (Target == TEXT("user_defined_struct"))
+    FUnrealMCPAssetEditHooks Hooks;
+    Hooks.Mutate = [&](UObject*, FUnrealMCPError&) -> bool
     {
-        UUserDefinedStruct* Struct = CastChecked<UUserDefinedStruct>(Asset); FGuid MemberId; FStructVariableDescription* Member = nullptr; FString ExistingMemberName;
-        if (Operation != TEXT("add_member"))
+        struct FKernelManagedTransaction { void Cancel() {} } Transaction;
+        if (Target == TEXT("user_defined_struct"))
         {
-            if (!RequestValidation::ParseGuidField(*Arguments, TEXT("member_id"), MemberId, OutError)) { Transaction.Cancel(); return false; }
-            Member = FStructureEditorUtils::GetVarDescByGuid(Struct, MemberId);
-            if (Member == nullptr) { Transaction.Cancel(); OutError = {TEXT("invalid_schema"), TEXT("The struct member identity is missing or stale")}; return false; }
-            ExistingMemberName = Member->FriendlyName;
-        }
-        bool bChanged = false;
-        if (Operation == TEXT("rename_member"))
-        {
-            FString Name; bChanged = Arguments->TryGetStringField(TEXT("new_name"), Name) && RequestValidation::ValidName(Name) && FStructureEditorUtils::RenameVariable(Struct, MemberId, Name); ChangedNames.Add(Name);
-        }
-        else if (Operation == TEXT("update_member"))
-        {
-            FString Field; Arguments->TryGetStringField(TEXT("field"), Field);
-            if (Field == TEXT("default"))
+            UUserDefinedStruct* Struct = CastChecked<UUserDefinedStruct>(Asset); FGuid MemberId; FStructVariableDescription* Member = nullptr; FString ExistingMemberName;
+            if (Operation != TEXT("add_member"))
             {
-                const TSharedPtr<FUnrealMCPRecord>* Default = nullptr; FString Text;
-                bChanged = Arguments->TryGetObjectField(TEXT("default"), Default) && Default != nullptr
-                    && UnrealMCP::K2TypeCodec::DecodeDefault(Member->ToPinType(), *Default, Text, OutError)
-                    && FStructureEditorUtils::ChangeVariableDefaultValue(Struct, MemberId, Text);
+                if (!RequestValidation::ParseGuidField(*Arguments, TEXT("member_id"), MemberId, OutError)) { Transaction.Cancel(); return false; }
+                Member = FStructureEditorUtils::GetVarDescByGuid(Struct, MemberId);
+                if (Member == nullptr) { Transaction.Cancel(); OutError = {TEXT("invalid_schema"), TEXT("The struct member identity is missing or stale")}; return false; }
+                ExistingMemberName = Member->FriendlyName;
             }
-            else if (Field == TEXT("type"))
+            bool bChanged = false;
+            if (Operation == TEXT("rename_member"))
             {
-                const TSharedPtr<FUnrealMCPRecord>* Type = nullptr; FEdGraphPinType PinType;
-                bChanged = Arguments->TryGetObjectField(TEXT("type"), Type) && Type != nullptr
-                    && UnrealMCP::K2TypeCodec::DecodeType(*Type, PinType, OutError) && !PinType.bIsReference && !PinType.bIsConst
-                    && FStructureEditorUtils::ChangeVariableType(Struct, MemberId, PinType);
+                FString Name; bChanged = Arguments->TryGetStringField(TEXT("new_name"), Name) && RequestValidation::ValidName(Name) && FStructureEditorUtils::RenameVariable(Struct, MemberId, Name); ChangedNames.Add(Name);
             }
-            ChangedNames.Add(ExistingMemberName);
-        }
-        else if (Operation == TEXT("reorder_member"))
-        {
-            FGuid Relative; FString Position;
-            bChanged = RequestValidation::ParseGuidField(*Arguments, TEXT("relative_to_member_id"), Relative, OutError)
-                && Arguments->TryGetStringField(TEXT("position"), Position) && MemberId != Relative
-                && FStructureEditorUtils::MoveVariable(Struct, MemberId, Relative,
-                    Position == TEXT("above") ? FStructureEditorUtils::PositionAbove : FStructureEditorUtils::PositionBelow);
-            ChangedNames.Add(ExistingMemberName);
-        }
-        else if (Operation == TEXT("remove_member"))
-        {
-            ChangedNames.Add(ExistingMemberName); bChanged = FStructureEditorUtils::RemoveVariable(Struct, MemberId);
-        }
-        else if (Operation == TEXT("add_member"))
-        {
-            const TSharedPtr<FUnrealMCPRecord>* MemberObject = nullptr; FString Name, Default, Tooltip; FEdGraphPinType Type;
-            if (!Arguments->TryGetObjectField(TEXT("member"), MemberObject) || MemberObject == nullptr || !ReadStructMember(*MemberObject, Name, Type, Default, Tooltip, OutError)) { Transaction.Cancel(); return false; }
-            bChanged = FStructureEditorUtils::AddVariable(Struct, Type);
-            if (bChanged)
+            else if (Operation == TEXT("update_member"))
             {
-                const FGuid Added = FStructureEditorUtils::GetVarDesc(Struct).Last().VarGuid;
-                bChanged = FStructureEditorUtils::RenameVariable(Struct, Added, Name)
-                    && (Default.IsEmpty() || FStructureEditorUtils::ChangeVariableDefaultValue(Struct, Added, Default))
-                    && (Tooltip.IsEmpty() || FStructureEditorUtils::ChangeVariableTooltip(Struct, Added, Tooltip));
+                FString Field; Arguments->TryGetStringField(TEXT("field"), Field);
+                if (Field == TEXT("default"))
+                {
+                    const TSharedPtr<FUnrealMCPRecord>* Default = nullptr; FString Text;
+                    bChanged = Arguments->TryGetObjectField(TEXT("default"), Default) && Default != nullptr
+                        && UnrealMCP::K2TypeCodec::DecodeDefault(Member->ToPinType(), *Default, Text, OutError)
+                        && FStructureEditorUtils::ChangeVariableDefaultValue(Struct, MemberId, Text);
+                }
+                else if (Field == TEXT("type"))
+                {
+                    const TSharedPtr<FUnrealMCPRecord>* Type = nullptr; FEdGraphPinType PinType;
+                    bChanged = Arguments->TryGetObjectField(TEXT("type"), Type) && Type != nullptr
+                        && UnrealMCP::K2TypeCodec::DecodeType(*Type, PinType, OutError) && !PinType.bIsReference && !PinType.bIsConst
+                        && FStructureEditorUtils::ChangeVariableType(Struct, MemberId, PinType);
+                }
+                ChangedNames.Add(ExistingMemberName);
             }
-            ChangedNames.Add(Name);
-        }
-        if (!bChanged || Struct->Status != UDSS_UpToDate)
-        { Transaction.Cancel(); OutError = OutError.Code.IsEmpty() ? FUnrealMCPError{TEXT("no_change"), TEXT("Unreal rejected the struct edit or it made no change")} : OutError; return false; }
-    }
-    else
-    {
-        UDataTable* Table = CastChecked<UDataTable>(Asset); UScriptStruct* Struct = const_cast<UScriptStruct*>(Table->GetRowStruct());
-        if (Operation == TEXT("rename_row"))
-        {
-            FString Old, New;
-            if (!Arguments->TryGetStringField(TEXT("row_name"), Old) || !Arguments->TryGetStringField(TEXT("new_row_name"), New) || !RequestValidation::ValidName(Old) || !RequestValidation::ValidName(New)
-                || Table->FindRowUnchecked(FName(*Old)) == nullptr || Table->FindRowUnchecked(FName(*New)) != nullptr || !FDataTableEditorUtils::RenameRow(Table, FName(*Old), FName(*New)))
-            { Transaction.Cancel(); OutError = {TEXT("invalid_row"), TEXT("The row rename source or destination is invalid")}; return false; }
-            ChangedNames.Add(New);
-        }
-        else if (Operation == TEXT("remove_row"))
-        {
-            FString Name;
-            if (!Arguments->TryGetStringField(TEXT("row_name"), Name) || !RequestValidation::ValidName(Name) || !FDataTableEditorUtils::RemoveRow(Table, FName(*Name)))
-            { Transaction.Cancel(); OutError = {TEXT("invalid_row"), TEXT("The row to remove does not exist")}; return false; }
-            ChangedNames.Add(Name);
+            else if (Operation == TEXT("reorder_member"))
+            {
+                FGuid Relative; FString Position;
+                bChanged = RequestValidation::ParseGuidField(*Arguments, TEXT("relative_to_member_id"), Relative, OutError)
+                    && Arguments->TryGetStringField(TEXT("position"), Position) && MemberId != Relative
+                    && FStructureEditorUtils::MoveVariable(Struct, MemberId, Relative,
+                        Position == TEXT("above") ? FStructureEditorUtils::PositionAbove : FStructureEditorUtils::PositionBelow);
+                ChangedNames.Add(ExistingMemberName);
+            }
+            else if (Operation == TEXT("remove_member"))
+            {
+                ChangedNames.Add(ExistingMemberName); bChanged = FStructureEditorUtils::RemoveVariable(Struct, MemberId);
+            }
+            else if (Operation == TEXT("add_member"))
+            {
+                const TSharedPtr<FUnrealMCPRecord>* MemberObject = nullptr; FString Name, Default, Tooltip; FEdGraphPinType Type;
+                if (!Arguments->TryGetObjectField(TEXT("member"), MemberObject) || MemberObject == nullptr || !ReadStructMember(*MemberObject, Name, Type, Default, Tooltip, OutError)) { Transaction.Cancel(); return false; }
+                bChanged = FStructureEditorUtils::AddVariable(Struct, Type);
+                if (bChanged)
+                {
+                    const FGuid Added = FStructureEditorUtils::GetVarDesc(Struct).Last().VarGuid;
+                    bChanged = FStructureEditorUtils::RenameVariable(Struct, Added, Name)
+                        && (Default.IsEmpty() || FStructureEditorUtils::ChangeVariableDefaultValue(Struct, Added, Default))
+                        && (Tooltip.IsEmpty() || FStructureEditorUtils::ChangeVariableTooltip(Struct, Added, Tooltip));
+                }
+                ChangedNames.Add(Name);
+            }
+            if (!bChanged || Struct->Status != UDSS_UpToDate)
+            { Transaction.Cancel(); OutError = OutError.Code.IsEmpty() ? FUnrealMCPError{TEXT("no_change"), TEXT("Unreal rejected the struct edit or it made no change")} : OutError; return false; }
         }
         else
         {
-            TArray<TSharedPtr<FUnrealMCPValue>> Writes; TArray<FString> Removes;
-            if (Operation == TEXT("add_row") || Operation == TEXT("replace_row"))
+            UDataTable* Table = CastChecked<UDataTable>(Asset); UScriptStruct* Struct = const_cast<UScriptStruct*>(Table->GetRowStruct());
+            if (Operation == TEXT("rename_row"))
             {
-                const TSharedRef<FUnrealMCPRecord> Write = MakeShared<FUnrealMCPRecord>(); FString Name; const TSharedPtr<FUnrealMCPRecord>* Values = nullptr; bool bPreserve = false;
-                if (!Arguments->TryGetStringField(TEXT("row_name"), Name) || !Arguments->TryGetObjectField(TEXT("values"), Values) || Values == nullptr
-                    || (Arguments->HasField(TEXT("preserve_unspecified")) && !Arguments->TryGetBoolField(TEXT("preserve_unspecified"), bPreserve)))
-                { Transaction.Cancel(); OutError = {TEXT("invalid_row"), TEXT("The row write is invalid")}; return false; }
-                Write->SetStringField(TEXT("row_name"), Name); Write->SetObjectField(TEXT("values"), *Values); Write->SetBoolField(TEXT("preserve_unspecified"), bPreserve);
-                Writes.Add(MakeShared<FUnrealMCPValueObject>(Write));
-                const bool bExists = Table->FindRowUnchecked(FName(*Name)) != nullptr;
-                if ((Operation == TEXT("add_row") && bExists) || (Operation == TEXT("replace_row") && !bExists))
-                { Transaction.Cancel(); OutError = {TEXT("invalid_row"), Operation == TEXT("add_row") ? TEXT("The row already exists") : TEXT("The row does not exist")}; return false; }
+                FString Old, New;
+                if (!Arguments->TryGetStringField(TEXT("row_name"), Old) || !Arguments->TryGetStringField(TEXT("new_row_name"), New) || !RequestValidation::ValidName(Old) || !RequestValidation::ValidName(New)
+                    || Table->FindRowUnchecked(FName(*Old)) == nullptr || Table->FindRowUnchecked(FName(*New)) != nullptr || !FDataTableEditorUtils::RenameRow(Table, FName(*Old), FName(*New)))
+                { Transaction.Cancel(); OutError = {TEXT("invalid_row"), TEXT("The row rename source or destination is invalid")}; return false; }
+                ChangedNames.Add(New);
             }
-            else if (Operation == TEXT("batch"))
+            else if (Operation == TEXT("remove_row"))
             {
-                const TArray<TSharedPtr<FUnrealMCPValue>>* Upserts = nullptr; const TArray<TSharedPtr<FUnrealMCPValue>>* RemoveValues = nullptr;
-                if (!Arguments->TryGetArrayField(TEXT("upserts"), Upserts) || Upserts == nullptr || !Arguments->TryGetArrayField(TEXT("remove_rows"), RemoveValues) || RemoveValues == nullptr
-                    || Upserts->Num() + RemoveValues->Num() > UnrealMCP::MaxGameDataBatchRows)
-                { Transaction.Cancel(); OutError = {TEXT("data_limit_exceeded"), TEXT("The atomic row batch exceeds the configured limit")}; return false; }
-                Writes = *Upserts; TSet<FName> Seen;
-                for (const TSharedPtr<FUnrealMCPValue>& Value : *RemoveValues)
+                FString Name;
+                if (!Arguments->TryGetStringField(TEXT("row_name"), Name) || !RequestValidation::ValidName(Name) || !FDataTableEditorUtils::RemoveRow(Table, FName(*Name)))
+                { Transaction.Cancel(); OutError = {TEXT("invalid_row"), TEXT("The row to remove does not exist")}; return false; }
+                ChangedNames.Add(Name);
+            }
+            else
+            {
+                TArray<TSharedPtr<FUnrealMCPValue>> Writes; TArray<FString> Removes;
+                if (Operation == TEXT("add_row") || Operation == TEXT("replace_row"))
                 {
-                    FString Name; if (!Value->TryGetString(Name) || !RequestValidation::ValidName(Name) || Seen.Contains(FName(*Name)) || Table->FindRowUnchecked(FName(*Name)) == nullptr)
-                    { Transaction.Cancel(); OutError = {TEXT("invalid_row"), TEXT("A batch removal is missing, duplicate, or case-conflicting")}; return false; }
-                    Seen.Add(FName(*Name)); Removes.Add(Name);
+                    const TSharedRef<FUnrealMCPRecord> Write = MakeShared<FUnrealMCPRecord>(); FString Name; const TSharedPtr<FUnrealMCPRecord>* Values = nullptr; bool bPreserve = false;
+                    if (!Arguments->TryGetStringField(TEXT("row_name"), Name) || !Arguments->TryGetObjectField(TEXT("values"), Values) || Values == nullptr
+                        || (Arguments->HasField(TEXT("preserve_unspecified")) && !Arguments->TryGetBoolField(TEXT("preserve_unspecified"), bPreserve)))
+                    { Transaction.Cancel(); OutError = {TEXT("invalid_row"), TEXT("The row write is invalid")}; return false; }
+                    Write->SetStringField(TEXT("row_name"), Name); Write->SetObjectField(TEXT("values"), *Values); Write->SetBoolField(TEXT("preserve_unspecified"), bPreserve);
+                    Writes.Add(MakeShared<FUnrealMCPValueObject>(Write));
+                    const bool bExists = Table->FindRowUnchecked(FName(*Name)) != nullptr;
+                    if ((Operation == TEXT("add_row") && bExists) || (Operation == TEXT("replace_row") && !bExists))
+                    { Transaction.Cancel(); OutError = {TEXT("invalid_row"), Operation == TEXT("add_row") ? TEXT("The row already exists") : TEXT("The row does not exist")}; return false; }
                 }
-                for (const TSharedPtr<FUnrealMCPValue>& Value : Writes)
+                else if (Operation == TEXT("batch"))
                 {
-                    const TSharedPtr<FUnrealMCPRecord>* Object = nullptr; FString Name;
-                    if (!Value->TryGetObject(Object) || Object == nullptr || !(*Object)->TryGetStringField(TEXT("row_name"), Name) || Seen.Contains(FName(*Name)))
-                    { Transaction.Cancel(); OutError = {TEXT("invalid_row"), TEXT("Batch upserts and removals overlap or conflict")}; return false; }
-                    Seen.Add(FName(*Name));
+                    const TArray<TSharedPtr<FUnrealMCPValue>>* Upserts = nullptr; const TArray<TSharedPtr<FUnrealMCPValue>>* RemoveValues = nullptr;
+                    if (!Arguments->TryGetArrayField(TEXT("upserts"), Upserts) || Upserts == nullptr || !Arguments->TryGetArrayField(TEXT("remove_rows"), RemoveValues) || RemoveValues == nullptr
+                        || Upserts->Num() + RemoveValues->Num() > UnrealMCP::MaxGameDataBatchRows)
+                    { Transaction.Cancel(); OutError = {TEXT("data_limit_exceeded"), TEXT("The atomic row batch exceeds the configured limit")}; return false; }
+                    Writes = *Upserts; TSet<FName> Seen;
+                    for (const TSharedPtr<FUnrealMCPValue>& Value : *RemoveValues)
+                    {
+                        FString Name; if (!Value->TryGetString(Name) || !RequestValidation::ValidName(Name) || Seen.Contains(FName(*Name)) || Table->FindRowUnchecked(FName(*Name)) == nullptr)
+                        { Transaction.Cancel(); OutError = {TEXT("invalid_row"), TEXT("A batch removal is missing, duplicate, or case-conflicting")}; return false; }
+                        Seen.Add(FName(*Name)); Removes.Add(Name);
+                    }
+                    for (const TSharedPtr<FUnrealMCPValue>& Value : Writes)
+                    {
+                        const TSharedPtr<FUnrealMCPRecord>* Object = nullptr; FString Name;
+                        if (!Value->TryGetObject(Object) || Object == nullptr || !(*Object)->TryGetStringField(TEXT("row_name"), Name) || Seen.Contains(FName(*Name)))
+                        { Transaction.Cancel(); OutError = {TEXT("invalid_row"), TEXT("Batch upserts and removals overlap or conflict")}; return false; }
+                        Seen.Add(FName(*Name));
+                    }
                 }
+                else { Transaction.Cancel(); OutError = {TEXT("invalid_argument"), TEXT("Unknown Data Table row operation")}; return false; }
+                TArray<FStagedRow> Staged; if (!StageRows(Struct, Writes, Table, Staged, OutError)) { Transaction.Cancel(); return false; }
+                for (const FString& Name : Removes) { if (!FDataTableEditorUtils::RemoveRow(Table, FName(*Name))) { Transaction.Cancel(); OutError = {TEXT("internal_error"), TEXT("A prevalidated row removal failed")}; return false; } ChangedNames.Add(Name); }
+                FDataTableEditorUtils::BroadcastPreChange(Table, FDataTableEditorUtils::EDataTableChangeInfo::RowData); Table->Modify();
+                for (const FStagedRow& Row : Staged)
+                {
+                    uint8* Destination = Table->FindRowUnchecked(FName(*Row.Name));
+                    if (Destination == nullptr) Destination = FDataTableEditorUtils::AddRow(Table, FName(*Row.Name));
+                    if (Destination == nullptr) { Transaction.Cancel(); OutError = {TEXT("internal_error"), TEXT("A prevalidated row upsert failed")}; return false; }
+                    Struct->CopyScriptStruct(Destination, Row.Data->GetStructMemory()); Table->HandleDataTableChanged(FName(*Row.Name)); ChangedNames.Add(Row.Name);
+                }
+                FDataTableEditorUtils::BroadcastPostChange(Table, FDataTableEditorUtils::EDataTableChangeInfo::RowData);
             }
-            else { Transaction.Cancel(); OutError = {TEXT("invalid_argument"), TEXT("Unknown Data Table row operation")}; return false; }
-            TArray<FStagedRow> Staged; if (!StageRows(Struct, Writes, Table, Staged, OutError)) { Transaction.Cancel(); return false; }
-            for (const FString& Name : Removes) { if (!FDataTableEditorUtils::RemoveRow(Table, FName(*Name))) { Transaction.Cancel(); OutError = {TEXT("internal_error"), TEXT("A prevalidated row removal failed")}; return false; } ChangedNames.Add(Name); }
-            FDataTableEditorUtils::BroadcastPreChange(Table, FDataTableEditorUtils::EDataTableChangeInfo::RowData); Table->Modify();
-            for (const FStagedRow& Row : Staged)
-            {
-                uint8* Destination = Table->FindRowUnchecked(FName(*Row.Name));
-                if (Destination == nullptr) Destination = FDataTableEditorUtils::AddRow(Table, FName(*Row.Name));
-                if (Destination == nullptr) { Transaction.Cancel(); OutError = {TEXT("internal_error"), TEXT("A prevalidated row upsert failed")}; return false; }
-                Struct->CopyScriptStruct(Destination, Row.Data->GetStructMemory()); Table->HandleDataTableChanged(FName(*Row.Name)); ChangedNames.Add(Row.Name);
-            }
-            FDataTableEditorUtils::BroadcastPostChange(Table, FDataTableEditorUtils::EDataTableChangeInfo::RowData);
         }
-    }
-    if (!SaveAsset(Asset))
+        return true;
+    };
+    Hooks.Persist = [](UObject* TargetAsset, FUnrealMCPError& Error)
     {
-        Transaction.Cancel(); OutError = {TEXT("save_failed"), TEXT("The game-data mutation could not be saved")}; RestoreAfterFailure(Asset, OutError); return false;
+        if (SaveAsset(TargetAsset)) return true;
+        Error = {TEXT("save_failed"), TEXT("The game-data mutation could not be saved")};
+        return false;
+    };
+    Hooks.ReadBack = [&](UObject*, FString& Snapshot, FUnrealMCPError& Error)
+    {
+        FString ReadTarget, ReadObject, ReadPackage; TArray<TSharedPtr<FUnrealMCPValue>> ReadRecords, ReadSchema; TSharedPtr<FUnrealMCPRecord> ReadMetadata;
+        return UnrealMCP::GameDataInspectionBuilder::Build(
+            *InspectArgs, ReadTarget, ReadObject, ReadPackage, ReadRecords,
+            ReadSchema, Snapshot, ReadMetadata, Error);
+    };
+    FString OperationId, ExpectedSnapshot;
+    Arguments->TryGetStringField(TEXT("operation_id"), OperationId);
+    Arguments->TryGetStringField(TEXT("expected_snapshot"), ExpectedSnapshot);
+    FUnrealMCPAssetEditRequest EditRequest{
+        OperationId, ObjectPath, ExpectedSnapshot,
+        TEXT("Unreal MCP Game Data Edit"), Asset, true, true};
+    FUnrealMCPAssetEditResult EditResult;
+    if (!FUnrealMCPAssetAuthoringKernel::ExecuteEdit(
+            EditRequest, Hooks, EditResult, OutError))
+    {
+        return false;
     }
-    FString AfterTarget, AfterObject, AfterPackage, AfterSnapshot; TArray<TSharedPtr<FUnrealMCPValue>> AfterRecords, AfterSchema; TSharedPtr<FUnrealMCPRecord> AfterMetadata;
-    if (!UnrealMCP::GameDataInspectionBuilder::Build(
-            *InspectArgs, AfterTarget, AfterObject, AfterPackage, AfterRecords, AfterSchema, AfterSnapshot, AfterMetadata, OutError)
-        || AfterSnapshot == BeforeSnapshot)
-    { Transaction.Cancel(); if (OutError.Code.IsEmpty()) OutError = {TEXT("internal_error"), TEXT("Game-data read-back did not verify a changed snapshot")}; RestoreAfterFailure(Asset, OutError); return false; }
-    const TSharedRef<FUnrealMCPRecord> Result = InspectionBuilder::BuildEditResult(Target, AfterObject, AfterSnapshot); Result->SetStringField(TEXT("operation"), Operation);
+    const TSharedRef<FUnrealMCPRecord> Result = InspectionBuilder::BuildEditResult(Target, ObjectPath, EditResult.SnapshotId); Result->SetStringField(TEXT("operation"), Operation);
     TArray<TSharedPtr<FUnrealMCPValue>> Names; for (const FString& Name : ChangedNames) Names.Add(MakeShared<FUnrealMCPValueString>(Name));
     Result->SetArrayField(TEXT("changed_names"), Names); Result->SetNumberField(TEXT("changed_count"), ChangedNames.Num()); OutResult = Result; return true;
 }

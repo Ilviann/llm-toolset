@@ -15,7 +15,7 @@ released_in: null
 **Depends on:**
 
 - [`commonui-assets-inspect`](../completed/commonui-assets-inspect.md)
-- [`asset-authoring-kernel`](asset-authoring-kernel.md)
+- [`asset-authoring-kernel`](../completed/asset-authoring-kernel.md)
 - [`companion-asset-adapters`](companion-asset-adapters.md)
 
 **Planning note:** Before implementation, freeze creation and mutation operations separately for each inspected asset family against the supported Unreal Engine build and public CommonUI editor APIs. Inspection support does not imply that a family is safe to create or update.

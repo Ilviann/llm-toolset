@@ -15,7 +15,7 @@ released_in: null
 **Depends on:**
 
 - [`gas-gameplay-effects-inspect`](../completed/gas-gameplay-effects-inspect.md)
-- [`asset-authoring-kernel`](asset-authoring-kernel.md)
+- [`asset-authoring-kernel`](../completed/asset-authoring-kernel.md)
 - [`companion-asset-adapters`](companion-asset-adapters.md)
 
 ### Creation and update implementation

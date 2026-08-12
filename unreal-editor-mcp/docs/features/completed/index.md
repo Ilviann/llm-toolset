@@ -4,6 +4,7 @@
 - [`native-command-catalog` — Fixed native command routing and capabilities](native-command-catalog.md).
 - [`asset-family-foundation` — Built-in asset-family adapter contracts](asset-family-foundation.md).
 - [`asset-inspection-adapters` — Asset inspection service decomposition](asset-inspection-adapters.md).
+- [`asset-authoring-kernel` — Shared asset creation and editing lifecycle](asset-authoring-kernel.md).
 - [`asset-inspect-core` — General asset inspection foundation and gameplay Blueprints](asset-inspect-core.md).
 - [`companion-plugins` — Companion plugin extension foundation](companion-plugins.md).
 - [`gas-ability-blueprints-inspect` — Gameplay Ability Blueprint inspection](gas-ability-blueprints-inspect.md).

@@ -6,6 +6,7 @@ References in this directory are grouped by the component that owns the contract
 - [`editor-bridge/`](editor-bridge/index.md) — native request, error, capability, state, discovery, and limit contracts.
 - [`native-command-catalog/`](native-command-catalog/index.md) — fixed command identities, access, dispatch, retained-operation policies, handlers, capabilities, limits, and registration lifecycle.
 - [`asset-family-registry/`](asset-family-registry/index.md) — built-in family descriptors, typed adapter contexts, independent capabilities, semantic builders, selection, bounds, and freeze lifecycle.
+- [`asset-authoring-kernel/`](asset-authoring-kernel/index.md) — exact creation/edit requests, lifecycle collaborators, results, persistence policy, and recovery errors.
 - [`companion-extension-registry/`](companion-extension-registry/index.md) — public native registration, contribution handlers, descriptor metadata, capability records, bounds, and errors.
 - [`asset-inspection/`](asset-inspection/index.md) — general asset-inspection request, YAML response, selector, graph, collection, inheritance, and asset-family contracts.
 - [`gas-ability-inspection/`](gas-ability-inspection/index.md) — Gameplay Ability family, typed policy/tag/trigger/effect records, inheritance, bounds, capabilities, and exclusions.

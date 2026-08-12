@@ -6,7 +6,7 @@
 
 ## Dependencies
 
-The component depends on the Widget tree identity helpers, Blueprint mutation preconditions, JSON request values, and the recursive Game Data value codec. Layout and style services depend on it; it does not depend on their class-specific policies.
+The component depends on the asset-authoring kernel, Widget tree identity helpers, Blueprint mutation preconditions, JSON request values, and the recursive Game Data value codec. Layout and style services depend on it; it does not depend on their class-specific policies.
 
 ## Invariants
 

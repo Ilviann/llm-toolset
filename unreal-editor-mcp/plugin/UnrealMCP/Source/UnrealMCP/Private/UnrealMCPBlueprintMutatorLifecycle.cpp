@@ -1,4 +1,5 @@
 #include "UnrealMCPBlueprintCallableMutationSupport.h"
+#include "UnrealMCPAssetAuthoringKernel.h"
 #include "Blueprint/UserWidget.h"
 #include "WidgetBlueprintOperationUtils.h"
 
@@ -69,68 +70,71 @@ bool FUnrealMCPBlueprintMutator::Create(
         OutError = {TEXT("invalid_argument"), TEXT("package_path must be one valid long package name without an object suffix")};
         return false;
     }
-    if (!ValidateMutationScope(PackageName, OutError))
-    {
-        return false;
-    }
     UClass* ParentClass = nullptr;
     if (!ResolveParent(ParentPath, ParentClass, OutError))
     {
         return false;
     }
-    if (PackageAlreadyExists(PackageName))
-    {
-        OutError = {TEXT("already_exists"), TEXT("The destination package or asset already exists")};
-        return false;
-    }
-    FString Filename;
-    if (!ValidateWritableTarget(PackageName, Filename, OutError))
-    {
-        return false;
-    }
-
     const FString AssetName = FPackageName::GetLongPackageAssetName(PackageName);
-    UPackage* Package = CreatePackage(*PackageName);
-    UBlueprint* Blueprint = ParentClass->IsChildOf(UUserWidget::StaticClass())
-        ? FWidgetBlueprintOperationUtils::CreateWidgetBlueprint(
-            Package, FName(*AssetName), BPTYPE_Normal, ParentClass, nullptr,
-            FName(TEXT("UnrealMCP")), false)
-        : FKismetEditorUtilities::CreateBlueprint(
-            ParentClass, Package, FName(*AssetName), BPTYPE_Normal, FName(TEXT("UnrealMCP")));
-    if (Blueprint == nullptr)
-    {
-        CleanupFailedCreation(Package, nullptr, Filename, false);
-        OutError = {TEXT("internal_error"), TEXT("Unreal could not create the Blueprint package")};
-        return false;
-    }
-
     FCompilerResultsLog Log;
     Log.bSilentMode = true;
-    CompileBlueprint(Blueprint, Log);
-    const bool bCompiled = Log.NumErrors == 0 && Blueprint->Status != BS_Error;
-    if (!bCompiled)
+    FString OperationId;
+    Arguments->TryGetStringField(TEXT("operation_id"), OperationId);
+    const FString ObjectPath = FUnrealMCPAssetAuthoringKernel::ObjectPathForPackage(PackageName);
+    FUnrealMCPAssetCreationRequest Request{OperationId, PackageName, ObjectPath};
+    FUnrealMCPAssetCreationHooks Hooks;
+    Hooks.Create = [ParentClass, AssetName](UPackage* Package, UObject*& OutAsset, FUnrealMCPError&)
     {
-        const FString First = Log.Messages.IsEmpty() ? FString() : Log.Messages[0]->ToText().ToString().Left(UnrealMCP::MaxDiagnosticChars);
-        CleanupFailedCreation(Package, Blueprint, Filename, false);
-        OutError = {TEXT("compile_failed"), TEXT("The new Blueprint did not compile")};
-        OutError.Details->SetNumberField(TEXT("diagnostic_count"), Log.Messages.Num());
-        if (!First.IsEmpty()) OutError.Details->SetStringField(TEXT("first_diagnostic"), First);
+        OutAsset = ParentClass->IsChildOf(UUserWidget::StaticClass())
+            ? FWidgetBlueprintOperationUtils::CreateWidgetBlueprint(
+                Package, FName(*AssetName), BPTYPE_Normal, ParentClass, nullptr,
+                FName(TEXT("UnrealMCP")), false)
+            : FKismetEditorUtilities::CreateBlueprint(
+                ParentClass, Package, FName(*AssetName), BPTYPE_Normal,
+                FName(TEXT("UnrealMCP")));
+        return OutAsset != nullptr;
+    };
+    Hooks.Finalize = [this, &Log](UObject* Asset, FUnrealMCPError& Error)
+    {
+        UBlueprint* Blueprint = CastChecked<UBlueprint>(Asset);
+        CompileBlueprint(Blueprint, Log);
+        if (Log.NumErrors == 0 && Blueprint->Status != BS_Error)
+        {
+            return true;
+        }
+        const FString First = Log.Messages.IsEmpty()
+            ? FString()
+            : Log.Messages[0]->ToText().ToString().Left(UnrealMCP::MaxDiagnosticChars);
+        Error = {TEXT("compile_failed"), TEXT("The new Blueprint did not compile")};
+        Error.Details->SetNumberField(TEXT("diagnostic_count"), Log.Messages.Num());
+        if (!First.IsEmpty())
+        {
+            Error.Details->SetStringField(TEXT("first_diagnostic"), First);
+        }
+        return false;
+    };
+    Hooks.Persist = [this](UObject* Asset, FUnrealMCPError& Error)
+    {
+        if (SaveBlueprint(CastChecked<UBlueprint>(Asset)))
+        {
+            return true;
+        }
+        Error = {TEXT("save_failed"), TEXT("The new Blueprint package could not be saved")};
+        return false;
+    };
+    Hooks.ReadBack = [this](UObject* Asset, FString& Snapshot, FUnrealMCPError& Error)
+    {
+        return ReadSnapshot(Inspector, Asset->GetPathName(), Snapshot, Error);
+    };
+    FUnrealMCPAssetCreationResult Creation;
+    if (!FUnrealMCPAssetAuthoringKernel::ExecuteCreation(
+            Request, Hooks, Creation, OutError))
+    {
         return false;
     }
-    if (!SaveBlueprint(Blueprint))
-    {
-        CleanupFailedCreation(Package, Blueprint, Filename, false);
-        OutError = {TEXT("save_failed"), TEXT("The new Blueprint package could not be saved")};
-        return false;
-    }
-    FAssetRegistryModule::AssetCreated(Blueprint);
-    FString Snapshot;
-    if (!ReadSnapshot(Inspector, Blueprint->GetPathName(), Snapshot, OutError))
-    {
-        CleanupFailedCreation(Package, Blueprint, Filename, true);
-        return false;
-    }
-    OutResult = BuildResult(Blueprint, Blueprint->GetPathName(), Snapshot, &Log, true, true);
+    UBlueprint* Blueprint = CastChecked<UBlueprint>(Creation.Asset);
+    OutResult = BuildResult(
+        Blueprint, Creation.ObjectPath, Creation.SnapshotId, &Log, true, true);
     return true;
 }
 

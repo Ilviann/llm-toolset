@@ -6,7 +6,7 @@
 
 ## Dependency direction
 
-The HTTP bridge owns one lazily created service and admits `game_data_edit` through the shared operation ledger. The facade depends on request validation and the inspection builder; operation handlers depend on both and on public Asset Registry, `FStructureEditorUtils`, `FDataTableEditorUtils`, package-saving, transaction, and user-defined-struct APIs. The inspection builder depends on the Asset Registry, request normalization, the row-value codec, and canonical K2 type/default encoding. The row-value codec depends only on reflected properties, live reference resolution, and K2 property-to-pin type conversion; Blueprint inspectors and mutators do not depend on game data.
+The HTTP bridge owns one lazily created service and admits `game_data_edit` through the shared operation ledger. The facade depends on request validation and the inspection builder; operation handlers depend on both, the asset-authoring kernel, and public Asset Registry, `FStructureEditorUtils`, `FDataTableEditorUtils`, package-saving, and user-defined-struct APIs. The inspection builder depends on the Asset Registry, request normalization, the row-value codec, and canonical K2 type/default encoding. The row-value codec depends only on reflected properties, live reference resolution, and K2 property-to-pin type conversion; Blueprint inspectors and mutators do not depend on game data.
 
 ## Invariants
 

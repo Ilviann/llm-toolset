@@ -14,7 +14,7 @@ released_in: null
 **Depends on:**
 
 - [`native-wire-contracts`](../completed/native-wire-contracts.md)
-- [`asset-authoring-kernel`](asset-authoring-kernel.md)
+- [`asset-authoring-kernel`](../completed/asset-authoring-kernel.md)
 
 ### Implementation
 

@@ -202,17 +202,16 @@ bool FUnrealMCPWidgetLayoutService::Execute(
     FProperty* Property =
         Slot->GetClass()->FindPropertyByName(FName(*PropertyName));
     TSharedPtr<FUnrealMCPRecord> Changed;
+    FString Snapshot;
     if (!ApplyProperty(
-            Blueprint, Slot, Property, *Value,
-            TEXT("Unreal MCP set widget slot layout"), Changed, OutError))
+            Inspector, *Arguments, Blueprint, ObjectPath, Slot, Property, *Value,
+            TEXT("Unreal MCP set widget slot layout"), Changed, Snapshot, OutError))
     {
         return false;
     }
 
     UWidget* Content = Slot->Content;
-    FString Snapshot;
-    if (Content == nullptr
-        || !ReadSnapshot(Inspector, ObjectPath, Snapshot, OutError))
+    if (Content == nullptr)
     {
         if (OutError.Code.IsEmpty())
         {

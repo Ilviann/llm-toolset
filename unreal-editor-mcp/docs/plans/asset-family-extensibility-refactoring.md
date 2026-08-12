@@ -82,7 +82,7 @@ adding an optional Engine-plugin dependency to the base module.
    defines descriptors, registries, and inspection/creation/edit adapter seams.
 4. [`asset-inspection-adapters`](../features/completed/asset-inspection-adapters.md)
    migrates built-in inspection behind the family seam.
-5. [`asset-authoring-kernel`](../features/planned/asset-authoring-kernel.md)
+5. [`asset-authoring-kernel`](../features/completed/asset-authoring-kernel.md)
    centralizes target-independent creation and stale-safe editing lifecycles.
 6. [`python-asset-family-catalog`](../features/planned/python-asset-family-catalog.md)
    makes Python publication data-driven and consistent with native capabilities.

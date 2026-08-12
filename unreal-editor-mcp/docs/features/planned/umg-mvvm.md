@@ -15,7 +15,7 @@ released_in: null
 **Depends on:**
 
 - [`umg-mvvm-inspect`](umg-mvvm-inspect.md)
-- [`asset-authoring-kernel`](asset-authoring-kernel.md)
+- [`asset-authoring-kernel`](../completed/asset-authoring-kernel.md)
 - [`companion-api-v2`](companion-api-v2.md)
 
 ### ViewModel Blueprint authoring

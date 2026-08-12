@@ -1,8 +1,8 @@
 #include "UnrealMCPWidgetAuthoringSupport.h"
 
+#include "UnrealMCPAssetAuthoringKernel.h"
 #include "Components/PanelSlot.h"
 #include "Kismet2/BlueprintEditorUtils.h"
-#include "ScopedTransaction.h"
 #include "UnrealMCPBlueprintMutationCommon.h"
 #include "UnrealMCPGameDataValueCodec.h"
 #include "UnrealMCPWidgetTreeSupport.h"
@@ -147,12 +147,16 @@ TSharedRef<FUnrealMCPRecord> EncodeProperty(UObject* Target, FProperty* Property
 }
 
 bool ApplyProperty(
+    FUnrealMCPBlueprintInspector& Inspector,
+    const FUnrealMCPRecord& Arguments,
     UWidgetBlueprint* Blueprint,
+    const FString& ObjectPath,
     UObject* Target,
     FProperty* Property,
     const TSharedPtr<FUnrealMCPValue>& Value,
     const FString& TransactionLabel,
     TSharedPtr<FUnrealMCPRecord>& OutChanged,
+    FString& OutSnapshot,
     FUnrealMCPError& OutError)
 {
     if (Blueprint == nullptr || Target == nullptr || Property == nullptr
@@ -191,20 +195,42 @@ bool ApplyProperty(
         return false;
     }
 
+    FString OperationId;
+    FString ExpectedSnapshot;
+    Arguments.TryGetStringField(TEXT("operation_id"), OperationId);
+    Arguments.TryGetStringField(TEXT("expected_snapshot"), ExpectedSnapshot);
+    FUnrealMCPAssetEditRequest Request{
+        OperationId,
+        ObjectPath,
+        ExpectedSnapshot,
+        TransactionLabel,
+        Blueprint,
+        false,
+        true};
+    FUnrealMCPAssetEditHooks Hooks;
+    Hooks.ReadBack = [&Inspector, &ObjectPath](UObject*, FString& Snapshot, FUnrealMCPError& Error)
     {
-        const FScopedTransaction Transaction(
-            FText::FromString(TransactionLabel));
-        Blueprint->SetFlags(RF_Transactional);
-        Blueprint->Modify();
+        return ReadSnapshot(Inspector, ObjectPath, Snapshot, Error);
+    };
+    Hooks.Mutate = [&](UObject*, FUnrealMCPError&)
+    {
         Target->SetFlags(RF_Transactional);
         Target->Modify();
         Property->CopyCompleteValue(Existing, Decoded);
         FPropertyChangedEvent Event(Property, EPropertyChangeType::ValueSet);
         Target->PostEditChangeProperty(Event);
         FBlueprintEditorUtils::MarkBlueprintAsModified(Blueprint);
-    }
+        return true;
+    };
+    FUnrealMCPAssetEditResult EditResult;
+    const bool bEdited = FUnrealMCPAssetAuthoringKernel::ExecuteEdit(
+        Request, Hooks, EditResult, OutError);
     Property->DestroyValue(Decoded);
     FMemory::Free(Decoded);
+    if (!bEdited)
+    {
+        return false;
+    }
     OutChanged = EncodeProperty(Target, Property);
     if (!OutChanged->GetBoolField(TEXT("supported")))
     {
@@ -214,6 +240,7 @@ bool ApplyProperty(
         RestoreFailedTransaction(OutError);
         return false;
     }
+    OutSnapshot = EditResult.SnapshotId;
     return true;
 }
 

@@ -6,7 +6,7 @@
 
 ## Dependency direction
 
-The HTTP bridge owns one inspector and constructs the mutator facade with a reference to it. Family units depend inward on the private mutation support layer, shared reflected-property and K2 type/default codecs, and `UnrealMCPBlueprintReferenceScanner`; the inspector does not depend on the mutator. Compile and save collaborators remain injected only through the facade for deterministic native failure tests; production composition uses the public Unreal implementations.
+The HTTP bridge owns one inspector and constructs the mutator facade with a reference to it. Family units depend inward on the asset-authoring kernel, private mutation support layer, shared reflected-property and K2 type/default codecs, and `UnrealMCPBlueprintReferenceScanner`; the inspector does not depend on the mutator. Compile and save collaborators remain injected only through the facade for deterministic native failure tests; production composition uses the public Unreal implementations.
 
 ## Invariants
 
