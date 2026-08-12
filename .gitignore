@@ -6,3 +6,6 @@
 
 # Python local files
 **/__pycache__/*
+
+# ChatGPT Codex settings
+/.codex/
