@@ -8,6 +8,7 @@
 #include "Misc/Paths.h"
 #include "Misc/SecureHash.h"
 #include "UnrealMCPAssetFamilyRegistry.h"
+#include "UnrealMCPAssetInspectionAdapters.h"
 #include "UnrealMCPBridge.h"
 #include "UnrealMCPCompatibility.h"
 #include "UnrealMCPExtensionRegistry.h"
@@ -91,7 +92,8 @@ public:
         ConfigureLoopbackListener(Port);
         AssetFamilyRegistry = MakeShared<FUnrealMCPAssetFamilyRegistry>();
         FUnrealMCPError RegistryError;
-        if (!AssetFamilyRegistry->Freeze(RegistryError))
+        if (!UnrealMCP::AssetInspection::RegisterBuiltInAdapters(*AssetFamilyRegistry, RegistryError)
+            || !AssetFamilyRegistry->Freeze(RegistryError))
         {
             UE_LOG(LogUnrealMCP, Error, TEXT("Unreal MCP disabled: %s"), *RegistryError.Message);
             AssetFamilyRegistry.Reset();

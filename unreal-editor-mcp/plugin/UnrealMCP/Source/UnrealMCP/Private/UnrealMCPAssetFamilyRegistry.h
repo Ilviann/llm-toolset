@@ -125,6 +125,8 @@ struct FUnrealMCPAssetFamilyInspectionContext
     int32 PageSize = 10;
     bool bVerbose = false;
     bool bAllowPartialGraph = false;
+    bool bHasPaging = false;
+    bool bHasPartialGraphFlag = false;
 };
 
 struct FUnrealMCPAssetFamilyCreationContext

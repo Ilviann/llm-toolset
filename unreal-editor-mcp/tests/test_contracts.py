@@ -63,7 +63,7 @@ class ReleaseContractTests(unittest.TestCase):
         native = re.search(r'Version\[\].*TEXT\("([^"]+)"\)', header)
         self.assertIsNotNone(native)
         versions = {project["project"]["version"], plugin["VersionName"], native.group(1), unreal_editor_mcp.__version__}
-        self.assertEqual(versions, {"0.39.0"})
+        self.assertEqual(versions, {"0.40.0"})
 
     def test_companion_api_and_companion_versions_are_internally_consistent(self):
         base = json.loads((ROOT / "plugin/UnrealMCP/UnrealMCP.uplugin").read_text(encoding="utf-8"))
@@ -238,6 +238,31 @@ class ReleaseContractTests(unittest.TestCase):
             self.assertIn(rejection, catalog)
         self.assertIn("UnrealMCP.CommandCatalog.FixedCompositionAndRejection", (
             root / "Tests/UnrealMCPAutomationTestsCommandCatalog.cpp"
+        ).read_text(encoding="utf-8"))
+
+    def test_asset_inspection_coordinator_is_family_neutral(self):
+        root = ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private"
+        coordinator = (root / "UnrealMCPAssetInspectionService.cpp").read_text(encoding="utf-8")
+        adapters = (root / "UnrealMCPAssetInspectionAdapters.cpp").read_text(encoding="utf-8")
+        self.assertIn("AssetFamilyRegistry->Select", coordinator)
+        self.assertIn("InspectionAdapter->Inspect", coordinator)
+        for family_symbol in [
+            "AGameMode", "AGameState", "APlayerController", "APlayerState",
+            "UActorComponent", "BPTYPE_Interface", "AddFamilySemantics",
+            "BuildCollectionSelection", "BuildSelectedGraph",
+        ]:
+            self.assertNotIn(family_symbol, coordinator)
+        for adapter_symbol in [
+            "FNeutralAssetInspectionAdapter", "FCoreBlueprintInspectionAdapter",
+            "FBlueprintInterfaceInspectionAdapter", "FActorComponentBlueprintInspectionAdapter",
+            "FGameplayBlueprintInspectionAdapter", "FBlueprintGraphInspectionAdapter",
+            "FBlueprintCollectionInspectionAdapter", "FBlueprintSemanticPropertyAdapter",
+        ]:
+            self.assertIn(adapter_symbol, adapters)
+        self.assertIn('TEXT("core_blueprint")', adapters)
+        self.assertIn('TEXT("neutral_asset")', adapters)
+        self.assertIn("UnrealMCP.AssetInspect.AdapterIsolation", (
+            root / "Tests/UnrealMCPAutomationTestsAssetInspection.cpp"
         ).read_text(encoding="utf-8"))
 
     def test_asset_references_is_published_bounded_and_covered(self):

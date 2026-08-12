@@ -80,7 +80,7 @@ adding an optional Engine-plugin dependency to the base module.
    replaces centralized command branching with deterministic typed registration.
 3. [`asset-family-foundation`](../features/completed/asset-family-foundation.md)
    defines descriptors, registries, and inspection/creation/edit adapter seams.
-4. [`asset-inspection-adapters`](../features/planned/asset-inspection-adapters.md)
+4. [`asset-inspection-adapters`](../features/completed/asset-inspection-adapters.md)
    migrates built-in inspection behind the family seam.
 5. [`asset-authoring-kernel`](../features/planned/asset-authoring-kernel.md)
    centralizes target-independent creation and stale-safe editing lifecycles.

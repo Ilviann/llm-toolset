@@ -9,7 +9,7 @@
 
 ## Adapter contexts
 
-- `FUnrealMCPAssetFamilyInspectionContext` carries the already resolved asset, canonical identity/snapshot precondition, decoded selector, bounded paging controls, and graph presentation choices.
+- `FUnrealMCPAssetFamilyInspectionContext` carries the already resolved asset, canonical identity/snapshot precondition, decoded selector, bounded paging controls, graph presentation choices, and explicit-presence flags for paging and partial-graph request fields. Those flags preserve validation distinctions between omitted defaults and caller-supplied values.
 - `FUnrealMCPAssetFamilyCreationContext` carries an admitted outer, resolved class, asset name, and canonical object path. The later authoring kernel owns transactions, persistence, cleanup, and rollback.
 - `FUnrealMCPAssetFamilyEditContext` carries the resolved asset, identity/snapshot precondition, one typed operation identity, and bounded semantic value records. It does not authorize persistence or access by itself.
 - `IUnrealMCPAssetFamilyInspectionAdapter`, `IUnrealMCPAssetFamilyCreationAdapter`, and `IUnrealMCPAssetFamilyEditingAdapter` are independent trusted base-native interfaces. An adapter may implement any combination through its descriptor.

@@ -57,6 +57,7 @@ def run_automation(executable: Path, project: Path, environment: dict[str, str],
         "RegistrySelectionCapabilitiesAndFreeze",
         "FamilyInspectionMutationAndPersistence",
         "LayoutStyleBindingsAndEvents",
+        "AdapterIsolation",
         "CoreFamiliesSelectorsPagingAndLimits",
         "PreflightTransactionPreservation",
         "LogicUnitsAndExternalLinks",
@@ -104,6 +105,10 @@ def run_automation(executable: Path, project: Path, environment: dict[str, str],
         expected = tuple(name for name in all_expected if name == "GameDataAuthoring")
     elif test_filter == "UnrealMCP.AssetReferences":
         expected = tuple(name for name in all_expected if name == "RegistryLiveMemoryAndCursors")
+    elif test_filter == "UnrealMCP.AssetInspect":
+        expected = tuple(name for name in all_expected if name in {
+            "AdapterIsolation", "CoreFamiliesSelectorsPagingAndLimits",
+        })
     elif test_filter == "UnrealMCP.LevelManagement":
         expected = tuple(name for name in all_expected if name == "CreateConfigurePersistAndDelete")
     elif test_filter == "UnrealMCP.CommonUI":

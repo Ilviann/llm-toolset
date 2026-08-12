@@ -18,7 +18,7 @@ Feature identifiers are stable names, not execution indexes. Unfinished features
   - Depends on:
     - `asset-inspect-core`
     - `native-command-catalog`
-- [ ] [`asset-inspection-adapters` — Asset inspection service decomposition](docs/features/planned/asset-inspection-adapters.md) — Move existing core asset semantics into focused adapters.
+- [x] [`asset-inspection-adapters` — Asset inspection service decomposition](docs/features/completed/asset-inspection-adapters.md) — Move existing core asset semantics into focused adapters.
   - Depends on:
     - `asset-family-foundation`
 - [ ] [`asset-authoring-kernel` — Shared asset creation and editing lifecycle](docs/features/planned/asset-authoring-kernel.md) — Centralize bounded admission, transactions, persistence, read-back, cleanup, and rollback.
@@ -181,5 +181,6 @@ Feature checkboxes record implementation completion after mandatory Windows veri
 
 - macOS:
   - `readonly-mode` — lifecycle-only acceptance is blocked by [`issue-4`](docs/issues/issue-4.md).
+  - `asset-inspection-adapters`
 - Windows:
   - None

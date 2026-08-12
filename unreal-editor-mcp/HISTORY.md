@@ -6,6 +6,11 @@
 - Added an independent CommonUI companion checkbox to the Windows deployment helper, including fixed base-dependent packaging, project/Engine installation, and transactional multi-plugin handling without changing runtime or plugin versions.
 - Decomposed Python packaging, Windows deployment, and headless integration support tools behind stable entrypoints, with shared Unreal-local primitives, typed deployment and Blueprint scenario state, focused domain modules, and unchanged runtime/plugin versions.
 
+## 0.40.0 — 2026-08-12
+
+- Routed `asset_inspect` through the frozen built-in asset-family registry, with separate neutral and core-Blueprint descriptors plus focused Interface, Actor Component, gameplay, graph, collection, and semantic-property inspection adapters while preserving the released schema, YAML, selectors, paging, graph limits, snapshots, errors, and read-only behavior.
+- Added adapter-isolation coverage proving an exact new family can override only its neutral fallback without changing core Blueprint or unrelated-family selection; companion API v1 remains unchanged.
+
 ## 0.39.0 — 2026-08-12
 
 - Added a frozen base-owned asset-family registry with stable descriptors, exact/derived priority classification, required-module readiness, independent inspection/creation/editing adapters, bounded typed semantic document/selector/snapshot contracts, fail-closed collisions and ambiguity, and restart-deterministic ordering and fingerprints without changing MCP schemas or companion API v1.

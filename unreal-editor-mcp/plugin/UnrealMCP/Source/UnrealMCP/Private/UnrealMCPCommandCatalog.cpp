@@ -397,7 +397,7 @@ bool FUnrealMCPCommandCatalog::RejectConcurrentRetainedOperation(const TCHAR* Me
 
 bool FUnrealMCPCommandCatalog::ExecuteAssetInspect(const TSharedPtr<FUnrealMCPRecord>& A, TSharedPtr<FUnrealMCPRecord>& R, FUnrealMCPError& E)
 {
-    if (!AssetInspectionService) AssetInspectionService = MakeUnique<FUnrealMCPAssetInspectionService>();
+    if (!AssetInspectionService) AssetInspectionService = MakeUnique<FUnrealMCPAssetInspectionService>(AssetFamilyRegistry);
     return AssetInspectionService->Execute(A, R, E);
 }
 bool FUnrealMCPCommandCatalog::ExecuteAssetReferences(const TSharedPtr<FUnrealMCPRecord>& A, TSharedPtr<FUnrealMCPRecord>& R, FUnrealMCPError& E)

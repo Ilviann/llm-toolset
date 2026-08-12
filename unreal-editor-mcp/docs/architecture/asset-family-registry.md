@@ -8,7 +8,7 @@
 
 The module creates and freezes the built-in registry before constructing the bridge. The command catalog retains the frozen registry for later domain composition and refuses startup composition with a mutable registry. Family adapters depend inward on typed contexts, semantic value records, and bounded builders; they do not depend on the bridge, JSON codecs, Python schemas, access policy, target resolution, transactions, persistence, or response encoding.
 
-Existing asset inspection and authoring services keep their released behavior until the dependent adapter-decomposition and authoring-kernel features migrate them. The foundation changes no MCP command, schema, capability envelope, or companion API.
+`asset_inspect` now selects the frozen `core_blueprint` or `neutral_asset` descriptor and invokes its inspection adapter. Existing authoring services retain their released paths until the authoring-kernel feature migrates them. Registry-backed inspection changes no MCP command, schema, capability envelope, or companion API.
 
 ## Invariants
 

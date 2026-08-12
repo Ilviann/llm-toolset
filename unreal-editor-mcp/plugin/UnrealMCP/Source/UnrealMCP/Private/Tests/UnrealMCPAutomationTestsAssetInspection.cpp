@@ -1,11 +1,14 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 #include "UnrealMCPAutomationTestSupport.h"
+#include "UnrealMCPAssetFamilyRegistry.h"
+#include "UnrealMCPAssetInspectionAdapters.h"
 
 #include "Components/ActorComponent.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/PlayerState.h"
 #include "UObject/Interface.h"
+#include "WidgetBlueprint.h"
 
 namespace
 {
@@ -39,6 +42,83 @@ FString AssetType(const TSharedPtr<FUnrealMCPRecord>& Result)
 {
     return Result.IsValid() ? Result->GetObjectField(TEXT("asset"))->GetStringField(TEXT("type")) : FString();
 }
+
+class FIsolatedTextureInspectionAdapter final : public IUnrealMCPAssetFamilyInspectionAdapter
+{
+public:
+    bool Inspect(
+        const FUnrealMCPAssetFamilyInspectionContext&,
+        FUnrealMCPAssetFamilyDocumentBuilder&,
+        FUnrealMCPAssetFamilySelectorRouter&,
+        FUnrealMCPAssetFamilySnapshotBuilder&,
+        FUnrealMCPError&) override
+    {
+        return true;
+    }
+};
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FUnrealMCPAssetInspectionAdapterIsolationTest,
+    "UnrealMCP.AssetInspect.AdapterIsolation",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FUnrealMCPAssetInspectionAdapterIsolationTest::RunTest(const FString& Parameters)
+{
+    FUnrealMCPAssetFamilyRegistry Registry;
+    FUnrealMCPError Error;
+    if (!TestTrue(TEXT("built-in adapters register"),
+        UnrealMCP::AssetInspection::RegisterBuiltInAdapters(Registry, Error)))
+    {
+        AddError(Error.Code + TEXT(": ") + Error.Message);
+        return false;
+    }
+
+    FUnrealMCPAssetFamilyDescriptor Texture;
+    Texture.FamilyId = TEXT("isolated_texture");
+    Texture.NativeClass = UTexture2D::StaticClass();
+    Texture.ClassPolicy = EUnrealMCPAssetFamilyClassPolicy::Exact;
+    Texture.Priority = 200;
+    Texture.Capabilities.bInspection = true;
+    Texture.InspectionAdapter = MakeShared<FIsolatedTextureInspectionAdapter>();
+    if (!TestTrue(TEXT("isolated family registers without coordinator changes"), Registry.Register(MoveTemp(Texture), Error))
+        || !TestTrue(TEXT("extended registry freezes"), Registry.Freeze(Error)))
+    {
+        AddError(Error.Code + TEXT(": ") + Error.Message);
+        return false;
+    }
+
+    FUnrealMCPAssetFamilySelection Selection;
+    if (!TestTrue(TEXT("Blueprint selection remains available"), Registry.Select(
+            UBlueprint::StaticClass(), EUnrealMCPAssetFamilyCapability::Inspection, Selection, Error)))
+    {
+        return false;
+    }
+    TestEqual(TEXT("unrelated family does not replace core Blueprints"),
+        Selection.Descriptor->FamilyId, FString(TEXT("core_blueprint")));
+
+    if (!TestTrue(TEXT("derived Blueprint storage selects core adapter"), Registry.Select(
+            UWidgetBlueprint::StaticClass(), EUnrealMCPAssetFamilyCapability::Inspection, Selection, Error)))
+    {
+        return false;
+    }
+    TestEqual(TEXT("Widget Blueprint storage remains a neutral core Blueprint response"),
+        Selection.Descriptor->FamilyId, FString(TEXT("core_blueprint")));
+
+    if (!TestTrue(TEXT("isolated exact family selects"), Registry.Select(
+            UTexture2D::StaticClass(), EUnrealMCPAssetFamilyCapability::Inspection, Selection, Error)))
+    {
+        return false;
+    }
+    TestEqual(TEXT("exact family overrides only its neutral fallback"),
+        Selection.Descriptor->FamilyId, FString(TEXT("isolated_texture")));
+
+    if (!TestTrue(TEXT("neutral fallback remains available"), Registry.Select(
+            UObject::StaticClass(), EUnrealMCPAssetFamilyCapability::Inspection, Selection, Error)))
+    {
+        return false;
+    }
+    TestEqual(TEXT("unsupported families remain neutral"),
+        Selection.Descriptor->FamilyId, FString(TEXT("neutral_asset")));
+    return true;
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FUnrealMCPAssetInspectionCoreTest,
@@ -48,9 +128,17 @@ bool FUnrealMCPAssetInspectionCoreTest::RunTest(const FString& Parameters)
 {
     using namespace UnrealMCP::Tests;
     const FString Root = TEXT("/Game/UnrealMCPTests/") + FGuid::NewGuid().ToString(EGuidFormats::Digits);
-    FUnrealMCPAssetInspectionService Service;
-    TSharedPtr<FUnrealMCPRecord> Result;
+    const TSharedRef<FUnrealMCPAssetFamilyRegistry> FamilyRegistry = MakeShared<FUnrealMCPAssetFamilyRegistry>();
     FUnrealMCPError Error;
+    if (!TestTrue(TEXT("built-in inspection adapters register"),
+            UnrealMCP::AssetInspection::RegisterBuiltInAdapters(*FamilyRegistry, Error))
+        || !TestTrue(TEXT("built-in inspection adapters freeze"), FamilyRegistry->Freeze(Error)))
+    {
+        AddError(Error.Code + TEXT(": ") + Error.Message);
+        return false;
+    }
+    FUnrealMCPAssetInspectionService Service(FamilyRegistry);
+    TSharedPtr<FUnrealMCPRecord> Result;
 
     struct FFamily { UClass* Parent; const TCHAR* Name; };
     const TArray<FFamily> Families = {

@@ -1,6 +1,5 @@
 # Planned features
 
-- [`asset-inspection-adapters` — Asset inspection service decomposition](asset-inspection-adapters.md).
 - [`asset-authoring-kernel` — Shared asset creation and editing lifecycle](asset-authoring-kernel.md).
 - [`python-asset-family-catalog` — Static Python asset-family catalog](python-asset-family-catalog.md).
 - [`asset-family-conformance` — Reusable asset-family verification](asset-family-conformance.md).

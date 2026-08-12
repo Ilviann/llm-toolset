@@ -55,7 +55,7 @@ Keep the authoritative checklist in [`ROADMAP.md`](../../ROADMAP.md) synchronize
   - Depends on:
     - `asset-inspect-core`
     - `native-command-catalog`
-- [`asset-inspection-adapters` — Asset inspection service decomposition](planned/asset-inspection-adapters.md) — Move existing core asset semantics into focused adapters.
+- [`asset-inspection-adapters` — Asset inspection service decomposition](completed/asset-inspection-adapters.md) — Move existing core asset semantics into focused adapters.
   - Depends on:
     - `asset-family-foundation`
 - [`asset-authoring-kernel` — Shared asset creation and editing lifecycle](planned/asset-authoring-kernel.md) — Centralize bounded admission, transactions, persistence, read-back, cleanup, and rollback.
