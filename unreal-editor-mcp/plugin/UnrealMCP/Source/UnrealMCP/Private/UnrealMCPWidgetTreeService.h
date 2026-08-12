@@ -1,7 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Dom/JsonObject.h"
+#include "UnrealMCPWireTypes.h"
 #include "UnrealMCPProtocol.h"
 
 class FUnrealMCPBlueprintInspector;
@@ -12,8 +12,8 @@ public:
     explicit FUnrealMCPWidgetTreeService(FUnrealMCPBlueprintInspector& InInspector);
 
     bool Execute(
-        const TSharedPtr<FJsonObject>& Arguments,
-        TSharedPtr<FJsonObject>& OutResult,
+        const TSharedPtr<FUnrealMCPRecord>& Arguments,
+        TSharedPtr<FUnrealMCPRecord>& OutResult,
         FUnrealMCPError& OutError);
 
 private:

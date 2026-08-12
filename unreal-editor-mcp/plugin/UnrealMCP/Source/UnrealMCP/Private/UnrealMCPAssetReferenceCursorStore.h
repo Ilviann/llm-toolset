@@ -1,7 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Dom/JsonObject.h"
+#include "UnrealMCPWireTypes.h"
 #include "Templates/Atomic.h"
 #include "UnrealMCPAssetReferenceTypes.h"
 #include "UnrealMCPProtocol.h"
@@ -16,14 +16,14 @@ public:
     ~FUnrealMCPAssetReferenceCursorStore();
 
     uint64 GetRegistrySerial() const;
-    TSharedPtr<FJsonObject> BuildPage(
+    TSharedPtr<FUnrealMCPRecord> BuildPage(
         const FUnrealMCPAssetReferenceSnapshot& Snapshot,
         int32 Offset,
         int32 PageSize);
     bool Continue(
         const FString& Cursor,
         int32 PageSize,
-        TSharedPtr<FJsonObject>& OutResult,
+        TSharedPtr<FUnrealMCPRecord>& OutResult,
         FUnrealMCPError& OutError);
 
 private:

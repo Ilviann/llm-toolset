@@ -30,8 +30,8 @@ void FUnrealMCPBlueprintInspector::RemoveExpiredCursors(double CurrentTime)
 }
 
 bool FUnrealMCPBlueprintInspector::Execute(
-    const TSharedPtr<FJsonObject>& Arguments,
-    TSharedPtr<FJsonObject>& OutResult,
+    const TSharedPtr<FUnrealMCPRecord>& Arguments,
+    TSharedPtr<FUnrealMCPRecord>& OutResult,
     FUnrealMCPError& OutError)
 {
     using namespace UnrealMCP::BlueprintInspectionPrivate;
@@ -61,7 +61,7 @@ bool FUnrealMCPBlueprintInspector::Execute(
     FCursorState* State = Cursors.Find(Cursor);
     if (State == nullptr)
     {
-        OutError = {TEXT("cursor_expired"), TEXT("The inspection cursor is missing or expired"), MakeShared<FJsonObject>(), true};
+        OutError = {TEXT("cursor_expired"), TEXT("The inspection cursor is missing or expired"), MakeShared<FUnrealMCPRecord>(), true};
         return false;
     }
     int32 PageSize = UnrealMCP::DefaultInspectPageSize;
@@ -75,11 +75,11 @@ bool FUnrealMCPBlueprintInspector::Execute(
 }
 
 bool FUnrealMCPBlueprintInspector::ExecuteInitial(
-    const TSharedPtr<FJsonObject>& Arguments,
+    const TSharedPtr<FUnrealMCPRecord>& Arguments,
     int32 Offset,
     const FString& ExpectedSnapshot,
     int32 PageSizeOverride,
-    TSharedPtr<FJsonObject>& OutResult,
+    TSharedPtr<FUnrealMCPRecord>& OutResult,
     FUnrealMCPError& OutError)
 {
     using namespace UnrealMCP::BlueprintInspectionPrivate;
@@ -98,10 +98,10 @@ bool FUnrealMCPBlueprintInspector::ExecuteInitial(
     {
         PageSize = PageSizeOverride;
     }
-    TArray<TSharedPtr<FJsonValue>> Records;
+    TArray<TSharedPtr<FUnrealMCPValue>> Records;
     FString Snapshot;
     FString BlueprintFamily;
-    TSharedPtr<FJsonObject> FamilyCapabilities;
+    TSharedPtr<FUnrealMCPRecord> FamilyCapabilities;
     bool bScanTruncated = false;
     const bool bBuilt = Mode == TEXT("discover")
         ? BuildDiscovery(*Arguments, ExtensionRegistry, Records, Snapshot, bScanTruncated, OutError)
@@ -121,16 +121,16 @@ bool FUnrealMCPBlueprintInspector::ExecuteInitial(
         return false;
     }
     const int32 End = FMath::Min(Offset + PageSize, Records.Num());
-    TArray<TSharedPtr<FJsonValue>> Page;
+    TArray<TSharedPtr<FUnrealMCPValue>> Page;
     for (int32 Index = Offset; Index < End; ++Index) Page.Add(Records[Index]);
-    const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Result = MakeShared<FUnrealMCPRecord>();
     Result->SetStringField(TEXT("mode"), Mode);
     Result->SetStringField(TEXT("snapshot_id"), Snapshot);
     if (Mode == TEXT("inspect"))
     {
         Result->SetStringField(TEXT("blueprint_family"), BlueprintFamily);
         Result->SetObjectField(TEXT("family_capabilities"), FamilyCapabilities.IsValid()
-            ? FamilyCapabilities.ToSharedRef() : MakeShared<FJsonObject>());
+            ? FamilyCapabilities.ToSharedRef() : MakeShared<FUnrealMCPRecord>());
     }
     Result->SetArrayField(TEXT("records"), Page);
     Result->SetNumberField(TEXT("record_count"), Records.Num());

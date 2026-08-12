@@ -20,7 +20,7 @@ static bool CollectOverviewAndComponents(
 {
 if (Sections.Contains(TEXT("summary")))
 {
-    const TSharedRef<FJsonObject> Value = Record(TEXT("summary"));
+    const TSharedRef<FUnrealMCPRecord> Value = Record(TEXT("summary"));
     Value->SetStringField(TEXT("asset_path"), AssetPath);
     Value->SetStringField(TEXT("asset_name"), Blueprint->GetName());
     Value->SetBoolField(TEXT("was_loaded"), bWasLoaded);
@@ -33,14 +33,14 @@ if (Sections.Contains(TEXT("summary")))
 }
 if (Sections.Contains(TEXT("parent_class")))
 {
-    const TSharedRef<FJsonObject> Value = Record(TEXT("parent_class"));
+    const TSharedRef<FUnrealMCPRecord> Value = Record(TEXT("parent_class"));
     Value->SetStringField(TEXT("class_path"), Blueprint->ParentClass->GetPathName());
     Value->SetBoolField(TEXT("blueprint_generated"), UBlueprint::GetBlueprintFromClass(Blueprint->ParentClass) != nullptr);
     AddRecord(Sink.Records, Value);
 }
 if (Sections.Contains(TEXT("compile_state")))
 {
-    const TSharedRef<FJsonObject> Value = Record(TEXT("compile_state"));
+    const TSharedRef<FUnrealMCPRecord> Value = Record(TEXT("compile_state"));
     Value->SetStringField(TEXT("state"), CompileState(Blueprint->Status));
     Value->SetBoolField(TEXT("being_compiled"), Blueprint->bBeingCompiled != 0);
     AddRecord(Sink.Records, Value);
@@ -72,7 +72,7 @@ for (const TPair<UBlueprint*, FString>& Owner : Owners)
     for (USCS_Node* Node : Owner.Key->SimpleConstructionScript->GetAllNodes())
     {
         if (Node == nullptr) continue;
-        const TSharedRef<FJsonObject> Value = Record(TEXT("component"));
+        const TSharedRef<FUnrealMCPRecord> Value = Record(TEXT("component"));
         const FString Id = GuidString(Node->VariableGuid);
         if (Id == ComponentFilter) bComponentFound = true;
         const USCS_Node* const* Parent = Parents.Find(Node);
@@ -118,7 +118,7 @@ if (bIncludeInherited && Blueprint->GeneratedClass != nullptr)
         for (UActorComponent* Component : NativeComponents)
         {
             if (Component == nullptr || Component->CreationMethod != EComponentCreationMethod::Native) continue;
-            const TSharedRef<FJsonObject> Value = Record(TEXT("component"));
+            const TSharedRef<FUnrealMCPRecord> Value = Record(TEXT("component"));
             const FString DefaultsFingerprint = AddComponentDefaults(Component, PropertyNames, Value);
             if (Sections.Contains(TEXT("components")) && ComponentFilter.IsEmpty())
             {
@@ -148,17 +148,17 @@ if (Sections.Contains(TEXT("class_defaults")))
     UObject* Defaults = Blueprint->GeneratedClass != nullptr ? Blueprint->GeneratedClass->GetDefaultObject(false) : nullptr;
     if (Defaults == nullptr)
     {
-        OutError = {TEXT("busy"), TEXT("The Blueprint generated-class defaults are unavailable"), MakeShared<FJsonObject>(), true};
+        OutError = {TEXT("busy"), TEXT("The Blueprint generated-class defaults are unavailable"), MakeShared<FUnrealMCPRecord>(), true};
         return false;
     }
     TArray<FString> SortedNames = PropertyNames.Array();
     SortedNames.Sort();
     for (const FString& Name : SortedNames)
     {
-        const TSharedRef<FJsonObject> Value = Record(TEXT("class_default"));
-        const TSharedRef<FJsonObject> Encoded = UnrealMCP::PropertyCodec::Encode(
+        const TSharedRef<FUnrealMCPRecord> Value = Record(TEXT("class_default"));
+        const TSharedRef<FUnrealMCPRecord> Encoded = UnrealMCP::PropertyCodec::Encode(
             Defaults, Defaults->GetClass()->FindPropertyByName(FName(*Name)));
-        for (const TPair<FString, TSharedPtr<FJsonValue>>& Pair : Encoded->Values) Value->SetField(Pair.Key, Pair.Value);
+        for (const TPair<FString, TSharedPtr<FUnrealMCPValue>>& Pair : Encoded->Values) Value->SetField(Pair.Key, Pair.Value);
         AddRecord(Sink.Records, Value);
     }
 }
@@ -184,7 +184,7 @@ for (const TPair<UBlueprint*, FString>& Owner : Owners)
         const FString EffectiveDefault = VariableDefaultText(Owner.Key, Variable);
         if (Sections.Contains(TEXT("variables")) && bSelected)
         {
-            const TSharedRef<FJsonObject> Value = Record(TEXT("variable"));
+            const TSharedRef<FUnrealMCPRecord> Value = Record(TEXT("variable"));
             Value->SetStringField(TEXT("id"), Id);
             Value->SetBoolField(TEXT("identity_stable"), !Id.IsEmpty());
             Value->SetStringField(TEXT("name"), Variable.VarName.ToString());
@@ -259,19 +259,19 @@ for (const TPair<UBlueprint*, FString>& Owner : Owners)
             Sink.Fingerprint.Add(TEXT("function|missing_entry|") + Owner.Value + TEXT("|") + FunctionId + TEXT("|") + FunctionGraph->GetName());
             continue;
         }
-        const TSharedRef<FJsonObject> Signature = FunctionSignature(Entry, Results);
-        const TSharedRef<FJsonObject> References = FunctionReferences(Blueprint, FunctionGraph);
-        TArray<TSharedPtr<FJsonValue>> RepNotifyMembers;
+        const TSharedRef<FUnrealMCPRecord> Signature = FunctionSignature(Entry, Results);
+        const TSharedRef<FUnrealMCPRecord> References = FunctionReferences(Blueprint, FunctionGraph);
+        TArray<TSharedPtr<FUnrealMCPValue>> RepNotifyMembers;
         for (const FBPVariableDescription& Variable : Owner.Key->NewVariables)
         {
             if (Variable.RepNotifyFunc == FunctionGraph->GetFName())
             {
-                RepNotifyMembers.Add(MakeShared<FJsonValueString>(GuidString(Variable.VarGuid)));
+                RepNotifyMembers.Add(MakeShared<FUnrealMCPValueString>(GuidString(Variable.VarGuid)));
             }
         }
         if (Sections.Contains(TEXT("functions")))
         {
-            const TSharedRef<FJsonObject> Value = Record(TEXT("function"));
+            const TSharedRef<FUnrealMCPRecord> Value = Record(TEXT("function"));
             Value->SetStringField(TEXT("id"), FunctionId);
             Value->SetBoolField(TEXT("identity_stable"), !FunctionId.IsEmpty());
             Value->SetStringField(TEXT("name"), FunctionGraph->GetName());
@@ -282,7 +282,7 @@ for (const TPair<UBlueprint*, FString>& Owner : Owners)
             Value->SetObjectField(TEXT("signature"), Signature);
             Value->SetObjectField(TEXT("metadata"), FunctionMetadata(Entry));
             Value->SetObjectField(TEXT("reference_summary"), References);
-            const TSharedRef<FJsonObject> Required = MakeShared<FJsonObject>();
+            const TSharedRef<FUnrealMCPRecord> Required = MakeShared<FUnrealMCPRecord>();
             Required->SetStringField(TEXT("entry_node_id"), GuidString(Entry->NodeGuid));
             Required->SetBoolField(TEXT("entry_present"), true);
             Required->SetNumberField(TEXT("result_count"), Results.Num());
@@ -290,7 +290,7 @@ for (const TPair<UBlueprint*, FString>& Owner : Owners)
             Required->SetBoolField(TEXT("result_present"), !Results.IsEmpty());
             Required->SetBoolField(TEXT("valid"), !Results.IsEmpty());
             Value->SetObjectField(TEXT("required_nodes"), Required);
-            const TSharedRef<FJsonObject> Boundary = ReplacementBoundaryRecord(
+            const TSharedRef<FUnrealMCPRecord> Boundary = ReplacementBoundaryRecord(
                 ReplacementBoundary, bEditable && bReplaceableBoundary);
             Boundary->SetStringField(TEXT("function_fingerprint"),
                 bReplaceableBoundary ? ReplacementBoundary.Fingerprint : FString());
@@ -310,7 +310,7 @@ for (const TPair<UBlueprint*, FString>& Owner : Owners)
                 UEdGraphPin* LivePin = Node->FindPin(Pin->PinName);
                 if (Sections.Contains(TEXT("parameters")) && MacroFilter.IsEmpty() && CustomEventFilter.IsEmpty())
                 {
-                    const TSharedRef<FJsonObject> Value = Record(TEXT("parameter"));
+                    const TSharedRef<FUnrealMCPRecord> Value = Record(TEXT("parameter"));
                     Value->SetStringField(TEXT("id"), LivePin != nullptr ? GuidString(LivePin->PinId) : FString());
                     Value->SetBoolField(TEXT("identity_stable"), LivePin != nullptr && LivePin->PinId.IsValid());
                     Value->SetStringField(TEXT("function_id"), FunctionId);
@@ -340,10 +340,10 @@ for (const TPair<UBlueprint*, FString>& Owner : Owners)
             const FString LocalId = GuidString(Local.VarGuid);
             if (!LocalFilter.IsEmpty() && LocalId != LocalFilter) continue;
             bLocalFound = true;
-            const TSharedRef<FJsonObject> LocalReferenceSummary = LocalReferences(Blueprint, FunctionGraph, Local.VarName);
+            const TSharedRef<FUnrealMCPRecord> LocalReferenceSummary = LocalReferences(Blueprint, FunctionGraph, Local.VarName);
             if (Sections.Contains(TEXT("local_variables")))
             {
-                const TSharedRef<FJsonObject> Value = Record(TEXT("local_variable"));
+                const TSharedRef<FUnrealMCPRecord> Value = Record(TEXT("local_variable"));
                 Value->SetStringField(TEXT("id"), LocalId);
                 Value->SetBoolField(TEXT("identity_stable"), !LocalId.IsEmpty());
                 Value->SetStringField(TEXT("name"), Local.VarName.ToString());
@@ -351,7 +351,7 @@ for (const TPair<UBlueprint*, FString>& Owner : Owners)
                 Value->SetBoolField(TEXT("inherited"), !bLocalOwner);
                 Value->SetStringField(TEXT("ownership"), bLocalOwner ? TEXT("local") : TEXT("inherited"));
                 Value->SetBoolField(TEXT("editable"), bEditable && !LocalId.IsEmpty());
-                const TSharedRef<FJsonObject> Scope = MakeShared<FJsonObject>();
+                const TSharedRef<FUnrealMCPRecord> Scope = MakeShared<FUnrealMCPRecord>();
                 Scope->SetStringField(TEXT("function_id"), FunctionId);
                 Scope->SetStringField(TEXT("function_name"), FunctionGraph->GetName());
                 Value->SetObjectField(TEXT("scope"), Scope);
@@ -412,11 +412,11 @@ for (const TPair<UBlueprint*, FString>& Owner : Owners)
         UnrealMCP::BlueprintLogicUnitFingerprint::FBoundary ReplacementBoundary;
         const bool bReplaceableBoundary =
             UnrealMCP::BlueprintLogicUnitFingerprint::DescribeMacro(MacroGraph, ReplacementBoundary);
-        const TSharedRef<FJsonObject> Signature = MacroSignature(Entry, Exit, bPure);
-        const TSharedRef<FJsonObject> References = MacroReferences(Blueprint, MacroGraph);
+        const TSharedRef<FUnrealMCPRecord> Signature = MacroSignature(Entry, Exit, bPure);
+        const TSharedRef<FUnrealMCPRecord> References = MacroReferences(Blueprint, MacroGraph);
         if (Sections.Contains(TEXT("macros")))
         {
-            const TSharedRef<FJsonObject> Value = Record(TEXT("macro"));
+            const TSharedRef<FUnrealMCPRecord> Value = Record(TEXT("macro"));
             Value->SetStringField(TEXT("id"), MacroId);
             Value->SetBoolField(TEXT("identity_stable"), !MacroId.IsEmpty());
             Value->SetStringField(TEXT("name"), MacroGraph->GetName());
@@ -428,11 +428,11 @@ for (const TPair<UBlueprint*, FString>& Owner : Owners)
             Value->SetObjectField(TEXT("metadata"), Entry != nullptr
                 ? CallableMetadata(Entry->MetaData, false) : CallableMetadata(FKismetUserDeclaredFunctionMetadata(), false));
             Value->SetObjectField(TEXT("reference_summary"), References);
-            const TSharedRef<FJsonObject> Relationship = MakeShared<FJsonObject>();
+            const TSharedRef<FUnrealMCPRecord> Relationship = MakeShared<FUnrealMCPRecord>();
             Relationship->SetStringField(TEXT("graph_id"), MacroId);
             Relationship->SetStringField(TEXT("graph_kind"), TEXT("macro"));
             Value->SetObjectField(TEXT("graph_relationship"), Relationship);
-            const TSharedRef<FJsonObject> Required = MakeShared<FJsonObject>();
+            const TSharedRef<FUnrealMCPRecord> Required = MakeShared<FUnrealMCPRecord>();
             Required->SetStringField(TEXT("entry_node_id"), Entry != nullptr ? GuidString(Entry->NodeGuid) : FString());
             Required->SetStringField(TEXT("exit_node_id"), Exit != nullptr ? GuidString(Exit->NodeGuid) : FString());
             Required->SetBoolField(TEXT("entry_present"), Entry != nullptr);
@@ -454,7 +454,7 @@ for (const TPair<UBlueprint*, FString>& Owner : Owners)
                 if (Sections.Contains(TEXT("parameters")) && FunctionFilter.IsEmpty()
                     && LocalFilter.IsEmpty() && CustomEventFilter.IsEmpty())
                 {
-                    const TSharedRef<FJsonObject> Value = Record(TEXT("parameter"));
+                    const TSharedRef<FUnrealMCPRecord> Value = Record(TEXT("parameter"));
                     Value->SetStringField(TEXT("id"), LivePin != nullptr ? GuidString(LivePin->PinId) : FString());
                     Value->SetBoolField(TEXT("identity_stable"), LivePin != nullptr && LivePin->PinId.IsValid());
                     Value->SetStringField(TEXT("owner_kind"), TEXT("macro"));

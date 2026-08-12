@@ -1,5 +1,6 @@
 # Completed features
 
+- [`native-wire-contracts` — Typed native request and result records](native-wire-contracts.md).
 - [`asset-inspect-core` — General asset inspection foundation and gameplay Blueprints](asset-inspect-core.md).
 - [`companion-plugins` — Companion plugin extension foundation](companion-plugins.md).
 - [`gas-ability-blueprints-inspect` — Gameplay Ability Blueprint inspection](gas-ability-blueprints-inspect.md).

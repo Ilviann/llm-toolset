@@ -1,7 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Dom/JsonObject.h"
+#include "UnrealMCPWireTypes.h"
 #include "UnrealMCPProtocol.h"
 
 namespace UnrealMCP::BlueprintBlockReplacement
@@ -42,7 +42,7 @@ struct FNodePlan
 struct FDefaultPlan
 {
     FEndpoint Endpoint;
-    TSharedPtr<FJsonObject> Value;
+    TSharedPtr<FUnrealMCPRecord> Value;
 };
 
 struct FConnectionPlan
@@ -90,5 +90,5 @@ struct FRequest
 };
 
 FString TargetKindString(ETargetKind Kind);
-bool Decode(const TSharedPtr<FJsonObject>& Arguments, FRequest& OutRequest, FUnrealMCPError& OutError);
+bool Decode(const TSharedPtr<FUnrealMCPRecord>& Arguments, FRequest& OutRequest, FUnrealMCPError& OutError);
 }

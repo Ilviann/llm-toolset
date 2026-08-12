@@ -1,7 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Dom/JsonObject.h"
+#include "UnrealMCPWireTypes.h"
 #include "UnrealMCPProtocol.h"
 
 class FUnrealMCPBlueprintInspector
@@ -13,25 +13,25 @@ public:
         TFunction<double()> InNow = [] { return FPlatformTime::Seconds(); });
 
     bool Execute(
-        const TSharedPtr<FJsonObject>& Arguments,
-        TSharedPtr<FJsonObject>& OutResult,
+        const TSharedPtr<FUnrealMCPRecord>& Arguments,
+        TSharedPtr<FUnrealMCPRecord>& OutResult,
         FUnrealMCPError& OutError);
 
 private:
     struct FCursorState
     {
-        TSharedPtr<FJsonObject> Arguments;
+        TSharedPtr<FUnrealMCPRecord> Arguments;
         FString SnapshotId;
         int32 Offset = 0;
         double ExpiresAt = 0.0;
     };
 
     bool ExecuteInitial(
-        const TSharedPtr<FJsonObject>& Arguments,
+        const TSharedPtr<FUnrealMCPRecord>& Arguments,
         int32 Offset,
         const FString& ExpectedSnapshot,
         int32 PageSizeOverride,
-        TSharedPtr<FJsonObject>& OutResult,
+        TSharedPtr<FUnrealMCPRecord>& OutResult,
         FUnrealMCPError& OutError);
     void RemoveExpiredCursors(double CurrentTime);
 

@@ -1,9 +1,11 @@
 #include "UnrealMCPProtocol.h"
 
+#include "Dom/JsonObject.h"
 #include "HttpServerResponse.h"
 #include "Serialization/JsonReader.h"
 #include "Serialization/JsonSerializer.h"
 #include "Serialization/JsonWriter.h"
+#include "UnrealMCPJsonCodec.h"
 #include "UnrealMCPVersion.h"
 
 namespace
@@ -98,7 +100,10 @@ bool UnrealMCP::Protocol::ConstantTimeEquals(const FString& Left, const FString&
     return Difference == 0U;
 }
 
-bool UnrealMCP::Protocol::ParseCommand(const TArray<uint8>& Body, FString& OutCommand, TSharedPtr<FJsonObject>& OutArguments, FUnrealMCPError& OutError)
+bool UnrealMCP::Protocol::ParseCommand(
+    const TArray<uint8>& Body,
+    FUnrealMCPCommandRequest& OutRequest,
+    FUnrealMCPError& OutError)
 {
     if (Body.Num() <= 0 || Body.Num() > UnrealMCP::MaxRequestBytes)
     {
@@ -120,29 +125,33 @@ bool UnrealMCP::Protocol::ParseCommand(const TArray<uint8>& Body, FString& OutCo
         return false;
     }
     const TSharedPtr<FJsonObject>* ArgumentsPointer = nullptr;
-    if (Root->Values.Num() != 2 || !Root->TryGetStringField(TEXT("command"), OutCommand)
-        || OutCommand.Len() < 1 || OutCommand.Len() > 64
+    FString Command;
+    if (Root->Values.Num() != 2 || !Root->TryGetStringField(TEXT("command"), Command)
+        || Command.Len() < 1 || Command.Len() > 64
         || !Root->TryGetObjectField(TEXT("arguments"), ArgumentsPointer)
         || ArgumentsPointer == nullptr || !ArgumentsPointer->IsValid())
     {
         OutError = {TEXT("invalid_argument"), TEXT("Request must contain only command and arguments")};
         return false;
     }
-    OutArguments = *ArgumentsPointer;
-    if ((OutCommand == TEXT("capabilities") || OutCommand == TEXT("editor_state") || OutCommand == TEXT("editor_shutdown"))
-        && !OutArguments->Values.IsEmpty())
+    TSharedPtr<FUnrealMCPRecord> Arguments;
+    if (!UnrealMCP::JsonCodec::DecodeRecord(*ArgumentsPointer, Arguments, OutError)) return false;
+    if ((Command == TEXT("capabilities") || Command == TEXT("editor_state") || Command == TEXT("editor_shutdown"))
+        && !Arguments->Values.IsEmpty())
     {
         OutError = {TEXT("invalid_argument"), TEXT("This command does not accept arguments")};
         return false;
     }
+    OutRequest.Command = MoveTemp(Command);
+    OutRequest.Arguments = MoveTemp(Arguments);
     return true;
 }
 
-TUniquePtr<FHttpServerResponse> UnrealMCP::Protocol::Success(const TSharedPtr<FJsonObject>& Result)
+TUniquePtr<FHttpServerResponse> UnrealMCP::Protocol::Success(const TSharedPtr<FUnrealMCPRecord>& Result)
 {
     const TSharedRef<FJsonObject> Envelope = MakeShared<FJsonObject>();
     Envelope->SetBoolField(TEXT("ok"), true);
-    Envelope->SetObjectField(TEXT("result"), Result);
+    Envelope->SetObjectField(TEXT("result"), UnrealMCP::JsonCodec::EncodeRecord(Result));
     return SerializeEnvelope(Envelope, EHttpServerResponseCodes::Ok);
 }
 
@@ -151,7 +160,10 @@ TUniquePtr<FHttpServerResponse> UnrealMCP::Protocol::Error(EHttpServerResponseCo
     const TSharedRef<FJsonObject> ErrorObject = MakeShared<FJsonObject>();
     ErrorObject->SetStringField(TEXT("code"), Bounded(ErrorValue.Code, 64));
     ErrorObject->SetStringField(TEXT("message"), Bounded(ErrorValue.Message, 512));
-    ErrorObject->SetObjectField(TEXT("details"), ErrorValue.Details.IsValid() ? ErrorValue.Details : MakeShared<FJsonObject>());
+    ErrorObject->SetObjectField(
+        TEXT("details"),
+        UnrealMCP::JsonCodec::EncodeRecord(
+            ErrorValue.Details.IsValid() ? ErrorValue.Details : MakeShared<FUnrealMCPRecord>()));
     ErrorObject->SetBoolField(TEXT("retryable"), ErrorValue.bRetryable);
     const TSharedRef<FJsonObject> Envelope = MakeShared<FJsonObject>();
     Envelope->SetBoolField(TEXT("ok"), false);
@@ -161,5 +173,5 @@ TUniquePtr<FHttpServerResponse> UnrealMCP::Protocol::Error(EHttpServerResponseCo
 
 TUniquePtr<FHttpServerResponse> UnrealMCP::Protocol::Error(EHttpServerResponseCodes Status, const FString& Code, const FString& Message, bool bRetryable)
 {
-    return Error(Status, FUnrealMCPError{Code, Message, MakeShared<FJsonObject>(), bRetryable});
+    return Error(Status, FUnrealMCPError{Code, Message, MakeShared<FUnrealMCPRecord>(), bRetryable});
 }

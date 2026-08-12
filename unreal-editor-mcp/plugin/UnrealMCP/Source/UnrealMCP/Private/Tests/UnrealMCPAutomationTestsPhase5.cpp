@@ -23,7 +23,7 @@ bool FUnrealMCPPhase5K2TypeCodecTest::RunTest(const FString& Parameters)
     };
     for (const FTypeCase& Case : Cases)
     {
-        const TSharedRef<FJsonObject> Json = K2Type(Case.Category);
+        const TSharedRef<FUnrealMCPRecord> Json = K2Type(Case.Category);
         if (!Case.Subcategory.IsEmpty()) Json->SetStringField(TEXT("subcategory"), Case.Subcategory);
         if (!Case.TypeObject.IsEmpty()) Json->SetStringField(TEXT("type_object"), Case.TypeObject);
         FEdGraphPinType Type;
@@ -37,13 +37,13 @@ bool FUnrealMCPPhase5K2TypeCodecTest::RunTest(const FString& Parameters)
 
     FUnrealMCPError Error;
     FEdGraphPinType ArrayType;
-    const TSharedRef<FJsonObject> ArrayJson = K2Type(TEXT("string"), TEXT("array"));
+    const TSharedRef<FUnrealMCPRecord> ArrayJson = K2Type(TEXT("string"), TEXT("array"));
     TestTrue(TEXT("array type decodes"), UnrealMCP::K2TypeCodec::DecodeType(ArrayJson, ArrayType, Error));
-    const TSharedRef<FJsonObject> ArrayDefault = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> ArrayDefault = MakeShared<FUnrealMCPRecord>();
     ArrayDefault->SetStringField(TEXT("kind"), TEXT("array"));
     ArrayDefault->SetArrayField(TEXT("items"), {
-        MakeShared<FJsonValueObject>(LiteralDefault(MakeShared<FJsonValueString>(TEXT("Alpha")))),
-        MakeShared<FJsonValueObject>(LiteralDefault(MakeShared<FJsonValueString>(TEXT("Beta"))))});
+        MakeShared<FUnrealMCPValueObject>(LiteralDefault(MakeShared<FUnrealMCPValueString>(TEXT("Alpha")))),
+        MakeShared<FUnrealMCPValueObject>(LiteralDefault(MakeShared<FUnrealMCPValueString>(TEXT("Beta"))))});
     FString Encoded;
     TestTrue(TEXT("array default decodes"), UnrealMCP::K2TypeCodec::DecodeDefault(ArrayType, ArrayDefault, Encoded, Error));
     TestEqual(TEXT("array default has canonical bounded text"), Encoded, FString(TEXT("(\"Alpha\",\"Beta\")")));
@@ -51,16 +51,16 @@ bool FUnrealMCPPhase5K2TypeCodecTest::RunTest(const FString& Parameters)
         UnrealMCP::K2TypeCodec::EncodeDefault(ArrayType, Encoded)->GetArrayField(TEXT("items")).Num(), 2);
 
     FEdGraphPinType MapType;
-    const TSharedRef<FJsonObject> MapJson = K2Type(TEXT("name"), TEXT("map"));
+    const TSharedRef<FUnrealMCPRecord> MapJson = K2Type(TEXT("name"), TEXT("map"));
     MapJson->SetObjectField(TEXT("value_type"), K2Type(TEXT("int")));
     MapJson->GetObjectField(TEXT("value_type"))->RemoveField(TEXT("container"));
     TestTrue(TEXT("map type decodes"), UnrealMCP::K2TypeCodec::DecodeType(MapJson, MapType, Error));
-    const TSharedRef<FJsonObject> Entry = MakeShared<FJsonObject>();
-    Entry->SetObjectField(TEXT("key"), LiteralDefault(MakeShared<FJsonValueString>(TEXT("Score"))));
-    Entry->SetObjectField(TEXT("value"), LiteralDefault(MakeShared<FJsonValueNumber>(7)));
-    const TSharedRef<FJsonObject> MapDefault = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Entry = MakeShared<FUnrealMCPRecord>();
+    Entry->SetObjectField(TEXT("key"), LiteralDefault(MakeShared<FUnrealMCPValueString>(TEXT("Score"))));
+    Entry->SetObjectField(TEXT("value"), LiteralDefault(MakeShared<FUnrealMCPValueNumber>(7)));
+    const TSharedRef<FUnrealMCPRecord> MapDefault = MakeShared<FUnrealMCPRecord>();
     MapDefault->SetStringField(TEXT("kind"), TEXT("map"));
-    MapDefault->SetArrayField(TEXT("entries"), {MakeShared<FJsonValueObject>(Entry)});
+    MapDefault->SetArrayField(TEXT("entries"), {MakeShared<FUnrealMCPValueObject>(Entry)});
     TestTrue(TEXT("map default decodes"), UnrealMCP::K2TypeCodec::DecodeDefault(MapType, MapDefault, Encoded, Error));
     TestEqual(TEXT("map default has canonical bounded text"), Encoded, FString(TEXT("((\"Score\",7))")));
 
@@ -85,15 +85,15 @@ bool FUnrealMCPPhase5MemberVariableTest::RunTest(const FString& Parameters)
     const FString AssetPath = Blueprint->GetPathName();
     FUnrealMCPBlueprintInspector Inspector;
     FUnrealMCPBlueprintMutator Mutator(Inspector);
-    TSharedPtr<FJsonObject> Result;
+    TSharedPtr<FUnrealMCPRecord> Result;
     FUnrealMCPError Error;
 
     FString Snapshot = InspectSnapshot(Inspector, AssetPath);
-    TSharedRef<FJsonObject> Add = MemberEditArguments(AssetPath, Snapshot, TEXT("add"));
+    TSharedRef<FUnrealMCPRecord> Add = MemberEditArguments(AssetPath, Snapshot, TEXT("add"));
     Add->SetStringField(TEXT("name"), TEXT("Health"));
     Add->SetObjectField(TEXT("type"), K2Type(TEXT("int")));
-    Add->SetObjectField(TEXT("default"), LiteralDefault(MakeShared<FJsonValueNumber>(100)));
-    const TSharedRef<FJsonObject> Metadata = MakeShared<FJsonObject>();
+    Add->SetObjectField(TEXT("default"), LiteralDefault(MakeShared<FUnrealMCPValueNumber>(100)));
+    const TSharedRef<FUnrealMCPRecord> Metadata = MakeShared<FUnrealMCPRecord>();
     Metadata->SetStringField(TEXT("category"), TEXT("Stats"));
     Metadata->SetStringField(TEXT("tooltip"), TEXT("Current health"));
     Metadata->SetBoolField(TEXT("instance_editable"), true);
@@ -113,34 +113,34 @@ bool FUnrealMCPPhase5MemberVariableTest::RunTest(const FString& Parameters)
         Result->GetObjectField(TEXT("member"))->GetObjectField(TEXT("replication"))->GetStringField(TEXT("mode")), FString(TEXT("replicated")));
 
     Snapshot = Result->GetStringField(TEXT("snapshot_id"));
-    TSharedRef<FJsonObject> TargetedInspect = InspectArguments(AssetPath);
-    TargetedInspect->SetArrayField(TEXT("sections"), {MakeShared<FJsonValueString>(TEXT("variables"))});
+    TSharedRef<FUnrealMCPRecord> TargetedInspect = InspectArguments(AssetPath);
+    TargetedInspect->SetArrayField(TEXT("sections"), {MakeShared<FUnrealMCPValueString>(TEXT("variables"))});
     TargetedInspect->SetStringField(TEXT("member_id"), HealthId);
     if (TestTrue(TEXT("stable member identity supports exact inspection"), Inspector.Execute(TargetedInspect, Result, Error)))
     {
         TestEqual(TEXT("targeted member inspection retains the authoritative snapshot"), Result->GetStringField(TEXT("snapshot_id")), Snapshot);
     }
-    TSharedRef<FJsonObject> Duplicate = MemberEditArguments(AssetPath, Snapshot, TEXT("add"));
+    TSharedRef<FUnrealMCPRecord> Duplicate = MemberEditArguments(AssetPath, Snapshot, TEXT("add"));
     Duplicate->SetStringField(TEXT("name"), TEXT("Health"));
     Duplicate->SetObjectField(TEXT("type"), K2Type(TEXT("boolean")));
     TestFalse(TEXT("duplicate member name rejects"), Mutator.Execute(TEXT("blueprint_member_edit"), Duplicate, Result, Error));
     TestEqual(TEXT("duplicate error is stable"), Error.Code, FString(TEXT("invalid_member")));
     TestEqual(TEXT("duplicate rejection preserves snapshot"), InspectSnapshot(Inspector, AssetPath), Snapshot);
 
-    TSharedRef<FJsonObject> InheritedCollision = MemberEditArguments(AssetPath, Snapshot, TEXT("add"));
+    TSharedRef<FUnrealMCPRecord> InheritedCollision = MemberEditArguments(AssetPath, Snapshot, TEXT("add"));
     InheritedCollision->SetStringField(TEXT("name"), TEXT("InitialLifeSpan"));
     InheritedCollision->SetObjectField(TEXT("type"), K2Type(TEXT("real")));
     InheritedCollision->GetObjectField(TEXT("type"))->SetStringField(TEXT("subcategory"), TEXT("float"));
     TestFalse(TEXT("inherited member collision rejects"), Mutator.Execute(TEXT("blueprint_member_edit"), InheritedCollision, Result, Error));
     TestEqual(TEXT("inherited collision preserves snapshot"), InspectSnapshot(Inspector, AssetPath), Snapshot);
 
-    TSharedRef<FJsonObject> GraphCollision = MemberEditArguments(AssetPath, Snapshot, TEXT("add"));
+    TSharedRef<FUnrealMCPRecord> GraphCollision = MemberEditArguments(AssetPath, Snapshot, TEXT("add"));
     GraphCollision->SetStringField(TEXT("name"), TEXT("EventGraph"));
     GraphCollision->SetObjectField(TEXT("type"), K2Type(TEXT("boolean")));
     TestFalse(TEXT("cross-kind graph collision rejects"), Mutator.Execute(TEXT("blueprint_member_edit"), GraphCollision, Result, Error));
     TestEqual(TEXT("cross-kind rejection preserves snapshot"), InspectSnapshot(Inspector, AssetPath), Snapshot);
 
-    TSharedRef<FJsonObject> Rename = MemberEditArguments(AssetPath, Snapshot, TEXT("rename"));
+    TSharedRef<FUnrealMCPRecord> Rename = MemberEditArguments(AssetPath, Snapshot, TEXT("rename"));
     Rename->SetStringField(TEXT("member_id"), HealthId);
     Rename->SetStringField(TEXT("new_name"), TEXT("HitPoints"));
     if (!TestTrue(TEXT("member rename succeeds"), Mutator.Execute(TEXT("blueprint_member_edit"), Rename, Result, Error)))
@@ -148,20 +148,20 @@ bool FUnrealMCPPhase5MemberVariableTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("rename preserves stable identity"), MemberIdByName(Inspector, AssetPath, TEXT("HitPoints")), HealthId);
 
     Snapshot = Result->GetStringField(TEXT("snapshot_id"));
-    TSharedRef<FJsonObject> UpdateDefault = MemberEditArguments(AssetPath, Snapshot, TEXT("update"));
+    TSharedRef<FUnrealMCPRecord> UpdateDefault = MemberEditArguments(AssetPath, Snapshot, TEXT("update"));
     UpdateDefault->SetStringField(TEXT("member_id"), HealthId);
     UpdateDefault->SetStringField(TEXT("field"), TEXT("default"));
-    UpdateDefault->SetObjectField(TEXT("default"), LiteralDefault(MakeShared<FJsonValueNumber>(125)));
+    UpdateDefault->SetObjectField(TEXT("default"), LiteralDefault(MakeShared<FUnrealMCPValueNumber>(125)));
     if (!TestTrue(TEXT("member default update succeeds"), Mutator.Execute(TEXT("blueprint_member_edit"), UpdateDefault, Result, Error)))
     { AddError(Error.Code + TEXT(": ") + Error.Message); return false; }
     TestEqual(TEXT("updated default reads back exactly"),
         Result->GetObjectField(TEXT("member"))->GetObjectField(TEXT("default"))->GetNumberField(TEXT("value")), 125.0);
 
     const FString BeforeMetadata = Result->GetStringField(TEXT("snapshot_id"));
-    TSharedRef<FJsonObject> UpdateMetadata = MemberEditArguments(AssetPath, BeforeMetadata, TEXT("update"));
+    TSharedRef<FUnrealMCPRecord> UpdateMetadata = MemberEditArguments(AssetPath, BeforeMetadata, TEXT("update"));
     UpdateMetadata->SetStringField(TEXT("member_id"), HealthId);
     UpdateMetadata->SetStringField(TEXT("field"), TEXT("metadata"));
-    const TSharedRef<FJsonObject> MetadataChanges = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> MetadataChanges = MakeShared<FUnrealMCPRecord>();
     MetadataChanges->SetStringField(TEXT("category"), TEXT("Combat"));
     MetadataChanges->SetBoolField(TEXT("save_game"), true);
     MetadataChanges->SetBoolField(TEXT("blueprint_read_only"), true);
@@ -175,7 +175,7 @@ bool FUnrealMCPPhase5MemberVariableTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Redo restores edited member snapshot"), InspectSnapshot(Inspector, AssetPath), AfterMetadata);
 
     Snapshot = AfterMetadata;
-    TSharedRef<FJsonObject> AddReferenced = MemberEditArguments(AssetPath, Snapshot, TEXT("add"));
+    TSharedRef<FUnrealMCPRecord> AddReferenced = MemberEditArguments(AssetPath, Snapshot, TEXT("add"));
     AddReferenced->SetStringField(TEXT("name"), TEXT("Referenced"));
     AddReferenced->SetObjectField(TEXT("type"), K2Type(TEXT("boolean")));
     if (!TestTrue(TEXT("reference fixture member add succeeds"), Mutator.Execute(TEXT("blueprint_member_edit"), AddReferenced, Result, Error)))
@@ -198,14 +198,14 @@ bool FUnrealMCPPhase5MemberVariableTest::RunTest(const FString& Parameters)
     FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(Blueprint);
     Snapshot = InspectSnapshot(Inspector, AssetPath);
 
-    TSharedRef<FJsonObject> RemoveReferenced = MemberEditArguments(AssetPath, Snapshot, TEXT("remove"));
+    TSharedRef<FUnrealMCPRecord> RemoveReferenced = MemberEditArguments(AssetPath, Snapshot, TEXT("remove"));
     RemoveReferenced->SetStringField(TEXT("member_id"), ReferencedId);
     RemoveReferenced->SetStringField(TEXT("policy"), TEXT("reject_if_referenced"));
     TestFalse(TEXT("referenced member removal rejects"), Mutator.Execute(TEXT("blueprint_member_edit"), RemoveReferenced, Result, Error));
     TestEqual(TEXT("referenced removal error is stable"), Error.Code, FString(TEXT("referenced_member")));
     TestEqual(TEXT("referenced removal preserves snapshot"), InspectSnapshot(Inspector, AssetPath), Snapshot);
 
-    TSharedRef<FJsonObject> ChangeReferencedType = MemberEditArguments(AssetPath, Snapshot, TEXT("update"));
+    TSharedRef<FUnrealMCPRecord> ChangeReferencedType = MemberEditArguments(AssetPath, Snapshot, TEXT("update"));
     ChangeReferencedType->SetStringField(TEXT("member_id"), ReferencedId);
     ChangeReferencedType->SetStringField(TEXT("field"), TEXT("type"));
     ChangeReferencedType->SetStringField(TEXT("policy"), TEXT("reject_if_referenced"));
@@ -223,8 +223,8 @@ bool FUnrealMCPPhase5MemberVariableTest::RunTest(const FString& Parameters)
     HitPoints->PropertyFlags |= CPF_Net | CPF_RepNotify;
     FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(Blueprint);
     Snapshot = InspectSnapshot(Inspector, AssetPath);
-    TSharedRef<FJsonObject> RepNotifyInspect = InspectArguments(AssetPath);
-    RepNotifyInspect->SetArrayField(TEXT("sections"), {MakeShared<FJsonValueString>(TEXT("variables"))});
+    TSharedRef<FUnrealMCPRecord> RepNotifyInspect = InspectArguments(AssetPath);
+    RepNotifyInspect->SetArrayField(TEXT("sections"), {MakeShared<FUnrealMCPValueString>(TEXT("variables"))});
     RepNotifyInspect->SetStringField(TEXT("member_id"), HealthId);
     TestTrue(TEXT("RepNotify member inspection succeeds"), Inspector.Execute(RepNotifyInspect, Result, Error));
     TestEqual(TEXT("RepNotify relationship is exposed"),
@@ -245,8 +245,8 @@ bool FUnrealMCPPhase5MemberVariableTest::RunTest(const FString& Parameters)
     FKismetEditorUtilities::CompileBlueprint(Blueprint, EBlueprintCompileOptions::None, &Log);
     TestEqual(TEXT("member-edited Blueprint compiles without errors"), Log.NumErrors, 0);
     const FString ActorClassId = MemberIdByName(Inspector, AssetPath, TEXT("ActorClass"));
-    TSharedRef<FJsonObject> ClassInspect = InspectArguments(AssetPath);
-    ClassInspect->SetArrayField(TEXT("sections"), {MakeShared<FJsonValueString>(TEXT("variables"))});
+    TSharedRef<FUnrealMCPRecord> ClassInspect = InspectArguments(AssetPath);
+    ClassInspect->SetArrayField(TEXT("sections"), {MakeShared<FUnrealMCPValueString>(TEXT("variables"))});
     ClassInspect->SetStringField(TEXT("member_id"), ActorClassId);
     if (TestTrue(TEXT("Blueprint-owned class-reference member inspection is safe"),
         Inspector.Execute(ClassInspect, Result, Error)))

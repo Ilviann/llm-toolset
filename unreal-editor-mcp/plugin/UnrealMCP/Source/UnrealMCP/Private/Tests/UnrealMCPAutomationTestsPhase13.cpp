@@ -83,11 +83,11 @@ bool FUnrealMCPPhase13AtomicGraphEditingTest::RunTest(const FString& Parameters)
     FUnrealMCPBlueprintActionCatalog Catalog(Inspector, TEXT("13131313131313131313131313131313"));
     FUnrealMCPBlueprintGraphEditor Editor(Inspector, Catalog);
     FUnrealMCPBlueprintMutator Mutator(Inspector);
-    TSharedPtr<FJsonObject> Result;
+    TSharedPtr<FUnrealMCPRecord> Result;
     FUnrealMCPError Error;
     auto Edit = [&](const FString& Operation)
     {
-        const TSharedRef<FJsonObject> Arguments = MakeShared<FJsonObject>();
+        const TSharedRef<FUnrealMCPRecord> Arguments = MakeShared<FUnrealMCPRecord>();
         Arguments->SetStringField(TEXT("operation_id"), FGuid::NewGuid().ToString(EGuidFormats::Digits).ToLower());
         Arguments->SetStringField(TEXT("asset_path"), AssetPath);
         Arguments->SetStringField(TEXT("expected_snapshot"), InspectSnapshot(Inspector, AssetPath));
@@ -98,7 +98,7 @@ bool FUnrealMCPPhase13AtomicGraphEditingTest::RunTest(const FString& Parameters)
     auto Connect = [&](FUnrealMCPBlueprintGraphEditor& TargetEditor, UEdGraphNode* FromNode, UEdGraphPin* FromPin,
         UEdGraphNode* ToNode, UEdGraphPin* ToPin, bool bAutomaticConversion, const FString& ExpectedSnapshot = FString())
     {
-        TSharedRef<FJsonObject> Arguments = Edit(TEXT("connect_pins"));
+        TSharedRef<FUnrealMCPRecord> Arguments = Edit(TEXT("connect_pins"));
         if (!ExpectedSnapshot.IsEmpty()) Arguments->SetStringField(TEXT("expected_snapshot"), ExpectedSnapshot);
         Arguments->SetStringField(TEXT("from_node_id"), Id(FromNode->NodeGuid));
         Arguments->SetStringField(TEXT("from_pin_id"), Id(FromPin->PinId));
@@ -138,7 +138,7 @@ bool FUnrealMCPPhase13AtomicGraphEditingTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("rollback restores exact snapshot"), InspectSnapshot(Inspector, AssetPath), BeforeRollback);
 
     TestTrue(TEXT("explicit conversion inserts one bounded node"), Connect(Editor, Literal, LiteralOut, PrintOne, TextIn, true));
-    TSharedPtr<FJsonObject> Connection = Result->GetObjectField(TEXT("changed"))->GetObjectField(TEXT("connection"));
+    TSharedPtr<FUnrealMCPRecord> Connection = Result->GetObjectField(TEXT("changed"))->GetObjectField(TEXT("connection"));
     TestTrue(TEXT("conversion is reported as non-direct"), !Connection->GetBoolField(TEXT("direct")));
     TestTrue(TEXT("conversion opt-in is reported"), Connection->GetBoolField(TEXT("automatic_conversion")));
     TestEqual(TEXT("one conversion node is reported"), static_cast<int32>(Connection->GetNumberField(TEXT("conversion_node_count"))), 1);
@@ -166,14 +166,14 @@ bool FUnrealMCPPhase13AtomicGraphEditingTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("derived tolerance pin is hidden"), DerivedTolerance->bHidden);
     TestTrue(TEXT("derived tolerance pin is untyped"), DerivedTolerance->PinType.PinCategory.IsNone());
     TestEqual(TEXT("derived tolerance pin is unlinked"), DerivedTolerance->LinkedTo.Num(), 0);
-    TSharedRef<FJsonObject> PinInspection = InspectArguments(AssetPath);
-    PinInspection->SetArrayField(TEXT("sections"), {MakeShared<FJsonValueString>(TEXT("pins"))});
+    TSharedRef<FUnrealMCPRecord> PinInspection = InspectArguments(AssetPath);
+    PinInspection->SetArrayField(TEXT("sections"), {MakeShared<FUnrealMCPValueString>(TEXT("pins"))});
     PinInspection->SetStringField(TEXT("graph_id"), GraphId);
     TestTrue(TEXT("specialized comparison pins inspect"), Inspector.Execute(PinInspection, Result, Error));
     int32 DerivedToleranceRecords = 0;
-    for (const TSharedPtr<FJsonValue>& Item : Result->GetArrayField(TEXT("records")))
+    for (const TSharedPtr<FUnrealMCPValue>& Item : Result->GetArrayField(TEXT("records")))
     {
-        const TSharedPtr<FJsonObject>* PinRecord = nullptr;
+        const TSharedPtr<FUnrealMCPRecord>* PinRecord = nullptr;
         FString NodeId;
         FString PinName;
         if (Item.IsValid() && Item->TryGetObject(PinRecord) && PinRecord != nullptr && PinRecord->IsValid()
@@ -210,12 +210,12 @@ bool FUnrealMCPPhase13AtomicGraphEditingTest::RunTest(const FString& Parameters)
         PrintLimit->FindPinChecked(UEdGraphSchema_K2::PN_Execute, EGPD_Input), false, TEXT("0000000000000000000000000000000000000000")));
     TestEqual(TEXT("stale snapshot has stable error"), Error.Code, FString(TEXT("stale_precondition")));
 
-    TSharedRef<FJsonObject> Compile = AssetArguments(AssetPath);
+    TSharedRef<FUnrealMCPRecord> Compile = AssetArguments(AssetPath);
     Compile->SetStringField(TEXT("operation_id"), FGuid::NewGuid().ToString(EGuidFormats::Digits).ToLower());
     Compile->SetStringField(TEXT("expected_snapshot"), InspectSnapshot(Inspector, AssetPath));
     TestTrue(TEXT("Phase 13 Blueprint compiles"), Mutator.Execute(TEXT("blueprint_compile"), Compile, Result, Error));
     TestTrue(TEXT("Phase 13 compile succeeds"), Result->GetBoolField(TEXT("compile_succeeded")));
-    TSharedRef<FJsonObject> Save = AssetArguments(AssetPath);
+    TSharedRef<FUnrealMCPRecord> Save = AssetArguments(AssetPath);
     Save->SetStringField(TEXT("operation_id"), FGuid::NewGuid().ToString(EGuidFormats::Digits).ToLower());
     Save->SetStringField(TEXT("expected_snapshot"), Result->GetStringField(TEXT("snapshot_id")));
     TestTrue(TEXT("Phase 13 Blueprint saves"), Mutator.Execute(TEXT("blueprint_save"), Save, Result, Error));

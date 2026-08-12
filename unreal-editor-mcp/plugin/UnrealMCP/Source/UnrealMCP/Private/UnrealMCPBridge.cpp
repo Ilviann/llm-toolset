@@ -2,7 +2,7 @@
 
 #include "Async/Async.h"
 #include "AssetCompilingManager.h"
-#include "Dom/JsonValue.h"
+#include "UnrealMCPWireTypes.h"
 #include "Editor.h"
 #include "HAL/PlatformMisc.h"
 #include "HAL/PlatformProperties.h"
@@ -43,13 +43,13 @@ namespace
 {
 const FHttpPath RoutePath(TEXT("/unreal-mcp/v1/command"));
 
-TArray<TSharedPtr<FJsonValue>> Strings(std::initializer_list<const TCHAR*> Values)
+TArray<TSharedPtr<FUnrealMCPValue>> Strings(std::initializer_list<const TCHAR*> Values)
 {
-    TArray<TSharedPtr<FJsonValue>> Result;
+    TArray<TSharedPtr<FUnrealMCPValue>> Result;
     Result.Reserve(static_cast<int32>(Values.size()));
     for (const TCHAR* Value : Values)
     {
-        Result.Add(MakeShared<FJsonValueString>(Value));
+        Result.Add(MakeShared<FUnrealMCPValueString>(Value));
     }
     return Result;
 }
@@ -204,7 +204,7 @@ bool FUnrealMCPBridge::HandleRequest(const FHttpServerRequest& Request, const FH
 {
     if (bStopping || bShutdownAccepted || !bReady)
     {
-        const TSharedRef<FJsonObject> Details = MakeShared<FJsonObject>();
+        const TSharedRef<FUnrealMCPRecord> Details = MakeShared<FUnrealMCPRecord>();
         Details->SetBoolField(TEXT("stopping"), bStopping);
         Details->SetBoolField(TEXT("shutdown_accepted"), bShutdownAccepted);
         Details->SetBoolField(TEXT("bridge_ready"), bReady);
@@ -229,14 +229,15 @@ bool FUnrealMCPBridge::HandleRequest(const FHttpServerRequest& Request, const FH
         Complete(UnrealMCP::Protocol::Error(EHttpServerResponseCodes::RequestTooLarge, TEXT("request_too_large"), TEXT("Request body exceeds the configured limit")));
         return true;
     }
-    FString Command;
-    TSharedPtr<FJsonObject> Arguments;
+    FUnrealMCPCommandRequest WireRequest;
     FUnrealMCPError ParseError;
-    if (!UnrealMCP::Protocol::ParseCommand(Request.Body, Command, Arguments, ParseError))
+    if (!UnrealMCP::Protocol::ParseCommand(Request.Body, WireRequest, ParseError))
     {
         Complete(UnrealMCP::Protocol::Error(EHttpServerResponseCodes::BadRequest, ParseError));
         return true;
     }
+    FString Command = MoveTemp(WireRequest.Command);
+    TSharedPtr<FUnrealMCPRecord> Arguments = MoveTemp(WireRequest.Arguments);
     if (Command != TEXT("capabilities") && Command != TEXT("editor_state") && Command != TEXT("editor_shutdown")
         && Command != TEXT("operation_status") && Command != TEXT("operation_cancel") && Command != TEXT("asset_inspect") && Command != TEXT("asset_references")
         && Command != TEXT("asset_delete")
@@ -255,7 +256,7 @@ bool FUnrealMCPBridge::HandleRequest(const FHttpServerRequest& Request, const FH
     }
     if (Command == TEXT("operation_status") || Command == TEXT("operation_cancel"))
     {
-        TSharedPtr<FJsonObject> Status;
+        TSharedPtr<FUnrealMCPRecord> Status;
         FUnrealMCPError Error;
         const bool bResolved = OperationLedger
             && (Command == TEXT("operation_status")
@@ -302,7 +303,7 @@ bool FUnrealMCPBridge::HandleRequest(const FHttpServerRequest& Request, const FH
 
 void FUnrealMCPBridge::DispatchOnGameThread(
     FString Command,
-    TSharedPtr<FJsonObject> Arguments,
+    TSharedPtr<FUnrealMCPRecord> Arguments,
     FString OperationId,
     FString RequestDigest,
     const FHttpResultCallback& Complete,
@@ -328,7 +329,7 @@ void FUnrealMCPBridge::DispatchOnGameThread(
         }
         if (FPlatformTime::Seconds() - AcceptedAt > UnrealMCP::CommandDeadlineSeconds)
         {
-            FUnrealMCPError Timeout{TEXT("timeout"), TEXT("Command expired before Game-thread dispatch"), MakeShared<FJsonObject>(), true};
+            FUnrealMCPError Timeout{TEXT("timeout"), TEXT("Command expired before Game-thread dispatch"), MakeShared<FUnrealMCPRecord>(), true};
             if (!OperationId.IsEmpty() && Pinned->OperationLedger) Pinned->OperationLedger->Reject(OperationId, Timeout);
             Complete(UnrealMCP::Protocol::Error(EHttpServerResponseCodes::GatewayTimeout, Timeout));
             return;
@@ -342,7 +343,7 @@ void FUnrealMCPBridge::DispatchOnGameThread(
                 return;
             }
         }
-        TSharedPtr<FJsonObject> Result;
+        TSharedPtr<FUnrealMCPRecord> Result;
         FUnrealMCPError Error;
         if (!Pinned->Execute(Command, Arguments, Result, Error))
         {
@@ -368,7 +369,7 @@ void FUnrealMCPBridge::DispatchOnGameThread(
     });
 }
 
-bool FUnrealMCPBridge::Execute(const FString& Command, const TSharedPtr<FJsonObject>& Arguments, TSharedPtr<FJsonObject>& OutResult, FUnrealMCPError& OutError)
+bool FUnrealMCPBridge::Execute(const FString& Command, const TSharedPtr<FUnrealMCPRecord>& Arguments, TSharedPtr<FUnrealMCPRecord>& OutResult, FUnrealMCPError& OutError)
 {
     check(IsInGameThread());
     if (Command == TEXT("capabilities"))
@@ -410,14 +411,14 @@ bool FUnrealMCPBridge::Execute(const FString& Command, const TSharedPtr<FJsonObj
         }
         if (OperationLedger)
         {
-            const TSharedPtr<FJsonObject> State = OperationLedger->CurrentState();
+            const TSharedPtr<FUnrealMCPRecord> State = OperationLedger->CurrentState();
             if (static_cast<int32>(State->GetNumberField(TEXT("queued"))) > 0
                 || static_cast<int32>(State->GetNumberField(TEXT("executing"))) > 1)
             {
                 OutError = {
                     TEXT("busy"),
                     TEXT("Asset deletion refused while another retained operation is queued or executing"),
-                    MakeShared<FJsonObject>(),
+                    MakeShared<FUnrealMCPRecord>(),
                     true};
                 return false;
             }
@@ -433,14 +434,14 @@ bool FUnrealMCPBridge::Execute(const FString& Command, const TSharedPtr<FJsonObj
         }
         if (Command != TEXT("level_inspect") && OperationLedger)
         {
-            const TSharedPtr<FJsonObject> State = OperationLedger->CurrentState();
+            const TSharedPtr<FUnrealMCPRecord> State = OperationLedger->CurrentState();
             if (static_cast<int32>(State->GetNumberField(TEXT("queued"))) > 0
                 || static_cast<int32>(State->GetNumberField(TEXT("executing"))) > 1)
             {
                 OutError = {
                     TEXT("busy"),
                     TEXT("Level operation refused while another retained operation is queued or executing"),
-                    MakeShared<FJsonObject>(),
+                    MakeShared<FUnrealMCPRecord>(),
                     true};
                 return false;
             }
@@ -532,9 +533,9 @@ bool FUnrealMCPBridge::Execute(const FString& Command, const TSharedPtr<FJsonObj
     return BlueprintMutator->Execute(Command, Arguments, OutResult, OutError);
 }
 
-TSharedPtr<FJsonObject> FUnrealMCPBridge::Capabilities() const
+TSharedPtr<FUnrealMCPRecord> FUnrealMCPBridge::Capabilities() const
 {
-    const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Result = MakeShared<FUnrealMCPRecord>();
     Result->SetStringField(TEXT("project_hash"), ProjectHash);
     Result->SetStringField(TEXT("bridge_version"), UnrealMCP::Version);
     Result->SetStringField(TEXT("bridge_instance_id"), BridgeInstanceId);
@@ -550,7 +551,7 @@ TSharedPtr<FJsonObject> FUnrealMCPBridge::Capabilities() const
         TEXT("widget_tree_edit"),
         TEXT("gameplay_framework_edit"), TEXT("game_data_inspect"), TEXT("game_data_edit")}));
 
-    const TSharedRef<FJsonObject> Features = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Features = MakeShared<FUnrealMCPRecord>();
     Features->SetBoolField(TEXT("asset_inspection_core"), true);
     Features->SetBoolField(TEXT("blueprint_mutation"), true);
     Features->SetBoolField(TEXT("blueprint_creation"), true);
@@ -640,23 +641,23 @@ TSharedPtr<FJsonObject> FUnrealMCPBridge::Capabilities() const
         ExtensionRegistry->HasReadyFamilyCapability(
             TEXT("commonui_widget"), EUnrealMCPExtensionAccess::Mutation));
     Result->SetObjectField(TEXT("features"), Features);
-    TArray<TSharedPtr<FJsonValue>> BlueprintFamilies =
+    TArray<TSharedPtr<FUnrealMCPValue>> BlueprintFamilies =
         UnrealMCP::BlueprintFamilyPolicy::BuildPublishedMatrix();
     BlueprintFamilies.Append(ExtensionRegistry->BuildBlueprintFamilyCapabilities());
     Result->SetArrayField(TEXT("blueprint_families"), BlueprintFamilies);
-    const TSharedPtr<FJsonObject> CompanionCapabilities = ExtensionRegistry->BuildCapabilities();
+    const TSharedPtr<FUnrealMCPRecord> CompanionCapabilities = ExtensionRegistry->BuildCapabilities();
     Result->SetNumberField(TEXT("companion_api_version"), CompanionCapabilities->GetNumberField(TEXT("companion_api_version")));
     Result->SetNumberField(TEXT("extension_schema_revision"), CompanionCapabilities->GetNumberField(TEXT("extension_schema_revision")));
     Result->SetStringField(TEXT("extension_registry_signature"), CompanionCapabilities->GetStringField(TEXT("registry_signature")));
     Result->SetArrayField(TEXT("companions"), CompanionCapabilities->GetArrayField(TEXT("companions")));
     Result->SetArrayField(TEXT("companion_registration_diagnostics"), CompanionCapabilities->GetArrayField(TEXT("registration_diagnostics")));
 
-    const TSharedRef<FJsonObject> AssetAccess = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> AssetAccess = MakeShared<FUnrealMCPRecord>();
     AssetAccess->SetStringField(TEXT("read_scope"), TEXT("all_mounted_content"));
     AssetAccess->SetStringField(TEXT("mutation_scope"), TEXT("project_content_and_local_project_plugins"));
     Result->SetObjectField(TEXT("asset_access"), AssetAccess);
 
-    const TSharedRef<FJsonObject> Limits = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Limits = MakeShared<FUnrealMCPRecord>();
     Limits->SetNumberField(TEXT("request_bytes"), UnrealMCP::MaxRequestBytes);
     Limits->SetNumberField(TEXT("companion_descriptors"), UnrealMCP::MaxDiscoveredCompanions);
     Limits->SetNumberField(TEXT("companions"), UnrealMCP::MaxAcceptedCompanions);
@@ -748,7 +749,7 @@ TSharedPtr<FJsonObject> FUnrealMCPBridge::Capabilities() const
     Limits->SetNumberField(TEXT("widget_bindings"), UnrealMCP::MaxWidgetBindings);
     Result->SetObjectField(TEXT("limits"), Limits);
 
-    const TSharedRef<FJsonObject> Listener = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Listener = MakeShared<FUnrealMCPRecord>();
     Listener->SetStringField(TEXT("host"), TEXT("127.0.0.1"));
     Listener->SetNumberField(TEXT("port"), Port);
     Listener->SetBoolField(TEXT("authenticated"), true);
@@ -756,9 +757,9 @@ TSharedPtr<FJsonObject> FUnrealMCPBridge::Capabilities() const
     return Result;
 }
 
-TSharedPtr<FJsonObject> FUnrealMCPBridge::EditorState() const
+TSharedPtr<FUnrealMCPRecord> FUnrealMCPBridge::EditorState() const
 {
-    const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Result = MakeShared<FUnrealMCPRecord>();
     Result->SetStringField(TEXT("project_hash"), ProjectHash);
     Result->SetStringField(TEXT("project_name"), FApp::GetProjectName());
     Result->SetBoolField(TEXT("bridge_ready"), bReady);
@@ -769,16 +770,16 @@ TSharedPtr<FJsonObject> FUnrealMCPBridge::EditorState() const
     Result->SetBoolField(TEXT("is_garbage_collecting"), IsGarbageCollecting());
     Result->SetNumberField(TEXT("queued_requests"), Pending.Load());
     Result->SetStringField(TEXT("bridge_instance_id"), BridgeInstanceId);
-    Result->SetObjectField(TEXT("operation"), OperationLedger ? OperationLedger->CurrentState() : MakeShared<FJsonObject>());
+    Result->SetObjectField(TEXT("operation"), OperationLedger ? OperationLedger->CurrentState() : MakeShared<FUnrealMCPRecord>());
     return Result;
 }
 
-bool FUnrealMCPBridge::EditorShutdown(TSharedPtr<FJsonObject>& OutResult, FUnrealMCPError& OutError)
+bool FUnrealMCPBridge::EditorShutdown(TSharedPtr<FUnrealMCPRecord>& OutResult, FUnrealMCPError& OutError)
 {
     check(IsInGameThread());
     if (IsEngineExitRequested())
     {
-        OutResult = MakeShared<FJsonObject>();
+        OutResult = MakeShared<FUnrealMCPRecord>();
         OutResult->SetBoolField(TEXT("accepted"), true);
         OutResult->SetStringField(TEXT("state"), TEXT("already_shutting_down"));
         OutResult->SetStringField(TEXT("project_hash"), ProjectHash);
@@ -796,7 +797,7 @@ bool FUnrealMCPBridge::EditorShutdown(TSharedPtr<FJsonObject>& OutResult, FUnrea
     if (bPlaying || bSimulating || bSaving || bCollecting || bTransaction
         || CompilingAssets > 0 || OtherQueuedRequests > 0)
     {
-        const TSharedRef<FJsonObject> Details = MakeShared<FJsonObject>();
+        const TSharedRef<FUnrealMCPRecord> Details = MakeShared<FUnrealMCPRecord>();
         Details->SetBoolField(TEXT("is_playing"), bPlaying);
         Details->SetBoolField(TEXT("is_simulating"), bSimulating);
         Details->SetBoolField(TEXT("is_saving"), bSaving);
@@ -827,7 +828,7 @@ bool FUnrealMCPBridge::EditorShutdown(TSharedPtr<FJsonObject>& OutResult, FUnrea
     DirtyPackages.Sort();
     if (DirtyPackageCount > 0)
     {
-        const TSharedRef<FJsonObject> Details = MakeShared<FJsonObject>();
+        const TSharedRef<FUnrealMCPRecord> Details = MakeShared<FUnrealMCPRecord>();
         Details->SetNumberField(TEXT("dirty_package_count"), DirtyPackageCount);
         Details->SetBoolField(TEXT("dirty_package_summary_truncated"), DirtyPackageCount > DirtyPackages.Num());
         Details->SetStringField(TEXT("dirty_packages"), FString::Join(DirtyPackages, TEXT(",")).Left(512));
@@ -836,7 +837,7 @@ bool FUnrealMCPBridge::EditorShutdown(TSharedPtr<FJsonObject>& OutResult, FUnrea
     }
 
     bShutdownAccepted = true;
-    OutResult = MakeShared<FJsonObject>();
+    OutResult = MakeShared<FUnrealMCPRecord>();
     OutResult->SetBoolField(TEXT("accepted"), true);
     OutResult->SetStringField(TEXT("state"), TEXT("shutting_down"));
     OutResult->SetNumberField(TEXT("dirty_package_count"), 0);

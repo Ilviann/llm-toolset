@@ -11,7 +11,7 @@ bool FUnrealMCPPhase3CreationTest::RunTest(const FString& Parameters)
     const FString ParentPackage = Base + TEXT("/BP_Created");
     FUnrealMCPBlueprintInspector Inspector;
     FUnrealMCPBlueprintMutator Mutator(Inspector);
-    TSharedPtr<FJsonObject> Result;
+    TSharedPtr<FUnrealMCPRecord> Result;
     FUnrealMCPError Error;
 
     TestTrue(TEXT("native Actor Blueprint creation succeeds"), Mutator.Execute(
@@ -109,7 +109,7 @@ bool FUnrealMCPPhase3FailureTest::RunTest(const FString& Parameters)
     using namespace UnrealMCP::Tests;
     const FString Base = TEXT("/Game/UnrealMCPTests/") + FGuid::NewGuid().ToString(EGuidFormats::Digits);
     FUnrealMCPBlueprintInspector Inspector;
-    TSharedPtr<FJsonObject> Result;
+    TSharedPtr<FUnrealMCPRecord> Result;
     FUnrealMCPError Error;
 
     const FString CompileFailurePackage = Base + TEXT("/BP_CompileFailure");
@@ -171,7 +171,7 @@ bool FUnrealMCPPhase3LiveFixtureTest::RunTest(const FString& Parameters)
         + FGuid::NewGuid().ToString(EGuidFormats::Digits);
     FUnrealMCPBlueprintInspector Inspector;
     FUnrealMCPBlueprintMutator Mutator(Inspector);
-    TSharedPtr<FJsonObject> Result;
+    TSharedPtr<FUnrealMCPRecord> Result;
     FUnrealMCPError Error;
     TestTrue(TEXT("live creation fixture is created through production mutator"), Mutator.Execute(
         TEXT("blueprint_create"), CreateArguments(TEXT("/Script/Engine.Actor"), PackageName), Result, Error));

@@ -11,23 +11,24 @@
 #include "Tests/AutomationEditorCommon.h"
 #include "UnrealMCPLevelActorEditingService.h"
 #include "UnrealMCPLevelService.h"
+#include "UnrealMCPJsonCodec.h"
 
 namespace UnrealMCPLevelEditTestPrivate
 {
-TSharedRef<FJsonObject> Vector(double X, double Y, double Z)
+TSharedRef<FUnrealMCPRecord> Vector(double X, double Y, double Z)
 {
-    const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Result = MakeShared<FUnrealMCPRecord>();
     Result->SetNumberField(TEXT("x"), X);
     Result->SetNumberField(TEXT("y"), Y);
     Result->SetNumberField(TEXT("z"), Z);
     return Result;
 }
 
-TSharedRef<FJsonObject> Transform(const FVector& Location, const FRotator& Rotation = FRotator::ZeroRotator)
+TSharedRef<FUnrealMCPRecord> Transform(const FVector& Location, const FRotator& Rotation = FRotator::ZeroRotator)
 {
-    const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Result = MakeShared<FUnrealMCPRecord>();
     Result->SetObjectField(TEXT("location"), Vector(Location.X, Location.Y, Location.Z));
-    const TSharedRef<FJsonObject> Rotator = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Rotator = MakeShared<FUnrealMCPRecord>();
     Rotator->SetNumberField(TEXT("pitch"), Rotation.Pitch);
     Rotator->SetNumberField(TEXT("yaw"), Rotation.Yaw);
     Rotator->SetNumberField(TEXT("roll"), Rotation.Roll);
@@ -49,9 +50,9 @@ FString ActorId(const FString& MapId, const AActor* Actor)
     return MapId + TEXT(":") + Actor->GetActorGuid().ToString(EGuidFormats::Digits).ToLower();
 }
 
-TSharedRef<FJsonObject> Operation(const TCHAR* Name, const FString& ActorIdentity = FString())
+TSharedRef<FUnrealMCPRecord> Operation(const TCHAR* Name, const FString& ActorIdentity = FString())
 {
-    const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Result = MakeShared<FUnrealMCPRecord>();
     Result->SetStringField(TEXT("operation"), Name);
     if (!ActorIdentity.IsEmpty()) Result->SetStringField(TEXT("actor_id"), ActorIdentity);
     return Result;
@@ -96,12 +97,12 @@ bool FUnrealMCPLevelEditTest::RunTest(const FString& Parameters)
 
     FUnrealMCPLevelService Levels(TEXT("3333333333333333333333333333333333333333"));
     FUnrealMCPLevelActorEditingService Editing(Levels);
-    TSharedPtr<FJsonObject> Result;
+    TSharedPtr<FUnrealMCPRecord> Result;
     FUnrealMCPError Error;
-    const TSharedRef<FJsonObject> Current = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Current = MakeShared<FUnrealMCPRecord>();
     Current->SetStringField(TEXT("mode"), TEXT("current"));
     TestTrue(TEXT("current snapshot succeeds"), Levels.Inspect(Current, Result, Error));
-    const TSharedPtr<FJsonObject> CurrentRecord = Result->GetArrayField(TEXT("records"))[0]->AsObject();
+    const TSharedPtr<FUnrealMCPRecord> CurrentRecord = Result->GetArrayField(TEXT("records"))[0]->AsObject();
     const FString MapId = CurrentRecord->GetStringField(TEXT("map_id"));
     const FString Snapshot = Result->GetStringField(TEXT("snapshot_id"));
     const FString TargetId = ActorId(MapId, Target);
@@ -112,64 +113,64 @@ bool FUnrealMCPLevelEditTest::RunTest(const FString& Parameters)
         TargetId + TEXT("|") + TextComponent->GetName() + TEXT("|")
         + TextComponent->GetClass()->GetPathName() + TEXT("|native_default"));
 
-    const TSharedRef<FJsonObject> CycleAttachA = Operation(TEXT("attach"), TargetId);
+    const TSharedRef<FUnrealMCPRecord> CycleAttachA = Operation(TEXT("attach"), TargetId);
     CycleAttachA->SetStringField(TEXT("parent_actor_id"), ParentId);
-    const TSharedRef<FJsonObject> CycleAttachB = Operation(TEXT("attach"), ParentId);
+    const TSharedRef<FUnrealMCPRecord> CycleAttachB = Operation(TEXT("attach"), ParentId);
     CycleAttachB->SetStringField(TEXT("parent_actor_id"), TargetId);
-    const TSharedRef<FJsonObject> Cycle = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Cycle = MakeShared<FUnrealMCPRecord>();
     Cycle->SetStringField(TEXT("operation_id"), TEXT("43434343434343434343434343434343"));
     Cycle->SetStringField(TEXT("map_id"), MapId);
     Cycle->SetStringField(TEXT("expected_snapshot"), Snapshot);
     Cycle->SetArrayField(TEXT("operations"), {
-        MakeShared<FJsonValueObject>(CycleAttachA), MakeShared<FJsonValueObject>(CycleAttachB)});
+        MakeShared<FUnrealMCPValueObject>(CycleAttachA), MakeShared<FUnrealMCPValueObject>(CycleAttachB)});
     TestFalse(TEXT("complete prevalidation rejects an attachment cycle"), Editing.Edit(Cycle, Result, Error));
     TestEqual(TEXT("cycle rejection is explicit"), Error.Code, FString(TEXT("attachment_cycle")));
     TestNull(TEXT("cycle rejection mutates no attachment"), Target->GetAttachParentActor());
 
-    TArray<TSharedPtr<FJsonValue>> Operations;
-    const TSharedRef<FJsonObject> TransformOp = Operation(TEXT("transform"), TargetId);
+    TArray<TSharedPtr<FUnrealMCPValue>> Operations;
+    const TSharedRef<FUnrealMCPRecord> TransformOp = Operation(TEXT("transform"), TargetId);
     TransformOp->SetObjectField(TEXT("transform"), Transform(FVector(100.0, 200.0, 300.0), FRotator(0.0, 45.0, 0.0)));
-    Operations.Add(MakeShared<FJsonValueObject>(TransformOp));
-    const TSharedRef<FJsonObject> LabelOp = Operation(TEXT("label"), TargetId);
+    Operations.Add(MakeShared<FUnrealMCPValueObject>(TransformOp));
+    const TSharedRef<FUnrealMCPRecord> LabelOp = Operation(TEXT("label"), TargetId);
     LabelOp->SetStringField(TEXT("label"), TEXT("EditedTarget"));
-    Operations.Add(MakeShared<FJsonValueObject>(LabelOp));
-    const TSharedRef<FJsonObject> TagsOp = Operation(TEXT("tags"), TargetId);
-    TagsOp->SetArrayField(TEXT("tags"), {MakeShared<FJsonValueString>(TEXT("Authored")), MakeShared<FJsonValueString>(TEXT("Verified"))});
-    Operations.Add(MakeShared<FJsonValueObject>(TagsOp));
-    const TSharedRef<FJsonObject> DataLayersOp = Operation(TEXT("data_layers"), TargetId);
+    Operations.Add(MakeShared<FUnrealMCPValueObject>(LabelOp));
+    const TSharedRef<FUnrealMCPRecord> TagsOp = Operation(TEXT("tags"), TargetId);
+    TagsOp->SetArrayField(TEXT("tags"), {MakeShared<FUnrealMCPValueString>(TEXT("Authored")), MakeShared<FUnrealMCPValueString>(TEXT("Verified"))});
+    Operations.Add(MakeShared<FUnrealMCPValueObject>(TagsOp));
+    const TSharedRef<FUnrealMCPRecord> DataLayersOp = Operation(TEXT("data_layers"), TargetId);
     DataLayersOp->SetArrayField(TEXT("data_layers"), {});
-    Operations.Add(MakeShared<FJsonValueObject>(DataLayersOp));
-    const TSharedRef<FJsonObject> AttachOp = Operation(TEXT("attach"), TargetId);
+    Operations.Add(MakeShared<FUnrealMCPValueObject>(DataLayersOp));
+    const TSharedRef<FUnrealMCPRecord> AttachOp = Operation(TEXT("attach"), TargetId);
     AttachOp->SetStringField(TEXT("parent_actor_id"), ParentId);
-    Operations.Add(MakeShared<FJsonValueObject>(AttachOp));
+    Operations.Add(MakeShared<FUnrealMCPValueObject>(AttachOp));
     // Attachment adopts the parent's editor folder, so the explicit folder edit is
     // deliberately ordered afterward and defines the batch's final folder state.
-    const TSharedRef<FJsonObject> FolderOp = Operation(TEXT("folder"), TargetId);
+    const TSharedRef<FUnrealMCPRecord> FolderOp = Operation(TEXT("folder"), TargetId);
     FolderOp->SetStringField(TEXT("folder"), TEXT("MCP/Edited"));
-    Operations.Add(MakeShared<FJsonValueObject>(FolderOp));
-    Operations.Add(MakeShared<FJsonValueObject>(Operation(TEXT("detach"), ParentId)));
-    const TSharedRef<FJsonObject> ActorPropertyOp = Operation(TEXT("actor_property"), TargetId);
+    Operations.Add(MakeShared<FUnrealMCPValueObject>(FolderOp));
+    Operations.Add(MakeShared<FUnrealMCPValueObject>(Operation(TEXT("detach"), ParentId)));
+    const TSharedRef<FUnrealMCPRecord> ActorPropertyOp = Operation(TEXT("actor_property"), TargetId);
     ActorPropertyOp->SetStringField(TEXT("property_name"), TEXT("InitialLifeSpan"));
     ActorPropertyOp->SetNumberField(TEXT("value"), 15.0);
-    Operations.Add(MakeShared<FJsonValueObject>(ActorPropertyOp));
-    const TSharedRef<FJsonObject> ComponentOp = Operation(TEXT("component_property"), TargetId);
+    Operations.Add(MakeShared<FUnrealMCPValueObject>(ActorPropertyOp));
+    const TSharedRef<FUnrealMCPRecord> ComponentOp = Operation(TEXT("component_property"), TargetId);
     ComponentOp->SetStringField(TEXT("component_id"), ComponentId);
     ComponentOp->SetStringField(TEXT("property_name"), TEXT("WorldSize"));
     ComponentOp->SetNumberField(TEXT("value"), 128.0);
-    Operations.Add(MakeShared<FJsonValueObject>(ComponentOp));
-    const TSharedRef<FJsonObject> NativeSpawn = Operation(TEXT("spawn"));
+    Operations.Add(MakeShared<FUnrealMCPValueObject>(ComponentOp));
+    const TSharedRef<FUnrealMCPRecord> NativeSpawn = Operation(TEXT("spawn"));
     NativeSpawn->SetStringField(TEXT("class_path"), TEXT("/Script/Engine.StaticMeshActor"));
     NativeSpawn->SetObjectField(TEXT("transform"), Transform(FVector(400.0, 0.0, 0.0)));
     NativeSpawn->SetStringField(TEXT("label"), TEXT("NativeSpawn"));
-    Operations.Add(MakeShared<FJsonValueObject>(NativeSpawn));
-    const TSharedRef<FJsonObject> BlueprintSpawn = Operation(TEXT("spawn"));
+    Operations.Add(MakeShared<FUnrealMCPValueObject>(NativeSpawn));
+    const TSharedRef<FUnrealMCPRecord> BlueprintSpawn = Operation(TEXT("spawn"));
     BlueprintSpawn->SetStringField(TEXT("class_path"), Blueprint->GeneratedClass->GetPathName());
     BlueprintSpawn->SetObjectField(TEXT("transform"), Transform(FVector(500.0, 0.0, 0.0)));
     BlueprintSpawn->SetStringField(TEXT("label"), TEXT("BlueprintSpawn"));
-    Operations.Add(MakeShared<FJsonValueObject>(BlueprintSpawn));
-    Operations.Add(MakeShared<FJsonValueObject>(Operation(TEXT("delete"), DisposableId)));
+    Operations.Add(MakeShared<FUnrealMCPValueObject>(BlueprintSpawn));
+    Operations.Add(MakeShared<FUnrealMCPValueObject>(Operation(TEXT("delete"), DisposableId)));
 
-    const TSharedRef<FJsonObject> Edit = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Edit = MakeShared<FUnrealMCPRecord>();
     Edit->SetStringField(TEXT("operation_id"), TEXT("44444444444444444444444444444444"));
     Edit->SetStringField(TEXT("map_id"), MapId);
     Edit->SetStringField(TEXT("expected_snapshot"), Snapshot);
@@ -191,11 +192,11 @@ bool FUnrealMCPLevelEditTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("attachment changed exactly"), Target->GetAttachParentActor(), static_cast<AActor*>(Parent));
     TestTrue(TEXT("map snapshot advanced"), Result->GetStringField(TEXT("snapshot_id")) != Snapshot);
     TestTrue(TEXT("affected package set includes root"), Result->GetArrayField(TEXT("affected_packages")).ContainsByPredicate(
-        [&PackageName](const TSharedPtr<FJsonValue>& Value) { return Value->AsString() == PackageName; }));
+        [&PackageName](const TSharedPtr<FUnrealMCPValue>& Value) { return Value->AsString() == PackageName; }));
     FString EditedSnapshot = Result->GetStringField(TEXT("snapshot_id"));
-    const TArray<TSharedPtr<FJsonValue>> Affected = Result->GetArrayField(TEXT("affected_packages"));
+    const TArray<TSharedPtr<FUnrealMCPValue>> Affected = Result->GetArrayField(TEXT("affected_packages"));
 
-    TSharedPtr<FJsonObject> Ignored;
+    TSharedPtr<FUnrealMCPRecord> Ignored;
     TestFalse(TEXT("stale batch rejects before mutation"), Editing.Edit(Edit, Ignored, Error));
     TestEqual(TEXT("stale error is explicit"), Error.Code, FString(TEXT("stale_precondition")));
     TestTrue(TEXT("the complete actor batch is one Undo unit"), GEditor->UndoTransaction());
@@ -205,27 +206,27 @@ bool FUnrealMCPLevelEditTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("current snapshot refresh succeeds after Redo"), Levels.Inspect(Current, Result, Error));
     EditedSnapshot = Result->GetStringField(TEXT("snapshot_id"));
 
-    const TSharedRef<FJsonObject> ExpectedComponent = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> ExpectedComponent = MakeShared<FUnrealMCPRecord>();
     ExpectedComponent->SetStringField(TEXT("component_id"), ComponentId);
-    const TSharedRef<FJsonObject> ExpectedWorldSize = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> ExpectedWorldSize = MakeShared<FUnrealMCPRecord>();
     ExpectedWorldSize->SetStringField(TEXT("property_name"), TEXT("WorldSize"));
     ExpectedWorldSize->SetNumberField(TEXT("value"), 128.0);
-    ExpectedComponent->SetArrayField(TEXT("properties"), {MakeShared<FJsonValueObject>(ExpectedWorldSize)});
-    const TSharedRef<FJsonObject> ExpectedActor = MakeShared<FJsonObject>();
+    ExpectedComponent->SetArrayField(TEXT("properties"), {MakeShared<FUnrealMCPValueObject>(ExpectedWorldSize)});
+    const TSharedRef<FUnrealMCPRecord> ExpectedActor = MakeShared<FUnrealMCPRecord>();
     ExpectedActor->SetStringField(TEXT("actor_id"), TargetId);
     ExpectedActor->SetStringField(TEXT("label"), TEXT("EditedTarget"));
     ExpectedActor->SetObjectField(TEXT("transform"), Transform(FVector(100.0, 200.0, 300.0), FRotator(0.0, 45.0, 0.0)));
-    ExpectedActor->SetArrayField(TEXT("tags"), {MakeShared<FJsonValueString>(TEXT("Authored")), MakeShared<FJsonValueString>(TEXT("Verified"))});
+    ExpectedActor->SetArrayField(TEXT("tags"), {MakeShared<FUnrealMCPValueString>(TEXT("Authored")), MakeShared<FUnrealMCPValueString>(TEXT("Verified"))});
     ExpectedActor->SetStringField(TEXT("folder"), TEXT("MCP/Edited"));
-    const TSharedRef<FJsonObject> ExpectedActorProperty = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> ExpectedActorProperty = MakeShared<FUnrealMCPRecord>();
     ExpectedActorProperty->SetStringField(TEXT("property_name"), TEXT("InitialLifeSpan"));
     ExpectedActorProperty->SetNumberField(TEXT("value"), 15.0);
-    ExpectedActor->SetArrayField(TEXT("actor_properties"), {MakeShared<FJsonValueObject>(ExpectedActorProperty)});
-    ExpectedActor->SetArrayField(TEXT("components"), {MakeShared<FJsonValueObject>(ExpectedComponent)});
-    const TSharedRef<FJsonObject> Verification = MakeShared<FJsonObject>();
+    ExpectedActor->SetArrayField(TEXT("actor_properties"), {MakeShared<FUnrealMCPValueObject>(ExpectedActorProperty)});
+    ExpectedActor->SetArrayField(TEXT("components"), {MakeShared<FUnrealMCPValueObject>(ExpectedComponent)});
+    const TSharedRef<FUnrealMCPRecord> Verification = MakeShared<FUnrealMCPRecord>();
     Verification->SetStringField(TEXT("mode"), TEXT("reload"));
-    Verification->SetArrayField(TEXT("actors"), {MakeShared<FJsonValueObject>(ExpectedActor)});
-    const TSharedRef<FJsonObject> Save = MakeShared<FJsonObject>();
+    Verification->SetArrayField(TEXT("actors"), {MakeShared<FUnrealMCPValueObject>(ExpectedActor)});
+    const TSharedRef<FUnrealMCPRecord> Save = MakeShared<FUnrealMCPRecord>();
     Save->SetStringField(TEXT("operation_id"), TEXT("55555555555555555555555555555555"));
     Save->SetStringField(TEXT("map_id"), MapId);
     Save->SetStringField(TEXT("expected_snapshot"), EditedSnapshot);
@@ -239,8 +240,7 @@ bool FUnrealMCPLevelEditTest::RunTest(const FString& Parameters)
     if (!Result->GetBoolField(TEXT("saved")) || !Result->GetBoolField(TEXT("verification_succeeded")))
     {
         FString Encoded;
-        const TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Encoded);
-        FJsonSerializer::Serialize(Result.ToSharedRef(), Writer);
+        UnrealMCP::JsonCodec::Serialize(Result, Encoded);
         AddError(FString::Printf(TEXT("level_save partial result: %s"), *Encoded));
     }
     TestTrue(TEXT("every package saves"), Result->GetBoolField(TEXT("saved")));
@@ -279,13 +279,13 @@ bool FUnrealMCPLevelEditTest::RunTest(const FString& Parameters)
     const FString MoveMapId = Result->GetArrayField(TEXT("records"))[0]->AsObject()->GetStringField(TEXT("map_id"));
     const FString MovingActorId = ActorId(MoveMapId, MovingActor);
     const FGuid MovingGuid = MovingActor->GetActorGuid();
-    const TSharedRef<FJsonObject> MoveOp = Operation(TEXT("move"), MovingActorId);
+    const TSharedRef<FUnrealMCPRecord> MoveOp = Operation(TEXT("move"), MovingActorId);
     MoveOp->SetStringField(TEXT("target_level"), SubPackage);
-    const TSharedRef<FJsonObject> MoveRequest = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> MoveRequest = MakeShared<FUnrealMCPRecord>();
     MoveRequest->SetStringField(TEXT("operation_id"), TEXT("56565656565656565656565656565656"));
     MoveRequest->SetStringField(TEXT("map_id"), MoveMapId);
     MoveRequest->SetStringField(TEXT("expected_snapshot"), Result->GetStringField(TEXT("snapshot_id")));
-    MoveRequest->SetArrayField(TEXT("operations"), {MakeShared<FJsonValueObject>(MoveOp)});
+    MoveRequest->SetArrayField(TEXT("operations"), {MakeShared<FUnrealMCPValueObject>(MoveOp)});
     if (!TestTrue(TEXT("non-partitioned loaded-level move commits"), Editing.Edit(MoveRequest, Result, Error)))
         AddError(FString::Printf(TEXT("move error: %s: %s"), *Error.Code, *Error.Message));
     AActor* MovedActor = nullptr;

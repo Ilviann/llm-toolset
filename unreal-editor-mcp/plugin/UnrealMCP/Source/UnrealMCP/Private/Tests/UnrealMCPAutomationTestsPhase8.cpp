@@ -16,11 +16,11 @@ bool FUnrealMCPPhase8ActionCatalogTest::RunTest(const FString& Parameters)
     const FString EventGraphId = EventGraph->GraphGuid.ToString(EGuidFormats::Digits).ToLower();
     FUnrealMCPBlueprintInspector Inspector;
     FUnrealMCPBlueprintMutator Mutator(Inspector);
-    TSharedPtr<FJsonObject> Result;
+    TSharedPtr<FUnrealMCPRecord> Result;
     FUnrealMCPError Error;
 
     FString Snapshot = InspectSnapshot(Inspector, AssetPath);
-    TSharedRef<FJsonObject> AddImpure = ScopedMemberEditArguments(AssetPath, Snapshot, TEXT("function"), TEXT("add"));
+    TSharedRef<FUnrealMCPRecord> AddImpure = ScopedMemberEditArguments(AssetPath, Snapshot, TEXT("function"), TEXT("add"));
     AddImpure->SetStringField(TEXT("name"), TEXT("RunCatalogWork"));
     AddImpure->SetObjectField(TEXT("signature"), FunctionSignature(TEXT("public"), false, false, {}));
     if (!TestTrue(TEXT("impure catalog fixture function is added"),
@@ -28,15 +28,15 @@ bool FUnrealMCPPhase8ActionCatalogTest::RunTest(const FString& Parameters)
     { AddError(Error.Code + TEXT(": ") + Error.Message); return false; }
     const FString FunctionGraphId = Result->GetObjectField(TEXT("function"))->GetStringField(TEXT("id"));
     Snapshot = Result->GetStringField(TEXT("snapshot_id"));
-    TSharedRef<FJsonObject> AddPure = ScopedMemberEditArguments(AssetPath, Snapshot, TEXT("function"), TEXT("add"));
+    TSharedRef<FUnrealMCPRecord> AddPure = ScopedMemberEditArguments(AssetPath, Snapshot, TEXT("function"), TEXT("add"));
     AddPure->SetStringField(TEXT("name"), TEXT("ReadCatalogValue"));
     AddPure->SetObjectField(TEXT("signature"), FunctionSignature(TEXT("public"), true, true, {
-        MakeShared<FJsonValueObject>(FunctionParameter(TEXT("Value"), TEXT("output"), K2Type(TEXT("int"))))}));
+        MakeShared<FUnrealMCPValueObject>(FunctionParameter(TEXT("Value"), TEXT("output"), K2Type(TEXT("int"))))}));
     if (!TestTrue(TEXT("pure catalog fixture function is added"),
         Mutator.Execute(TEXT("blueprint_member_edit"), AddPure, Result, Error)))
     { AddError(Error.Code + TEXT(": ") + Error.Message); return false; }
     Snapshot = Result->GetStringField(TEXT("snapshot_id"));
-    TSharedRef<FJsonObject> AddMacro = ScopedMemberEditArguments(AssetPath, Snapshot, TEXT("macro"), TEXT("add"));
+    TSharedRef<FUnrealMCPRecord> AddMacro = ScopedMemberEditArguments(AssetPath, Snapshot, TEXT("macro"), TEXT("add"));
     AddMacro->SetStringField(TEXT("name"), TEXT("CatalogMacro"));
     AddMacro->SetObjectField(TEXT("signature"), MacroSignature(true, {}));
     if (!TestTrue(TEXT("catalog fixture macro is added"),
@@ -50,7 +50,7 @@ bool FUnrealMCPPhase8ActionCatalogTest::RunTest(const FString& Parameters)
     FUnrealMCPBlueprintActionCatalog Catalog(Inspector, TEXT("11111111111111111111111111111111"), [&Clock] { return Clock; });
     auto CatalogArguments = [&](const FString& Family, const FString& Function, const FString& Member, int32 Limit = 20)
     {
-        const TSharedRef<FJsonObject> Arguments = MakeShared<FJsonObject>();
+        const TSharedRef<FUnrealMCPRecord> Arguments = MakeShared<FUnrealMCPRecord>();
         Arguments->SetStringField(TEXT("asset_path"), AssetPath);
         Arguments->SetStringField(TEXT("graph_id"), EventGraphId);
         Arguments->SetStringField(TEXT("expected_snapshot"), Snapshot);
@@ -60,10 +60,10 @@ bool FUnrealMCPPhase8ActionCatalogTest::RunTest(const FString& Parameters)
         Arguments->SetNumberField(TEXT("limit"), Limit);
         return Arguments;
     };
-    auto FirstAction = [](const TSharedPtr<FJsonObject>& CatalogResult) -> TSharedPtr<FJsonObject>
+    auto FirstAction = [](const TSharedPtr<FUnrealMCPRecord>& CatalogResult) -> TSharedPtr<FUnrealMCPRecord>
     {
         if (!CatalogResult.IsValid()) return nullptr;
-        const TArray<TSharedPtr<FJsonValue>>& Actions = CatalogResult->GetArrayField(TEXT("actions"));
+        const TArray<TSharedPtr<FUnrealMCPValue>>& Actions = CatalogResult->GetArrayField(TEXT("actions"));
         return !Actions.IsEmpty() ? Actions[0]->AsObject() : nullptr;
     };
 
@@ -72,32 +72,32 @@ bool FUnrealMCPPhase8ActionCatalogTest::RunTest(const FString& Parameters)
     const int32 TransactionsBefore = GEditor != nullptr && GEditor->Trans != nullptr ? GEditor->Trans->GetQueueLength() : 0;
     const int32 SelectedObjectsBefore = GEditor != nullptr && GEditor->GetSelectedObjects() != nullptr ? GEditor->GetSelectedObjects()->Num() : 0;
     const int32 SelectedActorsBefore = GEditor != nullptr && GEditor->GetSelectedActors() != nullptr ? GEditor->GetSelectedActors()->Num() : 0;
-    TSharedRef<FJsonObject> VariableGet = CatalogArguments(TEXT("variable_get"), FString(), TEXT("Health"));
+    TSharedRef<FUnrealMCPRecord> VariableGet = CatalogArguments(TEXT("variable_get"), FString(), TEXT("Health"));
     if (!TestTrue(TEXT("local member variable getter catalogs"), Catalog.Execute(VariableGet, Result, Error)))
     { AddError(Error.Code + TEXT(": ") + Error.Message); return false; }
-    TSharedPtr<FJsonObject> Action = FirstAction(Result);
+    TSharedPtr<FUnrealMCPRecord> Action = FirstAction(Result);
     if (!TestNotNull(TEXT("variable getter returns an action"), Action.Get())) return false;
     TestEqual(TEXT("variable action family is exact"), Action->GetStringField(TEXT("node_family")), FString(TEXT("variable_get")));
     TestEqual(TEXT("variable action member is exact"), Action->GetStringField(TEXT("member_name")), FString(TEXT("Health")));
     TestEqual(TEXT("opaque action identity is bounded"), Action->GetStringField(TEXT("action_id")).Len(), 32);
     const FString FirstVariableId = Action->GetStringField(TEXT("action_id"));
 
-    TSharedRef<FJsonObject> VariableSet = CatalogArguments(TEXT("variable_set"), FString(), TEXT("Health"));
+    TSharedRef<FUnrealMCPRecord> VariableSet = CatalogArguments(TEXT("variable_set"), FString(), TEXT("Health"));
     TestTrue(TEXT("local member variable setter catalogs"), Catalog.Execute(VariableSet, Result, Error));
     Action = FirstAction(Result);
     if (!TestNotNull(TEXT("variable setter returns an action"), Action.Get())) return false;
     TestEqual(TEXT("variable setter family is exact"), Action->GetStringField(TEXT("node_family")), FString(TEXT("variable_set")));
 
-    TSharedRef<FJsonObject> FunctionGraphCatalog = CatalogArguments(TEXT("variable_get"), FString(), TEXT("Health"));
+    TSharedRef<FUnrealMCPRecord> FunctionGraphCatalog = CatalogArguments(TEXT("variable_get"), FString(), TEXT("Health"));
     FunctionGraphCatalog->SetStringField(TEXT("graph_id"), FunctionGraphId);
     TestTrue(TEXT("function graph returns a core catalog"), Catalog.Execute(FunctionGraphCatalog, Result, Error));
     TestNotNull(TEXT("function graph has a variable action"), FirstAction(Result).Get());
-    TSharedRef<FJsonObject> MacroGraphCatalog = CatalogArguments(TEXT("variable_get"), FString(), TEXT("Health"));
+    TSharedRef<FUnrealMCPRecord> MacroGraphCatalog = CatalogArguments(TEXT("variable_get"), FString(), TEXT("Health"));
     MacroGraphCatalog->SetStringField(TEXT("graph_id"), MacroGraphId);
     TestTrue(TEXT("macro graph returns a core catalog"), Catalog.Execute(MacroGraphCatalog, Result, Error));
     TestNotNull(TEXT("macro graph has a variable action"), FirstAction(Result).Get());
 
-    TSharedPtr<FJsonObject> CachedResult;
+    TSharedPtr<FUnrealMCPRecord> CachedResult;
     TestTrue(TEXT("identical query uses retained catalog"), Catalog.Execute(VariableGet, CachedResult, Error));
     TestEqual(TEXT("cached action identity is stable"), FirstAction(CachedResult)->GetStringField(TEXT("action_id")), FirstVariableId);
 
@@ -105,34 +105,34 @@ bool FUnrealMCPPhase8ActionCatalogTest::RunTest(const FString& Parameters)
     {
         if (QueryLimit == 20) continue;
         Clock += 0.001;
-        TSharedRef<FJsonObject> DistinctQuery = CatalogArguments(TEXT("variable_get"), FString(), TEXT("Health"), QueryLimit);
+        TSharedRef<FUnrealMCPRecord> DistinctQuery = CatalogArguments(TEXT("variable_get"), FString(), TEXT("Health"), QueryLimit);
         if (!TestTrue(TEXT("distinct retained catalog executes"), Catalog.Execute(DistinctQuery, Result, Error))) return false;
     }
     TestTrue(TEXT("evicted catalog rebuilds"), Catalog.Execute(VariableGet, Result, Error));
     const FString AfterEvictionId = FirstAction(Result)->GetStringField(TEXT("action_id"));
     TestNotEqual(TEXT("catalog-capacity eviction invalidates action identity"), AfterEvictionId, FirstVariableId);
 
-    TSharedRef<FJsonObject> PureFunction = CatalogArguments(TEXT("function_call"), TEXT("ReadCatalogValue"), FString());
+    TSharedRef<FUnrealMCPRecord> PureFunction = CatalogArguments(TEXT("function_call"), TEXT("ReadCatalogValue"), FString());
     TestTrue(TEXT("pure local function catalogs"), Catalog.Execute(PureFunction, Result, Error));
     Action = FirstAction(Result);
     if (!TestNotNull(TEXT("pure function returns an action"), Action.Get())) return false;
     TestTrue(TEXT("pure function metadata is reported"), Action->GetBoolField(TEXT("pure")));
     TestFalse(TEXT("local function is instance context"), Action->GetBoolField(TEXT("static")));
 
-    TSharedRef<FJsonObject> ImpureFunction = CatalogArguments(TEXT("function_call"), TEXT("RunCatalogWork"), FString());
+    TSharedRef<FUnrealMCPRecord> ImpureFunction = CatalogArguments(TEXT("function_call"), TEXT("RunCatalogWork"), FString());
     TestTrue(TEXT("impure local function catalogs"), Catalog.Execute(ImpureFunction, Result, Error));
     Action = FirstAction(Result);
     if (!TestNotNull(TEXT("impure function returns an action"), Action.Get())) return false;
     TestFalse(TEXT("impure function metadata is reported"), Action->GetBoolField(TEXT("pure")));
 
-    TSharedRef<FJsonObject> InheritedFunction = CatalogArguments(TEXT("function_call"), TEXT("K2_GetActorLocation"), FString());
+    TSharedRef<FUnrealMCPRecord> InheritedFunction = CatalogArguments(TEXT("function_call"), TEXT("K2_GetActorLocation"), FString());
     InheritedFunction->SetStringField(TEXT("owner_class"), TEXT("/Script/Engine.Actor"));
     TestTrue(TEXT("inherited Actor function catalogs"), Catalog.Execute(InheritedFunction, Result, Error));
     Action = FirstAction(Result);
     if (!TestNotNull(TEXT("inherited function returns an action"), Action.Get())) return false;
     TestEqual(TEXT("inherited owner is exact"), Action->GetStringField(TEXT("owner_class")), FString(TEXT("/Script/Engine.Actor")));
 
-    TSharedRef<FJsonObject> StaticFunction = CatalogArguments(TEXT("function_call"), TEXT("PrintString"), FString());
+    TSharedRef<FUnrealMCPRecord> StaticFunction = CatalogArguments(TEXT("function_call"), TEXT("PrintString"), FString());
     StaticFunction->SetStringField(TEXT("owner_class"), TEXT("/Script/Engine.KismetSystemLibrary"));
     TestTrue(TEXT("static function catalogs"), Catalog.Execute(StaticFunction, Result, Error));
     Action = FirstAction(Result);
@@ -140,7 +140,7 @@ bool FUnrealMCPPhase8ActionCatalogTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("static function context is reported"), Action->GetBoolField(TEXT("static")));
     TestEqual(TEXT("static owner is exact"), Action->GetStringField(TEXT("owner_class")), FString(TEXT("/Script/Engine.KismetSystemLibrary")));
 
-    TSharedRef<FJsonObject> Truncated = CatalogArguments(FString(), FString(), FString(), 1);
+    TSharedRef<FUnrealMCPRecord> Truncated = CatalogArguments(FString(), FString(), FString(), 1);
     TestTrue(TEXT("broad catalog remains bounded"), Catalog.Execute(Truncated, Result, Error));
     TestEqual(TEXT("result limit is applied"), Result->GetIntegerField(TEXT("returned_count")), 1);
     TestTrue(TEXT("bounded result reports truncation"), Result->GetBoolField(TEXT("truncated")));
@@ -152,14 +152,14 @@ bool FUnrealMCPPhase8ActionCatalogTest::RunTest(const FString& Parameters)
         if (Node != nullptr && !Node->Pins.IsEmpty()) { ContextNode = Node; ContextPin = Node->Pins[0]; break; }
     }
     if (!TestNotNull(TEXT("fixture has a pin context"), ContextPin)) return false;
-    TSharedRef<FJsonObject> PinFiltered = CatalogArguments(TEXT("function_call"), FString(), FString(), 5);
-    const TSharedRef<FJsonObject> PinContext = MakeShared<FJsonObject>();
+    TSharedRef<FUnrealMCPRecord> PinFiltered = CatalogArguments(TEXT("function_call"), FString(), FString(), 5);
+    const TSharedRef<FUnrealMCPRecord> PinContext = MakeShared<FUnrealMCPRecord>();
     PinContext->SetStringField(TEXT("node_id"), ContextNode->NodeGuid.ToString(EGuidFormats::Digits).ToLower());
     PinContext->SetStringField(TEXT("pin_id"), ContextPin->PinId.ToString(EGuidFormats::Digits).ToLower());
     PinFiltered->SetObjectField(TEXT("pin_context"), PinContext);
     TestTrue(TEXT("live pin-context filter executes"), Catalog.Execute(PinFiltered, Result, Error));
 
-    TSharedRef<FJsonObject> Forged = CatalogArguments(TEXT("function_call"), TEXT("DefinitelyNotAnUnrealFunction"), FString());
+    TSharedRef<FUnrealMCPRecord> Forged = CatalogArguments(TEXT("function_call"), TEXT("DefinitelyNotAnUnrealFunction"), FString());
     TestTrue(TEXT("forged function name cannot resolve"), Catalog.Execute(Forged, Result, Error));
     TestEqual(TEXT("forged function returns no actions"), Result->GetIntegerField(TEXT("returned_count")), 0);
 

@@ -1,14 +1,14 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Dom/JsonObject.h"
+#include "UnrealMCPWireTypes.h"
 
 struct FUnrealMCPAssetReferenceSnapshot
 {
     FString AssetPath;
     FString SnapshotId;
-    TSharedPtr<FJsonObject> Target;
-    TSharedPtr<FJsonObject> Scans;
-    TArray<TSharedPtr<FJsonValue>> Records;
+    TSharedPtr<FUnrealMCPRecord> Target;
+    TSharedPtr<FUnrealMCPRecord> Scans;
+    TArray<TSharedPtr<FUnrealMCPValue>> Records;
     uint64 RegistrySerial = 0;
 };

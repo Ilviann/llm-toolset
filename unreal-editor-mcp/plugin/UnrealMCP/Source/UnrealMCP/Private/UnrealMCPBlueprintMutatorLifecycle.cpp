@@ -27,8 +27,8 @@ FUnrealMCPBlueprintMutator::FUnrealMCPBlueprintMutator(
 
 bool FUnrealMCPBlueprintMutator::Execute(
     const FString& Command,
-    const TSharedPtr<FJsonObject>& Arguments,
-    TSharedPtr<FJsonObject>& OutResult,
+    const TSharedPtr<FUnrealMCPRecord>& Arguments,
+    TSharedPtr<FUnrealMCPRecord>& OutResult,
     FUnrealMCPError& OutError)
 {
     using namespace UnrealMCP::BlueprintMutationPrivate;
@@ -49,8 +49,8 @@ bool FUnrealMCPBlueprintMutator::Execute(
 }
 
 bool FUnrealMCPBlueprintMutator::Create(
-    const TSharedPtr<FJsonObject>& Arguments,
-    TSharedPtr<FJsonObject>& OutResult,
+    const TSharedPtr<FUnrealMCPRecord>& Arguments,
+    TSharedPtr<FUnrealMCPRecord>& OutResult,
     FUnrealMCPError& OutError)
 {
     using namespace UnrealMCP::BlueprintMutationPrivate;
@@ -135,8 +135,8 @@ bool FUnrealMCPBlueprintMutator::Create(
 }
 
 bool FUnrealMCPBlueprintMutator::Compile(
-    const TSharedPtr<FJsonObject>& Arguments,
-    TSharedPtr<FJsonObject>& OutResult,
+    const TSharedPtr<FUnrealMCPRecord>& Arguments,
+    TSharedPtr<FUnrealMCPRecord>& OutResult,
     FUnrealMCPError& OutError)
 {
     using namespace UnrealMCP::BlueprintMutationPrivate;
@@ -168,8 +168,8 @@ bool FUnrealMCPBlueprintMutator::Compile(
 }
 
 bool FUnrealMCPBlueprintMutator::Save(
-    const TSharedPtr<FJsonObject>& Arguments,
-    TSharedPtr<FJsonObject>& OutResult,
+    const TSharedPtr<FUnrealMCPRecord>& Arguments,
+    TSharedPtr<FUnrealMCPRecord>& OutResult,
     FUnrealMCPError& OutError)
 {
     using namespace UnrealMCP::BlueprintMutationPrivate;

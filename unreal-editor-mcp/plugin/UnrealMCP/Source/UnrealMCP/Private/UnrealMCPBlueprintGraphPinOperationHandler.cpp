@@ -232,7 +232,7 @@ bool Execute(
     FUnrealMCPBlueprintInspector& Inspector,
     const FUnrealMCPBlueprintGraphEditor::FConnectionInvoker& ConnectionInvoker,
     const FString& Snapshot,
-    TSharedPtr<FJsonObject>& OutResult,
+    TSharedPtr<FUnrealMCPRecord>& OutResult,
     FUnrealMCPError& OutError)
 {
     const UEdGraphSchema_K2* Schema = Cast<UEdGraphSchema_K2>(Graph != nullptr ? Graph->GetSchema() : nullptr);
@@ -273,7 +273,7 @@ bool Execute(
             OutError = {TEXT("invalid_pin"), TEXT("The requested stable node and pin identities were not found in the graph")};
             return false;
         }
-        const TSharedRef<FJsonObject> EncodedType = UnrealMCP::K2TypeCodec::EncodeType(FromPin->PinType);
+        const TSharedRef<FUnrealMCPRecord> EncodedType = UnrealMCP::K2TypeCodec::EncodeType(FromPin->PinType);
         if (IsProtectedConnectionPin(FromPin) || FromPin->Direction != EGPD_Input || FromPin->HasAnyConnections()
             || FromPin->bDefaultValueIsIgnored || FromPin->bDefaultValueIsReadOnly
             || Schema->ShouldHidePinDefaultValue(FromPin) || !EncodedType->GetBoolField(TEXT("supported")))
@@ -530,26 +530,26 @@ bool Execute(
     }
     TSet<FString> CreatedIdentities;
     TSet<FString> ReconstructedIdentities;
-    TArray<TSharedPtr<FJsonValue>> ChangedNodes;
+    TArray<TSharedPtr<FUnrealMCPValue>> ChangedNodes;
     for (UEdGraphNode* Node : InsertedNodes)
     {
         AddNodeAndPinIdentities(Node, CreatedIdentities);
-        ChangedNodes.Add(MakeShared<FJsonValueObject>(EncodeNode(Graph, Node)));
+        ChangedNodes.Add(MakeShared<FUnrealMCPValueObject>(EncodeNode(Graph, Node)));
     }
     if (Request.Operation != TEXT("set_pin_default"))
     {
         if (WasNodeReconstructed(LiveFromNode, FromNodeBefore))
         {
             AddNodeAndPinIdentities(LiveFromNode, ReconstructedIdentities);
-            ChangedNodes.Add(MakeShared<FJsonValueObject>(EncodeNode(Graph, LiveFromNode)));
+            ChangedNodes.Add(MakeShared<FUnrealMCPValueObject>(EncodeNode(Graph, LiveFromNode)));
         }
         if (LiveToNode != LiveFromNode && WasNodeReconstructed(LiveToNode, ToNodeBefore))
         {
             AddNodeAndPinIdentities(LiveToNode, ReconstructedIdentities);
-            ChangedNodes.Add(MakeShared<FJsonValueObject>(EncodeNode(Graph, LiveToNode)));
+            ChangedNodes.Add(MakeShared<FUnrealMCPValueObject>(EncodeNode(Graph, LiveToNode)));
         }
     }
-    const TSharedRef<FJsonObject> Changed = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Changed = MakeShared<FUnrealMCPRecord>();
     Changed->SetStringField(TEXT("operation"), Request.Operation);
     if (Request.Operation == TEXT("set_pin_default"))
     {
@@ -559,7 +559,7 @@ bool Execute(
     }
     else
     {
-        const TSharedRef<FJsonObject> Connection = MakeShared<FJsonObject>();
+        const TSharedRef<FUnrealMCPRecord> Connection = MakeShared<FUnrealMCPRecord>();
         Connection->SetStringField(TEXT("from_node_id"), Request.FromNodeId);
         Connection->SetStringField(TEXT("from_pin_id"), GuidString(LiveFromPin->PinId));
         Connection->SetStringField(TEXT("to_node_id"), Request.ToNodeId);

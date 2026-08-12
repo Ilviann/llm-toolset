@@ -1,7 +1,7 @@
 #include "UnrealMCPPropertyCodec.h"
 
-#include "Dom/JsonObject.h"
-#include "Dom/JsonValue.h"
+#include "UnrealMCPWireTypes.h"
+#include "UnrealMCPWireTypes.h"
 #include "Misc/PackageName.h"
 #include "UnrealMCPProtocol.h"
 #include "UObject/SoftObjectPath.h"
@@ -23,14 +23,14 @@ bool IsSafeReferencedObject(const UObject* Object)
         && FPackageName::IsValidLongPackageName(Package->GetName(), true);
 }
 
-bool ReadString(const TSharedPtr<FJsonValue>& Value, FString& Out)
+bool ReadString(const TSharedPtr<FUnrealMCPValue>& Value, FString& Out)
 {
-    return Value.IsValid() && Value->Type == EJson::String && Value->TryGetString(Out) && Out.Len() <= 4096;
+    return Value.IsValid() && Value->Type == EUnrealMCPValueType::String && Value->TryGetString(Out) && Out.Len() <= 4096;
 }
 
-bool ReadFiniteNumber(const TSharedPtr<FJsonValue>& Value, double& Out)
+bool ReadFiniteNumber(const TSharedPtr<FUnrealMCPValue>& Value, double& Out)
 {
-    return Value.IsValid() && Value->Type == EJson::Number && Value->TryGetNumber(Out) && FMath::IsFinite(Out);
+    return Value.IsValid() && Value->Type == EUnrealMCPValueType::Number && Value->TryGetNumber(Out) && FMath::IsFinite(Out);
 }
 
 bool IsFlagsEnum(const UEnum* Enum)
@@ -77,19 +77,19 @@ UEnum* PropertyEnum(FProperty* Property)
     return nullptr;
 }
 
-TSharedPtr<FJsonValue> EncodeValue(UObject* Object, FProperty* Property, const FString& Kind)
+TSharedPtr<FUnrealMCPValue> EncodeValue(UObject* Object, FProperty* Property, const FString& Kind)
 {
     const void* Address = Property->ContainerPtrToValuePtr<void>(Object);
-    if (const FBoolProperty* Bool = CastField<FBoolProperty>(Property)) return MakeShared<FJsonValueBoolean>(Bool->GetPropertyValue(Address));
+    if (const FBoolProperty* Bool = CastField<FBoolProperty>(Property)) return MakeShared<FUnrealMCPValueBoolean>(Bool->GetPropertyValue(Address));
     if (const FNumericProperty* Numeric = CastField<FNumericProperty>(Property); Numeric != nullptr && PropertyEnum(Property) == nullptr)
     {
-        return MakeShared<FJsonValueNumber>(Numeric->IsFloatingPoint()
+        return MakeShared<FUnrealMCPValueNumber>(Numeric->IsFloatingPoint()
             ? Numeric->GetFloatingPointPropertyValue(Address)
             : static_cast<double>(Numeric->GetSignedIntPropertyValue(Address)));
     }
-    if (const FNameProperty* Name = CastField<FNameProperty>(Property)) return MakeShared<FJsonValueString>(Name->GetPropertyValue(Address).ToString());
-    if (const FStrProperty* String = CastField<FStrProperty>(Property)) return MakeShared<FJsonValueString>(String->GetPropertyValue(Address));
-    if (const FTextProperty* Text = CastField<FTextProperty>(Property)) return MakeShared<FJsonValueString>(Text->GetPropertyValue(Address).ToString());
+    if (const FNameProperty* Name = CastField<FNameProperty>(Property)) return MakeShared<FUnrealMCPValueString>(Name->GetPropertyValue(Address).ToString());
+    if (const FStrProperty* String = CastField<FStrProperty>(Property)) return MakeShared<FUnrealMCPValueString>(String->GetPropertyValue(Address));
+    if (const FTextProperty* Text = CastField<FTextProperty>(Property)) return MakeShared<FUnrealMCPValueString>(Text->GetPropertyValue(Address).ToString());
     if (UEnum* Enum = PropertyEnum(Property))
     {
         FString Exported;
@@ -103,37 +103,37 @@ TSharedPtr<FJsonValue> EncodeValue(UObject* Object, FProperty* Property, const F
                 NumericValue = ByteProperty->GetPropertyValue(Address);
             else if (const FNumericProperty* NumericProperty = CastField<FNumericProperty>(Property))
                 NumericValue = NumericProperty->GetSignedIntPropertyValue(Address);
-            TArray<TSharedPtr<FJsonValue>> Names;
+            TArray<TSharedPtr<FUnrealMCPValue>> Names;
             for (int32 Index = 0; Index < Enum->NumEnums(); ++Index)
             {
                 const int64 Flag = Enum->GetValueByIndex(Index);
                 if (Flag != 0 && !Enum->HasMetaData(TEXT("Hidden"), Index) && !Enum->HasMetaData(TEXT("Spacer"), Index)
                     && (NumericValue & Flag) == Flag)
                 {
-                    Names.Add(MakeShared<FJsonValueString>(Enum->GetNameStringByIndex(Index)));
+                    Names.Add(MakeShared<FUnrealMCPValueString>(Enum->GetNameStringByIndex(Index)));
                 }
             }
-            return MakeShared<FJsonValueArray>(Names);
+            return MakeShared<FUnrealMCPValueArray>(Names);
         }
-        return MakeShared<FJsonValueString>(Exported);
+        return MakeShared<FUnrealMCPValueString>(Exported);
     }
     if (const FSoftObjectProperty* SoftObject = CastField<FSoftObjectProperty>(Property))
     {
-        return MakeShared<FJsonValueString>(SoftObject->GetPropertyValue(Address).ToSoftObjectPath().ToString());
+        return MakeShared<FUnrealMCPValueString>(SoftObject->GetPropertyValue(Address).ToSoftObjectPath().ToString());
     }
     if (const FClassProperty* Class = CastField<FClassProperty>(Property))
     {
         const UClass* Value = Cast<UClass>(Class->GetObjectPropertyValue(Address));
-        return MakeShared<FJsonValueString>(Value != nullptr ? Value->GetPathName() : FString());
+        return MakeShared<FUnrealMCPValueString>(Value != nullptr ? Value->GetPathName() : FString());
     }
     if (const FObjectPropertyBase* ObjectProperty = CastField<FObjectPropertyBase>(Property))
     {
         const UObject* Value = ObjectProperty->GetObjectPropertyValue(Address);
-        return MakeShared<FJsonValueString>(Value != nullptr ? Value->GetPathName() : FString());
+        return MakeShared<FUnrealMCPValueString>(Value != nullptr ? Value->GetPathName() : FString());
     }
     FString Exported;
     UnrealMCP::PropertyCodec::ExportValueText(Object, Property, Exported);
-    return MakeShared<FJsonValueString>(Exported.Left(4096));
+    return MakeShared<FUnrealMCPValueString>(Exported.Left(4096));
 }
 
 bool ImportReference(UObject* Object, FProperty* Property, const FString& Path, FUnrealMCPError& OutError)
@@ -258,9 +258,9 @@ bool UnrealMCP::PropertyCodec::IsSupportedEditable(const FProperty* Property, FS
     return true;
 }
 
-TSharedRef<FJsonObject> UnrealMCP::PropertyCodec::Encode(UObject* Object, FProperty* Property)
+TSharedRef<FUnrealMCPRecord> UnrealMCP::PropertyCodec::Encode(UObject* Object, FProperty* Property)
 {
-    const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Result = MakeShared<FUnrealMCPRecord>();
     Result->SetStringField(TEXT("name"), Property != nullptr ? Property->GetName() : FString());
     FString Kind;
     const bool bSupported = Object != nullptr && IsSupportedEditable(Property, Kind);
@@ -273,8 +273,8 @@ TSharedRef<FJsonObject> UnrealMCP::PropertyCodec::Encode(UObject* Object, FPrope
 bool UnrealMCP::PropertyCodec::Set(
     UObject* Object,
     const FString& PropertyName,
-    const TSharedPtr<FJsonValue>& Value,
-    TSharedPtr<FJsonObject>& OutChanged,
+    const TSharedPtr<FUnrealMCPValue>& Value,
+    TSharedPtr<FUnrealMCPRecord>& OutChanged,
     FUnrealMCPError& OutError)
 {
     if (Object == nullptr || PropertyName.IsEmpty() || PropertyName.Len() > 128 || PropertyName.Contains(TEXT(".")))
@@ -295,7 +295,7 @@ bool UnrealMCP::PropertyCodec::Set(
     if (FBoolProperty* Bool = CastField<FBoolProperty>(Property))
     {
         bool Parsed = false;
-        bImported = Value.IsValid() && Value->Type == EJson::Boolean && Value->TryGetBool(Parsed);
+        bImported = Value.IsValid() && Value->Type == EUnrealMCPValueType::Boolean && Value->TryGetBool(Parsed);
         if (bImported) Bool->SetPropertyValue(Address, Parsed);
     }
     else if (FNumericProperty* Numeric = CastField<FNumericProperty>(Property); Numeric != nullptr && PropertyEnum(Property) == nullptr)
@@ -327,10 +327,10 @@ bool UnrealMCP::PropertyCodec::Set(
     else if (UEnum* Enum = PropertyEnum(Property))
     {
         int64 EnumValue = 0;
-        if (IsFlagsEnum(Enum) && Value.IsValid() && Value->Type == EJson::Array)
+        if (IsFlagsEnum(Enum) && Value.IsValid() && Value->Type == EUnrealMCPValueType::Array)
         {
             bImported = Value->AsArray().Num() <= 64;
-            for (const TSharedPtr<FJsonValue>& Item : Value->AsArray())
+            for (const TSharedPtr<FUnrealMCPValue>& Item : Value->AsArray())
             {
                 FString FlagName;
                 const int64 Flag = Item.IsValid() && Item->TryGetString(FlagName) ? EnumValueByName(Enum, FlagName) : INDEX_NONE;

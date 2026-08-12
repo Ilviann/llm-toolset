@@ -1,7 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Dom/JsonObject.h"
+#include "UnrealMCPWireTypes.h"
 #include "UnrealMCPAssetReferenceCursorStore.h"
 #include "UnrealMCPAssetReferenceSnapshotBuilder.h"
 #include "UnrealMCPAssetReferenceTypes.h"
@@ -14,8 +14,8 @@ public:
         TFunction<double()> InNow = [] { return FPlatformTime::Seconds(); });
 
     bool Inspect(
-        const TSharedPtr<FJsonObject>& Arguments,
-        TSharedPtr<FJsonObject>& OutResult,
+        const TSharedPtr<FUnrealMCPRecord>& Arguments,
+        TSharedPtr<FUnrealMCPRecord>& OutResult,
         FUnrealMCPError& OutError);
     bool Capture(
         const FString& AssetPath,
@@ -24,14 +24,14 @@ public:
 
 private:
     bool InspectInitial(
-        const FJsonObject& Arguments,
+        const FUnrealMCPRecord& Arguments,
         int32 PageSize,
-        TSharedPtr<FJsonObject>& OutResult,
+        TSharedPtr<FUnrealMCPRecord>& OutResult,
         FUnrealMCPError& OutError);
     bool Continue(
-        const FJsonObject& Arguments,
+        const FUnrealMCPRecord& Arguments,
         int32 PageSize,
-        TSharedPtr<FJsonObject>& OutResult,
+        TSharedPtr<FUnrealMCPRecord>& OutResult,
         FUnrealMCPError& OutError);
 
     FUnrealMCPAssetReferenceCursorStore CursorStore;

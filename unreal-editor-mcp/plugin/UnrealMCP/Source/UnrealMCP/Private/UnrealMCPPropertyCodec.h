@@ -2,10 +2,10 @@
 
 #include "CoreMinimal.h"
 
-class FJsonValue;
+class FUnrealMCPValue;
 class FProperty;
 class UObject;
-class FJsonObject;
+class FUnrealMCPRecord;
 struct FUnrealMCPError;
 
 namespace UnrealMCP::PropertyCodec
@@ -13,7 +13,7 @@ namespace UnrealMCP::PropertyCodec
 bool IsSupportedEditable(const FProperty* Property, FString& OutKind);
 bool IsIdenticalToArchetype(const UObject* Object, const FProperty* Property);
 bool ExportValueText(const UObject* Object, const FProperty* Property, FString& OutText);
-TSharedRef<FJsonObject> Encode(UObject* Object, FProperty* Property);
-bool Set(UObject* Object, const FString& PropertyName, const TSharedPtr<FJsonValue>& Value,
-    TSharedPtr<FJsonObject>& OutChanged, FUnrealMCPError& OutError);
+TSharedRef<FUnrealMCPRecord> Encode(UObject* Object, FProperty* Property);
+bool Set(UObject* Object, const FString& PropertyName, const TSharedPtr<FUnrealMCPValue>& Value,
+    TSharedPtr<FUnrealMCPRecord>& OutChanged, FUnrealMCPError& OutError);
 }

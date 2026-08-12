@@ -30,7 +30,7 @@ bool FUnrealMCPPhase2InspectionTest::RunTest(const FString& Parameters)
     }
 
     FUnrealMCPBlueprintInspector Inspector;
-    TSharedPtr<FJsonObject> Result;
+    TSharedPtr<FUnrealMCPRecord> Result;
     FUnrealMCPError Error;
     const FString ActorPath = ActorBlueprint->GetPathName();
     const bool bDirtyBefore = ActorBlueprint->GetOutermost()->IsDirty();
@@ -49,7 +49,7 @@ bool FUnrealMCPPhase2InspectionTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("inspection preserves selection"), GEditor != nullptr ? GEditor->GetSelectedObjects()->Num() : 0, SelectionBefore);
     TestEqual(TEXT("inspection creates no transaction"), GEditor != nullptr && GEditor->Trans != nullptr ? GEditor->Trans->GetQueueLength() : 0, TransactionsBefore);
 
-    const TSharedRef<FJsonObject> Discover = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Discover = MakeShared<FUnrealMCPRecord>();
     Discover->SetStringField(TEXT("mode"), TEXT("discover"));
     Discover->SetStringField(TEXT("package_path"), FPackageName::GetLongPackagePath(Base));
     Discover->SetStringField(TEXT("asset_name"), ActorBlueprint->GetName());
@@ -77,10 +77,10 @@ bool FUnrealMCPPhase2InspectionTest::RunTest(const FString& Parameters)
     TestFalse(TEXT("non-Blueprint asset is rejected"), Inspector.Execute(InspectArguments(PlainAsset->GetPathName()), Result, Error));
     TestEqual(TEXT("non-Blueprint error is stable"), Error.Code, FString(TEXT("wrong_type")));
 
-    TSharedRef<FJsonObject> Inherited = InspectArguments(ChildBlueprint->GetPathName());
+    TSharedRef<FUnrealMCPRecord> Inherited = InspectArguments(ChildBlueprint->GetPathName());
     Inherited->SetBoolField(TEXT("include_inherited"), true);
     Inherited->SetArrayField(TEXT("sections"), {
-        MakeShared<FJsonValueString>(TEXT("components")), MakeShared<FJsonValueString>(TEXT("variables"))});
+        MakeShared<FUnrealMCPValueString>(TEXT("components")), MakeShared<FUnrealMCPValueString>(TEXT("variables"))});
     TestTrue(TEXT("inherited inspection succeeds"), Inspector.Execute(Inherited, Result, Error));
     TestTrue(TEXT("inherited component is reported"), ResultHasSection(Result, TEXT("component")));
     TestTrue(TEXT("inherited variable is reported"), ResultHasSection(Result, TEXT("variable")));
@@ -116,12 +116,12 @@ bool FUnrealMCPPhase2CursorTest::RunTest(const FString& Parameters)
     if (!TestNotNull(TEXT("cursor Blueprint fixture is created"), Blueprint)) return false;
     double CurrentTime = 10.0;
     FUnrealMCPBlueprintInspector Inspector([&CurrentTime] { return CurrentTime; });
-    TSharedPtr<FJsonObject> Result;
+    TSharedPtr<FUnrealMCPRecord> Result;
     FUnrealMCPError Error;
     TestTrue(TEXT("first small page succeeds"), Inspector.Execute(AllSectionArguments(Blueprint->GetPathName(), 1), Result, Error));
     FString Cursor;
     TestTrue(TEXT("first page returns opaque cursor"), Result->TryGetStringField(TEXT("next_cursor"), Cursor));
-    const TSharedRef<FJsonObject> Continue = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Continue = MakeShared<FUnrealMCPRecord>();
     Continue->SetStringField(TEXT("cursor"), Cursor);
     TestTrue(TEXT("matching cursor continues"), Inspector.Execute(Continue, Result, Error));
 
@@ -148,7 +148,7 @@ bool FUnrealMCPPhase2LiveFixtureTest::RunTest(const FString& Parameters)
     UBlueprint* Blueprint = CreateBlueprintFixture(TEXT("/Game/UnrealMCPPhase2/BP_InspectionFixture"), AActor::StaticClass(), true);
     if (!TestNotNull(TEXT("live Actor Blueprint fixture is available"), Blueprint)) return false;
     FUnrealMCPBlueprintInspector Inspector;
-    TSharedPtr<FJsonObject> BeforeSave;
+    TSharedPtr<FUnrealMCPRecord> BeforeSave;
     FUnrealMCPError Error;
     TestTrue(TEXT("fixture inspects before save"), Inspector.Execute(AllSectionArguments(Blueprint->GetPathName()), BeforeSave, Error));
     const FString SnapshotBefore = BeforeSave.IsValid() ? BeforeSave->GetStringField(TEXT("snapshot_id")) : FString();
@@ -163,16 +163,16 @@ bool FUnrealMCPPhase2LiveFixtureTest::RunTest(const FString& Parameters)
             Node->NodePosX += 64;
         }
         TestTrue(TEXT("test transaction undoes"), GEditor->UndoTransaction());
-        TSharedPtr<FJsonObject> AfterUndo;
+        TSharedPtr<FUnrealMCPRecord> AfterUndo;
         TestTrue(TEXT("fixture inspects after undo"), Inspector.Execute(AllSectionArguments(Blueprint->GetPathName()), AfterUndo, Error));
         TestEqual(TEXT("undo restores structural snapshot"), AfterUndo->GetStringField(TEXT("snapshot_id")), SnapshotBefore);
     }
     FKismetEditorUtilities::CompileBlueprint(Blueprint);
-    TSharedPtr<FJsonObject> AfterCompile;
+    TSharedPtr<FUnrealMCPRecord> AfterCompile;
     TestTrue(TEXT("fixture inspects after reconstruction compile"), Inspector.Execute(AllSectionArguments(Blueprint->GetPathName()), AfterCompile, Error));
     TestEqual(TEXT("compile preserves available identities"), AfterCompile->GetStringField(TEXT("snapshot_id")), SnapshotBefore);
     TestTrue(TEXT("fixture saves without UI"), SaveBlueprintFixture(Blueprint));
-    TSharedPtr<FJsonObject> AfterSave;
+    TSharedPtr<FUnrealMCPRecord> AfterSave;
     TestTrue(TEXT("fixture inspects after save"), Inspector.Execute(AllSectionArguments(Blueprint->GetPathName()), AfterSave, Error));
     const FString SnapshotAfter = AfterSave.IsValid() ? AfterSave->GetStringField(TEXT("snapshot_id")) : FString();
     TestEqual(TEXT("save preserves structural snapshot"), SnapshotAfter, SnapshotBefore);

@@ -6,7 +6,7 @@
 namespace UnrealMCPAssetReferenceServicePrivate
 {
 bool HasOnlyFields(
-    const FJsonObject& Object,
+    const FUnrealMCPRecord& Object,
     std::initializer_list<const TCHAR*> Allowed)
 {
     TSet<FString> Names;
@@ -14,7 +14,7 @@ bool HasOnlyFields(
     {
         Names.Add(Name);
     }
-    for (const TPair<FString, TSharedPtr<FJsonValue>>& Pair : Object.Values)
+    for (const TPair<FString, TSharedPtr<FUnrealMCPValue>>& Pair : Object.Values)
     {
         if (!Names.Contains(Pair.Key))
         {
@@ -25,7 +25,7 @@ bool HasOnlyFields(
 }
 
 bool ReadPageSize(
-    const FJsonObject& Object,
+    const FUnrealMCPRecord& Object,
     int32& OutPageSize,
     FUnrealMCPError& OutError)
 {
@@ -63,8 +63,8 @@ FUnrealMCPAssetReferenceService::FUnrealMCPAssetReferenceService(
 }
 
 bool FUnrealMCPAssetReferenceService::Inspect(
-    const TSharedPtr<FJsonObject>& Arguments,
-    TSharedPtr<FJsonObject>& OutResult,
+    const TSharedPtr<FUnrealMCPRecord>& Arguments,
+    TSharedPtr<FUnrealMCPRecord>& OutResult,
     FUnrealMCPError& OutError)
 {
     check(IsInGameThread());
@@ -104,9 +104,9 @@ bool FUnrealMCPAssetReferenceService::Capture(
 }
 
 bool FUnrealMCPAssetReferenceService::InspectInitial(
-    const FJsonObject& Arguments,
+    const FUnrealMCPRecord& Arguments,
     int32 PageSize,
-    TSharedPtr<FJsonObject>& OutResult,
+    TSharedPtr<FUnrealMCPRecord>& OutResult,
     FUnrealMCPError& OutError)
 {
     if (!UnrealMCPAssetReferenceServicePrivate::HasOnlyFields(
@@ -138,9 +138,9 @@ bool FUnrealMCPAssetReferenceService::InspectInitial(
 }
 
 bool FUnrealMCPAssetReferenceService::Continue(
-    const FJsonObject& Arguments,
+    const FUnrealMCPRecord& Arguments,
     int32 PageSize,
-    TSharedPtr<FJsonObject>& OutResult,
+    TSharedPtr<FUnrealMCPRecord>& OutResult,
     FUnrealMCPError& OutError)
 {
     if (!UnrealMCPAssetReferenceServicePrivate::HasOnlyFields(

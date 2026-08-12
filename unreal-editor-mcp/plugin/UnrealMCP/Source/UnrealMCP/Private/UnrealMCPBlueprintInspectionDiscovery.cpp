@@ -4,9 +4,9 @@
 namespace UnrealMCP::BlueprintInspectionPrivate
 {
 bool BuildDiscovery(
-    const FJsonObject& Arguments,
+    const FUnrealMCPRecord& Arguments,
     const FUnrealMCPExtensionRegistry* ExtensionRegistry,
-    TArray<TSharedPtr<FJsonValue>>& OutRecords,
+    TArray<TSharedPtr<FUnrealMCPValue>>& OutRecords,
     FString& OutSnapshot,
     bool& OutScanTruncated,
     FUnrealMCPError& OutError)
@@ -71,7 +71,7 @@ bool BuildDiscovery(
         {
             continue;
         }
-        const TSharedRef<FJsonObject> Value = Record(TEXT("asset"));
+        const TSharedRef<FUnrealMCPRecord> Value = Record(TEXT("asset"));
         Value->SetStringField(TEXT("asset_path"), Asset.GetObjectPathString());
         Value->SetStringField(TEXT("package_path"), Asset.PackagePath.ToString());
         Value->SetStringField(TEXT("asset_name"), Asset.AssetName.ToString());

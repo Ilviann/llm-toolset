@@ -2,8 +2,8 @@
 
 
 bool FUnrealMCPBlueprintMutator::MacroEdit(
-    const TSharedPtr<FJsonObject>& Arguments,
-    TSharedPtr<FJsonObject>& OutResult,
+    const TSharedPtr<FUnrealMCPRecord>& Arguments,
+    TSharedPtr<FUnrealMCPRecord>& OutResult,
     FUnrealMCPError& OutError)
 {
     using namespace UnrealMCP::BlueprintMutationPrivate;
@@ -25,7 +25,7 @@ bool FUnrealMCPBlueprintMutator::MacroEdit(
         OutError = {TEXT("invalid_argument"), TEXT("Unknown macro edit operation")};
         return false;
     }
-    for (const TPair<FString, TSharedPtr<FJsonValue>>& Pair : Arguments->Values)
+    for (const TPair<FString, TSharedPtr<FUnrealMCPValue>>& Pair : Arguments->Values)
     {
         if (!Allowed.Contains(Pair.Key))
         {
@@ -40,7 +40,7 @@ bool FUnrealMCPBlueprintMutator::MacroEdit(
         OutError = {TEXT("invalid_argument"), TEXT("asset_path must identify one exact Blueprint asset")};
         return false;
     }
-    const TSharedRef<FJsonObject> AssetOnly = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> AssetOnly = MakeShared<FUnrealMCPRecord>();
     AssetOnly->SetStringField(TEXT("asset_path"), RawAsset);
     UBlueprint* Blueprint = nullptr;
     FString ObjectPath;
@@ -60,8 +60,8 @@ bool FUnrealMCPBlueprintMutator::MacroEdit(
     FString Policy;
     UEdGraph* Graph = nullptr;
     FMacroSignatureSpec Signature;
-    const TSharedPtr<FJsonObject>* SignatureObject = nullptr;
-    const TSharedPtr<FJsonObject>* MetadataObject = nullptr;
+    const TSharedPtr<FUnrealMCPRecord>* SignatureObject = nullptr;
+    const TSharedPtr<FUnrealMCPRecord>* MetadataObject = nullptr;
     UnrealMCP::BlueprintReferences::FScanResult ReferenceScan;
 
     if (Operation == TEXT("add"))
@@ -205,10 +205,10 @@ bool FUnrealMCPBlueprintMutator::MacroEdit(
         return false;
     }
 
-    TSharedPtr<FJsonObject> Macro;
+    TSharedPtr<FUnrealMCPRecord> Macro;
     if (Operation == TEXT("remove"))
     {
-        Macro = MakeShared<FJsonObject>();
+        Macro = MakeShared<FUnrealMCPRecord>();
         Macro->SetStringField(TEXT("id"), MacroId);
         Macro->SetStringField(TEXT("name"), Name);
         Macro->SetBoolField(TEXT("removed"), true);

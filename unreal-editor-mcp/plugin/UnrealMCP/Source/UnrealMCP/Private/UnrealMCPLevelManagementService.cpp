@@ -39,11 +39,11 @@ const TSet<FString> AllowedWorldSettings = {
     TEXT("PackedLightAndShadowMapTextureSize"), TEXT("bForceNoPrecomputedLighting"),
     TEXT("DefaultMaxDistanceFieldOcclusionDistance")};
 
-bool HasOnlyFields(const FJsonObject& Object, std::initializer_list<const TCHAR*> Allowed)
+bool HasOnlyFields(const FUnrealMCPRecord& Object, std::initializer_list<const TCHAR*> Allowed)
 {
     TSet<FString> Names;
     for (const TCHAR* Name : Allowed) Names.Add(Name);
-    for (const TPair<FString, TSharedPtr<FJsonValue>>& Pair : Object.Values)
+    for (const TPair<FString, TSharedPtr<FUnrealMCPValue>>& Pair : Object.Values)
     {
         if (!Names.Contains(Pair.Key)) return false;
     }
@@ -69,7 +69,7 @@ FString HashText(const FString& Text)
 }
 
 bool ReadExactMapPath(
-    const FJsonObject& Arguments,
+    const FUnrealMCPRecord& Arguments,
     const TCHAR* Field,
     FString& OutObjectPath,
     FString& OutPackageName,
@@ -181,7 +181,7 @@ bool HasUnsafeEditorWork(FUnrealMCPError& OutError)
     const bool bLoading = IsAsyncLoading();
     if (!bPlaying && !bSimulating && !bSaving && !bCollecting && !bTransaction
         && !bUndoRedo && !bCompiling && !bLoading) return false;
-    const TSharedRef<FJsonObject> Details = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Details = MakeShared<FUnrealMCPRecord>();
     Details->SetBoolField(TEXT("is_playing"), bPlaying);
     Details->SetBoolField(TEXT("is_simulating"), bSimulating);
     Details->SetBoolField(TEXT("is_saving"), bSaving);
@@ -198,14 +198,14 @@ bool CurrentState(
     FUnrealMCPLevelService& Levels,
     FString& OutPath,
     FString& OutSnapshot,
-    TSharedPtr<FJsonObject>& OutRecord,
+    TSharedPtr<FUnrealMCPRecord>& OutRecord,
     FUnrealMCPError& OutError)
 {
-    const TSharedRef<FJsonObject> Arguments = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Arguments = MakeShared<FUnrealMCPRecord>();
     Arguments->SetStringField(TEXT("mode"), TEXT("current"));
-    TSharedPtr<FJsonObject> Result;
+    TSharedPtr<FUnrealMCPRecord> Result;
     if (!Levels.Inspect(Arguments, Result, OutError)) return false;
-    const TArray<TSharedPtr<FJsonValue>>* Records = nullptr;
+    const TArray<TSharedPtr<FUnrealMCPValue>>* Records = nullptr;
     if (!Result->TryGetArrayField(TEXT("records"), Records) || Records == nullptr || Records->Num() != 1)
     {
         OutError = {TEXT("invalid_response"), TEXT("Current-map inspection did not return one exact record")};
@@ -226,14 +226,14 @@ bool RequireCleanCurrent(
     FUnrealMCPLevelService& Levels,
     const FString& ExpectedSnapshot,
     FString& OutPath,
-    TSharedPtr<FJsonObject>& OutRecord,
+    TSharedPtr<FUnrealMCPRecord>& OutRecord,
     FUnrealMCPError& OutError)
 {
     FString ActualSnapshot;
     if (!CurrentState(Levels, OutPath, ActualSnapshot, OutRecord, OutError)) return false;
     if (ActualSnapshot != ExpectedSnapshot)
     {
-        const TSharedRef<FJsonObject> Details = MakeShared<FJsonObject>();
+        const TSharedRef<FUnrealMCPRecord> Details = MakeShared<FUnrealMCPRecord>();
         Details->SetStringField(TEXT("expected_snapshot"), ExpectedSnapshot);
         Details->SetStringField(TEXT("actual_snapshot"), ActualSnapshot);
         OutError = {TEXT("stale_precondition"), TEXT("The current-map snapshot changed before level management"), Details};
@@ -248,12 +248,12 @@ bool RequireCleanCurrent(
 }
 
 bool ReadSettings(
-    const FJsonObject& Arguments,
-    TArray<TSharedPtr<FJsonObject>>& OutSettings,
+    const FUnrealMCPRecord& Arguments,
+    TArray<TSharedPtr<FUnrealMCPRecord>>& OutSettings,
     FUnrealMCPError& OutError)
 {
     if (!Arguments.HasField(TEXT("settings"))) return true;
-    const TArray<TSharedPtr<FJsonValue>>* Values = nullptr;
+    const TArray<TSharedPtr<FUnrealMCPValue>>* Values = nullptr;
     if (!Arguments.TryGetArrayField(TEXT("settings"), Values) || Values == nullptr
         || Values->IsEmpty() || Values->Num() > UnrealMCP::MaxLevelSetupProperties)
     {
@@ -261,9 +261,9 @@ bool ReadSettings(
         return false;
     }
     TSet<FString> Seen;
-    for (const TSharedPtr<FJsonValue>& Value : *Values)
+    for (const TSharedPtr<FUnrealMCPValue>& Value : *Values)
     {
-        const TSharedPtr<FJsonObject> Setting = Value.IsValid() ? Value->AsObject() : nullptr;
+        const TSharedPtr<FUnrealMCPRecord> Setting = Value.IsValid() ? Value->AsObject() : nullptr;
         FString Name;
         if (!Setting.IsValid() || !HasOnlyFields(*Setting, {TEXT("property_name"), TEXT("value")})
             || !Setting->TryGetStringField(TEXT("property_name"), Name)
@@ -281,9 +281,9 @@ bool ReadSettings(
 
 bool ApplySettings(
     UWorld* World,
-    const TArray<TSharedPtr<FJsonObject>>& Settings,
+    const TArray<TSharedPtr<FUnrealMCPRecord>>& Settings,
     bool bTransactional,
-    TArray<TSharedPtr<FJsonValue>>& OutChanged,
+    TArray<TSharedPtr<FUnrealMCPValue>>& OutChanged,
     FUnrealMCPError& OutError)
 {
     AWorldSettings* Target = World != nullptr ? World->GetWorldSettings() : nullptr;
@@ -295,11 +295,11 @@ bool ApplySettings(
     struct FSettingBackup
     {
         FString Name;
-        TSharedPtr<FJsonValue> Value;
+        TSharedPtr<FUnrealMCPValue> Value;
     };
     TArray<FSettingBackup> Backups;
     Backups.Reserve(Settings.Num());
-    for (const TSharedPtr<FJsonObject>& Setting : Settings)
+    for (const TSharedPtr<FUnrealMCPRecord>& Setting : Settings)
     {
         const FString Name = Setting->GetStringField(TEXT("property_name"));
         FProperty* Property = Target->GetClass()->FindPropertyByName(FName(*Name));
@@ -309,8 +309,8 @@ bool ApplySettings(
             OutError = {TEXT("unsupported_property"), TEXT("The allowlisted property is unavailable in this Unreal build")};
             return false;
         }
-        const TSharedRef<FJsonObject> Encoded = UnrealMCP::PropertyCodec::Encode(Target, Property);
-        const TSharedPtr<FJsonValue> PreviousValue = Encoded->TryGetField(TEXT("value"));
+        const TSharedRef<FUnrealMCPRecord> Encoded = UnrealMCP::PropertyCodec::Encode(Target, Property);
+        const TSharedPtr<FUnrealMCPValue> PreviousValue = Encoded->TryGetField(TEXT("value"));
         if (!PreviousValue.IsValid())
         {
             OutError = {TEXT("property_read_failed"), TEXT("An allowlisted World Settings property could not be snapshotted before mutation")};
@@ -327,9 +327,9 @@ bool ApplySettings(
             NSLOCTEXT("UnrealMCP", "LevelSetup", "Configure level World Settings"));
         Target->Modify();
     }
-    for (const TSharedPtr<FJsonObject>& Setting : Settings)
+    for (const TSharedPtr<FUnrealMCPRecord>& Setting : Settings)
     {
-        TSharedPtr<FJsonObject> Changed;
+        TSharedPtr<FUnrealMCPRecord> Changed;
         if (!UnrealMCP::PropertyCodec::Set(
             Target,
             Setting->GetStringField(TEXT("property_name")),
@@ -341,7 +341,7 @@ bool ApplySettings(
             bool bRestored = true;
             for (int32 Index = Backups.Num() - 1; Index >= 0; --Index)
             {
-                TSharedPtr<FJsonObject> Ignored;
+                TSharedPtr<FUnrealMCPRecord> Ignored;
                 FUnrealMCPError RestoreError;
                 if (!UnrealMCP::PropertyCodec::Set(
                     Target, Backups[Index].Name, Backups[Index].Value, Ignored, RestoreError))
@@ -357,15 +357,15 @@ bool ApplySettings(
                 : FUnrealMCPError{TEXT("rollback_failed"), TEXT("World Settings mutation failed and exact pre-mutation values could not all be restored")};
             return false;
         }
-        OutChanged.Add(MakeShared<FJsonValueObject>(Changed.ToSharedRef()));
+        OutChanged.Add(MakeShared<FUnrealMCPValueObject>(Changed.ToSharedRef()));
     }
     return true;
 }
 
 bool VerifySettingsReadback(
     UWorld* World,
-    const TArray<TSharedPtr<FJsonValue>>& Expected,
-    TArray<TSharedPtr<FJsonValue>>& OutReadback,
+    const TArray<TSharedPtr<FUnrealMCPValue>>& Expected,
+    TArray<TSharedPtr<FUnrealMCPValue>>& OutReadback,
     FUnrealMCPError& OutError)
 {
     AWorldSettings* Target = World != nullptr ? World->GetWorldSettings() : nullptr;
@@ -374,29 +374,29 @@ bool VerifySettingsReadback(
         OutError = {TEXT("reload_failed"), TEXT("Reloaded map has no World Settings object")};
         return false;
     }
-    for (const TSharedPtr<FJsonValue>& ExpectedValue : Expected)
+    for (const TSharedPtr<FUnrealMCPValue>& ExpectedValue : Expected)
     {
-        const TSharedPtr<FJsonObject> ExpectedRecord = ExpectedValue.IsValid() ? ExpectedValue->AsObject() : nullptr;
+        const TSharedPtr<FUnrealMCPRecord> ExpectedRecord = ExpectedValue.IsValid() ? ExpectedValue->AsObject() : nullptr;
         if (!ExpectedRecord.IsValid()) return false;
         FProperty* Property = Target->GetClass()->FindPropertyByName(
             FName(*ExpectedRecord->GetStringField(TEXT("name"))));
-        const TSharedRef<FJsonObject> Actual = UnrealMCP::PropertyCodec::Encode(Target, Property);
-        const TSharedPtr<FJsonValue> ExpectedPropertyValue = ExpectedRecord->TryGetField(TEXT("value"));
-        const TSharedPtr<FJsonValue> ActualPropertyValue = Actual->TryGetField(TEXT("value"));
+        const TSharedRef<FUnrealMCPRecord> Actual = UnrealMCP::PropertyCodec::Encode(Target, Property);
+        const TSharedPtr<FUnrealMCPValue> ExpectedPropertyValue = ExpectedRecord->TryGetField(TEXT("value"));
+        const TSharedPtr<FUnrealMCPValue> ActualPropertyValue = Actual->TryGetField(TEXT("value"));
         if (!ExpectedPropertyValue.IsValid() || !ActualPropertyValue.IsValid()
-            || !FJsonValue::CompareEqual(*ExpectedPropertyValue, *ActualPropertyValue))
+            || !FUnrealMCPValue::CompareEqual(*ExpectedPropertyValue, *ActualPropertyValue))
         {
             OutError = {TEXT("reload_verification_failed"), TEXT("A World Settings property changed across save and reload")};
             return false;
         }
-        OutReadback.Add(MakeShared<FJsonValueObject>(Actual));
+        OutReadback.Add(MakeShared<FUnrealMCPValueObject>(Actual));
     }
     return true;
 }
 
-TSharedRef<FJsonObject> EffectiveFacts(UWorld* World)
+TSharedRef<FUnrealMCPRecord> EffectiveFacts(UWorld* World)
 {
-    const TSharedRef<FJsonObject> Facts = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Facts = MakeShared<FUnrealMCPRecord>();
     const UWorldPartition* Partition = World != nullptr ? World->GetWorldPartition() : nullptr;
     Facts->SetBoolField(TEXT("world_partition"), Partition != nullptr);
     Facts->SetBoolField(TEXT("world_partition_streaming"), Partition != nullptr && Partition->IsStreamingEnabled());
@@ -411,7 +411,7 @@ bool SaveAndVerify(
     UWorld* World,
     const FString& PackageName,
     const FString& ObjectPath,
-    TArray<TSharedPtr<FJsonValue>>& OutPersistence,
+    TArray<TSharedPtr<FUnrealMCPValue>>& OutPersistence,
     bool& OutSaveSucceeded,
     FUnrealMCPError& OutError)
 {
@@ -478,14 +478,14 @@ bool SaveAndVerify(
         bAllRegistry &= bRegistry;
         bAllStorage &= bStorage;
         bAllClean &= bClean;
-        const TSharedRef<FJsonObject> PackageResult = MakeShared<FJsonObject>();
+        const TSharedRef<FUnrealMCPRecord> PackageResult = MakeShared<FUnrealMCPRecord>();
         PackageResult->SetStringField(TEXT("package_name"), OwnedName);
         PackageResult->SetBoolField(TEXT("required"), true);
         PackageResult->SetBoolField(TEXT("save_succeeded"), bRoot ? bRootSaved : bAuxiliarySaved);
         PackageResult->SetBoolField(TEXT("registry_present"), bRegistry);
         PackageResult->SetBoolField(TEXT("storage_present"), bStorage);
         PackageResult->SetBoolField(TEXT("clean"), bClean);
-        OutPersistence.Add(MakeShared<FJsonValueObject>(PackageResult));
+        OutPersistence.Add(MakeShared<FUnrealMCPValueObject>(PackageResult));
     }
     if (!OutSaveSucceeded)
     {
@@ -501,7 +501,7 @@ bool SaveAndVerify(
 }
 
 void SetIdentity(
-    TSharedRef<FJsonObject> Result,
+    TSharedRef<FUnrealMCPRecord> Result,
     const FString& ProjectHash,
     const FString& MapPath,
     UWorld* World)
@@ -550,8 +550,8 @@ FUnrealMCPLevelManagementService::FUnrealMCPLevelManagementService(
 }
 
 bool FUnrealMCPLevelManagementService::Manage(
-    const TSharedPtr<FJsonObject>& Arguments,
-    TSharedPtr<FJsonObject>& OutResult,
+    const TSharedPtr<FUnrealMCPRecord>& Arguments,
+    TSharedPtr<FUnrealMCPRecord>& OutResult,
     FUnrealMCPError& OutError)
 {
     check(IsInGameThread());
@@ -571,9 +571,9 @@ bool FUnrealMCPLevelManagementService::Manage(
         return false;
     }
     FString CurrentPath;
-    TSharedPtr<FJsonObject> CurrentRecord;
+    TSharedPtr<FUnrealMCPRecord> CurrentRecord;
     if (!RequireCleanCurrent(Levels, ExpectedSnapshot, CurrentPath, CurrentRecord, OutError)) return false;
-    TArray<TSharedPtr<FJsonObject>> Settings;
+    TArray<TSharedPtr<FUnrealMCPRecord>> Settings;
     if (!ReadSettings(*Arguments, Settings, OutError)) return false;
 
     FString MapPath;
@@ -593,7 +593,7 @@ bool FUnrealMCPLevelManagementService::Manage(
             return false;
         }
         bool bOpenAfterCreate = false;
-        const TSharedPtr<FJsonObject>* Source = nullptr;
+        const TSharedPtr<FUnrealMCPRecord>* Source = nullptr;
         if (!ReadExactMapPath(*Arguments, TEXT("destination_path"), MapPath, PackageName, AssetName, OutError)
             || !UnrealMCPLevelManagementPrivate::ValidateMutationScope(PackageName, OutError)
             || !Arguments->TryGetBoolField(TEXT("open_after_create"), bOpenAfterCreate)
@@ -609,7 +609,7 @@ bool FUnrealMCPLevelManagementService::Manage(
         }
         if (SourceKind == TEXT("blank"))
         {
-            const TSharedPtr<FJsonObject>* Options = nullptr;
+            const TSharedPtr<FUnrealMCPRecord>* Options = nullptr;
             bool bPartition = false;
             bool bStreaming = false;
             bool bExternalActors = false;
@@ -675,7 +675,7 @@ bool FUnrealMCPLevelManagementService::Manage(
         {
             FAssetRegistryModule::AssetCreated(World);
         }
-        TArray<TSharedPtr<FJsonValue>> Changed;
+        TArray<TSharedPtr<FUnrealMCPValue>> Changed;
         if (!ApplySettings(World, Settings, false, Changed, OutError))
         {
             const FUnrealMCPError MutationError = OutError;
@@ -683,9 +683,9 @@ bool FUnrealMCPLevelManagementService::Manage(
             OutError = MutationError;
             return false;
         }
-        TArray<TSharedPtr<FJsonValue>> Persistence;
-        const TSharedRef<FJsonObject> CreationFacts = EffectiveFacts(World);
-        const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+        TArray<TSharedPtr<FUnrealMCPValue>> Persistence;
+        const TSharedRef<FUnrealMCPRecord> CreationFacts = EffectiveFacts(World);
+        const TSharedRef<FUnrealMCPRecord> Result = MakeShared<FUnrealMCPRecord>();
         Result->SetStringField(TEXT("operation"), Operation);
         Result->SetStringField(TEXT("map_path"), MapPath);
         Result->SetStringField(TEXT("package_name"), PackageName);
@@ -698,7 +698,7 @@ bool FUnrealMCPLevelManagementService::Manage(
         SetIdentity(Result, ProjectHash, MapPath, World);
         const auto CompletePartial = [&](const FUnrealMCPError& Failure)
         {
-            const TSharedRef<FJsonObject> VerificationError = MakeShared<FJsonObject>();
+            const TSharedRef<FUnrealMCPRecord> VerificationError = MakeShared<FUnrealMCPRecord>();
             VerificationError->SetStringField(TEXT("code"), Failure.Code);
             VerificationError->SetStringField(TEXT("message"), Failure.Message);
             Result->SetStringField(TEXT("operation_state"), TEXT("partial"));
@@ -718,7 +718,7 @@ bool FUnrealMCPLevelManagementService::Manage(
         Result->SetBoolField(TEXT("saved"), true);
         bool bReloadVerified = false;
         bool bInactiveReloadUnloaded = false;
-        TArray<TSharedPtr<FJsonValue>> ReloadedProperties;
+        TArray<TSharedPtr<FUnrealMCPValue>> ReloadedProperties;
         if (!bOpenAfterCreate)
         {
             UPackage* CreatedPackage = World->GetPackage();
@@ -757,10 +757,10 @@ bool FUnrealMCPLevelManagementService::Manage(
         Result->SetBoolField(TEXT("reload_verified"), bReloadVerified);
         if (bOpenAfterCreate)
         {
-            const TSharedRef<FJsonObject> OpenArguments = MakeShared<FJsonObject>();
+            const TSharedRef<FUnrealMCPRecord> OpenArguments = MakeShared<FUnrealMCPRecord>();
             OpenArguments->SetStringField(TEXT("operation_id"), Arguments->GetStringField(TEXT("operation_id")));
             OpenArguments->SetStringField(TEXT("map_path"), MapPath);
-            TSharedPtr<FJsonObject> OpenResult;
+            TSharedPtr<FUnrealMCPRecord> OpenResult;
             if (!Levels.Open(OpenArguments, OpenResult, OutError)) return CompletePartial(OutError);
             bOpened = OpenResult->GetBoolField(TEXT("opened"));
             Result->SetStringField(TEXT("snapshot_id"), OpenResult->GetStringField(TEXT("snapshot_id")));
@@ -784,7 +784,7 @@ bool FUnrealMCPLevelManagementService::Manage(
         {
             FString VerifiedCurrentPath;
             FString VerifiedCurrentSnapshot;
-            TSharedPtr<FJsonObject> VerifiedCurrent;
+            TSharedPtr<FUnrealMCPRecord> VerifiedCurrent;
             if (!CurrentState(Levels, VerifiedCurrentPath, VerifiedCurrentSnapshot, VerifiedCurrent, OutError)
                 || VerifiedCurrentPath != CurrentPath || VerifiedCurrentSnapshot != ExpectedSnapshot)
             {
@@ -822,10 +822,10 @@ bool FUnrealMCPLevelManagementService::Manage(
         return false;
     }
     World = GEditor != nullptr ? GEditor->GetEditorWorldContext().World() : nullptr;
-    TArray<TSharedPtr<FJsonValue>> Changed;
+    TArray<TSharedPtr<FUnrealMCPValue>> Changed;
     if (!ApplySettings(World, Settings, true, Changed, OutError)) return false;
-    TArray<TSharedPtr<FJsonValue>> Persistence;
-    const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+    TArray<TSharedPtr<FUnrealMCPValue>> Persistence;
+    const TSharedRef<FUnrealMCPRecord> Result = MakeShared<FUnrealMCPRecord>();
     Result->SetStringField(TEXT("operation"), Operation);
     Result->SetStringField(TEXT("map_path"), MapPath);
     Result->SetStringField(TEXT("package_name"), PackageName);
@@ -835,7 +835,7 @@ bool FUnrealMCPLevelManagementService::Manage(
     Result->SetStringField(TEXT("precondition_snapshot"), ExpectedSnapshot);
     const auto CompletePartial = [&](const FUnrealMCPError& Failure, bool bSaved)
     {
-        const TSharedRef<FJsonObject> VerificationError = MakeShared<FJsonObject>();
+        const TSharedRef<FUnrealMCPRecord> VerificationError = MakeShared<FUnrealMCPRecord>();
         VerificationError->SetStringField(TEXT("code"), Failure.Code);
         VerificationError->SetStringField(TEXT("message"), Failure.Message);
         Result->SetStringField(TEXT("operation_state"), TEXT("partial"));
@@ -843,7 +843,7 @@ bool FUnrealMCPLevelManagementService::Manage(
         Result->SetBoolField(TEXT("saved"), bSaved);
         FString PartialPath;
         FString PartialSnapshot;
-        TSharedPtr<FJsonObject> PartialRecord;
+        TSharedPtr<FUnrealMCPRecord> PartialRecord;
         FUnrealMCPError InspectionError;
         if (CurrentState(Levels, PartialPath, PartialSnapshot, PartialRecord, InspectionError))
         {
@@ -873,13 +873,13 @@ bool FUnrealMCPLevelManagementService::Manage(
             return CompletePartial(OutError, true);
         }
         World = GEditor != nullptr ? GEditor->GetEditorWorldContext().World() : nullptr;
-        TArray<TSharedPtr<FJsonValue>> Reloaded;
+        TArray<TSharedPtr<FUnrealMCPValue>> Reloaded;
         if (!VerifySettingsReadback(World, Changed, Reloaded, OutError)) return CompletePartial(OutError, true);
         Changed = MoveTemp(Reloaded);
     }
     FString VerifiedPath;
     FString VerifiedSnapshot;
-    TSharedPtr<FJsonObject> VerifiedRecord;
+    TSharedPtr<FUnrealMCPRecord> VerifiedRecord;
     if (!CurrentState(Levels, VerifiedPath, VerifiedSnapshot, VerifiedRecord, OutError)
         || VerifiedPath != MapPath || VerifiedRecord->GetBoolField(TEXT("dirty")))
     {

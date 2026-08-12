@@ -48,7 +48,7 @@ bool FUnrealMCPReadonlyPreservationTest::RunTest(const FString& Parameters)
     };
 
     FUnrealMCPBlueprintInspector Inspector;
-    TSharedPtr<FJsonObject> Result;
+    TSharedPtr<FUnrealMCPRecord> Result;
     FUnrealMCPError Error;
     const FString AssetPath = Blueprint->GetPathName();
     TestTrue(
@@ -71,7 +71,7 @@ bool FUnrealMCPReadonlyPreservationTest::RunTest(const FString& Parameters)
     {
         return false;
     }
-    const TSharedRef<FJsonObject> CatalogArguments = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> CatalogArguments = MakeShared<FUnrealMCPRecord>();
     CatalogArguments->SetStringField(TEXT("asset_path"), AssetPath);
     CatalogArguments->SetStringField(
         TEXT("graph_id"),
@@ -98,13 +98,13 @@ bool FUnrealMCPReadonlyPreservationTest::RunTest(const FString& Parameters)
     FUnrealMCPOperationLedger Ledger(BridgeId, TEXT("readonly-preservation"), [] { return 200.0; });
     const auto OperationArguments = [](const FString& OperationId)
     {
-        const TSharedRef<FJsonObject> Arguments = MakeShared<FJsonObject>();
+        const TSharedRef<FUnrealMCPRecord> Arguments = MakeShared<FUnrealMCPRecord>();
         Arguments->SetStringField(TEXT("operation_id"), OperationId);
         return Arguments;
     };
     const auto IdentityArguments = [&BridgeId](const FString& OperationId)
     {
-        const TSharedRef<FJsonObject> Arguments = MakeShared<FJsonObject>();
+        const TSharedRef<FUnrealMCPRecord> Arguments = MakeShared<FUnrealMCPRecord>();
         Arguments->SetStringField(TEXT("operation_id"), OperationId);
         Arguments->SetStringField(TEXT("bridge_instance_id"), BridgeId);
         return Arguments;
@@ -145,7 +145,7 @@ bool FUnrealMCPReadonlyPreservationTest::RunTest(const FString& Parameters)
         Ledger.Admit(TEXT("level_open"), OperationArguments(CompletedId)).Kind,
         EUnrealMCPOperationAdmission::Accepted);
     TestTrue(TEXT("completed result fixture executes"), Ledger.MarkExecuting(CompletedId, Error));
-    const TSharedRef<FJsonObject> RetainedResult = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> RetainedResult = MakeShared<FUnrealMCPRecord>();
     RetainedResult->SetStringField(TEXT("operation_state"), TEXT("committed"));
     Ledger.Complete(CompletedId, TEXT("committed"), RetainedResult);
     TestTrue(

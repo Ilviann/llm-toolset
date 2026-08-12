@@ -1,7 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Dom/JsonObject.h"
+#include "UnrealMCPWireTypes.h"
 
 class UBlueprint;
 class UClass;
@@ -36,9 +36,9 @@ bool SupportsActorReplication(const UClass* Class);
 bool SupportsComponentReplication(const UClass* Class);
 bool SupportsReplicatedVariables(const UClass* Class);
 bool SupportsRpcMode(const UClass* Class, const FString& Mode);
-TSharedRef<FJsonObject> BuildLiveCapabilities(const UBlueprint* Blueprint);
-TSharedRef<FJsonObject> BuildLiveCapabilities(
+TSharedRef<FUnrealMCPRecord> BuildLiveCapabilities(const UBlueprint* Blueprint);
+TSharedRef<FUnrealMCPRecord> BuildLiveCapabilities(
     const UBlueprint* Blueprint,
     const FFamilyInfo& Family);
-TArray<TSharedPtr<FJsonValue>> BuildPublishedMatrix();
+TArray<TSharedPtr<FUnrealMCPValue>> BuildPublishedMatrix();
 }

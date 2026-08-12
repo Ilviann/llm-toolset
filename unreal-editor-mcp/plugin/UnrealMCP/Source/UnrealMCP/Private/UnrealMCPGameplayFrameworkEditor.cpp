@@ -17,11 +17,11 @@ namespace
 const TCHAR* SettingsSection = TEXT("/Script/EngineSettings.GameMapsSettings");
 constexpr int64 MaxConfigBytes = 4 * 1024 * 1024;
 
-bool HasOnlyFields(const FJsonObject& Object)
+bool HasOnlyFields(const FUnrealMCPRecord& Object)
 {
     const TSet<FString> Allowed = {TEXT("operation_id"), TEXT("project_hash"), TEXT("setting"),
         TEXT("class_path"), TEXT("expected_class")};
-    for (const TPair<FString, TSharedPtr<FJsonValue>>& Pair : Object.Values)
+    for (const TPair<FString, TSharedPtr<FUnrealMCPValue>>& Pair : Object.Values)
     {
         if (!Allowed.Contains(Pair.Key)) return false;
     }
@@ -181,8 +181,8 @@ bool Persist(const FString& Key, const FString& Value, FUnrealMCPError& OutError
 }
 
 bool FUnrealMCPGameplayFrameworkEditor::Execute(
-    const TSharedPtr<FJsonObject>& Arguments,
-    TSharedPtr<FJsonObject>& OutResult,
+    const TSharedPtr<FUnrealMCPRecord>& Arguments,
+    TSharedPtr<FUnrealMCPRecord>& OutResult,
     FUnrealMCPError& OutError)
 {
     if (!Arguments.IsValid() || !HasOnlyFields(*Arguments))
@@ -228,7 +228,7 @@ bool FUnrealMCPGameplayFrameworkEditor::Execute(
         OutError = {TEXT("internal_error"), TEXT("The persisted gameplay-framework assignment did not update the live settings object")};
         return false;
     }
-    OutResult = MakeShared<FJsonObject>();
+    OutResult = MakeShared<FUnrealMCPRecord>();
     OutResult->SetStringField(TEXT("project_hash"), ProjectHash);
     OutResult->SetStringField(TEXT("setting"), Setting);
     OutResult->SetStringField(TEXT("old_class"), OldClass);

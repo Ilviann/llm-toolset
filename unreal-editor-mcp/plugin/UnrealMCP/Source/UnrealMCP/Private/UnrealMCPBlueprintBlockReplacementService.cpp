@@ -276,10 +276,10 @@ bool SetDefault(
     const UEdGraphSchema_K2* Schema,
     UEdGraphNode* Node,
     UEdGraphPin* Pin,
-    const TSharedPtr<FJsonObject>& Value,
+    const TSharedPtr<FUnrealMCPRecord>& Value,
     FUnrealMCPError& OutError)
 {
-    const TSharedRef<FJsonObject> EncodedType = UnrealMCP::K2TypeCodec::EncodeType(Pin->PinType);
+    const TSharedRef<FUnrealMCPRecord> EncodedType = UnrealMCP::K2TypeCodec::EncodeType(Pin->PinType);
     if (Schema == nullptr || Node == nullptr || Pin == nullptr || !Pin->PinId.IsValid()
         || Pin->bWasTrashed || Pin->bOrphanedPin || Pin->bNotConnectable
         || Pin->HasAnyConnections() || Pin->bDefaultValueIsIgnored || Pin->bDefaultValueIsReadOnly
@@ -796,8 +796,8 @@ FUnrealMCPBlueprintBlockReplacementService::FUnrealMCPBlueprintBlockReplacementS
 }
 
 bool FUnrealMCPBlueprintBlockReplacementService::Execute(
-    const TSharedPtr<FJsonObject>& Arguments,
-    TSharedPtr<FJsonObject>& OutResult,
+    const TSharedPtr<FUnrealMCPRecord>& Arguments,
+    TSharedPtr<FUnrealMCPRecord>& OutResult,
     FUnrealMCPError& OutError)
 {
     using namespace UnrealMCP::BlueprintBlockReplacement;
@@ -822,7 +822,7 @@ bool FUnrealMCPBlueprintBlockReplacementService::Execute(
     if (Blueprint->bBeingCompiled)
     {
         OutError = {TEXT("busy"), TEXT("The requested Blueprint is compiling"),
-            MakeShared<FJsonObject>(), true};
+            MakeShared<FUnrealMCPRecord>(), true};
         return false;
     }
     FString Snapshot;
@@ -1035,7 +1035,7 @@ bool FUnrealMCPBlueprintBlockReplacementService::Execute(
         }
     }
 
-    const TSharedRef<FJsonObject> Changed = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Changed = MakeShared<FUnrealMCPRecord>();
     Changed->SetStringField(TEXT("target_kind"), TargetKindString(Request.TargetKind));
     Changed->SetStringField(TEXT("logic_unit_id"), Request.LogicUnitId);
     Changed->SetStringField(TEXT("graph_id"), Request.GraphId);
@@ -1046,11 +1046,11 @@ bool FUnrealMCPBlueprintBlockReplacementService::Execute(
     Changed->SetStringField(TEXT("untouched_graph_fingerprint"), UntouchedFingerprintAfter);
     if (Request.LayoutPolicy == ELayoutPolicy::LayeredV1)
     {
-        const TSharedRef<FJsonObject> Layout = MakeShared<FJsonObject>();
+        const TSharedRef<FUnrealMCPRecord> Layout = MakeShared<FUnrealMCPRecord>();
         Layout->SetStringField(TEXT("policy"), TEXT("layered_v1"));
         Layout->SetStringField(TEXT("fingerprint"), LiveApplied.Layout.Fingerprint);
         Layout->SetNumberField(TEXT("iterations"), LiveApplied.Layout.Iterations);
-        const TSharedRef<FJsonObject> Bounds = MakeShared<FJsonObject>();
+        const TSharedRef<FUnrealMCPRecord> Bounds = MakeShared<FUnrealMCPRecord>();
         Bounds->SetNumberField(TEXT("min_x"), LiveApplied.Layout.MinX);
         Bounds->SetNumberField(TEXT("min_y"), LiveApplied.Layout.MinY);
         Bounds->SetNumberField(TEXT("max_x"), LiveApplied.Layout.MaxX);
@@ -1069,13 +1069,13 @@ bool FUnrealMCPBlueprintBlockReplacementService::Execute(
         Changed->SetStringField(TEXT("function_id"), Request.LogicUnitId);
         Changed->SetStringField(TEXT("function_fingerprint"), NewBoundary.Fingerprint);
     }
-    TArray<TSharedPtr<FJsonValue>> Nodes;
+    TArray<TSharedPtr<FUnrealMCPValue>> Nodes;
     for (UEdGraphNode* Node : LiveApplied.CreatedNodes)
-        Nodes.Add(MakeShared<FJsonValueObject>(
+        Nodes.Add(MakeShared<FUnrealMCPValueObject>(
             UnrealMCP::BlueprintGraphResultBuilder::EncodeNode(Graph, Node)));
     Changed->SetArrayField(TEXT("nodes"), Nodes);
 
-    OutResult = MakeShared<FJsonObject>();
+    OutResult = MakeShared<FUnrealMCPRecord>();
     OutResult->SetStringField(TEXT("asset_path"), Request.AssetPath);
     OutResult->SetStringField(TEXT("blueprint_family"),
         UnrealMCP::BlueprintFamilyPolicy::Classify(Blueprint->ParentClass).Name);

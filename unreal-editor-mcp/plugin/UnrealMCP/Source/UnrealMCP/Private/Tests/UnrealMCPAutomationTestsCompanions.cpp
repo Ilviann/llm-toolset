@@ -339,13 +339,13 @@ bool FUnrealMCPCompanionAdmissionTest::RunTest(const FString& Parameters)
         TestEqual(TEXT("late registration is rejected after freeze"),
             Registry.Register(Late, Owner).Reason, FString(TEXT("registration_closed")));
         Registry.BeginShutdown();
-        const TSharedPtr<FJsonObject> Capabilities = Registry.BuildCapabilities();
-        const TArray<TSharedPtr<FJsonValue>>& Companions =
+        const TSharedPtr<FUnrealMCPRecord> Capabilities = Registry.BuildCapabilities();
+        const TArray<TSharedPtr<FUnrealMCPValue>>& Companions =
             Capabilities->GetArrayField(TEXT("companions"));
-        TSharedPtr<FJsonObject> FirstCapability;
-        for (const TSharedPtr<FJsonValue>& Value : Companions)
+        TSharedPtr<FUnrealMCPRecord> FirstCapability;
+        for (const TSharedPtr<FUnrealMCPValue>& Value : Companions)
         {
-            const TSharedPtr<FJsonObject> Candidate = Value->AsObject();
+            const TSharedPtr<FUnrealMCPRecord> Candidate = Value->AsObject();
             if (Candidate->GetStringField(TEXT("extension_id")) == TEXT("synthetic_first"))
             {
                 FirstCapability = Candidate;
@@ -391,12 +391,12 @@ bool FUnrealMCPCompanionBlueprintFamilyInspectionTest::RunTest(const FString& Pa
     FKismetEditorUtilities::CompileBlueprint(Blueprint);
     const bool bDirtyBefore = Package->IsDirty();
     FUnrealMCPBlueprintInspector Inspector(Registry);
-    const TSharedRef<FJsonObject> Arguments = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Arguments = MakeShared<FUnrealMCPRecord>();
     Arguments->SetStringField(TEXT("mode"), TEXT("inspect"));
     Arguments->SetStringField(TEXT("asset_path"), Blueprint->GetPathName());
     Arguments->SetArrayField(TEXT("sections"), {
-        MakeShared<FJsonValueString>(TEXT("summary"))});
-    TSharedPtr<FJsonObject> Result;
+        MakeShared<FUnrealMCPValueString>(TEXT("summary"))});
+    TSharedPtr<FUnrealMCPRecord> Result;
     FUnrealMCPError Error;
     TestTrue(TEXT("standard Blueprint inspector accepts the extension family"),
         Inspector.Execute(Arguments, Result, Error));

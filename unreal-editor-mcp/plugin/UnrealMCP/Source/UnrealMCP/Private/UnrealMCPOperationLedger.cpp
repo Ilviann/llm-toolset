@@ -1,11 +1,10 @@
 #include "UnrealMCPOperationLedger.h"
 
-#include "Dom/JsonObject.h"
-#include "Dom/JsonValue.h"
+#include "UnrealMCPWireTypes.h"
+#include "UnrealMCPWireTypes.h"
 #include "Misc/ScopeLock.h"
 #include "Misc/SecureHash.h"
-#include "Serialization/JsonSerializer.h"
-#include "Serialization/JsonWriter.h"
+#include "UnrealMCPJsonCodec.h"
 #include "UnrealMCPProtocol.h"
 #include "UnrealMCPVersion.h"
 
@@ -24,18 +23,16 @@ bool IsOperationId(const FString& Value)
 FString QuoteJsonString(const FString& Value)
 {
     FString Output;
-    const TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Output);
-    Writer->WriteValue(Value);
-    Writer->Close();
+    UnrealMCP::JsonCodec::SerializeValue(MakeShared<FUnrealMCPValueString>(Value), Output);
     return Output;
 }
 
-FString CanonicalValue(const TSharedPtr<FJsonValue>& Value);
+FString CanonicalValue(const TSharedPtr<FUnrealMCPValue>& Value);
 
-FString CanonicalObject(const TSharedPtr<FJsonObject>& Object)
+FString CanonicalObject(const TSharedPtr<FUnrealMCPRecord>& Object)
 {
     if (!Object.IsValid()) return TEXT("null");
-    TArray<TPair<FString, TSharedPtr<FJsonValue>>> Values;
+    TArray<TPair<FString, TSharedPtr<FUnrealMCPValue>>> Values;
     Values.Reserve(Object->Values.Num());
     for (const auto& Pair : Object->Values) Values.Emplace(FString(Pair.Key), Pair.Value);
     Values.Sort([](const auto& Left, const auto& Right) { return Left.Key < Right.Key; });
@@ -48,38 +45,38 @@ FString CanonicalObject(const TSharedPtr<FJsonObject>& Object)
     return TEXT("{") + FString::Join(Fields, TEXT(",")) + TEXT("}");
 }
 
-FString CanonicalValue(const TSharedPtr<FJsonValue>& Value)
+FString CanonicalValue(const TSharedPtr<FUnrealMCPValue>& Value)
 {
     if (!Value.IsValid()) return TEXT("null");
     switch (Value->Type)
     {
-    case EJson::Null: return TEXT("null");
-    case EJson::String: return QuoteJsonString(Value->AsString());
-    case EJson::Boolean: return Value->AsBool() ? TEXT("true") : TEXT("false");
-    case EJson::Number: return FString::Printf(TEXT("%.17g"), Value->AsNumber());
-    case EJson::Object: return CanonicalObject(Value->AsObject());
-    case EJson::Array:
+    case EUnrealMCPValueType::Null: return TEXT("null");
+    case EUnrealMCPValueType::String: return QuoteJsonString(Value->AsString());
+    case EUnrealMCPValueType::Boolean: return Value->AsBool() ? TEXT("true") : TEXT("false");
+    case EUnrealMCPValueType::Number: return FString::Printf(TEXT("%.17g"), Value->AsNumber());
+    case EUnrealMCPValueType::Record: return CanonicalObject(Value->AsObject());
+    case EUnrealMCPValueType::Array:
         {
             TArray<FString> Items;
-            for (const TSharedPtr<FJsonValue>& Item : Value->AsArray()) Items.Add(CanonicalValue(Item));
+            for (const TSharedPtr<FUnrealMCPValue>& Item : Value->AsArray()) Items.Add(CanonicalValue(Item));
             return TEXT("[") + FString::Join(Items, TEXT(",")) + TEXT("]");
         }
     default: return TEXT("null");
     }
 }
 
-TSharedRef<FJsonObject> ErrorValue(const FUnrealMCPError& Error)
+TSharedRef<FUnrealMCPRecord> ErrorValue(const FUnrealMCPError& Error)
 {
-    const TSharedRef<FJsonObject> Value = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Value = MakeShared<FUnrealMCPRecord>();
     Value->SetStringField(TEXT("code"), Error.Code.Left(64));
     Value->SetStringField(TEXT("message"), Error.Message.Left(512));
-    Value->SetObjectField(TEXT("details"), Error.Details.IsValid() ? Error.Details : MakeShared<FJsonObject>());
+    Value->SetObjectField(TEXT("details"), Error.Details.IsValid() ? Error.Details : MakeShared<FUnrealMCPRecord>());
     Value->SetBoolField(TEXT("retryable"), Error.bRetryable);
     return Value;
 }
 
 bool ParseOperationIdentity(
-    const TSharedPtr<FJsonObject>& Arguments,
+    const TSharedPtr<FUnrealMCPRecord>& Arguments,
     const FString& Command,
     FString& OutOperationId,
     FString& OutBridgeInstanceId,
@@ -90,7 +87,7 @@ bool ParseOperationIdentity(
         OutError = {TEXT("invalid_argument"), TEXT("arguments must be an object")};
         return false;
     }
-    for (const TPair<FString, TSharedPtr<FJsonValue>>& Pair : Arguments->Values)
+    for (const TPair<FString, TSharedPtr<FUnrealMCPValue>>& Pair : Arguments->Values)
     {
         if (Pair.Key != TEXT("operation_id") && Pair.Key != TEXT("bridge_instance_id"))
         {
@@ -113,11 +110,11 @@ bool ParseOperationIdentity(
     return true;
 }
 
-TSharedRef<FJsonObject> UnknownOperationStatus(
+TSharedRef<FUnrealMCPRecord> UnknownOperationStatus(
     const FString& OperationId,
     const FString& BridgeInstanceId)
 {
-    const TSharedRef<FJsonObject> Unknown = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Unknown = MakeShared<FUnrealMCPRecord>();
     Unknown->SetStringField(TEXT("operation_id"), OperationId);
     Unknown->SetStringField(TEXT("bridge_instance_id"), BridgeInstanceId);
     Unknown->SetStringField(TEXT("state"), TEXT("outcome_unknown"));
@@ -134,7 +131,7 @@ FUnrealMCPOperationLedger::FUnrealMCPOperationLedger(FString InBridgeInstanceId,
 
 FString FUnrealMCPOperationLedger::DigestRequest(
     const FString& Command,
-    const TSharedPtr<FJsonObject>& Arguments,
+    const TSharedPtr<FUnrealMCPRecord>& Arguments,
     const FString& ContextBinding)
 {
     const FString Canonical = Command + TEXT("\n") + CanonicalObject(Arguments) + TEXT("\n") + ContextBinding;
@@ -173,7 +170,7 @@ bool FUnrealMCPOperationLedger::MakeRoomLocked()
     return true;
 }
 
-FUnrealMCPOperationAdmission FUnrealMCPOperationLedger::Admit(const FString& Command, const TSharedPtr<FJsonObject>& Arguments)
+FUnrealMCPOperationAdmission FUnrealMCPOperationLedger::Admit(const FString& Command, const TSharedPtr<FUnrealMCPRecord>& Arguments)
 {
     FUnrealMCPOperationAdmission Admission;
     FString OperationId;
@@ -213,7 +210,7 @@ FUnrealMCPOperationAdmission FUnrealMCPOperationLedger::Admit(const FString& Com
         else
         {
             Admission.Kind = EUnrealMCPOperationAdmission::Busy;
-            Admission.OwnedError = MakeShared<FUnrealMCPError>(FUnrealMCPError{TEXT("busy"), TEXT("The retained operation is already queued or executing"), MakeShared<FJsonObject>(), true});
+            Admission.OwnedError = MakeShared<FUnrealMCPError>(FUnrealMCPError{TEXT("busy"), TEXT("The retained operation is already queued or executing"), MakeShared<FUnrealMCPRecord>(), true});
             Admission.Error = Admission.OwnedError.Get();
         }
         return Admission;
@@ -221,7 +218,7 @@ FUnrealMCPOperationAdmission FUnrealMCPOperationLedger::Admit(const FString& Com
     if (!MakeRoomLocked())
     {
         Admission.Kind = EUnrealMCPOperationAdmission::Busy;
-        Admission.OwnedError = MakeShared<FUnrealMCPError>(FUnrealMCPError{TEXT("busy"), TEXT("The retained operation ledger is full"), MakeShared<FJsonObject>(), true});
+        Admission.OwnedError = MakeShared<FUnrealMCPError>(FUnrealMCPError{TEXT("busy"), TEXT("The retained operation ledger is full"), MakeShared<FUnrealMCPRecord>(), true});
         Admission.Error = Admission.OwnedError.Get();
         return Admission;
     }
@@ -247,14 +244,14 @@ bool FUnrealMCPOperationLedger::MarkExecuting(const FString& OperationId, FUnrea
     }
     if (Entry->State != TEXT("queued"))
     {
-        OutError = {TEXT("busy"), TEXT("The operation is not queued"), MakeShared<FJsonObject>(), true};
+        OutError = {TEXT("busy"), TEXT("The operation is not queued"), MakeShared<FUnrealMCPRecord>(), true};
         return false;
     }
     Entry->State = TEXT("executing");
     return true;
 }
 
-void FUnrealMCPOperationLedger::Commit(const FString& OperationId, const TSharedPtr<FJsonObject>& Result)
+void FUnrealMCPOperationLedger::Commit(const FString& OperationId, const TSharedPtr<FUnrealMCPRecord>& Result)
 {
     Complete(OperationId, TEXT("committed"), Result);
 }
@@ -262,7 +259,7 @@ void FUnrealMCPOperationLedger::Commit(const FString& OperationId, const TShared
 void FUnrealMCPOperationLedger::Complete(
     const FString& OperationId,
     const FString& State,
-    const TSharedPtr<FJsonObject>& Result)
+    const TSharedPtr<FUnrealMCPRecord>& Result)
 {
     FScopeLock Lock(&Mutex);
     if (FEntry* Entry = Entries.Find(OperationId))
@@ -289,9 +286,9 @@ void FUnrealMCPOperationLedger::Reject(const FString& OperationId, const FUnreal
     }
 }
 
-TSharedRef<FJsonObject> FUnrealMCPOperationLedger::EntryStatusLocked(const FString& OperationId, const FEntry& Entry) const
+TSharedRef<FUnrealMCPRecord> FUnrealMCPOperationLedger::EntryStatusLocked(const FString& OperationId, const FEntry& Entry) const
 {
-    const TSharedRef<FJsonObject> Value = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Value = MakeShared<FUnrealMCPRecord>();
     Value->SetStringField(TEXT("operation_id"), OperationId);
     Value->SetStringField(TEXT("bridge_instance_id"), BridgeInstanceId);
     Value->SetStringField(TEXT("command"), Entry.Command);
@@ -313,8 +310,8 @@ TSharedRef<FJsonObject> FUnrealMCPOperationLedger::EntryStatusLocked(const FStri
 }
 
 bool FUnrealMCPOperationLedger::Status(
-    const TSharedPtr<FJsonObject>& Arguments,
-    TSharedPtr<FJsonObject>& OutResult,
+    const TSharedPtr<FUnrealMCPRecord>& Arguments,
+    TSharedPtr<FUnrealMCPRecord>& OutResult,
     FUnrealMCPError& OutError)
 {
     FString OperationId;
@@ -340,8 +337,8 @@ bool FUnrealMCPOperationLedger::Status(
 }
 
 bool FUnrealMCPOperationLedger::Cancel(
-    const TSharedPtr<FJsonObject>& Arguments,
-    TSharedPtr<FJsonObject>& OutResult,
+    const TSharedPtr<FUnrealMCPRecord>& Arguments,
+    TSharedPtr<FUnrealMCPRecord>& OutResult,
     FUnrealMCPError& OutError)
 {
     FString OperationId;
@@ -388,10 +385,10 @@ void FUnrealMCPOperationLedger::CancelQueued()
     }
 }
 
-TSharedPtr<FJsonObject> FUnrealMCPOperationLedger::CurrentState() const
+TSharedPtr<FUnrealMCPRecord> FUnrealMCPOperationLedger::CurrentState() const
 {
     FScopeLock Lock(&Mutex);
-    const TSharedRef<FJsonObject> State = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> State = MakeShared<FUnrealMCPRecord>();
     int32 Queued = 0;
     int32 Executing = 0;
     for (const TPair<FString, FEntry>& Pair : Entries)

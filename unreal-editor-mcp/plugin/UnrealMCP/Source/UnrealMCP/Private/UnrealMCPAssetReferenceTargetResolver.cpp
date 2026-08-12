@@ -78,7 +78,7 @@ bool FUnrealMCPAssetReferenceTargetResolver::Resolve(
     OutTarget.PackageName = PackageName;
     OutTarget.Asset = Asset;
     OutTarget.LoadedObject = LoadedObject;
-    OutTarget.Metadata = MakeShared<FJsonObject>();
+    OutTarget.Metadata = MakeShared<FUnrealMCPRecord>();
     OutTarget.Metadata->SetStringField(TEXT("asset_path"), AssetPath);
     OutTarget.Metadata->SetStringField(TEXT("package_name"), PackageName.Left(512));
     OutTarget.Metadata->SetStringField(TEXT("asset_name"), Asset.AssetName.ToString().Left(128));

@@ -20,7 +20,7 @@ struct FInspectionQuery
     TSet<FString> PropertyNames;
 };
 
-static bool DecodeInspectionQuery(const FJsonObject& Arguments, FInspectionQuery& Out, FUnrealMCPError& OutError)
+static bool DecodeInspectionQuery(const FUnrealMCPRecord& Arguments, FInspectionQuery& Out, FUnrealMCPError& OutError)
 {
     if (!HasOnlyFields(Arguments, {TEXT("mode"), TEXT("asset_path"), TEXT("sections"), TEXT("graph_id"), TEXT("component_id"), TEXT("member_id"),
         TEXT("function_id"), TEXT("local_id"), TEXT("macro_id"), TEXT("custom_event_id"), TEXT("widget_id"),
@@ -42,14 +42,14 @@ static bool DecodeInspectionQuery(const FJsonObject& Arguments, FInspectionQuery
         TEXT("commonui_widget"), TEXT("commonui_activation"), TEXT("commonui_references")};
     if (Arguments.HasField(TEXT("sections")))
     {
-        const TArray<TSharedPtr<FJsonValue>>* Values = nullptr;
+        const TArray<TSharedPtr<FUnrealMCPValue>>* Values = nullptr;
         if (!Arguments.TryGetArrayField(TEXT("sections"), Values) || Values == nullptr || Values->IsEmpty() || Values->Num() > 20)
         {
             OutError = {TEXT("invalid_argument"), TEXT("sections must be a non-empty bounded array")};
             return false;
         }
         Out.Sections.Reset();
-        for (const TSharedPtr<FJsonValue>& Item : *Values)
+        for (const TSharedPtr<FUnrealMCPValue>& Item : *Values)
         {
             FString Section;
             if (!Item.IsValid() || !Item->TryGetString(Section) || !InspectSections.Contains(Section) || Out.Sections.Contains(Section))

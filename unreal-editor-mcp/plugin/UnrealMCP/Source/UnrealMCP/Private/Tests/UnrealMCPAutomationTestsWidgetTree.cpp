@@ -13,12 +13,12 @@
 
 namespace
 {
-TSharedRef<FJsonObject> WidgetEdit(
+TSharedRef<FUnrealMCPRecord> WidgetEdit(
     const FString& AssetPath,
     const FString& Snapshot,
     const FString& Operation)
 {
-    const TSharedRef<FJsonObject> Arguments = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Arguments = MakeShared<FUnrealMCPRecord>();
     Arguments->SetStringField(
         TEXT("operation_id"),
         FGuid::NewGuid().ToString(EGuidFormats::Digits).ToLower());
@@ -28,9 +28,9 @@ TSharedRef<FJsonObject> WidgetEdit(
     return Arguments;
 }
 
-TSharedRef<FJsonObject> PanelTarget(const FString& ParentId)
+TSharedRef<FUnrealMCPRecord> PanelTarget(const FString& ParentId)
 {
-    const TSharedRef<FJsonObject> Target = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Target = MakeShared<FUnrealMCPRecord>();
     Target->SetStringField(TEXT("kind"), TEXT("panel"));
     Target->SetStringField(TEXT("parent_id"), ParentId);
     return Target;
@@ -42,20 +42,20 @@ FString RecordId(
     const FString& Section,
     const FString& Name)
 {
-    TSharedPtr<FJsonObject> Result;
+    TSharedPtr<FUnrealMCPRecord> Result;
     FUnrealMCPError Error;
-    const TSharedRef<FJsonObject> Arguments =
+    const TSharedRef<FUnrealMCPRecord> Arguments =
         UnrealMCP::Tests::InspectArguments(AssetPath);
     Arguments->SetArrayField(
         TEXT("sections"),
-        {MakeShared<FJsonValueString>(TEXT("widget_tree"))});
+        {MakeShared<FUnrealMCPValueString>(TEXT("widget_tree"))});
     if (!Inspector.Execute(Arguments, Result, Error))
     {
         return FString();
     }
-    for (const TSharedPtr<FJsonValue>& Item : Result->GetArrayField(TEXT("records")))
+    for (const TSharedPtr<FUnrealMCPValue>& Item : Result->GetArrayField(TEXT("records")))
     {
-        const TSharedPtr<FJsonObject> Record = Item->AsObject();
+        const TSharedPtr<FUnrealMCPRecord> Record = Item->AsObject();
         if (Record.IsValid()
             && Record->GetStringField(TEXT("section")) == Section
             && Record->GetStringField(TEXT("name")) == Name)
@@ -88,10 +88,10 @@ bool FUnrealMCPWidgetTreeTest::RunTest(const FString& Parameters)
         TEXT("Widget family rejects Actor component editing"),
         Supports(UUserWidget::StaticClass(), EOperation::Components));
 
-    TSharedPtr<FJsonObject> WidgetFamily;
-    for (const TSharedPtr<FJsonValue>& Value : BuildPublishedMatrix())
+    TSharedPtr<FUnrealMCPRecord> WidgetFamily;
+    for (const TSharedPtr<FUnrealMCPValue>& Value : BuildPublishedMatrix())
     {
-        const TSharedPtr<FJsonObject> Record = Value->AsObject();
+        const TSharedPtr<FUnrealMCPRecord> Record = Value->AsObject();
         if (Record.IsValid()
             && Record->GetStringField(TEXT("family")) == TEXT("widget"))
         {
@@ -122,7 +122,7 @@ bool FUnrealMCPWidgetTreeTest::RunTest(const FString& Parameters)
     FUnrealMCPBlueprintInspector Inspector;
     FUnrealMCPBlueprintMutator Mutator(Inspector);
     FUnrealMCPWidgetTreeService Widgets(Inspector);
-    TSharedPtr<FJsonObject> Result;
+    TSharedPtr<FUnrealMCPRecord> Result;
     FUnrealMCPError Error;
     if (!TestTrue(
         TEXT("Widget Blueprint creation succeeds"),
@@ -146,7 +146,7 @@ bool FUnrealMCPWidgetTreeTest::RunTest(const FString& Parameters)
         TEXT("creation reports widget family"),
         Result->GetStringField(TEXT("blueprint_family")),
         FString(TEXT("widget")));
-    const TSharedPtr<FJsonObject> Live =
+    const TSharedPtr<FUnrealMCPRecord> Live =
         Result->GetObjectField(TEXT("family_capabilities"));
     TestTrue(
         TEXT("live widget-tree capability is available"),
@@ -156,7 +156,7 @@ bool FUnrealMCPWidgetTreeTest::RunTest(const FString& Parameters)
         Live->GetBoolField(TEXT("components")));
 
     FString Snapshot = Result->GetStringField(TEXT("snapshot_id"));
-    TSharedRef<FJsonObject> Root =
+    TSharedRef<FUnrealMCPRecord> Root =
         WidgetEdit(AssetPath, Snapshot, TEXT("set_root"));
     Root->SetStringField(
         TEXT("widget_class"),
@@ -173,7 +173,7 @@ bool FUnrealMCPWidgetTreeTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("root identity is stable"), RootId.Len(), 32);
     Snapshot = Result->GetStringField(TEXT("snapshot_id"));
 
-    TSharedRef<FJsonObject> DuplicateRoot =
+    TSharedRef<FUnrealMCPRecord> DuplicateRoot =
         WidgetEdit(AssetPath, Snapshot, TEXT("set_root"));
     DuplicateRoot->SetStringField(
         TEXT("widget_class"),
@@ -191,7 +191,7 @@ bool FUnrealMCPWidgetTreeTest::RunTest(const FString& Parameters)
         InspectSnapshot(Inspector, AssetPath),
         Snapshot);
 
-    TSharedRef<FJsonObject> AddText =
+    TSharedRef<FUnrealMCPRecord> AddText =
         WidgetEdit(AssetPath, Snapshot, TEXT("add"));
     AddText->SetStringField(
         TEXT("widget_class"),
@@ -208,7 +208,7 @@ bool FUnrealMCPWidgetTreeTest::RunTest(const FString& Parameters)
     const FString TextId = Result->GetStringField(TEXT("widget_id"));
     Snapshot = Result->GetStringField(TEXT("snapshot_id"));
 
-    TSharedRef<FJsonObject> Rename =
+    TSharedRef<FUnrealMCPRecord> Rename =
         WidgetEdit(AssetPath, Snapshot, TEXT("rename"));
     Rename->SetStringField(TEXT("widget_id"), TextId);
     Rename->SetStringField(TEXT("new_name"), TEXT("HUDStatus"));
@@ -225,7 +225,7 @@ bool FUnrealMCPWidgetTreeTest::RunTest(const FString& Parameters)
         TextId);
     Snapshot = Result->GetStringField(TEXT("snapshot_id"));
 
-    TSharedRef<FJsonObject> SetVariable =
+    TSharedRef<FUnrealMCPRecord> SetVariable =
         WidgetEdit(AssetPath, Snapshot, TEXT("set_variable"));
     SetVariable->SetStringField(TEXT("widget_id"), TextId);
     SetVariable->SetBoolField(TEXT("is_variable"), true);
@@ -238,7 +238,7 @@ bool FUnrealMCPWidgetTreeTest::RunTest(const FString& Parameters)
     }
     Snapshot = Result->GetStringField(TEXT("snapshot_id"));
 
-    TSharedRef<FJsonObject> SetOpacity =
+    TSharedRef<FUnrealMCPRecord> SetOpacity =
         WidgetEdit(AssetPath, Snapshot, TEXT("set_property"));
     SetOpacity->SetStringField(TEXT("widget_id"), TextId);
     SetOpacity->SetStringField(TEXT("property_name"), TEXT("RenderOpacity"));
@@ -252,18 +252,18 @@ bool FUnrealMCPWidgetTreeTest::RunTest(const FString& Parameters)
     }
     Snapshot = Result->GetStringField(TEXT("snapshot_id"));
 
-    const TSharedRef<FJsonObject> InspectDefaults =
+    const TSharedRef<FUnrealMCPRecord> InspectDefaults =
         InspectArguments(AssetPath);
     InspectDefaults->SetArrayField(
         TEXT("sections"),
         {
-            MakeShared<FJsonValueString>(TEXT("widget_tree")),
-            MakeShared<FJsonValueString>(TEXT("widget_defaults")),
+            MakeShared<FUnrealMCPValueString>(TEXT("widget_tree")),
+            MakeShared<FUnrealMCPValueString>(TEXT("widget_defaults")),
         });
     InspectDefaults->SetStringField(TEXT("widget_id"), TextId);
     InspectDefaults->SetArrayField(
         TEXT("property_names"),
-        {MakeShared<FJsonValueString>(TEXT("RenderOpacity"))});
+        {MakeShared<FUnrealMCPValueString>(TEXT("RenderOpacity"))});
     if (!TestTrue(
         TEXT("targeted widget-default inspection succeeds"),
         Inspector.Execute(InspectDefaults, Result, Error)))
@@ -271,9 +271,9 @@ bool FUnrealMCPWidgetTreeTest::RunTest(const FString& Parameters)
         return false;
     }
     bool bFoundOpacity = false;
-    for (const TSharedPtr<FJsonValue>& Item : Result->GetArrayField(TEXT("records")))
+    for (const TSharedPtr<FUnrealMCPValue>& Item : Result->GetArrayField(TEXT("records")))
     {
-        const TSharedPtr<FJsonObject> Record = Item->AsObject();
+        const TSharedPtr<FUnrealMCPRecord> Record = Item->AsObject();
         if (Record.IsValid()
             && Record->GetStringField(TEXT("section")) == TEXT("widget_default")
             && Record->GetStringField(TEXT("name")) == TEXT("RenderOpacity")
@@ -284,7 +284,7 @@ bool FUnrealMCPWidgetTreeTest::RunTest(const FString& Parameters)
     }
     TestTrue(TEXT("edited widget default reads back"), bFoundOpacity);
 
-    TSharedRef<FJsonObject> AddBorder =
+    TSharedRef<FUnrealMCPRecord> AddBorder =
         WidgetEdit(AssetPath, Snapshot, TEXT("add"));
     AddBorder->SetStringField(
         TEXT("widget_class"),
@@ -301,7 +301,7 @@ bool FUnrealMCPWidgetTreeTest::RunTest(const FString& Parameters)
     const FString BorderId = Result->GetStringField(TEXT("widget_id"));
     Snapshot = Result->GetStringField(TEXT("snapshot_id"));
 
-    TSharedRef<FJsonObject> Reparent =
+    TSharedRef<FUnrealMCPRecord> Reparent =
         WidgetEdit(AssetPath, Snapshot, TEXT("reparent"));
     Reparent->SetStringField(TEXT("widget_id"), TextId);
     Reparent->SetObjectField(TEXT("target"), PanelTarget(BorderId));
@@ -340,7 +340,7 @@ bool FUnrealMCPWidgetTreeTest::RunTest(const FString& Parameters)
         ReparentedSnapshot);
     Snapshot = ReparentedSnapshot;
 
-    TSharedRef<FJsonObject> StaleRename =
+    TSharedRef<FUnrealMCPRecord> StaleRename =
         WidgetEdit(AssetPath, Snapshot, TEXT("rename"));
     StaleRename->SetStringField(
         TEXT("expected_snapshot"),
@@ -355,7 +355,7 @@ bool FUnrealMCPWidgetTreeTest::RunTest(const FString& Parameters)
         Error.Code,
         FString(TEXT("stale_precondition")));
 
-    TSharedRef<FJsonObject> Component = ComponentEditArguments(
+    TSharedRef<FUnrealMCPRecord> Component = ComponentEditArguments(
         AssetPath, Snapshot, TEXT("add"));
     Component->SetStringField(
         TEXT("component_class"),
@@ -370,7 +370,7 @@ bool FUnrealMCPWidgetTreeTest::RunTest(const FString& Parameters)
         Error.Code,
         FString(TEXT("invalid_component")));
 
-    TSharedRef<FJsonObject> Compile = AssetArguments(AssetPath);
+    TSharedRef<FUnrealMCPRecord> Compile = AssetArguments(AssetPath);
     Compile->SetStringField(
         TEXT("operation_id"),
         FGuid::NewGuid().ToString(EGuidFormats::Digits).ToLower());
@@ -415,7 +415,7 @@ bool FUnrealMCPWidgetTreeTest::RunTest(const FString& Parameters)
     Blueprint->Bindings.Add(WidgetBinding);
     Snapshot = InspectSnapshot(Inspector, AssetPath);
 
-    TSharedRef<FJsonObject> RemoveReferenced =
+    TSharedRef<FUnrealMCPRecord> RemoveReferenced =
         WidgetEdit(AssetPath, Snapshot, TEXT("remove"));
     RemoveReferenced->SetStringField(TEXT("widget_id"), TextId);
     RemoveReferenced->SetStringField(
@@ -436,7 +436,7 @@ bool FUnrealMCPWidgetTreeTest::RunTest(const FString& Parameters)
     Blueprint->Bindings.Reset();
     FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(Blueprint);
     Snapshot = InspectSnapshot(Inspector, AssetPath);
-    TSharedRef<FJsonObject> Remove =
+    TSharedRef<FUnrealMCPRecord> Remove =
         WidgetEdit(AssetPath, Snapshot, TEXT("remove"));
     Remove->SetStringField(TEXT("widget_id"), TextId);
     Remove->SetStringField(TEXT("policy"), TEXT("reject_if_referenced"));
@@ -449,7 +449,7 @@ bool FUnrealMCPWidgetTreeTest::RunTest(const FString& Parameters)
     }
     Snapshot = Result->GetStringField(TEXT("snapshot_id"));
 
-    TSharedRef<FJsonObject> Save = AssetArguments(AssetPath);
+    TSharedRef<FUnrealMCPRecord> Save = AssetArguments(AssetPath);
     Save->SetStringField(
         TEXT("operation_id"),
         FGuid::NewGuid().ToString(EGuidFormats::Digits).ToLower());

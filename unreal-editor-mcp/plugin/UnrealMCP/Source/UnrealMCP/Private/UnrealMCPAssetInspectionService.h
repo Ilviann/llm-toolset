@@ -2,7 +2,7 @@
 
 #include "CoreMinimal.h"
 
-class FJsonObject;
+class FUnrealMCPRecord;
 struct FUnrealMCPError;
 
 namespace UnrealMCP
@@ -16,7 +16,7 @@ class FUnrealMCPAssetInspectionService
 {
 public:
     bool Execute(
-        const TSharedPtr<FJsonObject>& Arguments,
-        TSharedPtr<FJsonObject>& OutResult,
+        const TSharedPtr<FUnrealMCPRecord>& Arguments,
+        TSharedPtr<FUnrealMCPRecord>& OutResult,
         FUnrealMCPError& OutError);
 };

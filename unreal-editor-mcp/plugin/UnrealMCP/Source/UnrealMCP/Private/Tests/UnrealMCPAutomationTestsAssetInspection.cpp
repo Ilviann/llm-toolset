@@ -9,9 +9,9 @@
 
 namespace
 {
-TSharedRef<FJsonObject> Request(const FString& Path, const FString& Selector = FString())
+TSharedRef<FUnrealMCPRecord> Request(const FString& Path, const FString& Selector = FString())
 {
-    const TSharedRef<FJsonObject> Arguments = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Arguments = MakeShared<FUnrealMCPRecord>();
     Arguments->SetStringField(TEXT("asset_path"), Path);
     if (!Selector.IsEmpty()) Arguments->SetStringField(TEXT("selector"), Selector);
     return Arguments;
@@ -35,7 +35,7 @@ UEdGraph* AddFunction(UBlueprint* Blueprint, const FName Name)
     return Graph;
 }
 
-FString AssetType(const TSharedPtr<FJsonObject>& Result)
+FString AssetType(const TSharedPtr<FUnrealMCPRecord>& Result)
 {
     return Result.IsValid() ? Result->GetObjectField(TEXT("asset"))->GetStringField(TEXT("type")) : FString();
 }
@@ -49,7 +49,7 @@ bool FUnrealMCPAssetInspectionCoreTest::RunTest(const FString& Parameters)
     using namespace UnrealMCP::Tests;
     const FString Root = TEXT("/Game/UnrealMCPTests/") + FGuid::NewGuid().ToString(EGuidFormats::Digits);
     FUnrealMCPAssetInspectionService Service;
-    TSharedPtr<FJsonObject> Result;
+    TSharedPtr<FUnrealMCPRecord> Result;
     FUnrealMCPError Error;
 
     struct FFamily { UClass* Parent; const TCHAR* Name; };
@@ -93,7 +93,7 @@ bool FUnrealMCPAssetInspectionCoreTest::RunTest(const FString& Parameters)
     const FString ActorPath = ActorPackage + TEXT(".BP_ActorSemantic");
     if (!TestTrue(TEXT("actor semantic root inspects"), Service.Execute(Request(ActorPath), Result, Error))) return false;
     const FString StableSnapshot = Result->GetStringField(TEXT("snapshot_id"));
-    TSharedPtr<FJsonObject> PackageForm;
+    TSharedPtr<FUnrealMCPRecord> PackageForm;
     if (!TestTrue(TEXT("package form inspects"), Service.Execute(Request(ActorPackage), PackageForm, Error))) return false;
     TestEqual(TEXT("package and object forms share snapshot"), PackageForm->GetStringField(TEXT("snapshot_id")), StableSnapshot);
 
@@ -108,20 +108,20 @@ bool FUnrealMCPAssetInspectionCoreTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("complete selected function is marked complete"),
         Result->GetObjectField(TEXT("graph"))->GetObjectField(TEXT("graph_status"))->GetBoolField(TEXT("complete")));
 
-    TSharedRef<FJsonObject> TagPage = Request(ActorPath, TEXT("properties/actor/tags"));
+    TSharedRef<FUnrealMCPRecord> TagPage = Request(ActorPath, TEXT("properties/actor/tags"));
     TagPage->SetNumberField(TEXT("page_size"), 2);
     TagPage->SetNumberField(TEXT("page_index"), 1);
     if (!TestTrue(TEXT("zero-based tag page inspects"), Service.Execute(TagPage, Result, Error))) return false;
-    const TSharedPtr<FJsonObject> Collection = Result->GetObjectField(TEXT("collection"));
+    const TSharedPtr<FUnrealMCPRecord> Collection = Result->GetObjectField(TEXT("collection"));
     TestEqual(TEXT("tag page retains total count"), Collection->GetIntegerField(TEXT("count")), 3);
     TestEqual(TEXT("tag page index is zero-based"), Collection->GetIntegerField(TEXT("page_index")), 1);
     TestEqual(TEXT("last tag page has one item"), Collection->GetArrayField(TEXT("items")).Num(), 1);
 
-    TSharedRef<FJsonObject> InvalidGraphPaging = Request(ActorPath, Utf8Selector);
+    TSharedRef<FUnrealMCPRecord> InvalidGraphPaging = Request(ActorPath, Utf8Selector);
     InvalidGraphPaging->SetNumberField(TEXT("page_index"), 0);
     TestFalse(TEXT("graph paging rejects"), Service.Execute(InvalidGraphPaging, Result, Error));
     TestEqual(TEXT("graph paging error is stable"), Error.Code, FString(TEXT("invalid_argument")));
-    TSharedRef<FJsonObject> InvalidPartialRoot = Request(ActorPath);
+    TSharedRef<FUnrealMCPRecord> InvalidPartialRoot = Request(ActorPath);
     InvalidPartialRoot->SetBoolField(TEXT("allow_partial_graph"), false);
     TestFalse(TEXT("partial flag on root rejects"), Service.Execute(InvalidPartialRoot, Result, Error));
     TestEqual(TEXT("partial root error is stable"), Error.Code, FString(TEXT("invalid_argument")));
@@ -132,7 +132,7 @@ bool FUnrealMCPAssetInspectionCoreTest::RunTest(const FString& Parameters)
         TestFalse(TEXT("unsafe or non-canonical path rejects"), Service.Execute(Request(BadPath), Result, Error));
         TestEqual(TEXT("path rejection is invalid_argument"), Error.Code, FString(TEXT("invalid_argument")));
     }
-    TSharedRef<FJsonObject> BadSelector = Request(ActorPath, TEXT("functions/%d0%a4"));
+    TSharedRef<FUnrealMCPRecord> BadSelector = Request(ActorPath, TEXT("functions/%d0%a4"));
     TestFalse(TEXT("non-canonical selector rejects"), Service.Execute(BadSelector, Result, Error));
     TestEqual(TEXT("selector rejection is invalid_argument"), Error.Code, FString(TEXT("invalid_argument")));
 
@@ -145,7 +145,7 @@ bool FUnrealMCPAssetInspectionCoreTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("interface classifies distinctly"), AssetType(Result), FString(TEXT("interface_blueprint")));
     if (!TestTrue(TEXT("interface declaration selects"),
         Service.Execute(Request(InterfacePackage, TEXT("functions/CanInteract")), Result, Error))) return false;
-    TestTrue(TEXT("interface selector returns declaration"), Result->HasTypedField<EJson::Object>(TEXT("interface_function")));
+    TestTrue(TEXT("interface selector returns declaration"), Result->HasTypedField<EUnrealMCPValueType::Record>(TEXT("interface_function")));
     TestFalse(TEXT("interface selector fabricates no graph"), Result->HasField(TEXT("graph")));
 
     const FString TexturePackage = Root + TEXT("/T_Media");
@@ -171,14 +171,14 @@ bool FUnrealMCPAssetInspectionCoreTest::RunTest(const FString& Parameters)
     TestFalse(TEXT("oversized complete graph rejects"),
         Service.Execute(Request(OversizedPackage, HugeSelector), Result, Error));
     TestEqual(TEXT("oversized graph uses data_limit_exceeded"), Error.Code, FString(TEXT("data_limit_exceeded")));
-    TSharedRef<FJsonObject> Partial = Request(OversizedPackage, HugeSelector);
+    TSharedRef<FUnrealMCPRecord> Partial = Request(OversizedPackage, HugeSelector);
     Partial->SetBoolField(TEXT("allow_partial_graph"), true);
     if (!TestTrue(TEXT("oversized graph supports explicit partial slice"), Service.Execute(Partial, Result, Error)))
     {
         AddError(Error.Code + TEXT(": ") + Error.Message);
         return false;
     }
-    const TSharedPtr<FJsonObject> Status = Result->GetObjectField(TEXT("graph"))->GetObjectField(TEXT("graph_status"));
+    const TSharedPtr<FUnrealMCPRecord> Status = Result->GetObjectField(TEXT("graph"))->GetObjectField(TEXT("graph_status"));
     TestFalse(TEXT("partial graph is explicitly incomplete"), Status->GetBoolField(TEXT("complete")));
     TestEqual(TEXT("partial graph reason is explicit"), Status->GetStringField(TEXT("reason")), FString(TEXT("graph_limit_exceeded")));
     TestTrue(TEXT("partial graph returns fewer detailed nodes"),

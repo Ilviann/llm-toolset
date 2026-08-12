@@ -22,18 +22,18 @@ bool FUnrealMCPFunctionReplaceTest::RunTest(const FString& Parameters)
     const FString AssetPath = Blueprint->GetPathName();
     FUnrealMCPBlueprintInspector Inspector;
     FUnrealMCPBlueprintMutator Mutator(Inspector);
-    TSharedPtr<FJsonObject> Result;
+    TSharedPtr<FUnrealMCPRecord> Result;
     FUnrealMCPError Error;
 
     FString Snapshot = InspectSnapshot(Inspector, AssetPath);
-    TSharedRef<FJsonObject> AddFunction =
+    TSharedRef<FUnrealMCPRecord> AddFunction =
         ScopedMemberEditArguments(AssetPath, Snapshot, TEXT("function"), TEXT("add"));
     AddFunction->SetStringField(TEXT("name"), TEXT("ReplaceableWork"));
     AddFunction->SetObjectField(TEXT("signature"), FunctionSignature(
         TEXT("public"), false, false, {
-            MakeShared<FJsonValueObject>(FunctionParameter(
+            MakeShared<FUnrealMCPValueObject>(FunctionParameter(
                 TEXT("Enabled"), TEXT("input"), K2Type(TEXT("boolean")))),
-            MakeShared<FJsonValueObject>(FunctionParameter(
+            MakeShared<FUnrealMCPValueObject>(FunctionParameter(
                 TEXT("Value"), TEXT("output"), K2Type(TEXT("int")))),
         }));
     if (!TestTrue(TEXT("replaceable function is added"),
@@ -53,12 +53,12 @@ bool FUnrealMCPFunctionReplaceTest::RunTest(const FString& Parameters)
 
     FKismetEditorUtilities::CompileBlueprint(Blueprint);
     Snapshot = InspectSnapshot(Inspector, AssetPath);
-    TSharedRef<FJsonObject> AddLocal =
+    TSharedRef<FUnrealMCPRecord> AddLocal =
         ScopedMemberEditArguments(AssetPath, Snapshot, TEXT("local_variable"), TEXT("add"));
     AddLocal->SetStringField(TEXT("function_id"), FunctionId);
     AddLocal->SetStringField(TEXT("name"), TEXT("Accumulator"));
     AddLocal->SetObjectField(TEXT("type"), K2Type(TEXT("int")));
-    AddLocal->SetObjectField(TEXT("default"), LiteralDefault(MakeShared<FJsonValueNumber>(1)));
+    AddLocal->SetObjectField(TEXT("default"), LiteralDefault(MakeShared<FUnrealMCPValueNumber>(1)));
     if (!TestTrue(TEXT("replaceable function local is added"),
         Mutator.Execute(TEXT("blueprint_member_edit"), AddLocal, Result, Error)))
     {
@@ -81,19 +81,19 @@ bool FUnrealMCPFunctionReplaceTest::RunTest(const FString& Parameters)
         Inspector, TEXT("abababababababababababababababab"));
     auto BranchAction = [&](const FString& CurrentSnapshot) -> FString
     {
-        const TSharedRef<FJsonObject> Query = MakeShared<FJsonObject>();
+        const TSharedRef<FUnrealMCPRecord> Query = MakeShared<FUnrealMCPRecord>();
         Query->SetStringField(TEXT("asset_path"), AssetPath);
         Query->SetStringField(TEXT("graph_id"), FunctionId);
         Query->SetStringField(TEXT("expected_snapshot"), CurrentSnapshot);
         Query->SetStringField(TEXT("node_family"), TEXT("flow_control"));
         Query->SetStringField(TEXT("text"), TEXT("Branch"));
         Query->SetNumberField(TEXT("limit"), 50);
-        TSharedPtr<FJsonObject> CatalogResult;
+        TSharedPtr<FUnrealMCPRecord> CatalogResult;
         FUnrealMCPError CatalogError;
         if (!Catalog.Execute(Query, CatalogResult, CatalogError)) return FString();
-        for (const TSharedPtr<FJsonValue>& Value : CatalogResult->GetArrayField(TEXT("actions")))
+        for (const TSharedPtr<FUnrealMCPValue>& Value : CatalogResult->GetArrayField(TEXT("actions")))
         {
-            const TSharedPtr<FJsonObject> Action = Value->AsObject();
+            const TSharedPtr<FUnrealMCPRecord> Action = Value->AsObject();
             if (Action.IsValid() && Action->GetStringField(TEXT("title")).Equals(
                 TEXT("Branch"), ESearchCase::IgnoreCase))
                 return Action->GetStringField(TEXT("action_id"));
@@ -105,14 +105,14 @@ bool FUnrealMCPFunctionReplaceTest::RunTest(const FString& Parameters)
 
     auto Position = [](int32 X, int32 Y)
     {
-        const TSharedRef<FJsonObject> Value = MakeShared<FJsonObject>();
+        const TSharedRef<FUnrealMCPRecord> Value = MakeShared<FUnrealMCPRecord>();
         Value->SetNumberField(TEXT("x"), X);
         Value->SetNumberField(TEXT("y"), Y);
         return Value;
     };
     auto Endpoint = [](const FString& NodeKey, const FString& PinName)
     {
-        const TSharedRef<FJsonObject> Value = MakeShared<FJsonObject>();
+        const TSharedRef<FUnrealMCPRecord> Value = MakeShared<FUnrealMCPRecord>();
         Value->SetStringField(TEXT("node_key"), NodeKey);
         Value->SetStringField(TEXT("pin_name"), PinName);
         return Value;
@@ -120,7 +120,7 @@ bool FUnrealMCPFunctionReplaceTest::RunTest(const FString& Parameters)
     auto Connection = [&](const FString& FromKey, const FString& FromPin,
         const FString& ToKey, const FString& ToPin)
     {
-        const TSharedRef<FJsonObject> Value = MakeShared<FJsonObject>();
+        const TSharedRef<FUnrealMCPRecord> Value = MakeShared<FUnrealMCPRecord>();
         Value->SetObjectField(TEXT("from"), Endpoint(FromKey, FromPin));
         Value->SetObjectField(TEXT("to"), Endpoint(ToKey, ToPin));
         return Value;
@@ -129,7 +129,7 @@ bool FUnrealMCPFunctionReplaceTest::RunTest(const FString& Parameters)
     {
         UnrealMCP::BlueprintLogicUnitFingerprint::FBoundary Boundary;
         check(UnrealMCP::BlueprintLogicUnitFingerprint::DescribeFunction(FunctionGraph, Boundary));
-        const TSharedRef<FJsonObject> Arguments = MakeShared<FJsonObject>();
+        const TSharedRef<FUnrealMCPRecord> Arguments = MakeShared<FUnrealMCPRecord>();
         Arguments->SetStringField(TEXT("operation_id"),
             FGuid::NewGuid().ToString(EGuidFormats::Digits).ToLower());
         Arguments->SetStringField(TEXT("asset_path"), AssetPath);
@@ -140,47 +140,47 @@ bool FUnrealMCPFunctionReplaceTest::RunTest(const FString& Parameters)
             Boundary.Entry->NodeGuid.ToString(EGuidFormats::Digits).ToLower());
         Arguments->SetStringField(TEXT("result_node_id"),
             Boundary.Result->NodeGuid.ToString(EGuidFormats::Digits).ToLower());
-        TArray<TSharedPtr<FJsonValue>> Owned;
+        TArray<TSharedPtr<FUnrealMCPValue>> Owned;
         for (const FString& Id : Boundary.OwnedNodeIds)
-            Owned.Add(MakeShared<FJsonValueString>(Id));
+            Owned.Add(MakeShared<FUnrealMCPValueString>(Id));
         Arguments->SetArrayField(TEXT("owned_node_ids"), Owned);
-        TArray<TSharedPtr<FJsonValue>> Locals;
+        TArray<TSharedPtr<FUnrealMCPValue>> Locals;
         for (const FString& Id : Boundary.LocalVariableIds)
-            Locals.Add(MakeShared<FJsonValueString>(Id));
+            Locals.Add(MakeShared<FUnrealMCPValueString>(Id));
         Arguments->SetArrayField(TEXT("local_variable_ids"), Locals);
         Arguments->SetObjectField(TEXT("entry_position"), Position(-320, 0));
         Arguments->SetObjectField(TEXT("result_position"), Position(640, 0));
-        TArray<TSharedPtr<FJsonValue>> Nodes;
+        TArray<TSharedPtr<FUnrealMCPValue>> Nodes;
         if (!CurrentAction.IsEmpty())
         {
-            const TSharedRef<FJsonObject> Node = MakeShared<FJsonObject>();
+            const TSharedRef<FUnrealMCPRecord> Node = MakeShared<FUnrealMCPRecord>();
             Node->SetStringField(TEXT("key"), TEXT("branch"));
             Node->SetStringField(TEXT("action_id"), CurrentAction);
             Node->SetObjectField(TEXT("position"), Position(0, 0));
-            Nodes.Add(MakeShared<FJsonValueObject>(Node));
+            Nodes.Add(MakeShared<FUnrealMCPValueObject>(Node));
         }
         Arguments->SetArrayField(TEXT("nodes"), Nodes);
-        TArray<TSharedPtr<FJsonValue>> Defaults;
-        const TSharedRef<FJsonObject> Default = MakeShared<FJsonObject>();
+        TArray<TSharedPtr<FUnrealMCPValue>> Defaults;
+        const TSharedRef<FUnrealMCPRecord> Default = MakeShared<FUnrealMCPRecord>();
         Default->SetObjectField(TEXT("endpoint"), Endpoint(TEXT("$result"), TEXT("Value")));
-        Default->SetObjectField(TEXT("value"), LiteralDefault(MakeShared<FJsonValueNumber>(7)));
-        Defaults.Add(MakeShared<FJsonValueObject>(Default));
+        Default->SetObjectField(TEXT("value"), LiteralDefault(MakeShared<FUnrealMCPValueNumber>(7)));
+        Defaults.Add(MakeShared<FUnrealMCPValueObject>(Default));
         Arguments->SetArrayField(TEXT("pin_defaults"), Defaults);
-        TArray<TSharedPtr<FJsonValue>> Connections;
+        TArray<TSharedPtr<FUnrealMCPValue>> Connections;
         if (!CurrentAction.IsEmpty())
         {
-            Connections.Add(MakeShared<FJsonValueObject>(
+            Connections.Add(MakeShared<FUnrealMCPValueObject>(
                 Connection(TEXT("$entry"), TEXT("then"), TEXT("branch"), TEXT("execute"))));
-            Connections.Add(MakeShared<FJsonValueObject>(
+            Connections.Add(MakeShared<FUnrealMCPValueObject>(
                 Connection(TEXT("$entry"), TEXT("Enabled"), TEXT("branch"), TEXT("Condition"))));
-            Connections.Add(MakeShared<FJsonValueObject>(
+            Connections.Add(MakeShared<FUnrealMCPValueObject>(
                 Connection(TEXT("branch"), TEXT("then"), TEXT("$result"), TEXT("execute"))));
         }
         Arguments->SetArrayField(TEXT("connections"), Connections);
         return Arguments;
     };
 
-    TSharedRef<FJsonObject> Replace = ReplacementArguments(Snapshot, ActionId);
+    TSharedRef<FUnrealMCPRecord> Replace = ReplacementArguments(Snapshot, ActionId);
     const FString OldNodeId = OldBranch->NodeGuid.ToString(EGuidFormats::Digits).ToLower();
     const int32 TransactionsBefore = GEditor->Trans->GetQueueLength();
     FUnrealMCPBlueprintBlockReplacementService Service(Inspector, Catalog);
@@ -223,7 +223,7 @@ bool FUnrealMCPFunctionReplaceTest::RunTest(const FString& Parameters)
         GEditor->Trans->GetQueueLength(), TransactionsBeforeStale);
 
     const FString BeforeCompileFailure = InspectSnapshot(Inspector, AssetPath);
-    TSharedRef<FJsonObject> CompileFailureArguments =
+    TSharedRef<FUnrealMCPRecord> CompileFailureArguments =
         ReplacementArguments(BeforeCompileFailure, FString());
     FUnrealMCPBlueprintBlockReplacementService CompileFailingService(
         Inspector, Catalog,
@@ -244,7 +244,7 @@ bool FUnrealMCPFunctionReplaceTest::RunTest(const FString& Parameters)
     const FString FailureAction = BranchAction(BeforeCompileFailure);
     if (!TestFalse(TEXT("fresh failure-path action is retained"), FailureAction.IsEmpty()))
         return false;
-    TSharedRef<FJsonObject> LiveFailureArguments =
+    TSharedRef<FUnrealMCPRecord> LiveFailureArguments =
         ReplacementArguments(BeforeCompileFailure, FailureAction);
     int32 InvocationCount = 0;
     FUnrealMCPBlueprintBlockReplacementService LiveFailingService(

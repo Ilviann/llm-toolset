@@ -65,10 +65,10 @@ private:
     TArray<FProperty*> Properties;
 };
 
-TSharedRef<FJsonObject> ScanStatus(const FScanCounts& Counts)
+TSharedRef<FUnrealMCPRecord> ScanStatus(const FScanCounts& Counts)
 {
     const bool bComplete = Counts.bSupported && !Counts.bTruncated;
-    const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Result = MakeShared<FUnrealMCPRecord>();
     Result->SetStringField(
         TEXT("status"),
         !Counts.bSupported ? TEXT("unsupported")
@@ -99,8 +99,8 @@ FString SafeClassPath(const UObject* Object)
 
 void FUnrealMCPAssetReferenceLiveScanner::Scan(
     UObject* TargetObject,
-    TArray<TSharedPtr<FJsonValue>>& OutRecords,
-    TSharedPtr<FJsonObject>& OutStatus,
+    TArray<TSharedPtr<FUnrealMCPValue>>& OutRecords,
+    TSharedPtr<FUnrealMCPRecord>& OutStatus,
     int32& OutOpenEditorCount) const
 {
     using namespace UnrealMCPAssetReferenceLiveScannerPrivate;
@@ -130,7 +130,7 @@ void FUnrealMCPAssetReferenceLiveScanner::Scan(
                 Counts.bTruncated = true;
                 break;
             }
-            const TSharedRef<FJsonObject> Record = MakeShared<FJsonObject>();
+            const TSharedRef<FUnrealMCPRecord> Record = MakeShared<FUnrealMCPRecord>();
             Record->SetStringField(TEXT("section"), TEXT("live_memory"));
             Record->SetStringField(TEXT("evidence"), TEXT("live_memory"));
             Record->SetStringField(TEXT("live_kind"), TEXT("asset_editor"));
@@ -142,7 +142,7 @@ void FUnrealMCPAssetReferenceLiveScanner::Scan(
                 Editor != nullptr
                     ? Editor->GetEditorName().ToString().Left(128)
                     : FString());
-            OutRecords.Add(MakeShared<FJsonValueObject>(Record));
+            OutRecords.Add(MakeShared<FUnrealMCPValueObject>(Record));
             ++Counts.Records;
         }
     }
@@ -182,7 +182,7 @@ void FUnrealMCPAssetReferenceLiveScanner::Scan(
             Potential->GetOutermost() != nullptr
             ? Potential->GetOutermost()->GetName().Left(512)
             : FString();
-        const TSharedRef<FJsonObject> Record = MakeShared<FJsonObject>();
+        const TSharedRef<FUnrealMCPRecord> Record = MakeShared<FUnrealMCPRecord>();
         Record->SetStringField(TEXT("section"), TEXT("live_memory"));
         Record->SetStringField(TEXT("evidence"), TEXT("live_memory"));
         Record->SetStringField(
@@ -208,7 +208,7 @@ void FUnrealMCPAssetReferenceLiveScanner::Scan(
         {
             return Left.GetName() < Right.GetName();
         });
-        TArray<TSharedPtr<FJsonValue>> PropertyValues;
+        TArray<TSharedPtr<FUnrealMCPValue>> PropertyValues;
         FString LastName;
         for (FProperty* Property : Properties)
         {
@@ -224,14 +224,14 @@ void FUnrealMCPAssetReferenceLiveScanner::Scan(
                 break;
             }
             LastName = Name;
-            PropertyValues.Add(MakeShared<FJsonValueString>(Name));
+            PropertyValues.Add(MakeShared<FUnrealMCPValueString>(Name));
         }
         Record->SetArrayField(TEXT("properties"), PropertyValues);
         if (!Record->HasField(TEXT("properties_truncated")))
         {
             Record->SetBoolField(TEXT("properties_truncated"), false);
         }
-        OutRecords.Add(MakeShared<FJsonValueObject>(Record));
+        OutRecords.Add(MakeShared<FUnrealMCPValueObject>(Record));
         ++Counts.Records;
     }
     OutStatus = ScanStatus(Counts);

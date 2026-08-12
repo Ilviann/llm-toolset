@@ -1,7 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Dom/JsonObject.h"
+#include "UnrealMCPWireTypes.h"
 #include "UnrealMCPProtocol.h"
 
 class FUnrealMCPBlueprintInspector;
@@ -11,7 +11,7 @@ struct FUnrealMCPWidgetBindingRecord
 {
     FString WidgetId;
     FString Fingerprint;
-    TSharedPtr<FJsonObject> Record;
+    TSharedPtr<FUnrealMCPRecord> Record;
 };
 
 class FUnrealMCPWidgetBindingService
@@ -21,8 +21,8 @@ public:
         FUnrealMCPBlueprintInspector& InInspector);
 
     bool Execute(
-        const TSharedPtr<FJsonObject>& Arguments,
-        TSharedPtr<FJsonObject>& OutResult,
+        const TSharedPtr<FUnrealMCPRecord>& Arguments,
+        TSharedPtr<FUnrealMCPRecord>& OutResult,
         FUnrealMCPError& OutError);
 
     static bool Collect(

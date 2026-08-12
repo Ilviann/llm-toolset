@@ -2,8 +2,8 @@
 
 
 bool FUnrealMCPBlueprintMutator::MemberEdit(
-    const TSharedPtr<FJsonObject>& Arguments,
-    TSharedPtr<FJsonObject>& OutResult,
+    const TSharedPtr<FUnrealMCPRecord>& Arguments,
+    TSharedPtr<FUnrealMCPRecord>& OutResult,
     FUnrealMCPError& OutError)
 {
     using namespace UnrealMCP::BlueprintMutationPrivate;
@@ -34,7 +34,7 @@ bool FUnrealMCPBlueprintMutator::MemberEdit(
         OutError = {TEXT("invalid_argument"), TEXT("Unknown member edit operation")};
         return false;
     }
-    for (const TPair<FString, TSharedPtr<FJsonValue>>& Pair : Arguments->Values)
+    for (const TPair<FString, TSharedPtr<FUnrealMCPValue>>& Pair : Arguments->Values)
     {
         if (!Allowed.Contains(Pair.Key))
         {
@@ -49,7 +49,7 @@ bool FUnrealMCPBlueprintMutator::MemberEdit(
         OutError = {TEXT("invalid_argument"), TEXT("asset_path must identify one exact Blueprint asset")};
         return false;
     }
-    const TSharedRef<FJsonObject> AssetOnly = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> AssetOnly = MakeShared<FUnrealMCPRecord>();
     AssetOnly->SetStringField(TEXT("asset_path"), RawAsset);
     UBlueprint* Blueprint = nullptr;
     FString ObjectPath;
@@ -71,9 +71,9 @@ bool FUnrealMCPBlueprintMutator::MemberEdit(
     UnrealMCP::BlueprintReferences::FScanResult ReferenceScan;
     FEdGraphPinType NewType;
     FString NewDefault;
-    const TSharedPtr<FJsonObject>* TypeObject = nullptr;
-    const TSharedPtr<FJsonObject>* DefaultObject = nullptr;
-    const TSharedPtr<FJsonObject>* MetadataObject = nullptr;
+    const TSharedPtr<FUnrealMCPRecord>* TypeObject = nullptr;
+    const TSharedPtr<FUnrealMCPRecord>* DefaultObject = nullptr;
+    const TSharedPtr<FUnrealMCPRecord>* MetadataObject = nullptr;
 
     if (Operation == TEXT("add"))
     {
@@ -254,8 +254,8 @@ bool FUnrealMCPBlueprintMutator::MemberEdit(
         return false;
     }
 
-    TSharedPtr<FJsonObject> Member;
-    TSharedPtr<FJsonObject> ResultReferences = UnrealMCP::BlueprintReferences::Encode(ReferenceScan);
+    TSharedPtr<FUnrealMCPRecord> Member;
+    TSharedPtr<FUnrealMCPRecord> ResultReferences = UnrealMCP::BlueprintReferences::Encode(ReferenceScan);
     if (Operation != TEXT("remove"))
     {
         if (!ReadInspectedMember(Inspector, ObjectPath, MemberId, Member, OutError))
@@ -263,7 +263,7 @@ bool FUnrealMCPBlueprintMutator::MemberEdit(
             RestoreFailedTransaction(OutError);
             return false;
         }
-        const TSharedPtr<FJsonObject>* ReadReferences = nullptr;
+        const TSharedPtr<FUnrealMCPRecord>* ReadReferences = nullptr;
         if (Member->TryGetObjectField(TEXT("reference_summary"), ReadReferences) && ReadReferences != nullptr)
         {
             ResultReferences = *ReadReferences;
@@ -271,7 +271,7 @@ bool FUnrealMCPBlueprintMutator::MemberEdit(
     }
     else
     {
-        Member = MakeShared<FJsonObject>();
+        Member = MakeShared<FUnrealMCPRecord>();
         Member->SetStringField(TEXT("id"), MemberId);
         Member->SetStringField(TEXT("name"), Name);
         Member->SetBoolField(TEXT("removed"), true);

@@ -152,8 +152,8 @@ TArray<FString> FUnrealMCPWidgetStyleService::SupportedProperties(
 }
 
 bool FUnrealMCPWidgetStyleService::Execute(
-    const TSharedPtr<FJsonObject>& Arguments,
-    TSharedPtr<FJsonObject>& OutResult,
+    const TSharedPtr<FUnrealMCPRecord>& Arguments,
+    TSharedPtr<FUnrealMCPRecord>& OutResult,
     FUnrealMCPError& OutError)
 {
     using namespace UnrealMCP::BlueprintMutationPrivate;
@@ -174,7 +174,7 @@ bool FUnrealMCPWidgetStyleService::Execute(
     }
     FString Operation;
     FString PropertyName;
-    const TSharedPtr<FJsonValue>* Value = Arguments->Values.Find(TEXT("value"));
+    const TSharedPtr<FUnrealMCPValue>* Value = Arguments->Values.Find(TEXT("value"));
     if (!Arguments->TryGetStringField(TEXT("operation"), Operation)
         || Operation != TEXT("set_style")
         || !Arguments->TryGetStringField(TEXT("property_name"), PropertyName)
@@ -205,7 +205,7 @@ bool FUnrealMCPWidgetStyleService::Execute(
     }
     FProperty* Property =
         Widget->GetClass()->FindPropertyByName(FName(*PropertyName));
-    TSharedPtr<FJsonObject> Changed;
+    TSharedPtr<FUnrealMCPRecord> Changed;
     if (!ApplyProperty(
             Blueprint, Widget, Property, *Value,
             TEXT("Unreal MCP set widget presentation"), Changed, OutError))

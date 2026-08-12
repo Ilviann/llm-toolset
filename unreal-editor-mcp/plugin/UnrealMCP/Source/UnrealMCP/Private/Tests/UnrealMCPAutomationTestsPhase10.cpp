@@ -18,19 +18,19 @@ bool FUnrealMCPPhase10ExpandedActionCatalogTest::RunTest(const FString& Paramete
     const FString EventGraphId = EventGraph->GraphGuid.ToString(EGuidFormats::Digits).ToLower();
     FUnrealMCPBlueprintInspector Inspector;
     FUnrealMCPBlueprintMutator Mutator(Inspector);
-    TSharedPtr<FJsonObject> Result;
+    TSharedPtr<FUnrealMCPRecord> Result;
     FUnrealMCPError Error;
 
     FString Snapshot = InspectSnapshot(Inspector, AssetPath);
-    TSharedRef<FJsonObject> AddFunction = ScopedMemberEditArguments(AssetPath, Snapshot, TEXT("function"), TEXT("add"));
+    TSharedRef<FUnrealMCPRecord> AddFunction = ScopedMemberEditArguments(AssetPath, Snapshot, TEXT("function"), TEXT("add"));
     AddFunction->SetStringField(TEXT("name"), TEXT("Phase10Function"));
     AddFunction->SetObjectField(TEXT("signature"), FunctionSignature(TEXT("public"), false, false, {
-        MakeShared<FJsonValueObject>(FunctionParameter(TEXT("Value"), TEXT("input"), K2Type(TEXT("int"))))}));
+        MakeShared<FUnrealMCPValueObject>(FunctionParameter(TEXT("Value"), TEXT("input"), K2Type(TEXT("int"))))}));
     if (!TestTrue(TEXT("Phase 10 function graph is added"), Mutator.Execute(TEXT("blueprint_member_edit"), AddFunction, Result, Error)))
     { AddError(Error.Code + TEXT(": ") + Error.Message); return false; }
     const FString FunctionGraphId = Result->GetObjectField(TEXT("function"))->GetStringField(TEXT("id"));
     Snapshot = Result->GetStringField(TEXT("snapshot_id"));
-    TSharedRef<FJsonObject> AddMacro = ScopedMemberEditArguments(AssetPath, Snapshot, TEXT("macro"), TEXT("add"));
+    TSharedRef<FUnrealMCPRecord> AddMacro = ScopedMemberEditArguments(AssetPath, Snapshot, TEXT("macro"), TEXT("add"));
     AddMacro->SetStringField(TEXT("name"), TEXT("Phase10Macro"));
     AddMacro->SetObjectField(TEXT("signature"), MacroSignature(true, {}));
     if (!TestTrue(TEXT("Phase 10 macro graph is added"), Mutator.Execute(TEXT("blueprint_member_edit"), AddMacro, Result, Error)))
@@ -43,7 +43,7 @@ bool FUnrealMCPPhase10ExpandedActionCatalogTest::RunTest(const FString& Paramete
     FUnrealMCPBlueprintActionCatalog Catalog(Inspector, TEXT("44444444444444444444444444444444"), [&Clock] { return Clock; });
     auto CatalogArguments = [&](const FString& GraphId, const FString& Family, int32 Limit = 20)
     {
-        const TSharedRef<FJsonObject> Arguments = MakeShared<FJsonObject>();
+        const TSharedRef<FUnrealMCPRecord> Arguments = MakeShared<FUnrealMCPRecord>();
         Arguments->SetStringField(TEXT("asset_path"), AssetPath);
         Arguments->SetStringField(TEXT("graph_id"), GraphId);
         Arguments->SetStringField(TEXT("expected_snapshot"), Snapshot);
@@ -51,31 +51,31 @@ bool FUnrealMCPPhase10ExpandedActionCatalogTest::RunTest(const FString& Paramete
         Arguments->SetNumberField(TEXT("limit"), Limit);
         return Arguments;
     };
-    auto Actions = [](const TSharedPtr<FJsonObject>& CatalogResult) -> const TArray<TSharedPtr<FJsonValue>>*
+    auto Actions = [](const TSharedPtr<FUnrealMCPRecord>& CatalogResult) -> const TArray<TSharedPtr<FUnrealMCPValue>>*
     {
-        const TArray<TSharedPtr<FJsonValue>>* Values = nullptr;
+        const TArray<TSharedPtr<FUnrealMCPValue>>* Values = nullptr;
         return CatalogResult.IsValid() && CatalogResult->TryGetArrayField(TEXT("actions"), Values) ? Values : nullptr;
     };
-    auto FirstAction = [&](const TSharedPtr<FJsonObject>& CatalogResult) -> TSharedPtr<FJsonObject>
+    auto FirstAction = [&](const TSharedPtr<FUnrealMCPRecord>& CatalogResult) -> TSharedPtr<FUnrealMCPRecord>
     {
-        const TArray<TSharedPtr<FJsonValue>>* Values = Actions(CatalogResult);
+        const TArray<TSharedPtr<FUnrealMCPValue>>* Values = Actions(CatalogResult);
         return Values != nullptr && !Values->IsEmpty() ? (*Values)[0]->AsObject() : nullptr;
     };
-    auto HasWildcard = [&](const TSharedPtr<FJsonObject>& CatalogResult)
+    auto HasWildcard = [&](const TSharedPtr<FUnrealMCPRecord>& CatalogResult)
     {
-        const TArray<TSharedPtr<FJsonValue>>* Values = Actions(CatalogResult);
+        const TArray<TSharedPtr<FUnrealMCPValue>>* Values = Actions(CatalogResult);
         if (Values == nullptr) return false;
-        for (const TSharedPtr<FJsonValue>& Value : *Values)
+        for (const TSharedPtr<FUnrealMCPValue>& Value : *Values)
         {
-            const TSharedPtr<FJsonObject> Record = Value->AsObject();
+            const TSharedPtr<FUnrealMCPRecord> Record = Value->AsObject();
             if (Record.IsValid() && Record->GetBoolField(TEXT("wildcard"))) return true;
         }
         return false;
     };
 
-    TSharedRef<FJsonObject> EventQuery = CatalogArguments(EventGraphId, TEXT("event"));
+    TSharedRef<FUnrealMCPRecord> EventQuery = CatalogArguments(EventGraphId, TEXT("event"));
     TestTrue(TEXT("unique inherited event catalogs in an event graph"), Catalog.Execute(EventQuery, Result, Error));
-    TSharedPtr<FJsonObject> Action = FirstAction(Result);
+    TSharedPtr<FUnrealMCPRecord> Action = FirstAction(Result);
     if (!TestNotNull(TEXT("event query returns an action"), Action.Get())) return false;
     TestEqual(TEXT("event family is exact"), Action->GetStringField(TEXT("node_family")), FString(TEXT("event")));
     TestEqual(TEXT("event member kind is explicit"), Action->GetStringField(TEXT("member_kind")), FString(TEXT("event")));
@@ -90,26 +90,26 @@ bool FUnrealMCPPhase10ExpandedActionCatalogTest::RunTest(const FString& Paramete
     if (!TestNotNull(TEXT("exact event filter returns an action"), Action.Get())) return false;
     TestEqual(TEXT("event function is exact"), Action->GetStringField(TEXT("member_name")), EventFunctionName);
     const FString EventActionId = Action->GetStringField(TEXT("action_id"));
-    TSharedPtr<FJsonObject> CachedEventResult;
+    TSharedPtr<FUnrealMCPRecord> CachedEventResult;
     TestTrue(TEXT("event query is cacheable"), Catalog.Execute(EventQuery, CachedEventResult, Error));
     TestEqual(TEXT("event cache reuses opaque identity"), FirstAction(CachedEventResult)->GetStringField(TEXT("action_id")), EventActionId);
 
     for (const FString& RestrictedGraphId : {FunctionGraphId, MacroGraphId})
     {
-        TSharedRef<FJsonObject> RestrictedEvent = CatalogArguments(RestrictedGraphId, TEXT("event"));
+        TSharedRef<FUnrealMCPRecord> RestrictedEvent = CatalogArguments(RestrictedGraphId, TEXT("event"));
         RestrictedEvent->SetStringField(TEXT("function"), EventFunctionName);
         TestTrue(TEXT("event family restriction query executes"), Catalog.Execute(RestrictedEvent, Result, Error));
         TestEqual(TEXT("events are unavailable outside event graphs"), Result->GetIntegerField(TEXT("returned_count")), 0);
     }
 
-    TSharedRef<FJsonObject> LatentEvent = CatalogArguments(EventGraphId, TEXT("function_call"));
+    TSharedRef<FUnrealMCPRecord> LatentEvent = CatalogArguments(EventGraphId, TEXT("function_call"));
     LatentEvent->SetStringField(TEXT("owner_class"), TEXT("/Script/Engine.KismetSystemLibrary"));
     LatentEvent->SetStringField(TEXT("function"), TEXT("Delay"));
     TestTrue(TEXT("latent function catalogs in event graph"), Catalog.Execute(LatentEvent, Result, Error));
     Action = FirstAction(Result);
     if (!TestNotNull(TEXT("event graph returns latent action"), Action.Get())) return false;
     TestTrue(TEXT("latent metadata is explicit"), Action->GetBoolField(TEXT("latent")));
-    TSharedRef<FJsonObject> LatentFunction = CatalogArguments(FunctionGraphId, TEXT("function_call"));
+    TSharedRef<FUnrealMCPRecord> LatentFunction = CatalogArguments(FunctionGraphId, TEXT("function_call"));
     LatentFunction->SetStringField(TEXT("owner_class"), TEXT("/Script/Engine.KismetSystemLibrary"));
     LatentFunction->SetStringField(TEXT("function"), TEXT("Delay"));
     TestTrue(TEXT("latent function restriction query executes"), Catalog.Execute(LatentFunction, Result, Error));
@@ -119,7 +119,7 @@ bool FUnrealMCPPhase10ExpandedActionCatalogTest::RunTest(const FString& Paramete
     {
         for (const FString& GraphId : {EventGraphId, FunctionGraphId, MacroGraphId})
         {
-            TSharedRef<FJsonObject> Query = CatalogArguments(GraphId, Family, 50);
+            TSharedRef<FUnrealMCPRecord> Query = CatalogArguments(GraphId, Family, 50);
             if (Family == TEXT("cast")) Query->SetStringField(TEXT("owner_class"), TEXT("/Script/Engine.Actor"));
             if (Family == TEXT("literal"))
             {
@@ -134,13 +134,13 @@ bool FUnrealMCPPhase10ExpandedActionCatalogTest::RunTest(const FString& Paramete
         }
     }
 
-    TSharedRef<FJsonObject> Operators = CatalogArguments(EventGraphId, TEXT("operator"), 50);
+    TSharedRef<FUnrealMCPRecord> Operators = CatalogArguments(EventGraphId, TEXT("operator"), 50);
     Operators->SetStringField(TEXT("owner_class"), TEXT("/Script/Engine.KismetMathLibrary"));
     TestTrue(TEXT("operator catalog executes"), Catalog.Execute(Operators, Result, Error));
     TestTrue(TEXT("operator family exposes wildcard candidates"), HasWildcard(Result));
     Action = FirstAction(Result);
     if (!TestNotNull(TEXT("operator query returns an action"), Action.Get())) return false;
-    TSharedRef<FJsonObject> ExactOperator = CatalogArguments(EventGraphId, TEXT("operator"), 5);
+    TSharedRef<FUnrealMCPRecord> ExactOperator = CatalogArguments(EventGraphId, TEXT("operator"), 5);
     ExactOperator->SetStringField(TEXT("owner_class"), TEXT("/Script/Engine.KismetMathLibrary"));
     ExactOperator->SetStringField(TEXT("function"), Action->GetStringField(TEXT("member_name")));
     TestTrue(TEXT("narrow exact operator filter executes"), Catalog.Execute(ExactOperator, Result, Error));
@@ -165,9 +165,9 @@ bool FUnrealMCPPhase10ExpandedActionCatalogTest::RunTest(const FString& Paramete
         }
     }
     if (!TestNotNull(TEXT("function fixture has an integer pin context"), IntegerContextPin)) return false;
-    TSharedRef<FJsonObject> PinOperators = CatalogArguments(FunctionGraphId, TEXT("operator"), 20);
+    TSharedRef<FUnrealMCPRecord> PinOperators = CatalogArguments(FunctionGraphId, TEXT("operator"), 20);
     PinOperators->SetStringField(TEXT("owner_class"), TEXT("/Script/Engine.KismetMathLibrary"));
-    const TSharedRef<FJsonObject> PinContext = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> PinContext = MakeShared<FUnrealMCPRecord>();
     PinContext->SetStringField(TEXT("node_id"), IntegerContextNode->NodeGuid.ToString(EGuidFormats::Digits).ToLower());
     PinContext->SetStringField(TEXT("pin_id"), IntegerContextPin->PinId.ToString(EGuidFormats::Digits).ToLower());
     PinOperators->SetObjectField(TEXT("pin_context"), PinContext);
@@ -176,7 +176,7 @@ bool FUnrealMCPPhase10ExpandedActionCatalogTest::RunTest(const FString& Paramete
 
     for (const FString& Family : {TEXT("event"), TEXT("flow_control"), TEXT("cast"), TEXT("literal"), TEXT("operator")})
     {
-        TSharedRef<FJsonObject> Forged = CatalogArguments(EventGraphId, Family);
+        TSharedRef<FUnrealMCPRecord> Forged = CatalogArguments(EventGraphId, Family);
         Forged->SetStringField(TEXT("text"), TEXT("DefinitelyNotARealUnrealAction"));
         TestTrue(*FString::Printf(TEXT("forged %s query executes"), *Family), Catalog.Execute(Forged, Result, Error));
         TestEqual(*FString::Printf(TEXT("forged %s action cannot resolve"), *Family), Result->GetIntegerField(TEXT("returned_count")), 0);

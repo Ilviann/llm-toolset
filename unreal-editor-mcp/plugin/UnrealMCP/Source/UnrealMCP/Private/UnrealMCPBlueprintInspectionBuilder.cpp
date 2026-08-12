@@ -9,12 +9,12 @@ namespace UnrealMCP::BlueprintInspectionPrivate
 {
 
 bool BuildInspection(
-    const FJsonObject& Arguments,
+    const FUnrealMCPRecord& Arguments,
     const FUnrealMCPExtensionRegistry* ExtensionRegistry,
-    TArray<TSharedPtr<FJsonValue>>& OutRecords,
+    TArray<TSharedPtr<FUnrealMCPValue>>& OutRecords,
     FString& OutSnapshot,
     FString& OutBlueprintFamily,
-    TSharedPtr<FJsonObject>& OutFamilyCapabilities,
+    TSharedPtr<FUnrealMCPRecord>& OutFamilyCapabilities,
     bool& OutScanTruncated,
     FUnrealMCPError& OutError)
 {
@@ -87,7 +87,7 @@ bool BuildInspection(
     if (!CollectWidgetTree(Blueprint, WidgetFilter, PropertyNames, Sections, Sink, OutError)) return false;
     if (ExtensionRegistry != nullptr
         && !ExtensionRegistry->AppendBlueprintInspection(
-            *Blueprint, MakeShared<FJsonObject>(Arguments), OutRecords, Sink.Fingerprint,
+            *Blueprint, MakeShared<FUnrealMCPRecord>(Arguments), OutRecords, Sink.Fingerprint,
             OutFamilyCapabilities, OutError))
     {
         return false;

@@ -19,24 +19,24 @@ bool CurrentSnapshot(
     FString& OutSnapshot,
     FUnrealMCPError& OutError)
 {
-    const TSharedRef<FJsonObject> Arguments = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Arguments = MakeShared<FUnrealMCPRecord>();
     Arguments->SetStringField(TEXT("mode"), TEXT("current"));
-    TSharedPtr<FJsonObject> Result;
+    TSharedPtr<FUnrealMCPRecord> Result;
     if (!Levels.Inspect(Arguments, Result, OutError)) return false;
     OutSnapshot = Result->GetStringField(TEXT("snapshot_id"));
     OutPath = Result->GetArrayField(TEXT("records"))[0]->AsObject()->GetStringField(TEXT("map_path"));
     return true;
 }
 
-TSharedRef<FJsonObject> Setting(const FString& Name, TSharedPtr<FJsonValue> Value)
+TSharedRef<FUnrealMCPRecord> Setting(const FString& Name, TSharedPtr<FUnrealMCPValue> Value)
 {
-    const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Result = MakeShared<FUnrealMCPRecord>();
     Result->SetStringField(TEXT("property_name"), Name);
     Result->SetField(TEXT("value"), MoveTemp(Value));
     return Result;
 }
 
-TSharedRef<FJsonObject> BlankCreate(
+TSharedRef<FUnrealMCPRecord> BlankCreate(
     const FString& Path,
     const FString& Snapshot,
     bool bOpen,
@@ -44,28 +44,28 @@ TSharedRef<FJsonObject> BlankCreate(
     bool bWorldPartitionStreaming = false,
     bool bExternalActors = false)
 {
-    const TSharedRef<FJsonObject> Arguments = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Arguments = MakeShared<FUnrealMCPRecord>();
     Arguments->SetStringField(TEXT("operation_id"), FGuid::NewGuid().ToString(EGuidFormats::Digits).ToLower());
     Arguments->SetStringField(TEXT("operation"), TEXT("create"));
     Arguments->SetStringField(TEXT("destination_path"), Path);
     Arguments->SetStringField(TEXT("expected_current_snapshot"), Snapshot);
     Arguments->SetBoolField(TEXT("open_after_create"), bOpen);
-    const TSharedRef<FJsonObject> Source = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Source = MakeShared<FUnrealMCPRecord>();
     Source->SetStringField(TEXT("kind"), TEXT("blank"));
     Arguments->SetObjectField(TEXT("source"), Source);
-    const TSharedRef<FJsonObject> Options = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Options = MakeShared<FUnrealMCPRecord>();
     Options->SetBoolField(TEXT("world_partition"), bWorldPartition);
     Options->SetBoolField(TEXT("world_partition_streaming"), bWorldPartitionStreaming);
     Options->SetBoolField(TEXT("external_actors"), bExternalActors);
     Arguments->SetObjectField(TEXT("creation_options"), Options);
     Arguments->SetArrayField(TEXT("settings"), {
-        MakeShared<FJsonValueObject>(Setting(TEXT("KillZ"), MakeShared<FJsonValueNumber>(-12345.0)))});
+        MakeShared<FUnrealMCPValueObject>(Setting(TEXT("KillZ"), MakeShared<FUnrealMCPValueNumber>(-12345.0)))});
     return Arguments;
 }
 
-TSharedRef<FJsonObject> LevelManagementDeleteArguments(const FString& Path, const FString& Snapshot)
+TSharedRef<FUnrealMCPRecord> LevelManagementDeleteArguments(const FString& Path, const FString& Snapshot)
 {
-    const TSharedRef<FJsonObject> Arguments = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Arguments = MakeShared<FUnrealMCPRecord>();
     Arguments->SetStringField(TEXT("operation_id"), FGuid::NewGuid().ToString(EGuidFormats::Digits).ToLower());
     Arguments->SetStringField(TEXT("asset_path"), Path);
     Arguments->SetStringField(TEXT("expected_snapshot"), Snapshot);
@@ -97,17 +97,17 @@ bool FUnrealMCPLevelManagementTest::RunTest(const FString& Parameters)
     FUnrealMCPLevelService Levels(TEXT("1111111111111111111111111111111111111111"));
     FUnrealMCPLevelManagementService Management(
         TEXT("1111111111111111111111111111111111111111"), Levels);
-    TSharedPtr<FJsonObject> Result;
+    TSharedPtr<FUnrealMCPRecord> Result;
     FUnrealMCPError Error;
     FString CurrentPath;
     FString Snapshot;
     if (!TestTrue(TEXT("current snapshot succeeds"), CurrentSnapshot(Levels, CurrentPath, Snapshot, Error))) return false;
     TestEqual(TEXT("base is current"), CurrentPath, BasePath);
 
-    const TSharedRef<FJsonObject> InvalidCreate = BlankCreate(CreatedPath, Snapshot, false);
+    const TSharedRef<FUnrealMCPRecord> InvalidCreate = BlankCreate(CreatedPath, Snapshot, false);
     InvalidCreate->SetArrayField(TEXT("settings"), {
-        MakeShared<FJsonValueObject>(Setting(TEXT("WorldToMeters"), MakeShared<FJsonValueNumber>(333.0))),
-        MakeShared<FJsonValueObject>(Setting(TEXT("KillZ"), MakeShared<FJsonValueString>(TEXT("invalid"))))});
+        MakeShared<FUnrealMCPValueObject>(Setting(TEXT("WorldToMeters"), MakeShared<FUnrealMCPValueNumber>(333.0))),
+        MakeShared<FUnrealMCPValueObject>(Setting(TEXT("KillZ"), MakeShared<FUnrealMCPValueString>(TEXT("invalid"))))});
     TestFalse(TEXT("invalid initial setup rejects"), Management.Manage(InvalidCreate, Result, Error));
     TestEqual(TEXT("invalid initial setup error is stable"), Error.Code, FString(TEXT("invalid_argument")));
 
@@ -128,7 +128,7 @@ bool FUnrealMCPLevelManagementTest::RunTest(const FString& Parameters)
         Management.Manage(BlankCreate(CreatedPath, Snapshot, false), Result, Error));
     TestEqual(TEXT("duplicate rejection is stable"), Error.Code, FString(TEXT("already_exists")));
 
-    const TSharedRef<FJsonObject> Open = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Open = MakeShared<FUnrealMCPRecord>();
     Open->SetStringField(TEXT("operation_id"), FGuid::NewGuid().ToString(EGuidFormats::Digits).ToLower());
     Open->SetStringField(TEXT("map_path"), CreatedPath);
     if (!TestTrue(TEXT("created map opens explicitly"), Levels.Open(Open, Result, Error))) return false;
@@ -136,29 +136,29 @@ bool FUnrealMCPLevelManagementTest::RunTest(const FString& Parameters)
     UWorld* OpenedWorld = GEditor != nullptr ? GEditor->GetEditorWorldContext().World() : nullptr;
     const double OriginalWorldToMeters = OpenedWorld != nullptr && OpenedWorld->GetWorldSettings() != nullptr
         ? OpenedWorld->GetWorldSettings()->WorldToMeters : 0.0;
-    const TSharedRef<FJsonObject> InvalidConfigure = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> InvalidConfigure = MakeShared<FUnrealMCPRecord>();
     InvalidConfigure->SetStringField(TEXT("operation_id"), FGuid::NewGuid().ToString(EGuidFormats::Digits).ToLower());
     InvalidConfigure->SetStringField(TEXT("operation"), TEXT("configure"));
     InvalidConfigure->SetStringField(TEXT("map_path"), CreatedPath);
     InvalidConfigure->SetStringField(TEXT("expected_current_snapshot"), CreatedSnapshot);
     InvalidConfigure->SetBoolField(TEXT("reload_after_save"), false);
     InvalidConfigure->SetArrayField(TEXT("settings"), {
-        MakeShared<FJsonValueObject>(Setting(TEXT("WorldToMeters"), MakeShared<FJsonValueNumber>(333.0))),
-        MakeShared<FJsonValueObject>(Setting(TEXT("KillZ"), MakeShared<FJsonValueString>(TEXT("invalid"))))});
+        MakeShared<FUnrealMCPValueObject>(Setting(TEXT("WorldToMeters"), MakeShared<FUnrealMCPValueNumber>(333.0))),
+        MakeShared<FUnrealMCPValueObject>(Setting(TEXT("KillZ"), MakeShared<FUnrealMCPValueString>(TEXT("invalid"))))});
     TestFalse(TEXT("multi-property failure rejects"), Management.Manage(InvalidConfigure, Result, Error));
     OpenedWorld = GEditor != nullptr ? GEditor->GetEditorWorldContext().World() : nullptr;
     TestEqual(TEXT("failed setup restores prior property"),
         OpenedWorld->GetWorldSettings()->WorldToMeters, static_cast<float>(OriginalWorldToMeters));
     TestFalse(TEXT("failed setup restores clean package"), OpenedWorld->GetPackage()->IsDirty());
 
-    const TSharedRef<FJsonObject> Configure = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Configure = MakeShared<FUnrealMCPRecord>();
     Configure->SetStringField(TEXT("operation_id"), FGuid::NewGuid().ToString(EGuidFormats::Digits).ToLower());
     Configure->SetStringField(TEXT("operation"), TEXT("configure"));
     Configure->SetStringField(TEXT("map_path"), CreatedPath);
     Configure->SetStringField(TEXT("expected_current_snapshot"), CreatedSnapshot);
     Configure->SetBoolField(TEXT("reload_after_save"), true);
     Configure->SetArrayField(TEXT("settings"), {
-        MakeShared<FJsonValueObject>(Setting(TEXT("WorldToMeters"), MakeShared<FJsonValueNumber>(250.0)))});
+        MakeShared<FUnrealMCPValueObject>(Setting(TEXT("WorldToMeters"), MakeShared<FUnrealMCPValueNumber>(250.0)))});
     if (!TestTrue(TEXT("current map configures"), Management.Manage(Configure, Result, Error)))
     {
         AddError(Error.Code + TEXT(": ") + Error.Message);
@@ -170,22 +170,22 @@ bool FUnrealMCPLevelManagementTest::RunTest(const FString& Parameters)
     FString AfterConfigurePath;
     FString AfterConfigureSnapshot;
     if (!CurrentSnapshot(Levels, AfterConfigurePath, AfterConfigureSnapshot, Error)) return false;
-    const TSharedRef<FJsonObject> Unsupported = MakeShared<FJsonObject>(*Configure);
+    const TSharedRef<FUnrealMCPRecord> Unsupported = MakeShared<FUnrealMCPRecord>(*Configure);
     Unsupported->SetStringField(TEXT("operation_id"), FGuid::NewGuid().ToString(EGuidFormats::Digits).ToLower());
     Unsupported->SetStringField(TEXT("expected_current_snapshot"), AfterConfigureSnapshot);
     Unsupported->SetArrayField(TEXT("settings"), {
-        MakeShared<FJsonValueObject>(Setting(TEXT("WorldPartition"), MakeShared<FJsonValueString>(TEXT("unsupported"))))});
+        MakeShared<FUnrealMCPValueObject>(Setting(TEXT("WorldPartition"), MakeShared<FUnrealMCPValueString>(TEXT("unsupported"))))});
     TestFalse(TEXT("post-creation partition conversion rejects"), Management.Manage(Unsupported, Result, Error));
     TestEqual(TEXT("unsupported property is stable"), Error.Code, FString(TEXT("unsupported_property")));
 
-    const TSharedRef<FJsonObject> ReopenBase = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> ReopenBase = MakeShared<FUnrealMCPRecord>();
     ReopenBase->SetStringField(TEXT("operation_id"), FGuid::NewGuid().ToString(EGuidFormats::Digits).ToLower());
     ReopenBase->SetStringField(TEXT("map_path"), BasePath);
     if (!TestTrue(TEXT("clean base map reopens"), Levels.Open(ReopenBase, Result, Error))) return false;
     FAssetCompilingManager::Get().FinishAllCompilation();
     FlushAsyncLoading();
     FUnrealMCPAssetReferenceService References;
-    const TSharedRef<FJsonObject> InspectReferences = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> InspectReferences = MakeShared<FUnrealMCPRecord>();
     InspectReferences->SetStringField(TEXT("asset_path"), CreatedPath);
     InspectReferences->SetNumberField(TEXT("page_size"), 100);
     if (!TestTrue(TEXT("map reference snapshot succeeds"), References.Inspect(InspectReferences, Result, Error))) return false;
@@ -223,7 +223,7 @@ bool FUnrealMCPLevelManagementTest::RunTest(const FString& Parameters)
         AddError(Error.Code + TEXT(": ") + Error.Message);
         return false;
     }
-    const TSharedPtr<FJsonObject> PartitionFacts = Result->GetObjectField(TEXT("effective_creation"));
+    const TSharedPtr<FUnrealMCPRecord> PartitionFacts = Result->GetObjectField(TEXT("effective_creation"));
     TestTrue(TEXT("partition fact reads back"), PartitionFacts->GetBoolField(TEXT("world_partition")));
     TestTrue(TEXT("partition streaming fact reads back"), PartitionFacts->GetBoolField(TEXT("world_partition_streaming")));
     TestTrue(TEXT("external actors fact reads back"), PartitionFacts->GetBoolField(TEXT("external_actors")));

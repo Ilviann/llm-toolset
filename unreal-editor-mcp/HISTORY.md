@@ -6,6 +6,10 @@
 - Added an independent CommonUI companion checkbox to the Windows deployment helper, including fixed base-dependent packaging, project/Engine installation, and transactional multi-plugin handling without changing runtime or plugin versions.
 - Decomposed Python packaging, Windows deployment, and headless integration support tools behind stable entrypoints, with shared Unreal-local primitives, typed deployment and Blueprint scenario state, focused domain modules, and unchanged runtime/plugin versions.
 
+## 0.37.0 — 2026-08-12
+
+- Replaced base native domain JSON coupling with bounded JSON-neutral request, result, error, value, capability, identity, selector, paging, diagnostic, mutation, and persistence records plus explicit protocol codecs, while preserving every released wire schema and retaining companion API v1 through one compatibility adapter.
+
 ## 0.36.0 — 2026-08-12
 
 - Added `asset_inspect`, a read-only exact-asset facade with canonical `/Game` object paths, compact semantic roots, hierarchical UTF-8 selectors, zero-based paging, stable snapshots, direct normalized `UEdGraph` traversal, atomic graph bounds, and explicit coherent partial-graph fallback for gameplay-framework, Actor Component, and Interface Blueprints.

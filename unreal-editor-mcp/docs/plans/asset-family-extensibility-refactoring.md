@@ -74,7 +74,7 @@ adding an optional Engine-plugin dependency to the base module.
 
 ## Planned delivery sequence
 
-1. [`native-wire-contracts`](../features/planned/native-wire-contracts.md) moves
+1. [`native-wire-contracts`](../features/completed/native-wire-contracts.md) moves
    JSON conversion to explicit transport codecs.
 2. [`native-command-catalog`](../features/planned/native-command-catalog.md)
    replaces centralized command branching with deterministic typed registration.

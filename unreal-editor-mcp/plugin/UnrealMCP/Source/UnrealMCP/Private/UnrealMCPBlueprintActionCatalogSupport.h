@@ -10,7 +10,7 @@
 #include "BlueprintFieldNodeSpawner.h"
 #include "BlueprintFunctionNodeSpawner.h"
 #include "BlueprintVariableNodeSpawner.h"
-#include "Dom/JsonValue.h"
+#include "UnrealMCPWireTypes.h"
 #include "EdGraph/EdGraph.h"
 #include "EdGraph/EdGraphNode.h"
 #include "EdGraph/EdGraphPin.h"
@@ -49,11 +49,11 @@
 
 namespace UnrealMCP::BlueprintActionCatalogPrivate
 {
-static bool HasOnlyFields(const FJsonObject& Object, std::initializer_list<const TCHAR*> Allowed)
+static bool HasOnlyFields(const FUnrealMCPRecord& Object, std::initializer_list<const TCHAR*> Allowed)
 {
     TSet<FString> Names;
     for (const TCHAR* Name : Allowed) Names.Add(Name);
-    for (const TPair<FString, TSharedPtr<FJsonValue>>& Pair : Object.Values)
+    for (const TPair<FString, TSharedPtr<FUnrealMCPValue>>& Pair : Object.Values)
         if (!Names.Contains(Pair.Key)) return false;
     return true;
 }
@@ -89,7 +89,7 @@ static bool NormalizeAssetPath(const FString& Input, FString& OutObjectPath)
 }
 
 static bool ReadOptionalString(
-    const FJsonObject& Object,
+    const FUnrealMCPRecord& Object,
     const TCHAR* Name,
     int32 MaxLength,
     FString& OutValue,
@@ -235,19 +235,19 @@ static FString ActionSignature(
     return QueryDigest(Material);
 }
 
-static TSharedRef<FJsonObject> MakeResult(
+static TSharedRef<FUnrealMCPRecord> MakeResult(
     const FString& BridgeInstanceId,
     const FString& AssetPath,
     const FString& BlueprintFamily,
     const FString& GraphId,
     const FString& SnapshotId,
-    const TArray<TSharedPtr<FJsonValue>>& Actions,
+    const TArray<TSharedPtr<FUnrealMCPValue>>& Actions,
     int32 ScannedCount,
     bool bTruncated,
     bool bTimedOut,
     int32 ExpiresInMs)
 {
-    const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Result = MakeShared<FUnrealMCPRecord>();
     Result->SetStringField(TEXT("bridge_instance_id"), BridgeInstanceId);
     Result->SetStringField(TEXT("asset_path"), AssetPath);
     Result->SetStringField(TEXT("blueprint_family"), BlueprintFamily);

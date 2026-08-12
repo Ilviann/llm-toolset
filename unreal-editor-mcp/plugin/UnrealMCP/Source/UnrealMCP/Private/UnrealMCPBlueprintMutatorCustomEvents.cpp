@@ -2,8 +2,8 @@
 
 
 bool FUnrealMCPBlueprintMutator::CustomEventEdit(
-    const TSharedPtr<FJsonObject>& Arguments,
-    TSharedPtr<FJsonObject>& OutResult,
+    const TSharedPtr<FUnrealMCPRecord>& Arguments,
+    TSharedPtr<FUnrealMCPRecord>& OutResult,
     FUnrealMCPError& OutError)
 {
     using namespace UnrealMCP::BlueprintMutationPrivate;
@@ -25,7 +25,7 @@ bool FUnrealMCPBlueprintMutator::CustomEventEdit(
         OutError = {TEXT("invalid_argument"), TEXT("Unknown custom-event edit operation")};
         return false;
     }
-    for (const TPair<FString, TSharedPtr<FJsonValue>>& Pair : Arguments->Values)
+    for (const TPair<FString, TSharedPtr<FUnrealMCPValue>>& Pair : Arguments->Values)
     {
         if (!Allowed.Contains(Pair.Key))
         {
@@ -40,7 +40,7 @@ bool FUnrealMCPBlueprintMutator::CustomEventEdit(
         OutError = {TEXT("invalid_argument"), TEXT("asset_path must identify one exact Blueprint asset")};
         return false;
     }
-    const TSharedRef<FJsonObject> AssetOnly = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> AssetOnly = MakeShared<FUnrealMCPRecord>();
     AssetOnly->SetStringField(TEXT("asset_path"), RawAsset);
     UBlueprint* Blueprint = nullptr;
     FString ObjectPath;
@@ -62,8 +62,8 @@ bool FUnrealMCPBlueprintMutator::CustomEventEdit(
     UEdGraph* Graph = nullptr;
     UK2Node_CustomEvent* Event = nullptr;
     FCustomEventSignatureSpec Signature;
-    const TSharedPtr<FJsonObject>* SignatureObject = nullptr;
-    const TSharedPtr<FJsonObject>* MetadataObject = nullptr;
+    const TSharedPtr<FUnrealMCPRecord>* SignatureObject = nullptr;
+    const TSharedPtr<FUnrealMCPRecord>* MetadataObject = nullptr;
     FCustomEventRpcSpec Rpc;
     UnrealMCP::BlueprintReferences::FScanResult ReferenceScan;
 
@@ -222,10 +222,10 @@ bool FUnrealMCPBlueprintMutator::CustomEventEdit(
         return false;
     }
 
-    TSharedPtr<FJsonObject> CustomEvent;
+    TSharedPtr<FUnrealMCPRecord> CustomEvent;
     if (Operation == TEXT("remove"))
     {
-        CustomEvent = MakeShared<FJsonObject>();
+        CustomEvent = MakeShared<FUnrealMCPRecord>();
         CustomEvent->SetStringField(TEXT("id"), EventId);
         CustomEvent->SetStringField(TEXT("name"), Name);
         CustomEvent->SetBoolField(TEXT("removed"), true);

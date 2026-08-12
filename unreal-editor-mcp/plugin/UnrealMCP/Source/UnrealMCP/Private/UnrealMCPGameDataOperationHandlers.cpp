@@ -5,7 +5,7 @@
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "AssetRegistry/IAssetRegistry.h"
 #include "DataTableEditorUtils.h"
-#include "Dom/JsonValue.h"
+#include "UnrealMCPWireTypes.h"
 #include "Editor.h"
 #include "EdGraphSchema_K2.h"
 #include "Engine/DataTable.h"
@@ -17,8 +17,6 @@
 #include "Misc/Paths.h"
 #include "Misc/SecureHash.h"
 #include "ScopedTransaction.h"
-#include "Serialization/JsonSerializer.h"
-#include "Serialization/JsonWriter.h"
 #include "StructUtils/UserDefinedStruct.h"
 #include "UnrealMCPGameDataValueCodec.h"
 #include "UnrealMCPK2TypeCodec.h"
@@ -145,7 +143,7 @@ bool ResolveStruct(const FString& Path, UScriptStruct*& Out, FUnrealMCPError& Ou
     int32 Count = 0;
     for (TFieldIterator<FProperty> It(Out); It; ++It)
     {
-        TSharedPtr<FJsonValue> Encoded;
+        TSharedPtr<FUnrealMCPValue> Encoded;
         if (++Count > UnrealMCP::MaxGameDataFields || !UnrealMCP::GameDataValueCodec::EncodeType(*It)->GetBoolField(TEXT("supported"))
             || !UnrealMCP::GameDataValueCodec::Encode(*It, It->ContainerPtrToValuePtr<void>(Defaults.GetStructMemory()), 0, Encoded, OutError))
         { OutError = {TEXT("unsupported_type"), TEXT("The row schema contains too many fields or an unsupported field type")}; return false; }
@@ -153,10 +151,10 @@ bool ResolveStruct(const FString& Path, UScriptStruct*& Out, FUnrealMCPError& Ou
     return true;
 }
 
-bool ReadStructMember(const TSharedPtr<FJsonObject>& Object, FString& OutName, FEdGraphPinType& OutType,
+bool ReadStructMember(const TSharedPtr<FUnrealMCPRecord>& Object, FString& OutName, FEdGraphPinType& OutType,
     FString& OutDefault, FString& OutTooltip, FUnrealMCPError& OutError)
 {
-    const TSharedPtr<FJsonObject>* Type = nullptr; const TSharedPtr<FJsonObject>* Default = nullptr;
+    const TSharedPtr<FUnrealMCPRecord>* Type = nullptr; const TSharedPtr<FUnrealMCPRecord>* Default = nullptr;
     if (!Object.IsValid() || !RequestValidation::HasOnlyFields(*Object, {TEXT("name"), TEXT("type"), TEXT("default"), TEXT("tooltip")})
         || !Object->TryGetStringField(TEXT("name"), OutName) || !RequestValidation::ValidName(OutName)
         || !Object->TryGetObjectField(TEXT("type"), Type) || Type == nullptr
@@ -173,7 +171,7 @@ bool ReadStructMember(const TSharedPtr<FJsonObject>& Object, FString& OutName, F
     return true;
 }
 
-bool ValidateExpected(const FJsonObject& Arguments, const FString& Actual, FUnrealMCPError& OutError)
+bool ValidateExpected(const FUnrealMCPRecord& Arguments, const FString& Actual, FUnrealMCPError& OutError)
 {
     FString Expected;
     if (!Arguments.TryGetStringField(TEXT("expected_snapshot"), Expected) || Expected.Len() != 40 || Expected != Actual)
@@ -187,14 +185,14 @@ bool RestoreAfterFailure(UObject* Asset, FUnrealMCPError& OutError)
     OutError = {TEXT("internal_error"), TEXT("The game-data mutation failed and explicit restoration was unavailable")}; return false;
 }
 
-bool StageRows(const UScriptStruct* Struct, const TArray<TSharedPtr<FJsonValue>>& Items, const UDataTable* Existing,
+bool StageRows(const UScriptStruct* Struct, const TArray<TSharedPtr<FUnrealMCPValue>>& Items, const UDataTable* Existing,
     TArray<FStagedRow>& Out, FUnrealMCPError& OutError)
 {
     if (Items.Num() > UnrealMCP::MaxGameDataBatchRows) { OutError = {TEXT("data_limit_exceeded"), TEXT("The row batch exceeds the configured limit")}; return false; }
     TSet<FName> Names;
-    for (const TSharedPtr<FJsonValue>& Item : Items)
+    for (const TSharedPtr<FUnrealMCPValue>& Item : Items)
     {
-        const TSharedPtr<FJsonObject>* Object = nullptr; FString Name; bool bPreserve = false; const TSharedPtr<FJsonObject>* Values = nullptr;
+        const TSharedPtr<FUnrealMCPRecord>* Object = nullptr; FString Name; bool bPreserve = false; const TSharedPtr<FUnrealMCPRecord>* Values = nullptr;
         if (!Item->TryGetObject(Object) || Object == nullptr || !(*Object).IsValid()
             || !RequestValidation::HasOnlyFields(**Object, {TEXT("row_name"), TEXT("values"), TEXT("preserve_unspecified")})
             || !(*Object)->TryGetStringField(TEXT("row_name"), Name) || !RequestValidation::ValidName(Name)
@@ -217,7 +215,7 @@ bool StageRows(const UScriptStruct* Struct, const TArray<TSharedPtr<FJsonValue>>
 }
 }
 
-bool FUnrealMCPGameDataService::Edit(const TSharedPtr<FJsonObject>& Arguments, TSharedPtr<FJsonObject>& OutResult, FUnrealMCPError& OutError)
+bool FUnrealMCPGameDataService::Edit(const TSharedPtr<FUnrealMCPRecord>& Arguments, TSharedPtr<FUnrealMCPRecord>& OutResult, FUnrealMCPError& OutError)
 {
     check(IsInGameThread());
     FString Target, Operation, InputPath;
@@ -239,15 +237,15 @@ bool FUnrealMCPGameDataService::Edit(const TSharedPtr<FJsonObject>& Arguments, T
         const FString AssetName = FPackageName::GetLongPackageAssetName(PackageName); UPackage* Package = CreatePackage(*PackageName); UObject* Asset = nullptr;
         if (Target == TEXT("user_defined_struct"))
         {
-            const TArray<TSharedPtr<FJsonValue>>* Items = nullptr;
+            const TArray<TSharedPtr<FUnrealMCPValue>>* Items = nullptr;
             if (!RequestValidation::HasOnlyFields(*Arguments, {TEXT("operation_id"), TEXT("target"), TEXT("operation"), TEXT("asset_path"), TEXT("members")})
                 || !Arguments->TryGetArrayField(TEXT("members"), Items) || Items == nullptr || Items->IsEmpty() || Items->Num() > UnrealMCP::MaxGameDataFields)
             { CleanupCreation(Package, nullptr, Filename, false); OutError = {TEXT("invalid_schema"), TEXT("Struct creation requires one bounded non-empty members array")}; return false; }
             struct FMember { FString Name; FEdGraphPinType Type; FString Default; FString Tooltip; };
             TArray<FMember> Members; TSet<FString> Folded;
-            for (const TSharedPtr<FJsonValue>& Item : *Items)
+            for (const TSharedPtr<FUnrealMCPValue>& Item : *Items)
             {
-                const TSharedPtr<FJsonObject>* Object = nullptr; FMember Member;
+                const TSharedPtr<FUnrealMCPRecord>* Object = nullptr; FMember Member;
                 if (!Item->TryGetObject(Object) || Object == nullptr || !ReadStructMember(*Object, Member.Name, Member.Type, Member.Default, Member.Tooltip, OutError)
                     || Folded.Contains(Member.Name.ToLower()))
                 { CleanupCreation(Package, nullptr, Filename, false); if (OutError.Code.IsEmpty()) OutError = {TEXT("invalid_schema"), TEXT("Struct member names must be unique ignoring case")}; return false; }
@@ -277,12 +275,12 @@ bool FUnrealMCPGameDataService::Edit(const TSharedPtr<FJsonObject>& Arguments, T
         }
         else
         {
-            const TArray<TSharedPtr<FJsonValue>>* Rows = nullptr; FString RowStructPath; UScriptStruct* RowStruct = nullptr;
+            const TArray<TSharedPtr<FUnrealMCPValue>>* Rows = nullptr; FString RowStructPath; UScriptStruct* RowStruct = nullptr;
             if (!RequestValidation::HasOnlyFields(*Arguments, {TEXT("operation_id"), TEXT("target"), TEXT("operation"), TEXT("asset_path"), TEXT("row_struct"), TEXT("rows")})
                 || !Arguments->TryGetStringField(TEXT("row_struct"), RowStructPath) || !ResolveStruct(RowStructPath, RowStruct, OutError)
                 || (Arguments->HasField(TEXT("rows")) && !Arguments->TryGetArrayField(TEXT("rows"), Rows)))
             { CleanupCreation(Package, nullptr, Filename, false); return false; }
-            TArray<TSharedPtr<FJsonValue>> Empty; TArray<FStagedRow> Staged;
+            TArray<TSharedPtr<FUnrealMCPValue>> Empty; TArray<FStagedRow> Staged;
             if (!StageRows(RowStruct, Rows != nullptr ? *Rows : Empty, nullptr, Staged, OutError)) { CleanupCreation(Package, nullptr, Filename, false); return false; }
             UDataTableFactory* Factory = NewObject<UDataTableFactory>(); Factory->Struct = RowStruct;
             UDataTable* Table = Cast<UDataTable>(Factory->FactoryCreateNew(UDataTable::StaticClass(), Package, FName(*AssetName), RF_Public | RF_Standalone | RF_Transactional, nullptr, GWarn)); Asset = Table;
@@ -297,20 +295,20 @@ bool FUnrealMCPGameDataService::Edit(const TSharedPtr<FJsonObject>& Arguments, T
         }
         if (!SaveAsset(Asset)) { CleanupCreation(Package, Asset, Filename, false); OutError = {TEXT("save_failed"), TEXT("The new game-data package could not be saved")}; return false; }
         FModuleManager::LoadModuleChecked<FAssetRegistryModule>(TEXT("AssetRegistry")).Get().AssetCreated(Asset);
-        const TSharedRef<FJsonObject> InspectArgs = MakeShared<FJsonObject>(); InspectArgs->SetStringField(TEXT("target"), Target); InspectArgs->SetStringField(TEXT("asset_path"), Asset->GetPathName());
-        FString ActualTarget, ObjectPath, PackagePath, Snapshot; TArray<TSharedPtr<FJsonValue>> Records, Schema; TSharedPtr<FJsonObject> Metadata;
+        const TSharedRef<FUnrealMCPRecord> InspectArgs = MakeShared<FUnrealMCPRecord>(); InspectArgs->SetStringField(TEXT("target"), Target); InspectArgs->SetStringField(TEXT("asset_path"), Asset->GetPathName());
+        FString ActualTarget, ObjectPath, PackagePath, Snapshot; TArray<TSharedPtr<FUnrealMCPValue>> Records, Schema; TSharedPtr<FUnrealMCPRecord> Metadata;
         if (!UnrealMCP::GameDataInspectionBuilder::Build(
             *InspectArgs, ActualTarget, ObjectPath, PackagePath, Records, Schema, Snapshot, Metadata, OutError))
         { CleanupCreation(Package, Asset, Filename, true); return false; }
-        const TSharedRef<FJsonObject> Result = InspectionBuilder::BuildEditResult(Target, ObjectPath, Snapshot); Result->SetStringField(TEXT("operation"), TEXT("create"));
+        const TSharedRef<FUnrealMCPRecord> Result = InspectionBuilder::BuildEditResult(Target, ObjectPath, Snapshot); Result->SetStringField(TEXT("operation"), TEXT("create"));
         Result->SetNumberField(TEXT("changed_count"), Records.Num()); OutResult = Result; return true;
     }
 
     FString ObjectPath, PackageName;
     if (!RequestValidation::NormalizeAssetPath(InputPath, ObjectPath, PackageName)) { OutError = {TEXT("invalid_argument"), TEXT("asset_path must be one exact bounded Unreal asset path")}; return false; }
     if (!ValidateMutationScope(PackageName, OutError)) return false;
-    const TSharedRef<FJsonObject> InspectArgs = MakeShared<FJsonObject>(); InspectArgs->SetStringField(TEXT("target"), Target); InspectArgs->SetStringField(TEXT("asset_path"), ObjectPath);
-    FString ActualTarget, ActualObject, ActualPackage, BeforeSnapshot; TArray<TSharedPtr<FJsonValue>> BeforeRecords, BeforeSchema; TSharedPtr<FJsonObject> BeforeMetadata;
+    const TSharedRef<FUnrealMCPRecord> InspectArgs = MakeShared<FUnrealMCPRecord>(); InspectArgs->SetStringField(TEXT("target"), Target); InspectArgs->SetStringField(TEXT("asset_path"), ObjectPath);
+    FString ActualTarget, ActualObject, ActualPackage, BeforeSnapshot; TArray<TSharedPtr<FUnrealMCPValue>> BeforeRecords, BeforeSchema; TSharedPtr<FUnrealMCPRecord> BeforeMetadata;
     if (!UnrealMCP::GameDataInspectionBuilder::Build(
             *InspectArgs, ActualTarget, ActualObject, ActualPackage, BeforeRecords, BeforeSchema, BeforeSnapshot, BeforeMetadata, OutError)
         || !ValidateExpected(*Arguments, BeforeSnapshot, OutError)) return false;
@@ -370,14 +368,14 @@ bool FUnrealMCPGameDataService::Edit(const TSharedPtr<FJsonObject>& Arguments, T
             FString Field; Arguments->TryGetStringField(TEXT("field"), Field);
             if (Field == TEXT("default"))
             {
-                const TSharedPtr<FJsonObject>* Default = nullptr; FString Text;
+                const TSharedPtr<FUnrealMCPRecord>* Default = nullptr; FString Text;
                 bChanged = Arguments->TryGetObjectField(TEXT("default"), Default) && Default != nullptr
                     && UnrealMCP::K2TypeCodec::DecodeDefault(Member->ToPinType(), *Default, Text, OutError)
                     && FStructureEditorUtils::ChangeVariableDefaultValue(Struct, MemberId, Text);
             }
             else if (Field == TEXT("type"))
             {
-                const TSharedPtr<FJsonObject>* Type = nullptr; FEdGraphPinType PinType;
+                const TSharedPtr<FUnrealMCPRecord>* Type = nullptr; FEdGraphPinType PinType;
                 bChanged = Arguments->TryGetObjectField(TEXT("type"), Type) && Type != nullptr
                     && UnrealMCP::K2TypeCodec::DecodeType(*Type, PinType, OutError) && !PinType.bIsReference && !PinType.bIsConst
                     && FStructureEditorUtils::ChangeVariableType(Struct, MemberId, PinType);
@@ -399,7 +397,7 @@ bool FUnrealMCPGameDataService::Edit(const TSharedPtr<FJsonObject>& Arguments, T
         }
         else if (Operation == TEXT("add_member"))
         {
-            const TSharedPtr<FJsonObject>* MemberObject = nullptr; FString Name, Default, Tooltip; FEdGraphPinType Type;
+            const TSharedPtr<FUnrealMCPRecord>* MemberObject = nullptr; FString Name, Default, Tooltip; FEdGraphPinType Type;
             if (!Arguments->TryGetObjectField(TEXT("member"), MemberObject) || MemberObject == nullptr || !ReadStructMember(*MemberObject, Name, Type, Default, Tooltip, OutError)) { Transaction.Cancel(); return false; }
             bChanged = FStructureEditorUtils::AddVariable(Struct, Type);
             if (bChanged)
@@ -434,35 +432,35 @@ bool FUnrealMCPGameDataService::Edit(const TSharedPtr<FJsonObject>& Arguments, T
         }
         else
         {
-            TArray<TSharedPtr<FJsonValue>> Writes; TArray<FString> Removes;
+            TArray<TSharedPtr<FUnrealMCPValue>> Writes; TArray<FString> Removes;
             if (Operation == TEXT("add_row") || Operation == TEXT("replace_row"))
             {
-                const TSharedRef<FJsonObject> Write = MakeShared<FJsonObject>(); FString Name; const TSharedPtr<FJsonObject>* Values = nullptr; bool bPreserve = false;
+                const TSharedRef<FUnrealMCPRecord> Write = MakeShared<FUnrealMCPRecord>(); FString Name; const TSharedPtr<FUnrealMCPRecord>* Values = nullptr; bool bPreserve = false;
                 if (!Arguments->TryGetStringField(TEXT("row_name"), Name) || !Arguments->TryGetObjectField(TEXT("values"), Values) || Values == nullptr
                     || (Arguments->HasField(TEXT("preserve_unspecified")) && !Arguments->TryGetBoolField(TEXT("preserve_unspecified"), bPreserve)))
                 { Transaction.Cancel(); OutError = {TEXT("invalid_row"), TEXT("The row write is invalid")}; return false; }
                 Write->SetStringField(TEXT("row_name"), Name); Write->SetObjectField(TEXT("values"), *Values); Write->SetBoolField(TEXT("preserve_unspecified"), bPreserve);
-                Writes.Add(MakeShared<FJsonValueObject>(Write));
+                Writes.Add(MakeShared<FUnrealMCPValueObject>(Write));
                 const bool bExists = Table->FindRowUnchecked(FName(*Name)) != nullptr;
                 if ((Operation == TEXT("add_row") && bExists) || (Operation == TEXT("replace_row") && !bExists))
                 { Transaction.Cancel(); OutError = {TEXT("invalid_row"), Operation == TEXT("add_row") ? TEXT("The row already exists") : TEXT("The row does not exist")}; return false; }
             }
             else if (Operation == TEXT("batch"))
             {
-                const TArray<TSharedPtr<FJsonValue>>* Upserts = nullptr; const TArray<TSharedPtr<FJsonValue>>* RemoveValues = nullptr;
+                const TArray<TSharedPtr<FUnrealMCPValue>>* Upserts = nullptr; const TArray<TSharedPtr<FUnrealMCPValue>>* RemoveValues = nullptr;
                 if (!Arguments->TryGetArrayField(TEXT("upserts"), Upserts) || Upserts == nullptr || !Arguments->TryGetArrayField(TEXT("remove_rows"), RemoveValues) || RemoveValues == nullptr
                     || Upserts->Num() + RemoveValues->Num() > UnrealMCP::MaxGameDataBatchRows)
                 { Transaction.Cancel(); OutError = {TEXT("data_limit_exceeded"), TEXT("The atomic row batch exceeds the configured limit")}; return false; }
                 Writes = *Upserts; TSet<FName> Seen;
-                for (const TSharedPtr<FJsonValue>& Value : *RemoveValues)
+                for (const TSharedPtr<FUnrealMCPValue>& Value : *RemoveValues)
                 {
                     FString Name; if (!Value->TryGetString(Name) || !RequestValidation::ValidName(Name) || Seen.Contains(FName(*Name)) || Table->FindRowUnchecked(FName(*Name)) == nullptr)
                     { Transaction.Cancel(); OutError = {TEXT("invalid_row"), TEXT("A batch removal is missing, duplicate, or case-conflicting")}; return false; }
                     Seen.Add(FName(*Name)); Removes.Add(Name);
                 }
-                for (const TSharedPtr<FJsonValue>& Value : Writes)
+                for (const TSharedPtr<FUnrealMCPValue>& Value : Writes)
                 {
-                    const TSharedPtr<FJsonObject>* Object = nullptr; FString Name;
+                    const TSharedPtr<FUnrealMCPRecord>* Object = nullptr; FString Name;
                     if (!Value->TryGetObject(Object) || Object == nullptr || !(*Object)->TryGetStringField(TEXT("row_name"), Name) || Seen.Contains(FName(*Name)))
                     { Transaction.Cancel(); OutError = {TEXT("invalid_row"), TEXT("Batch upserts and removals overlap or conflict")}; return false; }
                     Seen.Add(FName(*Name));
@@ -486,12 +484,12 @@ bool FUnrealMCPGameDataService::Edit(const TSharedPtr<FJsonObject>& Arguments, T
     {
         Transaction.Cancel(); OutError = {TEXT("save_failed"), TEXT("The game-data mutation could not be saved")}; RestoreAfterFailure(Asset, OutError); return false;
     }
-    FString AfterTarget, AfterObject, AfterPackage, AfterSnapshot; TArray<TSharedPtr<FJsonValue>> AfterRecords, AfterSchema; TSharedPtr<FJsonObject> AfterMetadata;
+    FString AfterTarget, AfterObject, AfterPackage, AfterSnapshot; TArray<TSharedPtr<FUnrealMCPValue>> AfterRecords, AfterSchema; TSharedPtr<FUnrealMCPRecord> AfterMetadata;
     if (!UnrealMCP::GameDataInspectionBuilder::Build(
             *InspectArgs, AfterTarget, AfterObject, AfterPackage, AfterRecords, AfterSchema, AfterSnapshot, AfterMetadata, OutError)
         || AfterSnapshot == BeforeSnapshot)
     { Transaction.Cancel(); if (OutError.Code.IsEmpty()) OutError = {TEXT("internal_error"), TEXT("Game-data read-back did not verify a changed snapshot")}; RestoreAfterFailure(Asset, OutError); return false; }
-    const TSharedRef<FJsonObject> Result = InspectionBuilder::BuildEditResult(Target, AfterObject, AfterSnapshot); Result->SetStringField(TEXT("operation"), Operation);
-    TArray<TSharedPtr<FJsonValue>> Names; for (const FString& Name : ChangedNames) Names.Add(MakeShared<FJsonValueString>(Name));
+    const TSharedRef<FUnrealMCPRecord> Result = InspectionBuilder::BuildEditResult(Target, AfterObject, AfterSnapshot); Result->SetStringField(TEXT("operation"), Operation);
+    TArray<TSharedPtr<FUnrealMCPValue>> Names; for (const FString& Name : ChangedNames) Names.Add(MakeShared<FUnrealMCPValueString>(Name));
     Result->SetArrayField(TEXT("changed_names"), Names); Result->SetNumberField(TEXT("changed_count"), ChangedNames.Num()); OutResult = Result; return true;
 }

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Dom/JsonObject.h"
+#include "UnrealMCPWireTypes.h"
 
 struct FUnrealMCPResolvedAssetReferenceTarget;
 
@@ -12,6 +12,6 @@ public:
         const FUnrealMCPResolvedAssetReferenceTarget& Target,
         uint64 SnapshotRegistrySerial,
         TFunctionRef<uint64()> CurrentRegistrySerial,
-        TArray<TSharedPtr<FJsonValue>>& OutRecords,
-        TSharedPtr<FJsonObject>& OutScans) const;
+        TArray<TSharedPtr<FUnrealMCPValue>>& OutRecords,
+        TSharedPtr<FUnrealMCPRecord>& OutScans) const;
 };

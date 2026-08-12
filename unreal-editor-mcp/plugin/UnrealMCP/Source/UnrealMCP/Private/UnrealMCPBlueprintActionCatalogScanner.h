@@ -6,7 +6,7 @@ namespace UnrealMCP::BlueprintActionCatalogPrivate
 {
 struct FActionScanResult
 {
-    TArray<TSharedPtr<FJsonObject>> CandidateRecords;
+    TArray<TSharedPtr<FUnrealMCPRecord>> CandidateRecords;
     int32 ScannedCount = 0;
     bool bTimedOut = false;
     bool bScanLimited = false;
@@ -32,7 +32,7 @@ if (ContextPin != nullptr) Filter.Context.Pins.Add(ContextPin);
 const double StartedAt = ScanNow();
 FBlueprintActionDatabase& Database = FBlueprintActionDatabase::Get();
 const FBlueprintActionDatabase::FActionRegistry& RegistryActions = Database.GetAllActions();
-TArray<TSharedPtr<FJsonObject>> CandidateRecords;
+TArray<TSharedPtr<FUnrealMCPRecord>> CandidateRecords;
 TSet<FString> Signatures;
 int32 ScannedCount = 0;
 bool bTimedOut = false;
@@ -75,7 +75,7 @@ auto ProcessActions = [&](UObject* ActionOwner, const FBlueprintActionDatabase::
         const FString Signature = ActionSignature(Family, OwnerPath, MemberName, ActionOwner, Spawner);
         if (Signatures.Contains(Signature)) continue;
         Signatures.Add(Signature);
-        const TSharedRef<FJsonObject> Record = MakeShared<FJsonObject>();
+        const TSharedRef<FUnrealMCPRecord> Record = MakeShared<FUnrealMCPRecord>();
         Record->SetStringField(TEXT("_rebuild_signature"), Signature);
         Record->SetStringField(TEXT("node_family"), Family);
         Record->SetStringField(TEXT("title"), Title);
@@ -134,7 +134,7 @@ if (!bScanLimited && !bTimedOut)
         if (bScanLimited || bTimedOut) break;
     }
 }
-CandidateRecords.Sort([](const TSharedPtr<FJsonObject>& Left, const TSharedPtr<FJsonObject>& Right)
+CandidateRecords.Sort([](const TSharedPtr<FUnrealMCPRecord>& Left, const TSharedPtr<FUnrealMCPRecord>& Right)
 {
     const FString A = Left->GetStringField(TEXT("node_family")) + TEXT("|") + Left->GetStringField(TEXT("owner_class"))
         + TEXT("|") + Left->GetStringField(TEXT("member_name")) + TEXT("|") + Left->GetStringField(TEXT("title"));

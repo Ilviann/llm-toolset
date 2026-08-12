@@ -1,7 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Dom/JsonObject.h"
+#include "UnrealMCPWireTypes.h"
 #include "UnrealMCPProtocol.h"
 
 namespace UnrealMCP::GameDataInspectionBuilder
@@ -9,17 +9,17 @@ namespace UnrealMCP::GameDataInspectionBuilder
 bool GatherDependencies(const FString& PackageName, TArray<FString>& OutDependencies, bool& bOutTruncated);
 
 bool Build(
-    const FJsonObject& Arguments,
+    const FUnrealMCPRecord& Arguments,
     FString& OutTarget,
     FString& OutObjectPath,
     FString& OutPackage,
-    TArray<TSharedPtr<FJsonValue>>& OutRecords,
-    TArray<TSharedPtr<FJsonValue>>& OutSchema,
+    TArray<TSharedPtr<FUnrealMCPValue>>& OutRecords,
+    TArray<TSharedPtr<FUnrealMCPValue>>& OutSchema,
     FString& OutSnapshot,
-    TSharedPtr<FJsonObject>& OutMetadata,
+    TSharedPtr<FUnrealMCPRecord>& OutMetadata,
     FUnrealMCPError& OutError);
 
-TSharedRef<FJsonObject> BuildEditResult(
+TSharedRef<FUnrealMCPRecord> BuildEditResult(
     const FString& Target,
     const FString& ObjectPath,
     const FString& Snapshot);

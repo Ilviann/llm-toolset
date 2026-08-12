@@ -8,7 +8,7 @@
 
 struct FHttpServerRequest;
 struct FUnrealMCPError;
-class FJsonObject;
+class FUnrealMCPRecord;
 class FUnrealMCPDiscovery;
 class FUnrealMCPBlueprintInspector;
 class FUnrealMCPBlueprintActionCatalog;
@@ -46,12 +46,12 @@ public:
 
 private:
     bool HandleRequest(const FHttpServerRequest& Request, const FHttpResultCallback& Complete);
-    void DispatchOnGameThread(FString Command, TSharedPtr<FJsonObject> Arguments, FString OperationId, FString RequestDigest,
+    void DispatchOnGameThread(FString Command, TSharedPtr<FUnrealMCPRecord> Arguments, FString OperationId, FString RequestDigest,
         const FHttpResultCallback& Complete, double AcceptedAt);
-    bool Execute(const FString& Command, const TSharedPtr<FJsonObject>& Arguments, TSharedPtr<FJsonObject>& OutResult, FUnrealMCPError& OutError);
-    TSharedPtr<FJsonObject> Capabilities() const;
-    TSharedPtr<FJsonObject> EditorState() const;
-    bool EditorShutdown(TSharedPtr<FJsonObject>& OutResult, FUnrealMCPError& OutError);
+    bool Execute(const FString& Command, const TSharedPtr<FUnrealMCPRecord>& Arguments, TSharedPtr<FUnrealMCPRecord>& OutResult, FUnrealMCPError& OutError);
+    TSharedPtr<FUnrealMCPRecord> Capabilities() const;
+    TSharedPtr<FUnrealMCPRecord> EditorState() const;
+    bool EditorShutdown(TSharedPtr<FUnrealMCPRecord>& OutResult, FUnrealMCPError& OutError);
     bool Heartbeat(float DeltaTime);
 
     FString Token;

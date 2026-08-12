@@ -18,7 +18,7 @@ struct FActionCatalogQuery
 };
 
 static bool DecodeActionCatalogQuery(
-    const TSharedPtr<FJsonObject>& Arguments,
+    const TSharedPtr<FUnrealMCPRecord>& Arguments,
     FActionCatalogQuery& Out,
     FUnrealMCPError& OutError)
 {

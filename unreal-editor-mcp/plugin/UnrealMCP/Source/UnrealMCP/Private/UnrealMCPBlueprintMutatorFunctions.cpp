@@ -2,8 +2,8 @@
 
 
 bool FUnrealMCPBlueprintMutator::FunctionEdit(
-    const TSharedPtr<FJsonObject>& Arguments,
-    TSharedPtr<FJsonObject>& OutResult,
+    const TSharedPtr<FUnrealMCPRecord>& Arguments,
+    TSharedPtr<FUnrealMCPRecord>& OutResult,
     FUnrealMCPError& OutError)
 {
     using namespace UnrealMCP::BlueprintMutationPrivate;
@@ -25,7 +25,7 @@ bool FUnrealMCPBlueprintMutator::FunctionEdit(
         OutError = {TEXT("invalid_argument"), TEXT("Unknown function edit operation")};
         return false;
     }
-    for (const TPair<FString, TSharedPtr<FJsonValue>>& Pair : Arguments->Values)
+    for (const TPair<FString, TSharedPtr<FUnrealMCPValue>>& Pair : Arguments->Values)
     {
         if (!Allowed.Contains(Pair.Key))
         {
@@ -40,7 +40,7 @@ bool FUnrealMCPBlueprintMutator::FunctionEdit(
         OutError = {TEXT("invalid_argument"), TEXT("asset_path must identify one exact Blueprint asset")};
         return false;
     }
-    const TSharedRef<FJsonObject> AssetOnly = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> AssetOnly = MakeShared<FUnrealMCPRecord>();
     AssetOnly->SetStringField(TEXT("asset_path"), RawAsset);
     UBlueprint* Blueprint = nullptr;
     FString ObjectPath;
@@ -61,8 +61,8 @@ bool FUnrealMCPBlueprintMutator::FunctionEdit(
     UEdGraph* Graph = nullptr;
     UK2Node_FunctionEntry* Entry = nullptr;
     FFunctionSignatureSpec Signature;
-    const TSharedPtr<FJsonObject>* SignatureObject = nullptr;
-    const TSharedPtr<FJsonObject>* MetadataObject = nullptr;
+    const TSharedPtr<FUnrealMCPRecord>* SignatureObject = nullptr;
+    const TSharedPtr<FUnrealMCPRecord>* MetadataObject = nullptr;
     UnrealMCP::BlueprintReferences::FScanResult ReferenceScan;
 
     if (Operation == TEXT("add"))
@@ -222,10 +222,10 @@ bool FUnrealMCPBlueprintMutator::FunctionEdit(
         return false;
     }
 
-    TSharedPtr<FJsonObject> Function;
+    TSharedPtr<FUnrealMCPRecord> Function;
     if (Operation == TEXT("remove"))
     {
-        Function = MakeShared<FJsonObject>();
+        Function = MakeShared<FUnrealMCPRecord>();
         Function->SetStringField(TEXT("id"), FunctionId);
         Function->SetStringField(TEXT("name"), Name);
         Function->SetBoolField(TEXT("removed"), true);

@@ -9,11 +9,11 @@
 
 namespace
 {
-TSharedRef<FJsonObject> AssetReferenceDataCreateArguments(
+TSharedRef<FUnrealMCPRecord> AssetReferenceDataCreateArguments(
     const FString& Target,
     const FString& AssetPath)
 {
-    const TSharedRef<FJsonObject> Arguments = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Arguments = MakeShared<FUnrealMCPRecord>();
     Arguments->SetStringField(
         TEXT("operation_id"),
         FGuid::NewGuid().ToString(EGuidFormats::Digits).ToLower());
@@ -23,11 +23,11 @@ TSharedRef<FJsonObject> AssetReferenceDataCreateArguments(
     return Arguments;
 }
 
-bool HasEvidence(const TArray<TSharedPtr<FJsonValue>>& Records, const FString& Evidence)
+bool HasEvidence(const TArray<TSharedPtr<FUnrealMCPValue>>& Records, const FString& Evidence)
 {
-    for (const TSharedPtr<FJsonValue>& Value : Records)
+    for (const TSharedPtr<FUnrealMCPValue>& Value : Records)
     {
-        const TSharedPtr<FJsonObject> Record = Value.IsValid() ? Value->AsObject() : nullptr;
+        const TSharedPtr<FUnrealMCPRecord> Record = Value.IsValid() ? Value->AsObject() : nullptr;
         FString Actual;
         if (Record.IsValid() && Record->TryGetStringField(TEXT("evidence"), Actual) && Actual == Evidence)
         {
@@ -54,21 +54,21 @@ bool FUnrealMCPAssetReferencesTest::RunTest(const FString& Parameters)
     const FString TablePackageB = Prefix + TEXT("/DT_ReferencerB");
 
     FUnrealMCPGameDataService GameData;
-    TSharedPtr<FJsonObject> Result;
+    TSharedPtr<FUnrealMCPRecord> Result;
     FUnrealMCPError Error;
-    TSharedRef<FJsonObject> CreateStruct =
+    TSharedRef<FUnrealMCPRecord> CreateStruct =
         AssetReferenceDataCreateArguments(
             TEXT("user_defined_struct"),
             StructPackage);
-    const TSharedRef<FJsonObject> Member = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Member = MakeShared<FUnrealMCPRecord>();
     Member->SetStringField(TEXT("name"), TEXT("Value"));
     Member->SetObjectField(TEXT("type"), K2Type(TEXT("int")));
     Member->SetObjectField(
         TEXT("default"),
-        LiteralDefault(MakeShared<FJsonValueNumber>(1)));
+        LiteralDefault(MakeShared<FUnrealMCPValueNumber>(1)));
     CreateStruct->SetArrayField(
         TEXT("members"),
-        {MakeShared<FJsonValueObject>(Member)});
+        {MakeShared<FUnrealMCPValueObject>(Member)});
     if (!TestTrue(
         TEXT("reference target struct creates"),
         GameData.Edit(CreateStruct, Result, Error)))
@@ -80,7 +80,7 @@ bool FUnrealMCPAssetReferencesTest::RunTest(const FString& Parameters)
 
     for (const FString& TablePackage : {TablePackageA, TablePackageB})
     {
-        TSharedRef<FJsonObject> CreateTable =
+        TSharedRef<FUnrealMCPRecord> CreateTable =
             AssetReferenceDataCreateArguments(
                 TEXT("data_table"),
                 TablePackage);
@@ -104,7 +104,7 @@ bool FUnrealMCPAssetReferencesTest::RunTest(const FString& Parameters)
     double CurrentTime = 100.0;
     FUnrealMCPAssetReferenceService Service(
         [&CurrentTime] { return CurrentTime; });
-    const TSharedRef<FJsonObject> Inspect = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Inspect = MakeShared<FUnrealMCPRecord>();
     Inspect->SetStringField(TEXT("asset_path"), StructPath);
     Inspect->SetNumberField(TEXT("page_size"), 1);
     if (!TestTrue(
@@ -143,7 +143,7 @@ bool FUnrealMCPAssetReferencesTest::RunTest(const FString& Parameters)
         Target->GetOutermost()->IsDirty(),
         bDirtyBefore);
 
-    const TSharedRef<FJsonObject> Continue = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Continue = MakeShared<FUnrealMCPRecord>();
     Continue->SetStringField(TEXT("cursor"), Cursor);
     Continue->SetNumberField(TEXT("page_size"), 100);
     TestTrue(
@@ -175,7 +175,7 @@ bool FUnrealMCPAssetReferencesTest::RunTest(const FString& Parameters)
         TEXT("RegistryEvent"),
         RF_Public | RF_Standalone);
     FAssetRegistryModule::AssetCreated(EventAsset);
-    const TSharedRef<FJsonObject> Stale = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Stale = MakeShared<FUnrealMCPRecord>();
     Stale->SetStringField(TEXT("cursor"), StaleCursor);
     TestFalse(
         TEXT("registry change invalidates continuation"),
@@ -188,7 +188,7 @@ bool FUnrealMCPAssetReferencesTest::RunTest(const FString& Parameters)
     EventAsset->ClearFlags(RF_Public | RF_Standalone);
     EventPackage->SetDirtyFlag(false);
 
-    const TSharedRef<FJsonObject> PackageOnly = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> PackageOnly = MakeShared<FUnrealMCPRecord>();
     PackageOnly->SetStringField(TEXT("asset_path"), StructPackage);
     TestFalse(
         TEXT("ambiguous package-only input rejects"),
@@ -198,7 +198,7 @@ bool FUnrealMCPAssetReferencesTest::RunTest(const FString& Parameters)
         Error.Code,
         FString(TEXT("invalid_argument")));
 
-    const TSharedRef<FJsonObject> Missing = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Missing = MakeShared<FUnrealMCPRecord>();
     Missing->SetStringField(TEXT("asset_path"), Prefix + TEXT("/Missing.Missing"));
     TestFalse(
         TEXT("missing target rejects"),

@@ -16,7 +16,7 @@ using namespace UnrealMCP::BlueprintMutationPrivate;
 using namespace UnrealMCP::WidgetTreePrivate;
 
 bool HasOnlyAuthoringFields(
-    const FJsonObject& Arguments,
+    const FUnrealMCPRecord& Arguments,
     std::initializer_list<const TCHAR*> Fields)
 {
     return HasOnlyFields(Arguments, Fields);
@@ -24,16 +24,16 @@ bool HasOnlyAuthoringFields(
 
 bool ResolveBlueprint(
     FUnrealMCPBlueprintInspector& Inspector,
-    const FJsonObject& Arguments,
+    const FUnrealMCPRecord& Arguments,
     UWidgetBlueprint*& OutBlueprint,
     FString& OutObjectPath,
     FUnrealMCPError& OutError)
 {
-    const TSharedRef<FJsonObject> Common = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Common = MakeShared<FUnrealMCPRecord>();
     for (const TCHAR* Field : {
         TEXT("operation_id"), TEXT("asset_path"), TEXT("expected_snapshot")})
     {
-        if (const TSharedPtr<FJsonValue>* Value = Arguments.Values.Find(Field))
+        if (const TSharedPtr<FUnrealMCPValue>* Value = Arguments.Values.Find(Field))
         {
             Common->SetField(Field, *Value);
         }
@@ -95,7 +95,7 @@ UPanelSlot* FindPanelSlot(UWidgetBlueprint* Blueprint, const FString& Id)
 
 bool ResolveWidget(
     UWidgetBlueprint* Blueprint,
-    const FJsonObject& Arguments,
+    const FUnrealMCPRecord& Arguments,
     UWidget*& OutWidget,
     FUnrealMCPError& OutError)
 {
@@ -119,9 +119,9 @@ bool ResolveWidget(
     return true;
 }
 
-TSharedRef<FJsonObject> EncodeProperty(UObject* Target, FProperty* Property)
+TSharedRef<FUnrealMCPRecord> EncodeProperty(UObject* Target, FProperty* Property)
 {
-    const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Result = MakeShared<FUnrealMCPRecord>();
     Result->SetStringField(
         TEXT("name"), Property != nullptr ? Property->GetName() : FString());
     if (Target == nullptr || Property == nullptr)
@@ -129,7 +129,7 @@ TSharedRef<FJsonObject> EncodeProperty(UObject* Target, FProperty* Property)
         Result->SetBoolField(TEXT("supported"), false);
         return Result;
     }
-    TSharedPtr<FJsonValue> Value;
+    TSharedPtr<FUnrealMCPValue> Value;
     FUnrealMCPError Error;
     const bool bEncoded = GameDataValueCodec::Encode(
         Property,
@@ -150,9 +150,9 @@ bool ApplyProperty(
     UWidgetBlueprint* Blueprint,
     UObject* Target,
     FProperty* Property,
-    const TSharedPtr<FJsonValue>& Value,
+    const TSharedPtr<FUnrealMCPValue>& Value,
     const FString& TransactionLabel,
-    TSharedPtr<FJsonObject>& OutChanged,
+    TSharedPtr<FUnrealMCPRecord>& OutChanged,
     FUnrealMCPError& OutError)
 {
     if (Blueprint == nullptr || Target == nullptr || Property == nullptr
@@ -217,15 +217,15 @@ bool ApplyProperty(
     return true;
 }
 
-TSharedRef<FJsonObject> BuildResult(
+TSharedRef<FUnrealMCPRecord> BuildResult(
     UWidgetBlueprint* Blueprint,
     const FString& ObjectPath,
     const FString& Operation,
     const FString& Snapshot,
     const FString& WidgetIdValue,
-    const TSharedPtr<FJsonObject>& Changed)
+    const TSharedPtr<FUnrealMCPRecord>& Changed)
 {
-    const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Result = MakeShared<FUnrealMCPRecord>();
     Result->SetStringField(TEXT("asset_path"), ObjectPath);
     Result->SetStringField(TEXT("blueprint_family"), TEXT("widget"));
     Result->SetObjectField(

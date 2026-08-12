@@ -133,23 +133,23 @@ FScanResult ScanCustomEvent(UBlueprint* Blueprint, UK2Node_CustomEvent* Event)
     return BuildResult(MoveTemp(Nodes), bReferenced);
 }
 
-TSharedRef<FJsonObject> Encode(const FScanResult& Result)
+TSharedRef<FUnrealMCPRecord> Encode(const FScanResult& Result)
 {
-    const TSharedRef<FJsonObject> Summary = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Summary = MakeShared<FUnrealMCPRecord>();
     Summary->SetBoolField(TEXT("referenced"), Result.bReferenced);
     Summary->SetNumberField(TEXT("reference_count"), Result.ReferenceCount);
     Summary->SetBoolField(TEXT("unresolved_references"), Result.bUnresolvedReferences);
     Summary->SetBoolField(TEXT("references_truncated"), Result.bTruncated);
-    TArray<TSharedPtr<FJsonValue>> References;
+    TArray<TSharedPtr<FUnrealMCPValue>> References;
     References.Reserve(Result.References.Num());
     for (const FNodeReference& Item : Result.References)
     {
-        const TSharedRef<FJsonObject> Reference = MakeShared<FJsonObject>();
+        const TSharedRef<FUnrealMCPRecord> Reference = MakeShared<FUnrealMCPRecord>();
         Reference->SetStringField(TEXT("graph_id"), Item.GraphId);
         Reference->SetStringField(TEXT("node_id"), Item.NodeId);
         Reference->SetStringField(TEXT("node_class"), Item.NodeClass);
         Reference->SetStringField(TEXT("title"), Item.Title);
-        References.Add(MakeShared<FJsonValueObject>(Reference));
+        References.Add(MakeShared<FUnrealMCPValueObject>(Reference));
     }
     Summary->SetArrayField(TEXT("references"), References);
     return Summary;

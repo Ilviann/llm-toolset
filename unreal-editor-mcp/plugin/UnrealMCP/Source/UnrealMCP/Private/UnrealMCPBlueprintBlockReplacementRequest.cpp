@@ -30,7 +30,7 @@ bool IsEndpointKey(const FString& Value)
     return Value == TEXT("$entry") || Value == TEXT("$result") || IsNodeKey(Value);
 }
 
-bool ReadPosition(const TSharedPtr<FJsonObject>& Object, FPosition& Out, FUnrealMCPError& OutError)
+bool ReadPosition(const TSharedPtr<FUnrealMCPRecord>& Object, FPosition& Out, FUnrealMCPError& OutError)
 {
     double X = 0.0;
     double Y = 0.0;
@@ -50,7 +50,7 @@ bool ReadPosition(const TSharedPtr<FJsonObject>& Object, FPosition& Out, FUnreal
     return true;
 }
 
-bool ReadEndpoint(const TSharedPtr<FJsonObject>& Object, FEndpoint& Out, FUnrealMCPError& OutError)
+bool ReadEndpoint(const TSharedPtr<FUnrealMCPRecord>& Object, FEndpoint& Out, FUnrealMCPError& OutError)
 {
     if (!Object.IsValid() || !HasOnlyFields(*Object, {TEXT("node_key"), TEXT("pin_name")})
         || !Object->TryGetStringField(TEXT("node_key"), Out.NodeKey) || !IsEndpointKey(Out.NodeKey)
@@ -64,7 +64,7 @@ bool ReadEndpoint(const TSharedPtr<FJsonObject>& Object, FEndpoint& Out, FUnreal
 }
 
 bool ReadExternalEndpoint(
-    const TSharedPtr<FJsonObject>& Object,
+    const TSharedPtr<FUnrealMCPRecord>& Object,
     FExternalEndpoint& Out,
     FUnrealMCPError& OutError)
 {
@@ -79,20 +79,20 @@ bool ReadExternalEndpoint(
 }
 
 bool ReadGuidArray(
-    const FJsonObject& Arguments,
+    const FUnrealMCPRecord& Arguments,
     const TCHAR* Name,
     int32 Maximum,
     TArray<FString>& Out,
     FUnrealMCPError& OutError)
 {
-    const TArray<TSharedPtr<FJsonValue>>* Values = nullptr;
+    const TArray<TSharedPtr<FUnrealMCPValue>>* Values = nullptr;
     if (!Arguments.TryGetArrayField(Name, Values) || Values == nullptr || Values->Num() > Maximum)
     {
         OutError = {TEXT("graph_limit_exceeded"), FString::Printf(TEXT("%s exceeds its replacement boundary limit"), Name)};
         return false;
     }
     TSet<FString> Unique;
-    for (const TSharedPtr<FJsonValue>& Value : *Values)
+    for (const TSharedPtr<FUnrealMCPValue>& Value : *Values)
     {
         FString Id;
         if (!Value.IsValid() || !Value->TryGetString(Id) || !IsGuidString(Id, 32) || Unique.Contains(Id))
@@ -108,7 +108,7 @@ bool ReadGuidArray(
 }
 
 bool ReadIdentityAndBoundary(
-    const TSharedPtr<FJsonObject>& Arguments,
+    const TSharedPtr<FUnrealMCPRecord>& Arguments,
     FRequest& Out,
     FUnrealMCPError& OutError)
 {
@@ -126,7 +126,7 @@ bool ReadIdentityAndBoundary(
         return false;
     if (Out.LayoutPolicy == ELayoutPolicy::Explicit)
     {
-        const TSharedPtr<FJsonObject>* EntryPosition = nullptr;
+        const TSharedPtr<FUnrealMCPRecord>* EntryPosition = nullptr;
         if (!Arguments->TryGetObjectField(TEXT("entry_position"), EntryPosition)
             || EntryPosition == nullptr || !ReadPosition(*EntryPosition, Out.EntryPosition, OutError))
             return false;
@@ -137,7 +137,7 @@ bool ReadIdentityAndBoundary(
             || !IsGuidString(Out.ResultNodeId, 32)) return false;
         if (Out.LayoutPolicy == ELayoutPolicy::Explicit)
         {
-            const TSharedPtr<FJsonObject>* ResultPosition = nullptr;
+            const TSharedPtr<FUnrealMCPRecord>* ResultPosition = nullptr;
             if (!Arguments->TryGetObjectField(TEXT("result_position"), ResultPosition)
                 || ResultPosition == nullptr || !ReadPosition(*ResultPosition, Out.ResultPosition, OutError))
                 return false;
@@ -147,7 +147,7 @@ bool ReadIdentityAndBoundary(
 }
 
 bool DecodeLegacyIdentity(
-    const TSharedPtr<FJsonObject>& Arguments,
+    const TSharedPtr<FUnrealMCPRecord>& Arguments,
     FRequest& Out,
     FUnrealMCPError& OutError)
 {
@@ -179,7 +179,7 @@ bool DecodeLegacyIdentity(
 }
 
 bool DecodeGenericIdentity(
-    const TSharedPtr<FJsonObject>& Arguments,
+    const TSharedPtr<FUnrealMCPRecord>& Arguments,
     FRequest& Out,
     FUnrealMCPError& OutError)
 {
@@ -220,7 +220,7 @@ bool DecodeGenericIdentity(
             TEXT("nodes"), TEXT("pin_defaults"), TEXT("connections"), TEXT("external_connections")}));
     if (bAutomaticLayout)
     {
-        const TSharedPtr<FJsonObject>* Layout = nullptr;
+        const TSharedPtr<FUnrealMCPRecord>* Layout = nullptr;
         FString Policy;
         if (!Arguments->TryGetObjectField(TEXT("layout"), Layout) || Layout == nullptr
             || !HasOnlyFields(**Layout, {TEXT("policy")})
@@ -255,11 +255,11 @@ bool DecodeGenericIdentity(
 }
 
 bool DecodePlan(
-    const TSharedPtr<FJsonObject>& Arguments,
+    const TSharedPtr<FUnrealMCPRecord>& Arguments,
     FRequest& Out,
     FUnrealMCPError& OutError)
 {
-    const TArray<TSharedPtr<FJsonValue>>* Nodes = nullptr;
+    const TArray<TSharedPtr<FUnrealMCPValue>>* Nodes = nullptr;
     if (!Arguments->TryGetArrayField(TEXT("nodes"), Nodes) || Nodes == nullptr
         || Nodes->Num() > UnrealMCP::MaxLogicUnitReplacementNodes)
     {
@@ -267,10 +267,10 @@ bool DecodePlan(
         return false;
     }
     TSet<FString> NodeKeys;
-    for (const TSharedPtr<FJsonValue>& Value : *Nodes)
+    for (const TSharedPtr<FUnrealMCPValue>& Value : *Nodes)
     {
-        const TSharedPtr<FJsonObject>* Object = nullptr;
-        const TSharedPtr<FJsonObject>* Position = nullptr;
+        const TSharedPtr<FUnrealMCPRecord>* Object = nullptr;
+        const TSharedPtr<FUnrealMCPRecord>* Position = nullptr;
         FNodePlan Plan;
         const bool bExactNodeShape = Value.IsValid() && Value->TryGetObject(Object) && Object != nullptr
             && (Out.LayoutPolicy == ELayoutPolicy::Explicit
@@ -293,7 +293,7 @@ bool DecodePlan(
         Out.Nodes.Add(MoveTemp(Plan));
     }
 
-    const TArray<TSharedPtr<FJsonValue>>* Defaults = nullptr;
+    const TArray<TSharedPtr<FUnrealMCPValue>>* Defaults = nullptr;
     if (!Arguments->TryGetArrayField(TEXT("pin_defaults"), Defaults) || Defaults == nullptr
         || Defaults->Num() > UnrealMCP::MaxLogicUnitDefaults)
     {
@@ -301,11 +301,11 @@ bool DecodePlan(
         return false;
     }
     TSet<FString> DefaultEndpoints;
-    for (const TSharedPtr<FJsonValue>& Value : *Defaults)
+    for (const TSharedPtr<FUnrealMCPValue>& Value : *Defaults)
     {
-        const TSharedPtr<FJsonObject>* Object = nullptr;
-        const TSharedPtr<FJsonObject>* Endpoint = nullptr;
-        const TSharedPtr<FJsonObject>* Default = nullptr;
+        const TSharedPtr<FUnrealMCPRecord>* Object = nullptr;
+        const TSharedPtr<FUnrealMCPRecord>* Endpoint = nullptr;
+        const TSharedPtr<FUnrealMCPRecord>* Default = nullptr;
         FDefaultPlan Plan;
         if (!Value.IsValid() || !Value->TryGetObject(Object) || Object == nullptr
             || !HasOnlyFields(**Object, {TEXT("endpoint"), TEXT("value")})
@@ -324,7 +324,7 @@ bool DecodePlan(
         Out.Defaults.Add(MoveTemp(Plan));
     }
 
-    const TArray<TSharedPtr<FJsonValue>>* Connections = nullptr;
+    const TArray<TSharedPtr<FUnrealMCPValue>>* Connections = nullptr;
     if (!Arguments->TryGetArrayField(TEXT("connections"), Connections) || Connections == nullptr
         || Connections->Num() > UnrealMCP::MaxLogicUnitConnections)
     {
@@ -332,11 +332,11 @@ bool DecodePlan(
         return false;
     }
     TSet<FString> ConnectionEndpoints;
-    for (const TSharedPtr<FJsonValue>& Value : *Connections)
+    for (const TSharedPtr<FUnrealMCPValue>& Value : *Connections)
     {
-        const TSharedPtr<FJsonObject>* Object = nullptr;
-        const TSharedPtr<FJsonObject>* From = nullptr;
-        const TSharedPtr<FJsonObject>* To = nullptr;
+        const TSharedPtr<FUnrealMCPRecord>* Object = nullptr;
+        const TSharedPtr<FUnrealMCPRecord>* From = nullptr;
+        const TSharedPtr<FUnrealMCPRecord>* To = nullptr;
         FConnectionPlan Plan;
         if (!Value.IsValid() || !Value->TryGetObject(Object) || Object == nullptr
             || !(*Object)->TryGetObjectField(TEXT("from"), From) || From == nullptr
@@ -345,7 +345,7 @@ bool DecodePlan(
             return false;
         if ((*Object)->HasField(TEXT("automatic_conversion")))
         {
-            const TSharedPtr<FJsonObject>* Position = nullptr;
+            const TSharedPtr<FUnrealMCPRecord>* Position = nullptr;
             const bool bExactConversionShape = Out.LayoutPolicy == ELayoutPolicy::Explicit
                 ? HasOnlyFields(**Object, {TEXT("from"), TEXT("to"), TEXT("automatic_conversion"), TEXT("conversion_position")})
                 : HasOnlyFields(**Object, {TEXT("from"), TEXT("to"), TEXT("automatic_conversion")});
@@ -372,10 +372,10 @@ bool DecodePlan(
         Out.Connections.Add(MoveTemp(Plan));
     }
 
-    const TArray<TSharedPtr<FJsonValue>>* ExternalConnections = nullptr;
+    const TArray<TSharedPtr<FUnrealMCPValue>>* ExternalConnections = nullptr;
     if (Out.bLegacyFunctionShape)
     {
-        static const TArray<TSharedPtr<FJsonValue>> Empty;
+        static const TArray<TSharedPtr<FUnrealMCPValue>> Empty;
         ExternalConnections = &Empty;
     }
     else if (!Arguments->TryGetArrayField(TEXT("external_connections"), ExternalConnections)
@@ -386,11 +386,11 @@ bool DecodePlan(
         return false;
     }
     TSet<FString> ExternalIdentities;
-    for (const TSharedPtr<FJsonValue>& Value : *ExternalConnections)
+    for (const TSharedPtr<FUnrealMCPValue>& Value : *ExternalConnections)
     {
-        const TSharedPtr<FJsonObject>* Object = nullptr;
-        const TSharedPtr<FJsonObject>* From = nullptr;
-        const TSharedPtr<FJsonObject>* To = nullptr;
+        const TSharedPtr<FUnrealMCPRecord>* Object = nullptr;
+        const TSharedPtr<FUnrealMCPRecord>* From = nullptr;
+        const TSharedPtr<FUnrealMCPRecord>* To = nullptr;
         FExternalConnectionPlan Plan;
         if (!Value.IsValid() || !Value->TryGetObject(Object) || Object == nullptr
             || !HasOnlyFields(**Object, {TEXT("from"), TEXT("to")})
@@ -469,7 +469,7 @@ FString TargetKindString(ETargetKind Kind)
     return FString();
 }
 
-bool Decode(const TSharedPtr<FJsonObject>& Arguments, FRequest& Out, FUnrealMCPError& OutError)
+bool Decode(const TSharedPtr<FUnrealMCPRecord>& Arguments, FRequest& Out, FUnrealMCPError& OutError)
 {
     if (!Arguments.IsValid())
     {

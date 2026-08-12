@@ -10,7 +10,7 @@ namespace UnrealMCP::BlueprintInspectionPrivate
 {
 inline FString WidgetDefaultsFingerprint(
     UWidget* Widget,
-    TArray<TSharedPtr<FJsonValue>>& OutChanged,
+    TArray<TSharedPtr<FUnrealMCPValue>>& OutChanged,
     int32& OutWidgetChangedCount,
     int32& InOutChangedCount)
 {
@@ -46,7 +46,7 @@ inline FString WidgetDefaultsFingerprint(
             + (bSupported ? Kind : TEXT("unsupported")) + TEXT("|") + HashLines({Encoded}));
         if (Index < VisibleCount)
         {
-            OutChanged.Add(MakeShared<FJsonValueObject>(
+            OutChanged.Add(MakeShared<FUnrealMCPValueObject>(
                 UnrealMCP::PropertyCodec::Encode(Widget, Property)));
         }
     }
@@ -75,7 +75,7 @@ inline bool CollectWidgetTree(
     }
     if (WidgetBlueprint->WidgetTree == nullptr)
     {
-        OutError = {TEXT("busy"), TEXT("The Widget Blueprint tree is unavailable"), MakeShared<FJsonObject>(), true};
+        OutError = {TEXT("busy"), TEXT("The Widget Blueprint tree is unavailable"), MakeShared<FUnrealMCPRecord>(), true};
         return false;
     }
 
@@ -121,8 +121,8 @@ inline bool CollectWidgetTree(
         const FString Id = UnrealMCP::WidgetTreePrivate::WidgetId(WidgetBlueprint, Widget);
         const bool bSelected = WidgetFilter.IsEmpty() || WidgetFilter == Id;
         bWidgetFound |= bSelected;
-        const TSharedRef<FJsonObject> Value = Record(TEXT("widget"));
-        TArray<TSharedPtr<FJsonValue>> ChangedDefaults;
+        const TSharedRef<FUnrealMCPRecord> Value = Record(TEXT("widget"));
+        TArray<TSharedPtr<FUnrealMCPValue>> ChangedDefaults;
         int32 WidgetChangedDefaultCount = 0;
         const FString DefaultsFingerprint =
             WidgetDefaultsFingerprint(
@@ -158,11 +158,11 @@ inline bool CollectWidgetTree(
             Value->SetBoolField(
                 TEXT("defaults_truncated"),
                 WidgetChangedDefaultCount > UnrealMCP::MaxWidgetDefaultsPerWidget);
-            TArray<TSharedPtr<FJsonValue>> StyleProperties;
+            TArray<TSharedPtr<FUnrealMCPValue>> StyleProperties;
             for (const FString& Name :
                 FUnrealMCPWidgetStyleService::SupportedProperties(Widget))
             {
-                StyleProperties.Add(MakeShared<FJsonValueString>(Name));
+                StyleProperties.Add(MakeShared<FUnrealMCPValueString>(Name));
             }
             Value->SetArrayField(
                 TEXT("supported_style_properties"), StyleProperties);
@@ -174,11 +174,11 @@ inline bool CollectWidgetTree(
             Names.Sort();
             for (const FString& Name : Names)
             {
-                const TSharedRef<FJsonObject> Default = Record(TEXT("widget_default"));
+                const TSharedRef<FUnrealMCPRecord> Default = Record(TEXT("widget_default"));
                 Default->SetStringField(TEXT("widget_id"), Id);
-                const TSharedRef<FJsonObject> Encoded = UnrealMCP::PropertyCodec::Encode(
+                const TSharedRef<FUnrealMCPRecord> Encoded = UnrealMCP::PropertyCodec::Encode(
                     Widget, Widget->GetClass()->FindPropertyByName(FName(*Name)));
-                for (const TPair<FString, TSharedPtr<FJsonValue>>& Pair : Encoded->Values)
+                for (const TPair<FString, TSharedPtr<FUnrealMCPValue>>& Pair : Encoded->Values)
                 {
                     Default->SetField(Pair.Key, Pair.Value);
                 }
@@ -214,7 +214,7 @@ inline bool CollectWidgetTree(
             const FString Id = UnrealMCP::WidgetTreePrivate::PanelSlotId(ParentId, ChildId);
             if (Sections.Contains(TEXT("widget_tree")))
             {
-                const TSharedRef<FJsonObject> Slot = Record(TEXT("widget_slot"));
+                const TSharedRef<FUnrealMCPRecord> Slot = Record(TEXT("widget_slot"));
                 Slot->SetStringField(TEXT("id"), Id);
                 Slot->SetBoolField(TEXT("identity_stable"), !Id.IsEmpty());
                 Slot->SetStringField(TEXT("kind"), TEXT("panel"));
@@ -225,12 +225,12 @@ inline bool CollectWidgetTree(
                     TEXT("slot_class"),
                     Child != nullptr && Child->Slot != nullptr
                         ? Child->Slot->GetClass()->GetPathName() : FString());
-                TArray<TSharedPtr<FJsonValue>> LayoutProperties;
+                TArray<TSharedPtr<FUnrealMCPValue>> LayoutProperties;
                 for (const FString& Name :
                     FUnrealMCPWidgetLayoutService::SupportedProperties(
                         Child != nullptr ? Child->Slot : nullptr))
                 {
-                    LayoutProperties.Add(MakeShared<FJsonValueString>(Name));
+                    LayoutProperties.Add(MakeShared<FUnrealMCPValueString>(Name));
                 }
                 Slot->SetArrayField(
                     TEXT("supported_layout_properties"), LayoutProperties);
@@ -252,7 +252,7 @@ inline bool CollectWidgetTree(
             UnrealMCP::WidgetTreePrivate::WidgetId(WidgetBlueprint, Ref.Content);
         if (Sections.Contains(TEXT("widget_tree")))
         {
-            const TSharedRef<FJsonObject> Slot = Record(TEXT("widget_slot"));
+            const TSharedRef<FUnrealMCPRecord> Slot = Record(TEXT("widget_slot"));
             Slot->SetStringField(TEXT("id"), Ref.Id);
             Slot->SetBoolField(TEXT("identity_stable"), !Ref.Id.IsEmpty());
             Slot->SetStringField(TEXT("kind"), TEXT("named_slot"));

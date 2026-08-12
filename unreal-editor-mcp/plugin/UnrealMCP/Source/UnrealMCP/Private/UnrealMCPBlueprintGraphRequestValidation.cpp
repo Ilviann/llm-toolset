@@ -17,9 +17,9 @@ bool IsGuidString(const FString& Value, int32 Digits)
     return true;
 }
 
-bool ReadPosition(const FJsonObject& Arguments, int32& OutX, int32& OutY, FUnrealMCPError& OutError)
+bool ReadPosition(const FUnrealMCPRecord& Arguments, int32& OutX, int32& OutY, FUnrealMCPError& OutError)
 {
-    const TSharedPtr<FJsonObject>* Position = nullptr;
+    const TSharedPtr<FUnrealMCPRecord>* Position = nullptr;
     double X = 0.0;
     double Y = 0.0;
     if (!Arguments.TryGetObjectField(TEXT("position"), Position) || Position == nullptr || !Position->IsValid()
@@ -38,7 +38,7 @@ bool ReadPosition(const FJsonObject& Arguments, int32& OutX, int32& OutY, FUnrea
 }
 }
 
-bool Decode(const TSharedPtr<FJsonObject>& Arguments, FRequest& Out, FUnrealMCPError& OutError)
+bool Decode(const TSharedPtr<FUnrealMCPRecord>& Arguments, FRequest& Out, FUnrealMCPError& OutError)
 {
     if (!Arguments.IsValid()
         || !Arguments->TryGetStringField(TEXT("operation"), Out.Operation)
@@ -102,7 +102,7 @@ bool Decode(const TSharedPtr<FJsonObject>& Arguments, FRequest& Out, FUnrealMCPE
         if (bMove && !ReadPosition(*Arguments, Out.X, Out.Y, OutError)) return false;
         if (bSetDefault)
         {
-            const TSharedPtr<FJsonObject>* Default = nullptr;
+            const TSharedPtr<FUnrealMCPRecord>* Default = nullptr;
             if (!Arguments->TryGetStringField(TEXT("pin_id"), Out.PinId) || !IsGuidString(Out.PinId, 32)
                 || !Arguments->TryGetObjectField(TEXT("default"), Default) || Default == nullptr || !Default->IsValid())
             {

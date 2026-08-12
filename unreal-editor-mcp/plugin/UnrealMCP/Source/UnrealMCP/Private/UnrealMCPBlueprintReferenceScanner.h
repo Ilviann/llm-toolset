@@ -1,7 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Dom/JsonObject.h"
+#include "UnrealMCPWireTypes.h"
 
 class UBlueprint;
 class UEdGraph;
@@ -32,5 +32,5 @@ FScanResult ScanLocalVariable(UBlueprint* Blueprint, UEdGraph* FunctionGraph, FN
 FScanResult ScanMacro(UBlueprint* Blueprint, UEdGraph* MacroGraph);
 FScanResult ScanCustomEvent(UBlueprint* Blueprint, UK2Node_CustomEvent* Event);
 
-TSharedRef<FJsonObject> Encode(const FScanResult& Result);
+TSharedRef<FUnrealMCPRecord> Encode(const FScanResult& Result);
 }

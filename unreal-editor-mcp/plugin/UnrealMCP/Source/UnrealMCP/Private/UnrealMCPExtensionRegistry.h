@@ -3,7 +3,8 @@
 #include "CoreMinimal.h"
 #include "UnrealMCPCompanionApi.h"
 
-class FJsonObject;
+class FUnrealMCPRecord;
+class FUnrealMCPValue;
 class IModuleInterface;
 class UBlueprint;
 class UClass;
@@ -23,11 +24,11 @@ public:
 
     bool Execute(
         const FString& ToolFamily,
-        const TSharedPtr<FJsonObject>& Arguments,
-        TSharedPtr<FJsonObject>& OutResult,
+        const TSharedPtr<FUnrealMCPRecord>& Arguments,
+        TSharedPtr<FUnrealMCPRecord>& OutResult,
         FUnrealMCPError& OutError) const;
-    bool HasExtensionRequest(const TSharedPtr<FJsonObject>& Arguments) const;
-    TSharedPtr<FJsonObject> BuildCapabilities() const;
+    bool HasExtensionRequest(const TSharedPtr<FUnrealMCPRecord>& Arguments) const;
+    TSharedPtr<FUnrealMCPRecord> BuildCapabilities() const;
     FString RegistrySignature() const;
     bool ClassifyBlueprintClass(
         const UClass* Class,
@@ -35,12 +36,12 @@ public:
         FString& OutNativeBaseClass) const;
     bool AppendBlueprintInspection(
         const UBlueprint& Blueprint,
-        const TSharedPtr<FJsonObject>& Arguments,
-        TArray<TSharedPtr<FJsonValue>>& OutRecords,
+        const TSharedPtr<FUnrealMCPRecord>& Arguments,
+        TArray<TSharedPtr<FUnrealMCPValue>>& OutRecords,
         TArray<FString>& OutFingerprint,
-        TSharedPtr<FJsonObject>& InOutFamilyCapabilities,
+        TSharedPtr<FUnrealMCPRecord>& InOutFamilyCapabilities,
         FUnrealMCPError& OutError) const;
-    TArray<TSharedPtr<FJsonValue>> BuildBlueprintFamilyCapabilities() const;
+    TArray<TSharedPtr<FUnrealMCPValue>> BuildBlueprintFamilyCapabilities() const;
     bool HasReadyFamilyCapability(
         const FString& TargetFamily,
         EUnrealMCPExtensionAccess Access) const;
@@ -77,7 +78,7 @@ private:
 
     static bool IsStableId(const FString& Value);
     static bool HasOnlyAllowedFields(
-        const FJsonObject& Arguments,
+        const FUnrealMCPRecord& Arguments,
         const FUnrealMCPExtensionContribution& Contribution);
     static FString SnapshotFor(
         const UObject& Target,

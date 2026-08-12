@@ -37,14 +37,14 @@ FString EvidenceName(EDependencyCategory Category)
     return TEXT("unsupported");
 }
 
-TArray<TSharedPtr<FJsonValue>> PropertyNames(EDependencyProperty Properties)
+TArray<TSharedPtr<FUnrealMCPValue>> PropertyNames(EDependencyProperty Properties)
 {
-    TArray<TSharedPtr<FJsonValue>> Result;
+    TArray<TSharedPtr<FUnrealMCPValue>> Result;
     const auto Add = [&Result, Properties](EDependencyProperty Property, const TCHAR* Name)
     {
         if (EnumHasAnyFlags(Properties, Property))
         {
-            Result.Add(MakeShared<FJsonValueString>(Name));
+            Result.Add(MakeShared<FUnrealMCPValueString>(Name));
         }
     };
     Add(EDependencyProperty::Hard, TEXT("hard"));
@@ -55,9 +55,9 @@ TArray<TSharedPtr<FJsonValue>> PropertyNames(EDependencyProperty Properties)
     return Result;
 }
 
-TSharedRef<FJsonObject> ScanStatus(const FScanCounts& Counts)
+TSharedRef<FUnrealMCPRecord> ScanStatus(const FScanCounts& Counts)
 {
-    const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Result = MakeShared<FUnrealMCPRecord>();
     Result->SetStringField(
         TEXT("status"),
         Counts.bTruncated ? TEXT("truncated")
@@ -73,13 +73,13 @@ TSharedRef<FJsonObject> ScanStatus(const FScanCounts& Counts)
     return Result;
 }
 
-TSharedRef<FJsonObject> RegistryRecord(
+TSharedRef<FUnrealMCPRecord> RegistryRecord(
     const FAssetDependency& Dependency,
     const FString& TargetIdentifier,
     const FAssetData* ReferencerAsset)
 {
     const FString PackageName = Dependency.AssetId.PackageName.ToString().Left(512);
-    const TSharedRef<FJsonObject> Record = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Record = MakeShared<FUnrealMCPRecord>();
     Record->SetStringField(TEXT("section"), TEXT("registry"));
     Record->SetStringField(TEXT("evidence"), EvidenceName(Dependency.Category));
     Record->SetStringField(TEXT("dependency_category"), CategoryName(Dependency.Category));
@@ -188,7 +188,7 @@ void AppendCategory(
     const TArray<FAssetIdentifier>& Targets,
     EDependencyCategory Category,
     bool bRegistryStale,
-    TArray<TSharedPtr<FJsonValue>>& Records,
+    TArray<TSharedPtr<FUnrealMCPValue>>& Records,
     FScanCounts& OutCounts)
 {
     OutCounts.bStale = bRegistryStale;
@@ -249,7 +249,7 @@ void AppendCategory(
                 continue;
             }
             Records.Add(
-                MakeShared<FJsonValueObject>(
+                MakeShared<FUnrealMCPValueObject>(
                     RegistryRecord(Pair.Value, Pair.Key, nullptr)));
             ++OutCounts.Records;
             continue;
@@ -262,7 +262,7 @@ void AppendCategory(
                 break;
             }
             Records.Add(
-                MakeShared<FJsonValueObject>(
+                MakeShared<FUnrealMCPValueObject>(
                     RegistryRecord(Pair.Value, Pair.Key, &Asset)));
             ++OutCounts.Records;
         }
@@ -274,8 +274,8 @@ void FUnrealMCPAssetReferenceRegistryScanner::Scan(
     const FUnrealMCPResolvedAssetReferenceTarget& Target,
     uint64 SnapshotRegistrySerial,
     TFunctionRef<uint64()> CurrentRegistrySerial,
-    TArray<TSharedPtr<FJsonValue>>& OutRecords,
-    TSharedPtr<FJsonObject>& OutScans) const
+    TArray<TSharedPtr<FUnrealMCPValue>>& OutRecords,
+    TSharedPtr<FUnrealMCPRecord>& OutScans) const
 {
     using namespace UnrealMCPAssetReferenceRegistryScannerPrivate;
     IAssetRegistry& Registry = FAssetRegistryModule::GetRegistry();
@@ -321,7 +321,7 @@ void FUnrealMCPAssetReferenceRegistryScanner::Scan(
         Management.bStale = true;
         Searchable.bStale = true;
     }
-    OutScans = MakeShared<FJsonObject>();
+    OutScans = MakeShared<FUnrealMCPRecord>();
     OutScans->SetObjectField(TEXT("serialized"), ScanStatus(Serialized));
     OutScans->SetObjectField(TEXT("management"), ScanStatus(Management));
     OutScans->SetObjectField(TEXT("searchable_name"), ScanStatus(Searchable));

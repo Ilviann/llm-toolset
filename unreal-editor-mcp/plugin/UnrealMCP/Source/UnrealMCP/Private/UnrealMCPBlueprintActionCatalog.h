@@ -2,7 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "BlueprintNodeSpawner.h"
-#include "Dom/JsonObject.h"
+#include "UnrealMCPWireTypes.h"
 #include "UnrealMCPProtocol.h"
 
 class FUnrealMCPBlueprintInspector;
@@ -19,8 +19,8 @@ public:
         TFunction<double()> InScanNow = [] { return FPlatformTime::Seconds(); });
 
     bool Execute(
-        const TSharedPtr<FJsonObject>& Arguments,
-        TSharedPtr<FJsonObject>& OutResult,
+        const TSharedPtr<FUnrealMCPRecord>& Arguments,
+        TSharedPtr<FUnrealMCPRecord>& OutResult,
         FUnrealMCPError& OutError);
 
     struct FResolvedAction
@@ -52,7 +52,7 @@ public:
 private:
     struct FRetainedAction
     {
-        TSharedPtr<FJsonObject> PublicRecord;
+        TSharedPtr<FUnrealMCPRecord> PublicRecord;
         FString QueryKey;
         FString RebuildSignature;
         FString TargetClass;
@@ -80,7 +80,7 @@ private:
 
     void RemoveExpired(double CurrentTime);
     void EvictFor(int32 IncomingCount);
-    bool BuildCachedResult(const FCachedCatalog& Cache, TSharedPtr<FJsonObject>& OutResult) const;
+    bool BuildCachedResult(const FCachedCatalog& Cache, TSharedPtr<FUnrealMCPRecord>& OutResult) const;
 
     FUnrealMCPBlueprintInspector& Inspector;
     FString BridgeInstanceId;

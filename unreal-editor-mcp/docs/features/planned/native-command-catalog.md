@@ -12,7 +12,7 @@ released_in: null
 
 **Depends on:**
 
-- [`native-wire-contracts`](native-wire-contracts.md)
+- [`native-wire-contracts`](../completed/native-wire-contracts.md)
 
 ### Implementation
 

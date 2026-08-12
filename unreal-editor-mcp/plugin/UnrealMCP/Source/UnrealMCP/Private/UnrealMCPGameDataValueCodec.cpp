@@ -1,10 +1,9 @@
 #include "UnrealMCPGameDataValueCodec.h"
 
-#include "Dom/JsonObject.h"
+#include "UnrealMCPWireTypes.h"
 #include "EdGraphSchema_K2.h"
 #include "Misc/PackageName.h"
-#include "Serialization/JsonSerializer.h"
-#include "Serialization/JsonWriter.h"
+#include "UnrealMCPJsonCodec.h"
 #include "UnrealMCPK2TypeCodec.h"
 #include "UnrealMCPProtocol.h"
 #include "UnrealMCPVersion.h"
@@ -13,22 +12,21 @@
 
 namespace
 {
-bool CodecHasOnlyFields(const FJsonObject& Object, std::initializer_list<const TCHAR*> Allowed)
+bool CodecHasOnlyFields(const FUnrealMCPRecord& Object, std::initializer_list<const TCHAR*> Allowed)
 {
     TSet<FString> Names;
     for (const TCHAR* Name : Allowed) Names.Add(Name);
-    for (const TPair<FString, TSharedPtr<FJsonValue>>& Pair : Object.Values)
+    for (const TPair<FString, TSharedPtr<FUnrealMCPValue>>& Pair : Object.Values)
     {
         if (!Names.Contains(Pair.Key)) return false;
     }
     return true;
 }
 
-FString CanonicalJson(const TSharedPtr<FJsonValue>& Value)
+FString CanonicalJson(const TSharedPtr<FUnrealMCPValue>& Value)
 {
     FString Result;
-    const TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Result);
-    FJsonSerializer::Serialize(Value, FString(), Writer);
+    UnrealMCP::JsonCodec::SerializeValue(Value, Result);
     return Result;
 }
 
@@ -74,17 +72,17 @@ bool SafeReference(const UObject* Object)
         && FPackageName::IsValidLongPackageName(Package->GetName(), true);
 }
 
-TSharedRef<FJsonObject> ReferenceValue(const FString& Path)
+TSharedRef<FUnrealMCPRecord> ReferenceValue(const FString& Path)
 {
-    const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Result = MakeShared<FUnrealMCPRecord>();
     Result->SetStringField(TEXT("kind"), TEXT("reference"));
     Result->SetStringField(TEXT("path"), Path);
     return Result;
 }
 
-bool ReadReference(const TSharedPtr<FJsonValue>& Input, FString& OutPath, FUnrealMCPError& OutError)
+bool ReadReference(const TSharedPtr<FUnrealMCPValue>& Input, FString& OutPath, FUnrealMCPError& OutError)
 {
-    const TSharedPtr<FJsonObject>* Object = nullptr; FString Kind;
+    const TSharedPtr<FUnrealMCPRecord>* Object = nullptr; FString Kind;
     if (!Input.IsValid() || !Input->TryGetObject(Object) || Object == nullptr || !(*Object).IsValid()
         || !CodecHasOnlyFields(**Object, {TEXT("kind"), TEXT("path")})
         || !(*Object)->TryGetStringField(TEXT("kind"), Kind) || Kind != TEXT("reference")
@@ -109,14 +107,14 @@ FProperty* FindAuthoredProperty(const UScriptStruct* Struct, const FString& Name
 }
 }
 
-TSharedRef<FJsonObject> UnrealMCP::GameDataValueCodec::EncodeType(const FProperty* Property)
+TSharedRef<FUnrealMCPRecord> UnrealMCP::GameDataValueCodec::EncodeType(const FProperty* Property)
 {
     FEdGraphPinType PinType;
     if (Property != nullptr && GetDefault<UEdGraphSchema_K2>()->ConvertPropertyToPinType(Property, PinType))
     {
         return UnrealMCP::K2TypeCodec::EncodeType(PinType);
     }
-    const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Result = MakeShared<FUnrealMCPRecord>();
     Result->SetStringField(TEXT("category"), TEXT("unsupported"));
     Result->SetStringField(TEXT("container"), TEXT("none"));
     Result->SetBoolField(TEXT("reference"), false);
@@ -127,7 +125,7 @@ TSharedRef<FJsonObject> UnrealMCP::GameDataValueCodec::EncodeType(const FPropert
 
 bool UnrealMCP::GameDataValueCodec::Encode(
     const FProperty* Property, const void* Value, int32 Depth,
-    TSharedPtr<FJsonValue>& OutValue, FUnrealMCPError& OutError)
+    TSharedPtr<FUnrealMCPValue>& OutValue, FUnrealMCPError& OutError)
 {
     if (FailDepth(Depth, OutError) || IsUnsafe(Property) || Value == nullptr)
     {
@@ -136,7 +134,7 @@ bool UnrealMCP::GameDataValueCodec::Encode(
     }
     if (const FBoolProperty* Bool = CastField<FBoolProperty>(Property))
     {
-        OutValue = MakeShared<FJsonValueBoolean>(Bool->GetPropertyValue(Value));
+        OutValue = MakeShared<FUnrealMCPValueBoolean>(Bool->GetPropertyValue(Value));
         return true;
     }
     if (const FNumericProperty* Numeric = CastField<FNumericProperty>(Property); Numeric != nullptr && PropertyEnum(Property) == nullptr)
@@ -150,7 +148,7 @@ bool UnrealMCP::GameDataValueCodec::Encode(
             OutError = {TEXT("unsupported_type"), TEXT("The numeric row value cannot be represented exactly as bounded JSON")};
             return false;
         }
-        OutValue = MakeShared<FJsonValueNumber>(Number);
+        OutValue = MakeShared<FUnrealMCPValueNumber>(Number);
         return true;
     }
     if (const UEnum* Enum = PropertyEnum(Property))
@@ -165,103 +163,103 @@ bool UnrealMCP::GameDataValueCodec::Encode(
             OutError = {TEXT("invalid_row"), TEXT("The enum row value is not one live enumerator")};
             return false;
         }
-        OutValue = MakeShared<FJsonValueString>(Name);
+        OutValue = MakeShared<FUnrealMCPValueString>(Name);
         return true;
     }
     if (const FNameProperty* Name = CastField<FNameProperty>(Property))
     {
-        OutValue = MakeShared<FJsonValueString>(Name->GetPropertyValue(Value).ToString()); return true;
+        OutValue = MakeShared<FUnrealMCPValueString>(Name->GetPropertyValue(Value).ToString()); return true;
     }
     if (const FStrProperty* String = CastField<FStrProperty>(Property))
     {
-        OutValue = MakeShared<FJsonValueString>(String->GetPropertyValue(Value).Left(UnrealMCP::MaxStringLength)); return true;
+        OutValue = MakeShared<FUnrealMCPValueString>(String->GetPropertyValue(Value).Left(UnrealMCP::MaxStringLength)); return true;
     }
     if (const FTextProperty* Text = CastField<FTextProperty>(Property))
     {
-        OutValue = MakeShared<FJsonValueString>(Text->GetPropertyValue(Value).ToString().Left(UnrealMCP::MaxStringLength)); return true;
+        OutValue = MakeShared<FUnrealMCPValueString>(Text->GetPropertyValue(Value).ToString().Left(UnrealMCP::MaxStringLength)); return true;
     }
     if (const FClassProperty* ClassProperty = CastField<FClassProperty>(Property))
     {
         const UClass* Class = Cast<UClass>(ClassProperty->GetObjectPropertyValue(Value));
         if (!SafeReference(Class)) { OutError = {TEXT("unsupported_type"), TEXT("The row contains an unsafe class reference")}; return false; }
-        OutValue = MakeShared<FJsonValueObject>(ReferenceValue(Class != nullptr ? Class->GetPathName() : FString())); return true;
+        OutValue = MakeShared<FUnrealMCPValueObject>(ReferenceValue(Class != nullptr ? Class->GetPathName() : FString())); return true;
     }
     if (const FSoftObjectProperty* Soft = CastField<FSoftObjectProperty>(Property))
     {
         const FString Path = Soft->GetPropertyValue(Value).ToSoftObjectPath().ToString();
         if (Path.Len() > 512 || Path.Contains(TEXT("..")) || Path.Contains(TEXT("\\")) || (!Path.IsEmpty() && !Path.StartsWith(TEXT("/"))))
         { OutError = {TEXT("unsupported_type"), TEXT("The row contains an unsafe soft reference")}; return false; }
-        OutValue = MakeShared<FJsonValueObject>(ReferenceValue(Path)); return true;
+        OutValue = MakeShared<FUnrealMCPValueObject>(ReferenceValue(Path)); return true;
     }
     if (const FObjectPropertyBase* ObjectProperty = CastField<FObjectPropertyBase>(Property))
     {
         const UObject* Object = ObjectProperty->GetObjectPropertyValue(Value);
         if (!SafeReference(Object)) { OutError = {TEXT("unsupported_type"), TEXT("The row contains an unsafe object graph")}; return false; }
-        OutValue = MakeShared<FJsonValueObject>(ReferenceValue(Object != nullptr ? Object->GetPathName() : FString())); return true;
+        OutValue = MakeShared<FUnrealMCPValueObject>(ReferenceValue(Object != nullptr ? Object->GetPathName() : FString())); return true;
     }
     if (const FStructProperty* StructProperty = CastField<FStructProperty>(Property))
     {
         bool bSucceeded = false;
-        const TSharedRef<FJsonObject> Fields = EncodeFields(StructProperty->Struct, Value, Depth + 1, OutError, bSucceeded);
+        const TSharedRef<FUnrealMCPRecord> Fields = EncodeFields(StructProperty->Struct, Value, Depth + 1, OutError, bSucceeded);
         if (!bSucceeded) return false;
-        const TSharedRef<FJsonObject> Tagged = MakeShared<FJsonObject>();
+        const TSharedRef<FUnrealMCPRecord> Tagged = MakeShared<FUnrealMCPRecord>();
         Tagged->SetStringField(TEXT("kind"), TEXT("struct"));
         Tagged->SetObjectField(TEXT("fields"), Fields);
-        OutValue = MakeShared<FJsonValueObject>(Tagged); return true;
+        OutValue = MakeShared<FUnrealMCPValueObject>(Tagged); return true;
     }
     if (const FArrayProperty* Array = CastField<FArrayProperty>(Property))
     {
         FScriptArrayHelper Helper(Array, Value);
         if (Helper.Num() > UnrealMCP::MaxGameDataCollectionItems) { OutError = {TEXT("data_limit_exceeded"), TEXT("A row array exceeds the collection limit")}; return false; }
-        TArray<TSharedPtr<FJsonValue>> Items;
+        TArray<TSharedPtr<FUnrealMCPValue>> Items;
         for (int32 Index = 0; Index < Helper.Num(); ++Index)
         {
-            TSharedPtr<FJsonValue> Item;
+            TSharedPtr<FUnrealMCPValue> Item;
             if (!Encode(Array->Inner, Helper.GetRawPtr(Index), Depth + 1, Item, OutError)) return false;
             Items.Add(Item);
         }
-        OutValue = MakeShared<FJsonValueArray>(Items); return true;
+        OutValue = MakeShared<FUnrealMCPValueArray>(Items); return true;
     }
     if (const FSetProperty* Set = CastField<FSetProperty>(Property))
     {
         FScriptSetHelper Helper(Set, Value);
         if (Helper.Num() > UnrealMCP::MaxGameDataCollectionItems) { OutError = {TEXT("data_limit_exceeded"), TEXT("A row set exceeds the collection limit")}; return false; }
-        TArray<TSharedPtr<FJsonValue>> Items;
+        TArray<TSharedPtr<FUnrealMCPValue>> Items;
         for (int32 Index = 0; Index < Helper.GetMaxIndex(); ++Index) if (Helper.IsValidIndex(Index))
         {
-            TSharedPtr<FJsonValue> Item;
+            TSharedPtr<FUnrealMCPValue> Item;
             if (!Encode(Set->ElementProp, Helper.GetElementPtr(Index), Depth + 1, Item, OutError)) return false;
             Items.Add(Item);
         }
-        Items.Sort([](const TSharedPtr<FJsonValue>& Left, const TSharedPtr<FJsonValue>& Right)
+        Items.Sort([](const TSharedPtr<FUnrealMCPValue>& Left, const TSharedPtr<FUnrealMCPValue>& Right)
         { return CanonicalJson(Left) < CanonicalJson(Right); });
-        const TSharedRef<FJsonObject> Tagged = MakeShared<FJsonObject>(); Tagged->SetStringField(TEXT("kind"), TEXT("set")); Tagged->SetArrayField(TEXT("items"), Items);
-        OutValue = MakeShared<FJsonValueObject>(Tagged); return true;
+        const TSharedRef<FUnrealMCPRecord> Tagged = MakeShared<FUnrealMCPRecord>(); Tagged->SetStringField(TEXT("kind"), TEXT("set")); Tagged->SetArrayField(TEXT("items"), Items);
+        OutValue = MakeShared<FUnrealMCPValueObject>(Tagged); return true;
     }
     if (const FMapProperty* Map = CastField<FMapProperty>(Property))
     {
         FScriptMapHelper Helper(Map, Value);
         if (Helper.Num() > UnrealMCP::MaxGameDataCollectionItems) { OutError = {TEXT("data_limit_exceeded"), TEXT("A row map exceeds the collection limit")}; return false; }
-        TArray<TSharedPtr<FJsonValue>> Entries;
+        TArray<TSharedPtr<FUnrealMCPValue>> Entries;
         for (int32 Index = 0; Index < Helper.GetMaxIndex(); ++Index) if (Helper.IsValidIndex(Index))
         {
-            TSharedPtr<FJsonValue> Key; TSharedPtr<FJsonValue> Item;
+            TSharedPtr<FUnrealMCPValue> Key; TSharedPtr<FUnrealMCPValue> Item;
             if (!Encode(Map->KeyProp, Helper.GetKeyPtr(Index), Depth + 1, Key, OutError)
                 || !Encode(Map->ValueProp, Helper.GetValuePtr(Index), Depth + 1, Item, OutError)) return false;
-            const TSharedRef<FJsonObject> Entry = MakeShared<FJsonObject>(); Entry->SetField(TEXT("key"), Key); Entry->SetField(TEXT("value"), Item);
-            Entries.Add(MakeShared<FJsonValueObject>(Entry));
+            const TSharedRef<FUnrealMCPRecord> Entry = MakeShared<FUnrealMCPRecord>(); Entry->SetField(TEXT("key"), Key); Entry->SetField(TEXT("value"), Item);
+            Entries.Add(MakeShared<FUnrealMCPValueObject>(Entry));
         }
-        Entries.Sort([](const TSharedPtr<FJsonValue>& Left, const TSharedPtr<FJsonValue>& Right)
+        Entries.Sort([](const TSharedPtr<FUnrealMCPValue>& Left, const TSharedPtr<FUnrealMCPValue>& Right)
         { return CanonicalJson(Left) < CanonicalJson(Right); });
-        const TSharedRef<FJsonObject> Tagged = MakeShared<FJsonObject>(); Tagged->SetStringField(TEXT("kind"), TEXT("map")); Tagged->SetArrayField(TEXT("entries"), Entries);
-        OutValue = MakeShared<FJsonValueObject>(Tagged); return true;
+        const TSharedRef<FUnrealMCPRecord> Tagged = MakeShared<FUnrealMCPRecord>(); Tagged->SetStringField(TEXT("kind"), TEXT("map")); Tagged->SetArrayField(TEXT("entries"), Entries);
+        OutValue = MakeShared<FUnrealMCPValueObject>(Tagged); return true;
     }
     OutError = {TEXT("unsupported_type"), TEXT("The row field type is outside the bounded game-data codec")};
     return false;
 }
 
 bool UnrealMCP::GameDataValueCodec::Decode(
-    const FProperty* Property, void* Value, const TSharedPtr<FJsonValue>& Input,
+    const FProperty* Property, void* Value, const TSharedPtr<FUnrealMCPValue>& Input,
     int32 Depth, FUnrealMCPError& OutError)
 {
     if (FailDepth(Depth, OutError) || IsUnsafe(Property) || Value == nullptr || !Input.IsValid())
@@ -328,14 +326,14 @@ bool UnrealMCP::GameDataValueCodec::Decode(
     }
     if (const FStructProperty* StructProperty = CastField<FStructProperty>(Property))
     {
-        const TSharedPtr<FJsonObject>* Tagged = nullptr; const TSharedPtr<FJsonObject>* Fields = nullptr; FString Kind;
+        const TSharedPtr<FUnrealMCPRecord>* Tagged = nullptr; const TSharedPtr<FUnrealMCPRecord>* Fields = nullptr; FString Kind;
         if (!Input->TryGetObject(Tagged) || Tagged == nullptr || !(*Tagged).IsValid()
             || !CodecHasOnlyFields(**Tagged, {TEXT("kind"), TEXT("fields")})
             || !(*Tagged)->TryGetStringField(TEXT("kind"), Kind) || Kind != TEXT("struct")
             || !(*Tagged)->TryGetObjectField(TEXT("fields"), Fields) || Fields == nullptr
             || (*Fields)->Values.Num() > UnrealMCP::MaxGameDataFields)
         { OutError = {TEXT("invalid_row"), TEXT("A struct row field requires tagged bounded fields")}; return false; }
-        for (const TPair<FString, TSharedPtr<FJsonValue>>& Pair : (*Fields)->Values)
+        for (const TPair<FString, TSharedPtr<FUnrealMCPValue>>& Pair : (*Fields)->Values)
         {
             FProperty* Child = FindAuthoredProperty(StructProperty->Struct, Pair.Key);
             if (Child == nullptr || !Decode(Child, Child->ContainerPtrToValuePtr<void>(Value), Pair.Value, Depth + 1, OutError))
@@ -345,7 +343,7 @@ bool UnrealMCP::GameDataValueCodec::Decode(
     }
     if (const FArrayProperty* Array = CastField<FArrayProperty>(Property))
     {
-        const TArray<TSharedPtr<FJsonValue>>* Items = nullptr;
+        const TArray<TSharedPtr<FUnrealMCPValue>>* Items = nullptr;
         if (!Input->TryGetArray(Items) || Items == nullptr || Items->Num() > UnrealMCP::MaxGameDataCollectionItems)
         { OutError = {TEXT("data_limit_exceeded"), TEXT("A row array is invalid or exceeds the collection limit")}; return false; }
         FScriptArrayHelper Helper(Array, Value); Helper.EmptyValues(); Helper.AddValues(Items->Num());
@@ -354,13 +352,13 @@ bool UnrealMCP::GameDataValueCodec::Decode(
     }
     if (const FSetProperty* Set = CastField<FSetProperty>(Property))
     {
-        const TSharedPtr<FJsonObject>* Tagged = nullptr; const TArray<TSharedPtr<FJsonValue>>* Items = nullptr; FString Kind;
+        const TSharedPtr<FUnrealMCPRecord>* Tagged = nullptr; const TArray<TSharedPtr<FUnrealMCPValue>>* Items = nullptr; FString Kind;
         if (!Input->TryGetObject(Tagged) || Tagged == nullptr || !(*Tagged).IsValid() || !CodecHasOnlyFields(**Tagged, {TEXT("kind"), TEXT("items")})
             || !(*Tagged)->TryGetStringField(TEXT("kind"), Kind) || Kind != TEXT("set") || !(*Tagged)->TryGetArrayField(TEXT("items"), Items)
             || Items == nullptr || Items->Num() > UnrealMCP::MaxGameDataCollectionItems)
         { OutError = {TEXT("data_limit_exceeded"), TEXT("A row set is invalid or exceeds the collection limit")}; return false; }
         FScriptSetHelper Helper(Set, Value); Helper.EmptyElements();
-        for (const TSharedPtr<FJsonValue>& Item : *Items)
+        for (const TSharedPtr<FUnrealMCPValue>& Item : *Items)
         {
             const int32 Index = Helper.AddDefaultValue_Invalid_NeedsRehash();
             if (!Decode(Set->ElementProp, Helper.GetElementPtr(Index), Item, Depth + 1, OutError)) return false;
@@ -371,15 +369,15 @@ bool UnrealMCP::GameDataValueCodec::Decode(
     }
     if (const FMapProperty* Map = CastField<FMapProperty>(Property))
     {
-        const TSharedPtr<FJsonObject>* Tagged = nullptr; const TArray<TSharedPtr<FJsonValue>>* Entries = nullptr; FString Kind;
+        const TSharedPtr<FUnrealMCPRecord>* Tagged = nullptr; const TArray<TSharedPtr<FUnrealMCPValue>>* Entries = nullptr; FString Kind;
         if (!Input->TryGetObject(Tagged) || Tagged == nullptr || !(*Tagged).IsValid() || !CodecHasOnlyFields(**Tagged, {TEXT("kind"), TEXT("entries")})
             || !(*Tagged)->TryGetStringField(TEXT("kind"), Kind) || Kind != TEXT("map") || !(*Tagged)->TryGetArrayField(TEXT("entries"), Entries)
             || Entries == nullptr || Entries->Num() > UnrealMCP::MaxGameDataCollectionItems)
         { OutError = {TEXT("data_limit_exceeded"), TEXT("A row map is invalid or exceeds the collection limit")}; return false; }
         FScriptMapHelper Helper(Map, Value); Helper.EmptyValues();
-        for (const TSharedPtr<FJsonValue>& EntryValue : *Entries)
+        for (const TSharedPtr<FUnrealMCPValue>& EntryValue : *Entries)
         {
-            const TSharedPtr<FJsonObject>* Entry = nullptr;
+            const TSharedPtr<FUnrealMCPRecord>* Entry = nullptr;
             if (!EntryValue->TryGetObject(Entry) || Entry == nullptr || !(*Entry).IsValid() || !CodecHasOnlyFields(**Entry, {TEXT("key"), TEXT("value")}))
             { OutError = {TEXT("invalid_row"), TEXT("A row map entry requires exactly key and value")}; return false; }
             const int32 Index = Helper.AddDefaultValue_Invalid_NeedsRehash();
@@ -399,11 +397,11 @@ InvalidString:
 }
 
 bool UnrealMCP::GameDataValueCodec::ApplyFields(
-    const UScriptStruct* Struct, void* Data, const TSharedPtr<FJsonObject>& Fields, FUnrealMCPError& OutError)
+    const UScriptStruct* Struct, void* Data, const TSharedPtr<FUnrealMCPRecord>& Fields, FUnrealMCPError& OutError)
 {
     if (Struct == nullptr || Data == nullptr || !Fields.IsValid() || Fields->Values.Num() > UnrealMCP::MaxGameDataFields)
     { OutError = {TEXT("data_limit_exceeded"), TEXT("Row fields are missing or exceed the configured field limit")}; return false; }
-    for (const TPair<FString, TSharedPtr<FJsonValue>>& Pair : Fields->Values)
+    for (const TPair<FString, TSharedPtr<FUnrealMCPValue>>& Pair : Fields->Values)
     {
         FProperty* Property = FindAuthoredProperty(Struct, Pair.Key);
         if (Property == nullptr)
@@ -417,10 +415,10 @@ bool UnrealMCP::GameDataValueCodec::ApplyFields(
     return true;
 }
 
-TSharedRef<FJsonObject> UnrealMCP::GameDataValueCodec::EncodeFields(
+TSharedRef<FUnrealMCPRecord> UnrealMCP::GameDataValueCodec::EncodeFields(
     const UScriptStruct* Struct, const void* Data, int32 Depth, FUnrealMCPError& OutError, bool& bSucceeded)
 {
-    const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Result = MakeShared<FUnrealMCPRecord>();
     bSucceeded = false;
     if (FailDepth(Depth, OutError)) return Result;
     if (Struct == nullptr || Data == nullptr) { OutError = {TEXT("invalid_schema"), TEXT("The live row schema is unavailable")}; return Result; }
@@ -428,7 +426,7 @@ TSharedRef<FJsonObject> UnrealMCP::GameDataValueCodec::EncodeFields(
     for (TFieldIterator<FProperty> It(Struct); It; ++It)
     {
         if (++Count > UnrealMCP::MaxGameDataFields) { OutError = {TEXT("data_limit_exceeded"), TEXT("The live row schema exceeds the field limit")}; return Result; }
-        TSharedPtr<FJsonValue> Value;
+        TSharedPtr<FUnrealMCPValue> Value;
         if (!Encode(*It, It->ContainerPtrToValuePtr<void>(Data), Depth, Value, OutError)) return Result;
         Result->SetField(Struct->GetAuthoredNameForField(*It), Value);
     }

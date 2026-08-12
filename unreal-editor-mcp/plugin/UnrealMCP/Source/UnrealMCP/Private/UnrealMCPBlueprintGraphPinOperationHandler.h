@@ -1,7 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Dom/JsonObject.h"
+#include "UnrealMCPWireTypes.h"
 #include "UnrealMCPBlueprintGraphEditor.h"
 #include "UnrealMCPBlueprintGraphRequestValidation.h"
 #include "UnrealMCPProtocol.h"
@@ -19,6 +19,6 @@ bool Execute(
     FUnrealMCPBlueprintInspector& Inspector,
     const FUnrealMCPBlueprintGraphEditor::FConnectionInvoker& ConnectionInvoker,
     const FString& Snapshot,
-    TSharedPtr<FJsonObject>& OutResult,
+    TSharedPtr<FUnrealMCPRecord>& OutResult,
     FUnrealMCPError& OutError);
 }

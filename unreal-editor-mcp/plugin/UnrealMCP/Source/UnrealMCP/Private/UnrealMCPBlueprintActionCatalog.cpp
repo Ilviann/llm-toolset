@@ -334,15 +334,15 @@ void FUnrealMCPBlueprintActionCatalog::EvictFor(int32 IncomingCount)
 
 bool FUnrealMCPBlueprintActionCatalog::BuildCachedResult(
     const FCachedCatalog& Cache,
-    TSharedPtr<FJsonObject>& OutResult) const
+    TSharedPtr<FUnrealMCPRecord>& OutResult) const
 {
     using namespace UnrealMCP::BlueprintActionCatalogPrivate;
-    TArray<TSharedPtr<FJsonValue>> Actions;
+    TArray<TSharedPtr<FUnrealMCPValue>> Actions;
     for (const FString& Id : Cache.ActionIds)
     {
         const FRetainedAction* Retained = RetainedActions.Find(Id);
         if (Retained == nullptr || !Retained->PublicRecord.IsValid()) return false;
-        Actions.Add(MakeShared<FJsonValueObject>(Retained->PublicRecord));
+        Actions.Add(MakeShared<FUnrealMCPValueObject>(Retained->PublicRecord));
     }
     OutResult = MakeResult(BridgeInstanceId, Cache.AssetPath, Cache.BlueprintFamily, Cache.GraphId, Cache.SnapshotId,
         Actions, Cache.ScannedCount, Cache.bTruncated, Cache.bTimedOut,
@@ -351,8 +351,8 @@ bool FUnrealMCPBlueprintActionCatalog::BuildCachedResult(
 }
 
 bool FUnrealMCPBlueprintActionCatalog::Execute(
-    const TSharedPtr<FJsonObject>& Arguments,
-    TSharedPtr<FJsonObject>& OutResult,
+    const TSharedPtr<FUnrealMCPRecord>& Arguments,
+    TSharedPtr<FUnrealMCPRecord>& OutResult,
     FUnrealMCPError& OutError)
 {
     using namespace UnrealMCP::BlueprintActionCatalogPrivate;
@@ -369,12 +369,12 @@ bool FUnrealMCPBlueprintActionCatalog::Execute(
     const FString& FamilyFilter = Query.Family;
     const int32 Limit = Query.Limit;
 
-    const TSharedRef<FJsonObject> InspectArguments = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> InspectArguments = MakeShared<FUnrealMCPRecord>();
     InspectArguments->SetStringField(TEXT("mode"), TEXT("inspect"));
     InspectArguments->SetStringField(TEXT("asset_path"), AssetPath);
-    InspectArguments->SetArrayField(TEXT("sections"), {MakeShared<FJsonValueString>(TEXT("summary"))});
+    InspectArguments->SetArrayField(TEXT("sections"), {MakeShared<FUnrealMCPValueString>(TEXT("summary"))});
     InspectArguments->SetNumberField(TEXT("page_size"), 1);
-    TSharedPtr<FJsonObject> Inspection;
+    TSharedPtr<FUnrealMCPRecord> Inspection;
     if (!Inspector.Execute(InspectArguments, Inspection, OutError)) return false;
     const FString SnapshotId = Inspection->GetStringField(TEXT("snapshot_id"));
     if (SnapshotId != ExpectedSnapshot)
@@ -388,7 +388,7 @@ bool FUnrealMCPBlueprintActionCatalog::Execute(
         + TEXT("|") + MemberFilter.ToLower() + TEXT("|") + FamilyFilter + TEXT("|") + LexToString(Limit);
     FString PinNodeId;
     FString PinId;
-    const TSharedPtr<FJsonObject>* PinContextObject = nullptr;
+    const TSharedPtr<FUnrealMCPRecord>* PinContextObject = nullptr;
     const bool bHasPinContext = Arguments->HasField(TEXT("pin_context"));
     if (Arguments->TryGetObjectField(TEXT("pin_context"), PinContextObject))
     {
@@ -478,7 +478,7 @@ bool FUnrealMCPBlueprintActionCatalog::Execute(
 
     FActionScanResult Scan = ScanActions(Blueprint, Graph, ContextPin, Text, OwnerClassFilter,
         FunctionFilter, MemberFilter, FamilyFilter, Limit, ScanNow);
-    TArray<TSharedPtr<FJsonObject>>& CandidateRecords = Scan.CandidateRecords;
+    TArray<TSharedPtr<FUnrealMCPRecord>>& CandidateRecords = Scan.CandidateRecords;
     const int32 ScannedCount = Scan.ScannedCount;
     const bool bTimedOut = Scan.bTimedOut;
     const bool bScanLimited = Scan.bScanLimited;
@@ -512,8 +512,8 @@ bool FUnrealMCPBlueprintActionCatalog::Execute(
     Cache.bTruncated = bScanLimited || bTimedOut || bResultLimited;
     Cache.bTimedOut = bTimedOut;
     Cache.ExpiresAt = Now() + UnrealMCP::ActionLifetimeSeconds;
-    TArray<TSharedPtr<FJsonValue>> PublicActions;
-    for (const TSharedPtr<FJsonObject>& Record : CandidateRecords)
+    TArray<TSharedPtr<FUnrealMCPValue>> PublicActions;
+    for (const TSharedPtr<FUnrealMCPRecord>& Record : CandidateRecords)
     {
         const FString ActionId = FGuid::NewGuid().ToString(EGuidFormats::Digits).ToLower();
         const FString RebuildSignature = Record->GetStringField(TEXT("_rebuild_signature"));
@@ -524,7 +524,7 @@ bool FUnrealMCPBlueprintActionCatalog::Execute(
             Blueprint->GeneratedClass != nullptr ? Blueprint->GeneratedClass->GetPathName() : FString(),
             GraphSchema->GetClass()->GetPathName(),
             AssetPath, GraphId, SnapshotId, PinNodeId, PinId, Cache.ExpiresAt});
-        PublicActions.Add(MakeShared<FJsonValueObject>(Record));
+        PublicActions.Add(MakeShared<FUnrealMCPValueObject>(Record));
     }
     Catalogs.Add(QueryKey, Cache);
     OutResult = MakeResult(BridgeInstanceId, AssetPath, Cache.BlueprintFamily, GraphId, SnapshotId, PublicActions,

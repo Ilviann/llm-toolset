@@ -26,11 +26,11 @@ bool FUnrealMCPEventMacroReplaceTest::RunTest(const FString& Parameters)
     const FString EventGraphId = EventGraph->GraphGuid.ToString(EGuidFormats::Digits).ToLower();
     FUnrealMCPBlueprintInspector Inspector;
     FUnrealMCPBlueprintMutator Mutator(Inspector);
-    TSharedPtr<FJsonObject> Result;
+    TSharedPtr<FUnrealMCPRecord> Result;
     FUnrealMCPError Error;
 
     FString Snapshot = InspectSnapshot(Inspector, AssetPath);
-    TSharedRef<FJsonObject> AddShared = MemberEditArguments(AssetPath, Snapshot, TEXT("add"));
+    TSharedRef<FUnrealMCPRecord> AddShared = MemberEditArguments(AssetPath, Snapshot, TEXT("add"));
     AddShared->SetStringField(TEXT("name"), TEXT("SharedCondition"));
     AddShared->SetObjectField(TEXT("type"), K2Type(TEXT("boolean")));
     if (!TestTrue(TEXT("shared boundary variable is added"),
@@ -43,7 +43,7 @@ bool FUnrealMCPEventMacroReplaceTest::RunTest(const FString& Parameters)
     if (!TestNotNull(TEXT("shared boundary variable is live"), SharedVariable)) return false;
 
     Snapshot = Result->GetStringField(TEXT("snapshot_id"));
-    TSharedRef<FJsonObject> AddMacro = ScopedMemberEditArguments(
+    TSharedRef<FUnrealMCPRecord> AddMacro = ScopedMemberEditArguments(
         AssetPath, Snapshot, TEXT("macro"), TEXT("add"));
     AddMacro->SetStringField(TEXT("name"), TEXT("ReplaceableMacro"));
     AddMacro->SetObjectField(TEXT("signature"), MacroSignature(false, {}));
@@ -58,7 +58,7 @@ bool FUnrealMCPEventMacroReplaceTest::RunTest(const FString& Parameters)
     if (!TestNotNull(TEXT("replaceable macro graph is live"), MacroGraph)) return false;
 
     Snapshot = Result->GetStringField(TEXT("snapshot_id"));
-    TSharedRef<FJsonObject> AddCustomEvent = ScopedMemberEditArguments(
+    TSharedRef<FUnrealMCPRecord> AddCustomEvent = ScopedMemberEditArguments(
         AssetPath, Snapshot, TEXT("custom_event"), TEXT("add"));
     AddCustomEvent->SetStringField(TEXT("graph_id"), EventGraphId);
     AddCustomEvent->SetStringField(TEXT("name"), TEXT("ReplaceableCustomEvent"));
@@ -81,19 +81,19 @@ bool FUnrealMCPEventMacroReplaceTest::RunTest(const FString& Parameters)
     auto CatalogAction = [&](UEdGraph* Graph, const FString& CurrentSnapshot,
         const FString& Family, const FString& Text) -> FString
     {
-        const TSharedRef<FJsonObject> Query = MakeShared<FJsonObject>();
+        const TSharedRef<FUnrealMCPRecord> Query = MakeShared<FUnrealMCPRecord>();
         Query->SetStringField(TEXT("asset_path"), AssetPath);
         Query->SetStringField(TEXT("graph_id"), Graph->GraphGuid.ToString(EGuidFormats::Digits).ToLower());
         Query->SetStringField(TEXT("expected_snapshot"), CurrentSnapshot);
         Query->SetStringField(TEXT("node_family"), Family);
         if (!Text.IsEmpty()) Query->SetStringField(TEXT("text"), Text);
         Query->SetNumberField(TEXT("limit"), 50);
-        TSharedPtr<FJsonObject> CatalogResult;
+        TSharedPtr<FUnrealMCPRecord> CatalogResult;
         FUnrealMCPError CatalogError;
         if (!Catalog.Execute(Query, CatalogResult, CatalogError)) return FString();
-        for (const TSharedPtr<FJsonValue>& Value : CatalogResult->GetArrayField(TEXT("actions")))
+        for (const TSharedPtr<FUnrealMCPValue>& Value : CatalogResult->GetArrayField(TEXT("actions")))
         {
-            const TSharedPtr<FJsonObject> Action = Value->AsObject();
+            const TSharedPtr<FUnrealMCPRecord> Action = Value->AsObject();
             if (Action.IsValid() && (Text.IsEmpty()
                 || Action->GetStringField(TEXT("title")).Contains(Text, ESearchCase::IgnoreCase)))
                 return Action->GetStringField(TEXT("action_id"));
@@ -161,14 +161,14 @@ bool FUnrealMCPEventMacroReplaceTest::RunTest(const FString& Parameters)
 
     auto Position = [](int32 X, int32 Y)
     {
-        const TSharedRef<FJsonObject> Value = MakeShared<FJsonObject>();
+        const TSharedRef<FUnrealMCPRecord> Value = MakeShared<FUnrealMCPRecord>();
         Value->SetNumberField(TEXT("x"), X);
         Value->SetNumberField(TEXT("y"), Y);
         return Value;
     };
     auto InternalEndpoint = [](const FString& Key, const FString& Pin)
     {
-        const TSharedRef<FJsonObject> Value = MakeShared<FJsonObject>();
+        const TSharedRef<FUnrealMCPRecord> Value = MakeShared<FUnrealMCPRecord>();
         Value->SetStringField(TEXT("node_key"), Key);
         Value->SetStringField(TEXT("pin_name"), Pin);
         return Value;
@@ -176,21 +176,21 @@ bool FUnrealMCPEventMacroReplaceTest::RunTest(const FString& Parameters)
     auto InternalConnection = [&](const FString& FromKey, const FString& FromPin,
         const FString& ToKey, const FString& ToPin)
     {
-        const TSharedRef<FJsonObject> Value = MakeShared<FJsonObject>();
+        const TSharedRef<FUnrealMCPRecord> Value = MakeShared<FUnrealMCPRecord>();
         Value->SetObjectField(TEXT("from"), InternalEndpoint(FromKey, FromPin));
         Value->SetObjectField(TEXT("to"), InternalEndpoint(ToKey, ToPin));
         return Value;
     };
     auto IdArray = [](const TArray<FString>& Values)
     {
-        TArray<TSharedPtr<FJsonValue>> Result;
-        for (const FString& Value : Values) Result.Add(MakeShared<FJsonValueString>(Value));
+        TArray<TSharedPtr<FUnrealMCPValue>> Result;
+        for (const FString& Value : Values) Result.Add(MakeShared<FUnrealMCPValueString>(Value));
         return Result;
     };
     auto BuildArguments = [&](const FString& TargetKind, UEdGraph* Graph, UEdGraphNode* Root,
         const LogicUnit::FBoundary& Boundary, const FString& ActionId, bool bExternal)
     {
-        const TSharedRef<FJsonObject> Arguments = MakeShared<FJsonObject>();
+        const TSharedRef<FUnrealMCPRecord> Arguments = MakeShared<FUnrealMCPRecord>();
         Arguments->SetStringField(TEXT("operation_id"),
             FGuid::NewGuid().ToString(EGuidFormats::Digits).ToLower());
         Arguments->SetStringField(TEXT("asset_path"), AssetPath);
@@ -212,32 +212,32 @@ bool FUnrealMCPEventMacroReplaceTest::RunTest(const FString& Parameters)
                 Boundary.Result->NodeGuid.ToString(EGuidFormats::Digits).ToLower());
             Arguments->SetObjectField(TEXT("result_position"), Position(640, Root->NodePosY));
         }
-        const TSharedRef<FJsonObject> Node = MakeShared<FJsonObject>();
+        const TSharedRef<FUnrealMCPRecord> Node = MakeShared<FUnrealMCPRecord>();
         Node->SetStringField(TEXT("key"), TEXT("branch"));
         Node->SetStringField(TEXT("action_id"), ActionId);
         Node->SetObjectField(TEXT("position"), Position(0, Root->NodePosY));
-        Arguments->SetArrayField(TEXT("nodes"), {MakeShared<FJsonValueObject>(Node)});
+        Arguments->SetArrayField(TEXT("nodes"), {MakeShared<FUnrealMCPValueObject>(Node)});
         Arguments->SetArrayField(TEXT("pin_defaults"), {});
         const FString RootExecPin = TargetKind == TEXT("macro") ? TEXT("execute") : TEXT("then");
-        TArray<TSharedPtr<FJsonValue>> Connections{
-            MakeShared<FJsonValueObject>(InternalConnection(
+        TArray<TSharedPtr<FUnrealMCPValue>> Connections{
+            MakeShared<FUnrealMCPValueObject>(InternalConnection(
                 TEXT("$entry"), RootExecPin, TEXT("branch"), TEXT("execute")))};
         if (Boundary.Result != nullptr)
-            Connections.Add(MakeShared<FJsonValueObject>(InternalConnection(
+            Connections.Add(MakeShared<FUnrealMCPValueObject>(InternalConnection(
                 TEXT("branch"), TEXT("then"), TEXT("$result"), TEXT("then"))));
         Arguments->SetArrayField(TEXT("connections"), Connections);
-        TArray<TSharedPtr<FJsonValue>> ExternalConnections;
+        TArray<TSharedPtr<FUnrealMCPValue>> ExternalConnections;
         if (bExternal)
         {
-            const TSharedRef<FJsonObject> External = MakeShared<FJsonObject>();
-            const TSharedRef<FJsonObject> From = MakeShared<FJsonObject>();
+            const TSharedRef<FUnrealMCPRecord> External = MakeShared<FUnrealMCPRecord>();
+            const TSharedRef<FUnrealMCPRecord> From = MakeShared<FUnrealMCPRecord>();
             From->SetStringField(TEXT("node_id"),
                 SharedGetter->NodeGuid.ToString(EGuidFormats::Digits).ToLower());
             From->SetStringField(TEXT("pin_id"),
                 SharedGetter->GetValuePin()->PinId.ToString(EGuidFormats::Digits).ToLower());
             External->SetObjectField(TEXT("from"), From);
             External->SetObjectField(TEXT("to"), InternalEndpoint(TEXT("branch"), TEXT("Condition")));
-            ExternalConnections.Add(MakeShared<FJsonValueObject>(External));
+            ExternalConnections.Add(MakeShared<FUnrealMCPValueObject>(External));
         }
         Arguments->SetArrayField(TEXT("external_connections"), ExternalConnections);
         return Arguments;
@@ -256,7 +256,7 @@ bool FUnrealMCPEventMacroReplaceTest::RunTest(const FString& Parameters)
             : LogicUnit::DescribeEventHandler(Graph, Root, Boundary);
         if (!bDescribed) return false;
         if (bExternal && Boundary.ExternalLinks.Num() != 1) return false;
-        TSharedRef<FJsonObject> Arguments = BuildArguments(
+        TSharedRef<FUnrealMCPRecord> Arguments = BuildArguments(
             TargetKind, Graph, Root, Boundary, ActionId, bExternal);
         if (!Service.Execute(Arguments, Result, Error))
         {

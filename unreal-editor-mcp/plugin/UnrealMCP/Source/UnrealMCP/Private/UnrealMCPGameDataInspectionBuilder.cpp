@@ -10,8 +10,7 @@
 #include "Engine/DataTable.h"
 #include "Kismet2/StructureEditorUtils.h"
 #include "Misc/SecureHash.h"
-#include "Serialization/JsonSerializer.h"
-#include "Serialization/JsonWriter.h"
+#include "UnrealMCPJsonCodec.h"
 #include "StructUtils/UserDefinedStruct.h"
 #include "UObject/UObjectGlobals.h"
 #include "UserDefinedStructure/UserDefinedStructEditorData.h"
@@ -22,11 +21,10 @@ using namespace UnrealMCP::GameDataRequestValidation;
 
 namespace
 {
-FString HashJson(const TSharedRef<FJsonObject>& Value)
+FString HashJson(const TSharedRef<FUnrealMCPRecord>& Value)
 {
     FString Text;
-    const TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Text);
-    FJsonSerializer::Serialize(Value, Writer);
+    UnrealMCP::JsonCodec::Serialize(Value, Text);
     FTCHARToUTF8 Encoded(*Text);
     uint8 Digest[FSHA1::DigestSize];
     FSHA1::HashBuffer(Encoded.Get(), Encoded.Length(), Digest);
@@ -38,9 +36,9 @@ FString Guid(const FGuid& Value)
     return Value.IsValid() ? Value.ToString(EGuidFormats::Digits).ToLower() : FString();
 }
 
-TSharedRef<FJsonObject> SchemaRecord(const UScriptStruct* Struct, const FProperty* Property)
+TSharedRef<FUnrealMCPRecord> SchemaRecord(const UScriptStruct* Struct, const FProperty* Property)
 {
-    const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Result = MakeShared<FUnrealMCPRecord>();
     Result->SetStringField(TEXT("name"), Struct->GetAuthoredNameForField(Property));
     Result->SetStringField(TEXT("property_name"), Property->GetName());
     Result->SetObjectField(TEXT("type"), UnrealMCP::GameDataValueCodec::EncodeType(Property));
@@ -61,14 +59,14 @@ bool GatherDependencies(const FString& PackageName, TArray<FString>& Out, bool& 
 }
 
 bool Build(
-    const FJsonObject& Arguments,
+    const FUnrealMCPRecord& Arguments,
     FString& OutTarget,
     FString& OutObjectPath,
     FString& OutPackage,
-    TArray<TSharedPtr<FJsonValue>>& OutRecords,
-    TArray<TSharedPtr<FJsonValue>>& OutSchema,
+    TArray<TSharedPtr<FUnrealMCPValue>>& OutRecords,
+    TArray<TSharedPtr<FUnrealMCPValue>>& OutSchema,
     FString& OutSnapshot,
-    TSharedPtr<FJsonObject>& OutMetadata,
+    TSharedPtr<FUnrealMCPRecord>& OutMetadata,
     FUnrealMCPError& OutError)
 {
     FString InputPath;
@@ -94,8 +92,8 @@ bool Build(
         OutError = {TEXT("not_found"), TEXT("The game-data asset was not found")};
         return false;
     }
-    OutMetadata = MakeShared<FJsonObject>();
-    TArray<TSharedPtr<FJsonValue>> FingerprintRecords;
+    OutMetadata = MakeShared<FUnrealMCPRecord>();
+    TArray<TSharedPtr<FUnrealMCPValue>> FingerprintRecords;
     if (OutTarget == TEXT("user_defined_struct"))
     {
         UUserDefinedStruct* Struct = Cast<UUserDefinedStruct>(Asset);
@@ -115,7 +113,7 @@ bool Build(
         for (int32 Index = 0; Index < Members.Num(); ++Index)
         {
             const FStructVariableDescription& Member = Members[Index];
-            const TSharedRef<FJsonObject> Record = MakeShared<FJsonObject>();
+            const TSharedRef<FUnrealMCPRecord> Record = MakeShared<FUnrealMCPRecord>();
             Record->SetStringField(TEXT("kind"), TEXT("member"));
             Record->SetStringField(TEXT("id"), Guid(Member.VarGuid));
             Record->SetBoolField(TEXT("identity_stable"), Member.VarGuid.IsValid());
@@ -126,15 +124,15 @@ bool Build(
             Record->SetObjectField(TEXT("type"), UnrealMCP::K2TypeCodec::EncodeType(PinType));
             Record->SetObjectField(TEXT("default"), UnrealMCP::K2TypeCodec::EncodeDefault(PinType, Member.DefaultValue));
             Record->SetStringField(TEXT("tooltip"), Member.ToolTip.Left(512));
-            const TSharedPtr<FJsonValue> Value = MakeShared<FJsonValueObject>(Record);
+            const TSharedPtr<FUnrealMCPValue> Value = MakeShared<FUnrealMCPValueObject>(Record);
             OutRecords.Add(Value);
             FingerprintRecords.Add(Value);
         }
         TArray<FString> Dependencies;
         bool bTruncated = false;
         GatherDependencies(OutPackage, Dependencies, bTruncated);
-        TArray<TSharedPtr<FJsonValue>> Values;
-        for (const FString& Item : Dependencies) Values.Add(MakeShared<FJsonValueString>(Item));
+        TArray<TSharedPtr<FUnrealMCPValue>> Values;
+        for (const FString& Item : Dependencies) Values.Add(MakeShared<FUnrealMCPValueString>(Item));
         OutMetadata->SetArrayField(TEXT("dependencies"), Values);
         OutMetadata->SetBoolField(TEXT("dependencies_truncated"), bTruncated);
     }
@@ -157,19 +155,19 @@ bool Build(
                 OutError = {TEXT("data_limit_exceeded"), TEXT("The row schema exceeds the field limit")};
                 return false;
             }
-            OutSchema.Add(MakeShared<FJsonValueObject>(SchemaRecord(RowStruct, *It)));
+            OutSchema.Add(MakeShared<FUnrealMCPValueObject>(SchemaRecord(RowStruct, *It)));
         }
         TSet<FName> Filter;
         if (Arguments.HasField(TEXT("row_names")))
         {
-            const TArray<TSharedPtr<FJsonValue>>* Names = nullptr;
+            const TArray<TSharedPtr<FUnrealMCPValue>>* Names = nullptr;
             if (!Arguments.TryGetArrayField(TEXT("row_names"), Names) || Names == nullptr
                 || Names->IsEmpty() || Names->Num() > UnrealMCP::MaxGameDataBatchRows)
             {
                 OutError = {TEXT("invalid_argument"), TEXT("row_names must be one bounded non-empty array")};
                 return false;
             }
-            for (const TSharedPtr<FJsonValue>& Value : *Names)
+            for (const TSharedPtr<FUnrealMCPValue>& Value : *Names)
             {
                 FString Name;
                 if (!Value->TryGetString(Name) || !ValidName(Name) || Filter.Contains(FName(*Name)))
@@ -192,18 +190,18 @@ bool Build(
         {
             bool bEncoded = false;
             FUnrealMCPError ValueError;
-            const TSharedRef<FJsonObject> Values = UnrealMCP::GameDataValueCodec::EncodeFields(
+            const TSharedRef<FUnrealMCPRecord> Values = UnrealMCP::GameDataValueCodec::EncodeFields(
                 RowStruct, Table->FindRowUnchecked(Name), 0, ValueError, bEncoded);
             if (!bEncoded)
             {
                 OutError = ValueError;
                 return false;
             }
-            const TSharedRef<FJsonObject> Record = MakeShared<FJsonObject>();
+            const TSharedRef<FUnrealMCPRecord> Record = MakeShared<FUnrealMCPRecord>();
             Record->SetStringField(TEXT("kind"), TEXT("row"));
             Record->SetStringField(TEXT("name"), Name.ToString());
             Record->SetObjectField(TEXT("values"), Values);
-            const TSharedPtr<FJsonValue> Value = MakeShared<FJsonValueObject>(Record);
+            const TSharedPtr<FUnrealMCPValue> Value = MakeShared<FUnrealMCPValueObject>(Record);
             FingerprintRecords.Add(Value);
             if (Filter.IsEmpty() || Filter.Contains(Name)) OutRecords.Add(Value);
         }
@@ -214,7 +212,7 @@ bool Build(
         }
         OutMetadata->SetNumberField(TEXT("row_count"), Table->GetRowMap().Num());
     }
-    const TSharedRef<FJsonObject> Fingerprint = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Fingerprint = MakeShared<FUnrealMCPRecord>();
     Fingerprint->SetStringField(TEXT("target"), OutTarget);
     Fingerprint->SetStringField(TEXT("asset_path"), OutObjectPath);
     Fingerprint->SetObjectField(TEXT("metadata"), OutMetadata);
@@ -224,9 +222,9 @@ bool Build(
     return true;
 }
 
-TSharedRef<FJsonObject> BuildEditResult(const FString& Target, const FString& ObjectPath, const FString& Snapshot)
+TSharedRef<FUnrealMCPRecord> BuildEditResult(const FString& Target, const FString& ObjectPath, const FString& Snapshot)
 {
-    const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Result = MakeShared<FUnrealMCPRecord>();
     Result->SetStringField(TEXT("target"), Target);
     Result->SetStringField(TEXT("asset_path"), ObjectPath);
     Result->SetStringField(TEXT("snapshot_id"), Snapshot);

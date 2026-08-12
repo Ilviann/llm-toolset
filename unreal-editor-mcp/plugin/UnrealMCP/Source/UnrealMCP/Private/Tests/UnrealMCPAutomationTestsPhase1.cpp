@@ -44,18 +44,17 @@ bool FUnrealMCPProtocolBoundsTest::RunTest(const FString& Parameters)
     const FString Json = TEXT("{\"command\":\"capabilities\",\"arguments\":{}}");
     FTCHARToUTF8 Encoded(*Json);
     TArray<uint8> Body(reinterpret_cast<const uint8*>(Encoded.Get()), Encoded.Length());
-    FString Command;
-    TSharedPtr<FJsonObject> Arguments;
+    FUnrealMCPCommandRequest Request;
     FUnrealMCPError Error;
-    TestTrue(TEXT("valid command parses"), UnrealMCP::Protocol::ParseCommand(Body, Command, Arguments, Error));
-    TestEqual(TEXT("command preserved"), Command, FString(TEXT("capabilities")));
+    TestTrue(TEXT("valid command parses"), UnrealMCP::Protocol::ParseCommand(Body, Request, Error));
+    TestEqual(TEXT("command preserved"), Request.Command, FString(TEXT("capabilities")));
     TArray<uint8> Large;
     Large.SetNumZeroed(UnrealMCP::MaxRequestBytes + 1);
-    TestFalse(TEXT("oversized body rejects"), UnrealMCP::Protocol::ParseCommand(Large, Command, Arguments, Error));
+    TestFalse(TEXT("oversized body rejects"), UnrealMCP::Protocol::ParseCommand(Large, Request, Error));
     const FString DeepJson = TEXT("{\"command\":\"capabilities\",\"arguments\":") + FString::ChrN(20, TEXT('[')) + FString::ChrN(20, TEXT(']')) + TEXT("}");
     FTCHARToUTF8 DeepEncoded(*DeepJson);
     TArray<uint8> DeepBody(reinterpret_cast<const uint8*>(DeepEncoded.Get()), DeepEncoded.Length());
-    TestFalse(TEXT("excessive JSON depth rejects"), UnrealMCP::Protocol::ParseCommand(DeepBody, Command, Arguments, Error));
+    TestFalse(TEXT("excessive JSON depth rejects"), UnrealMCP::Protocol::ParseCommand(DeepBody, Request, Error));
     return true;
 }
 

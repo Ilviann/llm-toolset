@@ -89,10 +89,10 @@ TArray<FString> FUnrealMCPWidgetLayoutService::SupportedProperties(
     return Result;
 }
 
-TSharedRef<FJsonObject> FUnrealMCPWidgetLayoutService::Encode(
+TSharedRef<FUnrealMCPRecord> FUnrealMCPWidgetLayoutService::Encode(
     const UPanelSlot* Slot)
 {
-    const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Result = MakeShared<FUnrealMCPRecord>();
     if (Slot == nullptr)
     {
         return Result;
@@ -101,12 +101,12 @@ TSharedRef<FJsonObject> FUnrealMCPWidgetLayoutService::Encode(
     {
         FProperty* Property =
             Slot->GetClass()->FindPropertyByName(FName(*Name));
-        const TSharedRef<FJsonObject> Encoded =
+        const TSharedRef<FUnrealMCPRecord> Encoded =
             UnrealMCP::WidgetAuthoring::EncodeProperty(
                 const_cast<UPanelSlot*>(Slot), Property);
         if (Encoded->GetBoolField(TEXT("supported")))
         {
-            const TSharedPtr<FJsonValue> EncodedValue =
+            const TSharedPtr<FUnrealMCPValue> EncodedValue =
                 Encoded->Values.FindRef(TEXT("value"));
             if (EncodedValue.IsValid())
             {
@@ -139,8 +139,8 @@ FString FUnrealMCPWidgetLayoutService::Fingerprint(const UPanelSlot* Slot)
 }
 
 bool FUnrealMCPWidgetLayoutService::Execute(
-    const TSharedPtr<FJsonObject>& Arguments,
-    TSharedPtr<FJsonObject>& OutResult,
+    const TSharedPtr<FUnrealMCPRecord>& Arguments,
+    TSharedPtr<FUnrealMCPRecord>& OutResult,
     FUnrealMCPError& OutError)
 {
     using namespace UnrealMCP::BlueprintMutationPrivate;
@@ -162,7 +162,7 @@ bool FUnrealMCPWidgetLayoutService::Execute(
     FString Operation;
     FString SlotId;
     FString PropertyName;
-    const TSharedPtr<FJsonValue>* Value = Arguments->Values.Find(TEXT("value"));
+    const TSharedPtr<FUnrealMCPValue>* Value = Arguments->Values.Find(TEXT("value"));
     if (!Arguments->TryGetStringField(TEXT("operation"), Operation)
         || Operation != TEXT("set_slot")
         || !Arguments->TryGetStringField(TEXT("slot_id"), SlotId)
@@ -201,7 +201,7 @@ bool FUnrealMCPWidgetLayoutService::Execute(
     }
     FProperty* Property =
         Slot->GetClass()->FindPropertyByName(FName(*PropertyName));
-    TSharedPtr<FJsonObject> Changed;
+    TSharedPtr<FUnrealMCPRecord> Changed;
     if (!ApplyProperty(
             Blueprint, Slot, Property, *Value,
             TEXT("Unreal MCP set widget slot layout"), Changed, OutError))

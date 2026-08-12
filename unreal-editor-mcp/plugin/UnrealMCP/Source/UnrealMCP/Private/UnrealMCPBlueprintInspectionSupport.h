@@ -31,8 +31,6 @@
 #include "Kismet2/KismetEditorUtilities.h"
 #include "Misc/PackageName.h"
 #include "Misc/SecureHash.h"
-#include "Serialization/JsonSerializer.h"
-#include "Serialization/JsonWriter.h"
 #include "UnrealMCPVersion.h"
 #include "UnrealMCPBlueprintFamilyPolicy.h"
 #include "UnrealMCPExtensionRegistry.h"
@@ -46,7 +44,7 @@ namespace UnrealMCP::BlueprintInspectionPrivate
 {
 struct FInspectionSink
 {
-    explicit FInspectionSink(TArray<TSharedPtr<FJsonValue>>& InRecords)
+    explicit FInspectionSink(TArray<TSharedPtr<FUnrealMCPValue>>& InRecords)
         : Records(InRecords)
     {
     }
@@ -57,7 +55,7 @@ struct FInspectionSink
             || Fingerprint.Num() > UnrealMCP::MaxInspectRecords;
     }
 
-    TArray<TSharedPtr<FJsonValue>>& Records;
+    TArray<TSharedPtr<FUnrealMCPValue>>& Records;
     TArray<FString> Fingerprint;
 };
 
@@ -81,12 +79,12 @@ static FString GuidString(const FGuid& Guid)
     return Guid.IsValid() ? Guid.ToString(EGuidFormats::Digits).ToLower() : FString();
 }
 
-static TSharedRef<FJsonObject> ReplacementBoundaryRecord(
+static TSharedRef<FUnrealMCPRecord> ReplacementBoundaryRecord(
     const UnrealMCP::BlueprintLogicUnitFingerprint::FBoundary& Boundary,
     bool bReplaceable)
 {
     using namespace UnrealMCP::BlueprintLogicUnitFingerprint;
-    const TSharedRef<FJsonObject> Value = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Value = MakeShared<FUnrealMCPRecord>();
     Value->SetBoolField(TEXT("replaceable"), bReplaceable);
     Value->SetStringField(TEXT("target_kind"), KindString(Boundary.Kind));
     Value->SetStringField(TEXT("logic_unit_id"),
@@ -100,23 +98,23 @@ static TSharedRef<FJsonObject> ReplacementBoundaryRecord(
         GuidString(Boundary.Entry != nullptr ? Boundary.Entry->NodeGuid : FGuid()));
     if (Boundary.Result != nullptr)
         Value->SetStringField(TEXT("result_node_id"), GuidString(Boundary.Result->NodeGuid));
-    TArray<TSharedPtr<FJsonValue>> OwnedNodeIds;
+    TArray<TSharedPtr<FUnrealMCPValue>> OwnedNodeIds;
     for (const FString& Id : Boundary.OwnedNodeIds)
-        OwnedNodeIds.Add(MakeShared<FJsonValueString>(Id));
+        OwnedNodeIds.Add(MakeShared<FUnrealMCPValueString>(Id));
     Value->SetArrayField(TEXT("owned_node_ids"), OwnedNodeIds);
-    TArray<TSharedPtr<FJsonValue>> LocalVariableIds;
+    TArray<TSharedPtr<FUnrealMCPValue>> LocalVariableIds;
     for (const FString& Id : Boundary.LocalVariableIds)
-        LocalVariableIds.Add(MakeShared<FJsonValueString>(Id));
+        LocalVariableIds.Add(MakeShared<FUnrealMCPValueString>(Id));
     Value->SetArrayField(TEXT("local_variable_ids"), LocalVariableIds);
-    TArray<TSharedPtr<FJsonValue>> ExternalLinks;
+    TArray<TSharedPtr<FUnrealMCPValue>> ExternalLinks;
     for (const FExternalLink& Link : Boundary.ExternalLinks)
     {
-        const TSharedRef<FJsonObject> Record = MakeShared<FJsonObject>();
+        const TSharedRef<FUnrealMCPRecord> Record = MakeShared<FUnrealMCPRecord>();
         Record->SetStringField(TEXT("from_node_id"), Link.FromNodeId);
         Record->SetStringField(TEXT("from_pin_id"), Link.FromPinId);
         Record->SetStringField(TEXT("to_node_id"), Link.ToNodeId);
         Record->SetStringField(TEXT("to_pin_id"), Link.ToPinId);
-        ExternalLinks.Add(MakeShared<FJsonValueObject>(Record));
+        ExternalLinks.Add(MakeShared<FUnrealMCPValueObject>(Record));
     }
     Value->SetArrayField(TEXT("external_links"), ExternalLinks);
     return Value;
@@ -159,26 +157,26 @@ static FString HashLines(TArray<FString> Lines)
     return BytesToHex(Digest, FSHA1::DigestSize).ToLower();
 }
 
-static TSharedRef<FJsonObject> Record(const TCHAR* Section)
+static TSharedRef<FUnrealMCPRecord> Record(const TCHAR* Section)
 {
-    const TSharedRef<FJsonObject> Value = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Value = MakeShared<FUnrealMCPRecord>();
     Value->SetStringField(TEXT("section"), Section);
     return Value;
 }
 
-static void AddRecord(TArray<TSharedPtr<FJsonValue>>& Records, const TSharedRef<FJsonObject>& Value)
+static void AddRecord(TArray<TSharedPtr<FUnrealMCPValue>>& Records, const TSharedRef<FUnrealMCPRecord>& Value)
 {
-    Records.Add(MakeShared<FJsonValueObject>(Value));
+    Records.Add(MakeShared<FUnrealMCPValueObject>(Value));
 }
 
-static bool HasOnlyFields(const FJsonObject& Object, std::initializer_list<const TCHAR*> Allowed)
+static bool HasOnlyFields(const FUnrealMCPRecord& Object, std::initializer_list<const TCHAR*> Allowed)
 {
     TSet<FString> Names;
     for (const TCHAR* Name : Allowed)
     {
         Names.Add(Name);
     }
-    for (const TPair<FString, TSharedPtr<FJsonValue>>& Pair : Object.Values)
+    for (const TPair<FString, TSharedPtr<FUnrealMCPValue>>& Pair : Object.Values)
     {
         if (!Names.Contains(Pair.Key))
         {
@@ -188,7 +186,7 @@ static bool HasOnlyFields(const FJsonObject& Object, std::initializer_list<const
     return true;
 }
 
-static bool ReadPageSize(const FJsonObject& Object, int32& OutPageSize, FUnrealMCPError& OutError)
+static bool ReadPageSize(const FUnrealMCPRecord& Object, int32& OutPageSize, FUnrealMCPError& OutError)
 {
     OutPageSize = UnrealMCP::DefaultInspectPageSize;
     if (!Object.HasField(TEXT("page_size")))
@@ -210,7 +208,7 @@ static bool ReadPageSize(const FJsonObject& Object, int32& OutPageSize, FUnrealM
     return true;
 }
 
-static bool ReadOptionalBool(const FJsonObject& Object, const TCHAR* Name, bool DefaultValue, bool& OutValue, FUnrealMCPError& OutError)
+static bool ReadOptionalBool(const FUnrealMCPRecord& Object, const TCHAR* Name, bool DefaultValue, bool& OutValue, FUnrealMCPError& OutError)
 {
     OutValue = DefaultValue;
     if (!Object.HasField(Name))
@@ -297,9 +295,9 @@ static FString VariableTypeFingerprint(const FEdGraphPinType& Type)
         + (ValueTypeObject != nullptr ? ValueTypeObject->GetPathName() : FString());
 }
 
-static TSharedRef<FJsonObject> PinType(const FEdGraphPinType& Type)
+static TSharedRef<FUnrealMCPRecord> PinType(const FEdGraphPinType& Type)
 {
-    const TSharedRef<FJsonObject> Value = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Value = MakeShared<FUnrealMCPRecord>();
     const FString Category = Type.PinCategory.ToString().ToLower();
     Value->SetStringField(TEXT("category"), Category);
     Value->SetStringField(TEXT("subcategory"), Type.PinSubCategory.ToString());
@@ -314,7 +312,7 @@ static TSharedRef<FJsonObject> PinType(const FEdGraphPinType& Type)
     return Value;
 }
 
-static TSharedRef<FJsonObject> VariableReferences(UBlueprint* Blueprint, const FName VariableName)
+static TSharedRef<FUnrealMCPRecord> VariableReferences(UBlueprint* Blueprint, const FName VariableName)
 {
     return UnrealMCP::BlueprintReferences::Encode(
         UnrealMCP::BlueprintReferences::ScanMemberVariable(Blueprint, VariableName));
@@ -322,25 +320,25 @@ static TSharedRef<FJsonObject> VariableReferences(UBlueprint* Blueprint, const F
 
 
 
-static TSharedRef<FJsonObject> FunctionReferences(UBlueprint* Blueprint, UEdGraph* FunctionGraph)
+static TSharedRef<FUnrealMCPRecord> FunctionReferences(UBlueprint* Blueprint, UEdGraph* FunctionGraph)
 {
     return UnrealMCP::BlueprintReferences::Encode(
         UnrealMCP::BlueprintReferences::ScanFunction(Blueprint, FunctionGraph));
 }
 
-static TSharedRef<FJsonObject> MacroReferences(UBlueprint* Blueprint, UEdGraph* MacroGraph)
+static TSharedRef<FUnrealMCPRecord> MacroReferences(UBlueprint* Blueprint, UEdGraph* MacroGraph)
 {
     return UnrealMCP::BlueprintReferences::Encode(
         UnrealMCP::BlueprintReferences::ScanMacro(Blueprint, MacroGraph));
 }
 
-static TSharedRef<FJsonObject> CustomEventReferences(UBlueprint* Blueprint, UK2Node_CustomEvent* Event)
+static TSharedRef<FUnrealMCPRecord> CustomEventReferences(UBlueprint* Blueprint, UK2Node_CustomEvent* Event)
 {
     return UnrealMCP::BlueprintReferences::Encode(
         UnrealMCP::BlueprintReferences::ScanCustomEvent(Blueprint, Event));
 }
 
-static TSharedRef<FJsonObject> LocalReferences(UBlueprint* Blueprint, UEdGraph* FunctionGraph, const FName VariableName)
+static TSharedRef<FUnrealMCPRecord> LocalReferences(UBlueprint* Blueprint, UEdGraph* FunctionGraph, const FName VariableName)
 {
     return UnrealMCP::BlueprintReferences::Encode(
         UnrealMCP::BlueprintReferences::ScanLocalVariable(Blueprint, FunctionGraph, VariableName));
@@ -368,9 +366,9 @@ static FString FunctionAccess(int32 Flags)
     return TEXT("public");
 }
 
-static TSharedRef<FJsonObject> FunctionMetadata(const UK2Node_FunctionEntry* Entry)
+static TSharedRef<FUnrealMCPRecord> FunctionMetadata(const UK2Node_FunctionEntry* Entry)
 {
-    const TSharedRef<FJsonObject> Metadata = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Metadata = MakeShared<FUnrealMCPRecord>();
     Metadata->SetStringField(TEXT("category"), Entry->MetaData.Category.ToString().Left(128));
     Metadata->SetStringField(TEXT("tooltip"), Entry->MetaData.ToolTip.ToString().Left(512));
     Metadata->SetStringField(TEXT("keywords"), Entry->MetaData.Keywords.ToString().Left(256));
@@ -378,9 +376,9 @@ static TSharedRef<FJsonObject> FunctionMetadata(const UK2Node_FunctionEntry* Ent
     return Metadata;
 }
 
-static TSharedRef<FJsonObject> CallableMetadata(const FKismetUserDeclaredFunctionMetadata& Source, bool bCallInEditor)
+static TSharedRef<FUnrealMCPRecord> CallableMetadata(const FKismetUserDeclaredFunctionMetadata& Source, bool bCallInEditor)
 {
-    const TSharedRef<FJsonObject> Metadata = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Metadata = MakeShared<FUnrealMCPRecord>();
     Metadata->SetStringField(TEXT("category"), Source.Category.ToString().Left(128));
     Metadata->SetStringField(TEXT("tooltip"), Source.ToolTip.ToString().Left(512));
     Metadata->SetStringField(TEXT("keywords"), Source.Keywords.ToString().Left(256));
@@ -388,9 +386,9 @@ static TSharedRef<FJsonObject> CallableMetadata(const FKismetUserDeclaredFunctio
     return Metadata;
 }
 
-static TSharedRef<FJsonObject> CustomEventMetadata(UK2Node_CustomEvent* Event)
+static TSharedRef<FUnrealMCPRecord> CustomEventMetadata(UK2Node_CustomEvent* Event)
 {
-    const TSharedRef<FJsonObject> Metadata = CallableMetadata(Event->GetUserDefinedMetaData(), Event->bCallInEditor);
+    const TSharedRef<FUnrealMCPRecord> Metadata = CallableMetadata(Event->GetUserDefinedMetaData(), Event->bCallInEditor);
     const uint32 Flags = Event->FunctionFlags & (FUNC_Net | FUNC_NetReliable | FUNC_NetServer | FUNC_NetClient | FUNC_NetMulticast);
     const bool bNet = (Flags & FUNC_Net) != 0;
     const FString Mode = !bNet ? TEXT("not_replicated")
@@ -401,21 +399,21 @@ static TSharedRef<FJsonObject> CustomEventMetadata(UK2Node_CustomEvent* Event)
     return Metadata;
 }
 
-static TSharedRef<FJsonObject> FunctionSignature(const UK2Node_FunctionEntry* Entry, const TArray<UK2Node_FunctionResult*>& Results)
+static TSharedRef<FUnrealMCPRecord> FunctionSignature(const UK2Node_FunctionEntry* Entry, const TArray<UK2Node_FunctionResult*>& Results)
 {
     const int32 Flags = Entry->GetFunctionFlags();
-    const TSharedRef<FJsonObject> Signature = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Signature = MakeShared<FUnrealMCPRecord>();
     Signature->SetStringField(TEXT("access"), FunctionAccess(Flags));
     Signature->SetBoolField(TEXT("pure"), (Flags & FUNC_BlueprintPure) != 0);
     Signature->SetBoolField(TEXT("const"), (Flags & FUNC_Const) != 0);
-    TArray<TSharedPtr<FJsonValue>> Parameters;
+    TArray<TSharedPtr<FUnrealMCPValue>> Parameters;
     auto Append = [&Parameters](const UK2Node_EditablePinBase* Node, const TCHAR* Direction)
     {
         if (Node == nullptr) return;
         for (const TSharedPtr<FUserPinInfo>& Pin : Node->UserDefinedPins)
         {
             if (!Pin.IsValid()) continue;
-            const TSharedRef<FJsonObject> Parameter = MakeShared<FJsonObject>();
+            const TSharedRef<FUnrealMCPRecord> Parameter = MakeShared<FUnrealMCPRecord>();
             Parameter->SetStringField(TEXT("name"), Pin->PinName.ToString());
             Parameter->SetStringField(TEXT("direction"), Direction);
             Parameter->SetObjectField(TEXT("type"), UnrealMCP::K2TypeCodec::EncodeType(Pin->PinType));
@@ -423,7 +421,7 @@ static TSharedRef<FJsonObject> FunctionSignature(const UK2Node_FunctionEntry* En
             {
                 Parameter->SetObjectField(TEXT("default"), UnrealMCP::K2TypeCodec::EncodeDefault(Pin->PinType, Pin->PinDefaultValue));
             }
-            Parameters.Add(MakeShared<FJsonValueObject>(Parameter));
+            Parameters.Add(MakeShared<FUnrealMCPValueObject>(Parameter));
         }
     };
     Append(Entry, TEXT("input"));
@@ -432,18 +430,18 @@ static TSharedRef<FJsonObject> FunctionSignature(const UK2Node_FunctionEntry* En
     return Signature;
 }
 
-static TSharedRef<FJsonObject> MacroSignature(UK2Node_Tunnel* Entry, UK2Node_Tunnel* Exit, bool bPure)
+static TSharedRef<FUnrealMCPRecord> MacroSignature(UK2Node_Tunnel* Entry, UK2Node_Tunnel* Exit, bool bPure)
 {
-    const TSharedRef<FJsonObject> Signature = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Signature = MakeShared<FUnrealMCPRecord>();
     Signature->SetBoolField(TEXT("pure"), bPure);
-    TArray<TSharedPtr<FJsonValue>> Parameters;
+    TArray<TSharedPtr<FUnrealMCPValue>> Parameters;
     auto Append = [&Parameters](const UK2Node_Tunnel* Node, const TCHAR* Direction)
     {
         if (Node == nullptr) return;
         for (const TSharedPtr<FUserPinInfo>& Pin : Node->UserDefinedPins)
         {
             if (!Pin.IsValid() || Pin->PinType.PinCategory == UEdGraphSchema_K2::PC_Exec) continue;
-            const TSharedRef<FJsonObject> Parameter = MakeShared<FJsonObject>();
+            const TSharedRef<FUnrealMCPRecord> Parameter = MakeShared<FUnrealMCPRecord>();
             Parameter->SetStringField(TEXT("name"), Pin->PinName.ToString());
             Parameter->SetStringField(TEXT("direction"), Direction);
             Parameter->SetObjectField(TEXT("type"), UnrealMCP::K2TypeCodec::EncodeType(Pin->PinType));
@@ -451,7 +449,7 @@ static TSharedRef<FJsonObject> MacroSignature(UK2Node_Tunnel* Entry, UK2Node_Tun
             {
                 Parameter->SetObjectField(TEXT("default"), UnrealMCP::K2TypeCodec::EncodeDefault(Pin->PinType, Pin->PinDefaultValue));
             }
-            Parameters.Add(MakeShared<FJsonValueObject>(Parameter));
+            Parameters.Add(MakeShared<FUnrealMCPValueObject>(Parameter));
         }
     };
     Append(Entry, TEXT("input"));
@@ -460,29 +458,29 @@ static TSharedRef<FJsonObject> MacroSignature(UK2Node_Tunnel* Entry, UK2Node_Tun
     return Signature;
 }
 
-static TSharedRef<FJsonObject> CustomEventSignature(const UK2Node_CustomEvent* Event)
+static TSharedRef<FUnrealMCPRecord> CustomEventSignature(const UK2Node_CustomEvent* Event)
 {
-    const TSharedRef<FJsonObject> Signature = MakeShared<FJsonObject>();
-    TArray<TSharedPtr<FJsonValue>> Parameters;
+    const TSharedRef<FUnrealMCPRecord> Signature = MakeShared<FUnrealMCPRecord>();
+    TArray<TSharedPtr<FUnrealMCPValue>> Parameters;
     for (const TSharedPtr<FUserPinInfo>& Pin : Event->UserDefinedPins)
     {
         if (!Pin.IsValid()) continue;
-        const TSharedRef<FJsonObject> Parameter = MakeShared<FJsonObject>();
+        const TSharedRef<FUnrealMCPRecord> Parameter = MakeShared<FUnrealMCPRecord>();
         Parameter->SetStringField(TEXT("name"), Pin->PinName.ToString());
         Parameter->SetObjectField(TEXT("type"), UnrealMCP::K2TypeCodec::EncodeType(Pin->PinType));
         if (!Pin->PinType.bIsReference)
         {
             Parameter->SetObjectField(TEXT("default"), UnrealMCP::K2TypeCodec::EncodeDefault(Pin->PinType, Pin->PinDefaultValue));
         }
-        Parameters.Add(MakeShared<FJsonValueObject>(Parameter));
+        Parameters.Add(MakeShared<FUnrealMCPValueObject>(Parameter));
     }
     Signature->SetArrayField(TEXT("parameters"), Parameters);
     return Signature;
 }
 
-static TSharedRef<FJsonObject> VariableMetadata(const FBPVariableDescription& Variable)
+static TSharedRef<FUnrealMCPRecord> VariableMetadata(const FBPVariableDescription& Variable)
 {
-    const TSharedRef<FJsonObject> Metadata = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Metadata = MakeShared<FUnrealMCPRecord>();
     Metadata->SetStringField(TEXT("category"), Variable.Category.ToString().Left(128));
     Metadata->SetStringField(TEXT("tooltip"), Variable.HasMetaData(TEXT("tooltip")) ? Variable.GetMetaData(TEXT("tooltip")).Left(512) : FString());
     Metadata->SetBoolField(TEXT("instance_editable"), (Variable.PropertyFlags & CPF_Edit) != 0
@@ -496,9 +494,9 @@ static TSharedRef<FJsonObject> VariableMetadata(const FBPVariableDescription& Va
     return Metadata;
 }
 
-static TSharedRef<FJsonObject> VariableReplication(UBlueprint* Blueprint, const FBPVariableDescription& Variable, const bool bMutable)
+static TSharedRef<FUnrealMCPRecord> VariableReplication(UBlueprint* Blueprint, const FBPVariableDescription& Variable, const bool bMutable)
 {
-    const TSharedRef<FJsonObject> Replication = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Replication = MakeShared<FUnrealMCPRecord>();
     const bool bRepNotify = !Variable.RepNotifyFunc.IsNone() || (Variable.PropertyFlags & CPF_RepNotify) != 0;
     Replication->SetStringField(TEXT("mode"), bRepNotify ? TEXT("rep_notify")
         : (Variable.PropertyFlags & CPF_Net) != 0 ? TEXT("replicated") : TEXT("none"));
@@ -569,17 +567,17 @@ static void AddBlueprintGraphs(UBlueprint* Blueprint, const FString& OwnerPath, 
     Append(Blueprint->DelegateSignatureGraphs);
 }
 
-static bool ReadPropertyNames(const FJsonObject& Arguments, TSet<FString>& OutNames, FUnrealMCPError& OutError)
+static bool ReadPropertyNames(const FUnrealMCPRecord& Arguments, TSet<FString>& OutNames, FUnrealMCPError& OutError)
 {
     if (!Arguments.HasField(TEXT("property_names"))) return true;
-    const TArray<TSharedPtr<FJsonValue>>* Values = nullptr;
+    const TArray<TSharedPtr<FUnrealMCPValue>>* Values = nullptr;
     if (!Arguments.TryGetArrayField(TEXT("property_names"), Values) || Values == nullptr || Values->IsEmpty()
         || Values->Num() > UnrealMCP::MaxPropertyNames)
     {
         OutError = {TEXT("invalid_argument"), TEXT("property_names must be a non-empty bounded array")};
         return false;
     }
-    for (const TSharedPtr<FJsonValue>& Item : *Values)
+    for (const TSharedPtr<FUnrealMCPValue>& Item : *Values)
     {
         FString Name;
         if (!Item.IsValid() || !Item->TryGetString(Name) || Name.IsEmpty() || Name.Len() > 128 || Name.Contains(TEXT(".")) || OutNames.Contains(Name))
@@ -592,7 +590,7 @@ static bool ReadPropertyNames(const FJsonObject& Arguments, TSet<FString>& OutNa
     return true;
 }
 
-static FString AddComponentDefaults(UActorComponent* Template, const TSet<FString>& RequestedProperties, const TSharedRef<FJsonObject>& Component)
+static FString AddComponentDefaults(UActorComponent* Template, const TSet<FString>& RequestedProperties, const TSharedRef<FUnrealMCPRecord>& Component)
 {
     TArray<FProperty*> Changed;
     for (TFieldIterator<FProperty> It(Template->GetClass(), EFieldIterationFlags::IncludeSuper); It; ++It)
@@ -605,7 +603,7 @@ static FString AddComponentDefaults(UActorComponent* Template, const TSet<FStrin
         }
     }
     Changed.Sort([](const FProperty& Left, const FProperty& Right) { return Left.GetName() < Right.GetName(); });
-    TArray<TSharedPtr<FJsonValue>> Defaults;
+    TArray<TSharedPtr<FUnrealMCPValue>> Defaults;
     TArray<FString> Fingerprint;
     const int32 Count = FMath::Min(Changed.Num(), UnrealMCP::MaxComponentDefaults);
     for (int32 Index = 0; Index < Changed.Num(); ++Index)
@@ -616,7 +614,7 @@ static FString AddComponentDefaults(UActorComponent* Template, const TSet<FStrin
         FString Encoded;
         UnrealMCP::PropertyCodec::ExportValueText(Template, Property, Encoded);
         Fingerprint.Add(Property->GetName() + TEXT("|") + (bSupported ? Kind : TEXT("unsupported")) + TEXT("|") + Encoded);
-        if (Index < Count) Defaults.Add(MakeShared<FJsonValueObject>(UnrealMCP::PropertyCodec::Encode(Template, Property)));
+        if (Index < Count) Defaults.Add(MakeShared<FUnrealMCPValueObject>(UnrealMCP::PropertyCodec::Encode(Template, Property)));
     }
     Component->SetArrayField(TEXT("changed_defaults"), Defaults);
     Component->SetNumberField(TEXT("changed_default_count"), Changed.Num());
@@ -625,10 +623,10 @@ static FString AddComponentDefaults(UActorComponent* Template, const TSet<FStrin
     {
         TArray<FString> Sorted = RequestedProperties.Array();
         Sorted.Sort();
-        TArray<TSharedPtr<FJsonValue>> Editable;
+        TArray<TSharedPtr<FUnrealMCPValue>> Editable;
         for (const FString& Name : Sorted)
         {
-            Editable.Add(MakeShared<FJsonValueObject>(UnrealMCP::PropertyCodec::Encode(
+            Editable.Add(MakeShared<FUnrealMCPValueObject>(UnrealMCP::PropertyCodec::Encode(
                 Template, Template->GetClass()->FindPropertyByName(FName(*Name)))));
         }
         Component->SetArrayField(TEXT("editable_properties"), Editable);

@@ -89,19 +89,19 @@ void FUnrealMCPAssetReferenceCursorStore::RemoveExpired(double CurrentTime)
     }
 }
 
-TSharedPtr<FJsonObject> FUnrealMCPAssetReferenceCursorStore::BuildPage(
+TSharedPtr<FUnrealMCPRecord> FUnrealMCPAssetReferenceCursorStore::BuildPage(
     const FUnrealMCPAssetReferenceSnapshot& Snapshot,
     int32 Offset,
     int32 PageSize)
 {
     const int32 End =
         FMath::Min(Offset + PageSize, Snapshot.Records.Num());
-    TArray<TSharedPtr<FJsonValue>> Page;
+    TArray<TSharedPtr<FUnrealMCPValue>> Page;
     for (int32 Index = Offset; Index < End; ++Index)
     {
         Page.Add(Snapshot.Records[Index]);
     }
-    const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Result = MakeShared<FUnrealMCPRecord>();
     Result->SetStringField(TEXT("asset_path"), Snapshot.AssetPath);
     Result->SetStringField(TEXT("snapshot_id"), Snapshot.SnapshotId);
     Result->SetObjectField(TEXT("target"), Snapshot.Target.ToSharedRef());
@@ -110,7 +110,7 @@ TSharedPtr<FJsonObject> FUnrealMCPAssetReferenceCursorStore::BuildPage(
     Result->SetNumberField(TEXT("record_count"), Snapshot.Records.Num());
     Result->SetNumberField(TEXT("page_offset"), Offset);
     Result->SetBoolField(TEXT("has_more"), End < Snapshot.Records.Num());
-    const TSharedRef<FJsonObject> Limitations = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Limitations = MakeShared<FUnrealMCPRecord>();
     Limitations->SetBoolField(
         TEXT("includes_runtime_constructed_paths"),
         false);
@@ -161,7 +161,7 @@ TSharedPtr<FJsonObject> FUnrealMCPAssetReferenceCursorStore::BuildPage(
 bool FUnrealMCPAssetReferenceCursorStore::Continue(
     const FString& Cursor,
     int32 PageSize,
-    TSharedPtr<FJsonObject>& OutResult,
+    TSharedPtr<FUnrealMCPRecord>& OutResult,
     FUnrealMCPError& OutError)
 {
     RemoveExpired(Now());
@@ -178,7 +178,7 @@ bool FUnrealMCPAssetReferenceCursorStore::Continue(
         OutError = {
             TEXT("cursor_expired"),
             TEXT("The asset-reference cursor is missing or expired"),
-            MakeShared<FJsonObject>(),
+            MakeShared<FUnrealMCPRecord>(),
             true};
         return false;
     }

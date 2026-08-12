@@ -13,12 +13,12 @@
 
 namespace
 {
-TSharedRef<FJsonObject> UMGEdit(
+TSharedRef<FUnrealMCPRecord> UMGEdit(
     const FString& AssetPath,
     const FString& Snapshot,
     const FString& Operation)
 {
-    TSharedRef<FJsonObject> Arguments =
+    TSharedRef<FUnrealMCPRecord> Arguments =
         UnrealMCP::Tests::AssetArguments(AssetPath);
     Arguments->SetStringField(
         TEXT("operation_id"),
@@ -28,18 +28,18 @@ TSharedRef<FJsonObject> UMGEdit(
     return Arguments;
 }
 
-TSharedRef<FJsonObject> UMGPanelTarget(const FString& ParentId)
+TSharedRef<FUnrealMCPRecord> UMGPanelTarget(const FString& ParentId)
 {
-    const TSharedRef<FJsonObject> Target = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Target = MakeShared<FUnrealMCPRecord>();
     Target->SetStringField(TEXT("kind"), TEXT("panel"));
     Target->SetStringField(TEXT("parent_id"), ParentId);
     return Target;
 }
 
-TSharedRef<FJsonObject> StructValue(
-    const TSharedRef<FJsonObject>& Fields)
+TSharedRef<FUnrealMCPRecord> StructValue(
+    const TSharedRef<FUnrealMCPRecord>& Fields)
 {
-    const TSharedRef<FJsonObject> Value = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Value = MakeShared<FUnrealMCPRecord>();
     Value->SetStringField(TEXT("kind"), TEXT("struct"));
     Value->SetObjectField(TEXT("fields"), Fields);
     return Value;
@@ -50,22 +50,22 @@ FString SlotIdFor(
     const FString& AssetPath,
     const FString& WidgetId)
 {
-    TSharedPtr<FJsonObject> Result;
+    TSharedPtr<FUnrealMCPRecord> Result;
     FUnrealMCPError Error;
-    const TSharedRef<FJsonObject> Arguments =
+    const TSharedRef<FUnrealMCPRecord> Arguments =
         UnrealMCP::Tests::InspectArguments(AssetPath);
     Arguments->SetArrayField(
         TEXT("sections"),
-        {MakeShared<FJsonValueString>(TEXT("widget_tree"))});
+        {MakeShared<FUnrealMCPValueString>(TEXT("widget_tree"))});
     Arguments->SetStringField(TEXT("widget_id"), WidgetId);
     if (!Inspector.Execute(Arguments, Result, Error))
     {
         return FString();
     }
-    for (const TSharedPtr<FJsonValue>& Item :
+    for (const TSharedPtr<FUnrealMCPValue>& Item :
         Result->GetArrayField(TEXT("records")))
     {
-        const TSharedPtr<FJsonObject> Record = Item->AsObject();
+        const TSharedPtr<FUnrealMCPRecord> Record = Item->AsObject();
         if (Record.IsValid()
             && Record->GetStringField(TEXT("section")) == TEXT("widget")
             && Record->GetStringField(TEXT("id")) == WidgetId)
@@ -77,7 +77,7 @@ FString SlotIdFor(
 }
 
 bool HasBindingRecord(
-    const TSharedPtr<FJsonObject>& Result,
+    const TSharedPtr<FUnrealMCPRecord>& Result,
     const FString& WidgetId,
     const FString& RecordType)
 {
@@ -85,10 +85,10 @@ bool HasBindingRecord(
     {
         return false;
     }
-    for (const TSharedPtr<FJsonValue>& Item :
+    for (const TSharedPtr<FUnrealMCPValue>& Item :
         Result->GetArrayField(TEXT("records")))
     {
-        const TSharedPtr<FJsonObject> Record = Item->AsObject();
+        const TSharedPtr<FUnrealMCPRecord> Record = Item->AsObject();
         if (Record.IsValid()
             && Record->GetStringField(TEXT("section"))
                 == TEXT("widget_bindings")
@@ -117,7 +117,7 @@ bool FUnrealMCPUMGAuthoringTest::RunTest(const FString& Parameters)
     FUnrealMCPBlueprintInspector Inspector;
     FUnrealMCPBlueprintMutator Mutator(Inspector);
     FUnrealMCPWidgetTreeService Widgets(Inspector);
-    TSharedPtr<FJsonObject> Result;
+    TSharedPtr<FUnrealMCPRecord> Result;
     FUnrealMCPError Error;
     if (!TestTrue(
             TEXT("UMG fixture creation succeeds"),
@@ -149,7 +149,7 @@ bool FUnrealMCPUMGAuthoringTest::RunTest(const FString& Parameters)
     FKismetEditorUtilities::CompileBlueprint(Blueprint);
     FString Snapshot = InspectSnapshot(Inspector, AssetPath);
 
-    TSharedRef<FJsonObject> Root =
+    TSharedRef<FUnrealMCPRecord> Root =
         UMGEdit(AssetPath, Snapshot, TEXT("set_root"));
     Root->SetStringField(
         TEXT("widget_class"), UCanvasPanel::StaticClass()->GetPathName());
@@ -169,7 +169,7 @@ bool FUnrealMCPUMGAuthoringTest::RunTest(const FString& Parameters)
         const FString& Name,
         FString& OutId) -> bool
     {
-        TSharedRef<FJsonObject> Add =
+        TSharedRef<FUnrealMCPRecord> Add =
             UMGEdit(AssetPath, Snapshot, TEXT("add"));
         Add->SetStringField(TEXT("widget_class"), Class->GetPathName());
         Add->SetStringField(TEXT("name"), Name);
@@ -209,24 +209,24 @@ bool FUnrealMCPUMGAuthoringTest::RunTest(const FString& Parameters)
 
     const FString TextSlotId = SlotIdFor(Inspector, AssetPath, TextId);
     TestEqual(TEXT("canvas slot identity is stable"), TextSlotId.Len(), 32);
-    const TSharedRef<FJsonObject> Anchors = MakeShared<FJsonObject>();
-    const TSharedRef<FJsonObject> Minimum = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Anchors = MakeShared<FUnrealMCPRecord>();
+    const TSharedRef<FUnrealMCPRecord> Minimum = MakeShared<FUnrealMCPRecord>();
     Minimum->SetNumberField(TEXT("X"), 0.0);
     Minimum->SetNumberField(TEXT("Y"), 0.0);
-    const TSharedRef<FJsonObject> Maximum = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Maximum = MakeShared<FUnrealMCPRecord>();
     Maximum->SetNumberField(TEXT("X"), 1.0);
     Maximum->SetNumberField(TEXT("Y"), 0.0);
     Anchors->SetObjectField(TEXT("Minimum"), StructValue(Minimum));
     Anchors->SetObjectField(TEXT("Maximum"), StructValue(Maximum));
-    const TSharedRef<FJsonObject> Offsets = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Offsets = MakeShared<FUnrealMCPRecord>();
     Offsets->SetNumberField(TEXT("Left"), 24.0);
     Offsets->SetNumberField(TEXT("Top"), 24.0);
     Offsets->SetNumberField(TEXT("Right"), -24.0);
     Offsets->SetNumberField(TEXT("Bottom"), 64.0);
-    const TSharedRef<FJsonObject> LayoutFields = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> LayoutFields = MakeShared<FUnrealMCPRecord>();
     LayoutFields->SetObjectField(TEXT("Anchors"), StructValue(Anchors));
     LayoutFields->SetObjectField(TEXT("Offsets"), StructValue(Offsets));
-    TSharedRef<FJsonObject> SetLayout =
+    TSharedRef<FUnrealMCPRecord> SetLayout =
         UMGEdit(AssetPath, Snapshot, TEXT("set_slot"));
     SetLayout->SetStringField(TEXT("slot_id"), TextSlotId);
     SetLayout->SetStringField(TEXT("property_name"), TEXT("LayoutData"));
@@ -240,7 +240,7 @@ bool FUnrealMCPUMGAuthoringTest::RunTest(const FString& Parameters)
     }
     Snapshot = Result->GetStringField(TEXT("snapshot_id"));
 
-    TSharedRef<FJsonObject> SetText =
+    TSharedRef<FUnrealMCPRecord> SetText =
         UMGEdit(AssetPath, Snapshot, TEXT("set_style"));
     SetText->SetStringField(TEXT("widget_id"), TextId);
     SetText->SetStringField(TEXT("property_name"), TEXT("Text"));
@@ -253,7 +253,7 @@ bool FUnrealMCPUMGAuthoringTest::RunTest(const FString& Parameters)
         return false;
     }
     Snapshot = Result->GetStringField(TEXT("snapshot_id"));
-    TSharedRef<FJsonObject> SetProgress =
+    TSharedRef<FUnrealMCPRecord> SetProgress =
         UMGEdit(AssetPath, Snapshot, TEXT("set_style"));
     SetProgress->SetStringField(TEXT("widget_id"), ProgressId);
     SetProgress->SetStringField(TEXT("property_name"), TEXT("Percent"));
@@ -267,16 +267,16 @@ bool FUnrealMCPUMGAuthoringTest::RunTest(const FString& Parameters)
     }
     Snapshot = Result->GetStringField(TEXT("snapshot_id"));
     const FString BeforeOptions = Snapshot;
-    TSharedRef<FJsonObject> SetOptions =
+    TSharedRef<FUnrealMCPRecord> SetOptions =
         UMGEdit(AssetPath, Snapshot, TEXT("set_style"));
     SetOptions->SetStringField(TEXT("widget_id"), ComboId);
     SetOptions->SetStringField(TEXT("property_name"), TEXT("DefaultOptions"));
     SetOptions->SetArrayField(
         TEXT("value"),
         {
-            MakeShared<FJsonValueString>(TEXT("Low")),
-            MakeShared<FJsonValueString>(TEXT("Medium")),
-            MakeShared<FJsonValueString>(TEXT("High")),
+            MakeShared<FUnrealMCPValueString>(TEXT("Low")),
+            MakeShared<FUnrealMCPValueString>(TEXT("Medium")),
+            MakeShared<FUnrealMCPValueString>(TEXT("High")),
         });
     if (!TestTrue(
             TEXT("bounded combo-box options succeed"),
@@ -286,7 +286,7 @@ bool FUnrealMCPUMGAuthoringTest::RunTest(const FString& Parameters)
         return false;
     }
     Snapshot = Result->GetStringField(TEXT("snapshot_id"));
-    TSharedRef<FJsonObject> UnsafeStyle =
+    TSharedRef<FUnrealMCPRecord> UnsafeStyle =
         UMGEdit(AssetPath, Snapshot, TEXT("set_style"));
     UnsafeStyle->SetStringField(TEXT("widget_id"), ComboId);
     UnsafeStyle->SetStringField(TEXT("property_name"), TEXT("Slot"));
@@ -298,7 +298,7 @@ bool FUnrealMCPUMGAuthoringTest::RunTest(const FString& Parameters)
         TEXT("unsupported style has a stable error"),
         Error.Code,
         FString(TEXT("unsupported_style")));
-    TSharedRef<FJsonObject> StaleStyle =
+    TSharedRef<FUnrealMCPRecord> StaleStyle =
         UMGEdit(AssetPath, BeforeOptions, TEXT("set_style"));
     StaleStyle->SetStringField(TEXT("widget_id"), ComboId);
     StaleStyle->SetStringField(TEXT("property_name"), TEXT("SelectedOption"));
@@ -317,7 +317,7 @@ bool FUnrealMCPUMGAuthoringTest::RunTest(const FString& Parameters)
 
     for (const FString& WidgetId : {ProgressId, ButtonId})
     {
-        TSharedRef<FJsonObject> Expose =
+        TSharedRef<FUnrealMCPRecord> Expose =
             UMGEdit(AssetPath, Snapshot, TEXT("set_variable"));
         Expose->SetStringField(TEXT("widget_id"), WidgetId);
         Expose->SetBoolField(TEXT("is_variable"), true);
@@ -328,7 +328,7 @@ bool FUnrealMCPUMGAuthoringTest::RunTest(const FString& Parameters)
         }
         Snapshot = Result->GetStringField(TEXT("snapshot_id"));
     }
-    TSharedRef<FJsonObject> Compile = AssetArguments(AssetPath);
+    TSharedRef<FUnrealMCPRecord> Compile = AssetArguments(AssetPath);
     Compile->SetStringField(
         TEXT("operation_id"),
         FGuid::NewGuid().ToString(EGuidFormats::Digits).ToLower());
@@ -343,7 +343,7 @@ bool FUnrealMCPUMGAuthoringTest::RunTest(const FString& Parameters)
     }
     Snapshot = Result->GetStringField(TEXT("snapshot_id"));
 
-    TSharedRef<FJsonObject> BindProgress =
+    TSharedRef<FUnrealMCPRecord> BindProgress =
         UMGEdit(AssetPath, Snapshot, TEXT("bind_property"));
     BindProgress->SetStringField(TEXT("widget_id"), ProgressId);
     BindProgress->SetStringField(TEXT("target_property"), TEXT("Percent"));
@@ -358,7 +358,7 @@ bool FUnrealMCPUMGAuthoringTest::RunTest(const FString& Parameters)
     }
     Snapshot = Result->GetStringField(TEXT("snapshot_id"));
 
-    TSharedRef<FJsonObject> BindButton =
+    TSharedRef<FUnrealMCPRecord> BindButton =
         UMGEdit(AssetPath, Snapshot, TEXT("bind_event"));
     BindButton->SetStringField(TEXT("widget_id"), ButtonId);
     BindButton->SetStringField(TEXT("delegate_name"), TEXT("OnClicked"));
@@ -371,12 +371,12 @@ bool FUnrealMCPUMGAuthoringTest::RunTest(const FString& Parameters)
     }
     Snapshot = Result->GetStringField(TEXT("snapshot_id"));
 
-    const TSharedRef<FJsonObject> Inspect = InspectArguments(AssetPath);
+    const TSharedRef<FUnrealMCPRecord> Inspect = InspectArguments(AssetPath);
     Inspect->SetArrayField(
         TEXT("sections"),
         {
-            MakeShared<FJsonValueString>(TEXT("widget_tree")),
-            MakeShared<FJsonValueString>(TEXT("widget_bindings")),
+            MakeShared<FUnrealMCPValueString>(TEXT("widget_tree")),
+            MakeShared<FUnrealMCPValueString>(TEXT("widget_bindings")),
         });
     if (!TestTrue(
             TEXT("UMG binding inspection succeeds"),
@@ -392,7 +392,7 @@ bool FUnrealMCPUMGAuthoringTest::RunTest(const FString& Parameters)
         TEXT("event binding reads back with graph identity"),
         HasBindingRecord(Result, ButtonId, TEXT("event_binding")));
 
-    TSharedRef<FJsonObject> Save = AssetArguments(AssetPath);
+    TSharedRef<FUnrealMCPRecord> Save = AssetArguments(AssetPath);
     Save->SetStringField(
         TEXT("operation_id"),
         FGuid::NewGuid().ToString(EGuidFormats::Digits).ToLower());

@@ -19,18 +19,18 @@ bool FUnrealMCPPhase11GraphNodeLifecycleTest::RunTest(const FString& Parameters)
     const FString EventGraphId = EventGraph->GraphGuid.ToString(EGuidFormats::Digits).ToLower();
     FUnrealMCPBlueprintInspector Inspector;
     FUnrealMCPBlueprintMutator Mutator(Inspector);
-    TSharedPtr<FJsonObject> Result;
+    TSharedPtr<FUnrealMCPRecord> Result;
     FUnrealMCPError Error;
 
     FString Snapshot = InspectSnapshot(Inspector, AssetPath);
-    TSharedRef<FJsonObject> AddFunction = ScopedMemberEditArguments(AssetPath, Snapshot, TEXT("function"), TEXT("add"));
+    TSharedRef<FUnrealMCPRecord> AddFunction = ScopedMemberEditArguments(AssetPath, Snapshot, TEXT("function"), TEXT("add"));
     AddFunction->SetStringField(TEXT("name"), TEXT("Phase11Function"));
     AddFunction->SetObjectField(TEXT("signature"), FunctionSignature(TEXT("public"), false, false, {}));
     if (!TestTrue(TEXT("Phase 11 function graph is added"), Mutator.Execute(TEXT("blueprint_member_edit"), AddFunction, Result, Error)))
     { AddError(Error.Code + TEXT(": ") + Error.Message); return false; }
     const FString FunctionGraphId = Result->GetObjectField(TEXT("function"))->GetStringField(TEXT("id"));
     Snapshot = Result->GetStringField(TEXT("snapshot_id"));
-    TSharedRef<FJsonObject> AddMacro = ScopedMemberEditArguments(AssetPath, Snapshot, TEXT("macro"), TEXT("add"));
+    TSharedRef<FUnrealMCPRecord> AddMacro = ScopedMemberEditArguments(AssetPath, Snapshot, TEXT("macro"), TEXT("add"));
     AddMacro->SetStringField(TEXT("name"), TEXT("Phase11Macro"));
     AddMacro->SetObjectField(TEXT("signature"), MacroSignature(false, {}));
     if (!TestTrue(TEXT("Phase 11 macro graph is added"), Mutator.Execute(TEXT("blueprint_member_edit"), AddMacro, Result, Error)))
@@ -64,7 +64,7 @@ bool FUnrealMCPPhase11GraphNodeLifecycleTest::RunTest(const FString& Parameters)
         bool* Pure = nullptr,
         const FString& OwnerClass = FString()) -> FString
     {
-        const TSharedRef<FJsonObject> Query = MakeShared<FJsonObject>();
+        const TSharedRef<FUnrealMCPRecord> Query = MakeShared<FUnrealMCPRecord>();
         Query->SetStringField(TEXT("asset_path"), AssetPath);
         Query->SetStringField(TEXT("graph_id"), GraphId);
         Query->SetStringField(TEXT("expected_snapshot"), InspectSnapshot(Inspector, AssetPath));
@@ -73,21 +73,21 @@ bool FUnrealMCPPhase11GraphNodeLifecycleTest::RunTest(const FString& Parameters)
         if (!OwnerClass.IsEmpty()) Query->SetStringField(TEXT("owner_class"), OwnerClass);
         if (!Function.IsEmpty()) Query->SetStringField(TEXT("function"), Function);
         if (!Member.IsEmpty()) Query->SetStringField(TEXT("member"), Member);
-        TSharedPtr<FJsonObject> CatalogResult;
+        TSharedPtr<FUnrealMCPRecord> CatalogResult;
         FUnrealMCPError CatalogError;
         if (!Catalog.Execute(Query, CatalogResult, CatalogError)) return FString();
-        for (const TSharedPtr<FJsonValue>& Value : CatalogResult->GetArrayField(TEXT("actions")))
+        for (const TSharedPtr<FUnrealMCPValue>& Value : CatalogResult->GetArrayField(TEXT("actions")))
         {
-            const TSharedPtr<FJsonObject> Action = Value->AsObject();
+            const TSharedPtr<FUnrealMCPRecord> Action = Value->AsObject();
             if (!Action.IsValid()) continue;
             if (Pure != nullptr && Action->HasField(TEXT("pure"))) *Pure = Action->GetBoolField(TEXT("pure"));
             return Action->GetStringField(TEXT("action_id"));
         }
         return FString();
     };
-    auto EditArguments = [&](const FString& Operation, const FString& GraphId) -> TSharedRef<FJsonObject>
+    auto EditArguments = [&](const FString& Operation, const FString& GraphId) -> TSharedRef<FUnrealMCPRecord>
     {
-        const TSharedRef<FJsonObject> Arguments = MakeShared<FJsonObject>();
+        const TSharedRef<FUnrealMCPRecord> Arguments = MakeShared<FUnrealMCPRecord>();
         Arguments->SetStringField(TEXT("operation_id"), FGuid::NewGuid().ToString(EGuidFormats::Digits).ToLower());
         Arguments->SetStringField(TEXT("asset_path"), AssetPath);
         Arguments->SetStringField(TEXT("expected_snapshot"), InspectSnapshot(Inspector, AssetPath));
@@ -97,35 +97,35 @@ bool FUnrealMCPPhase11GraphNodeLifecycleTest::RunTest(const FString& Parameters)
     };
     auto Position = [](int32 X, int32 Y)
     {
-        const TSharedRef<FJsonObject> Value = MakeShared<FJsonObject>();
+        const TSharedRef<FUnrealMCPRecord> Value = MakeShared<FUnrealMCPRecord>();
         Value->SetNumberField(TEXT("x"), X);
         Value->SetNumberField(TEXT("y"), Y);
         return Value;
     };
     auto AddAction = [&](const FString& GraphId, const FString& ActionId, int32 X, int32 Y, FString& OutNodeId) -> bool
     {
-        TSharedRef<FJsonObject> Arguments = EditArguments(TEXT("add_node"), GraphId);
+        TSharedRef<FUnrealMCPRecord> Arguments = EditArguments(TEXT("add_node"), GraphId);
         Arguments->SetStringField(TEXT("action_id"), ActionId);
         Arguments->SetObjectField(TEXT("position"), Position(X, Y));
-        TSharedPtr<FJsonObject> EditResult;
+        TSharedPtr<FUnrealMCPRecord> EditResult;
         FUnrealMCPError EditError;
         if (!GraphEditor.Execute(Arguments, EditResult, EditError))
         {
             AddError(EditError.Code + TEXT(": ") + EditError.Message);
             return false;
         }
-        const TSharedPtr<FJsonObject> Node = EditResult->GetObjectField(TEXT("changed"))->GetObjectField(TEXT("node"));
+        const TSharedPtr<FUnrealMCPRecord> Node = EditResult->GetObjectField(TEXT("changed"))->GetObjectField(TEXT("node"));
         OutNodeId = Node->GetStringField(TEXT("id"));
         if (!Node->GetBoolField(TEXT("identity_stable")) || Node->GetIntegerField(TEXT("pin_count")) <= 0) return false;
-        for (const TSharedPtr<FJsonValue>& PinValue : Node->GetArrayField(TEXT("pins")))
+        for (const TSharedPtr<FUnrealMCPValue>& PinValue : Node->GetArrayField(TEXT("pins")))
             if (!PinValue->AsObject()->GetBoolField(TEXT("identity_stable"))) return false;
         return true;
     };
     auto RemoveNode = [&](const FString& GraphId, const FString& NodeId) -> bool
     {
-        TSharedRef<FJsonObject> Arguments = EditArguments(TEXT("remove_node"), GraphId);
+        TSharedRef<FUnrealMCPRecord> Arguments = EditArguments(TEXT("remove_node"), GraphId);
         Arguments->SetStringField(TEXT("node_id"), NodeId);
-        TSharedPtr<FJsonObject> EditResult;
+        TSharedPtr<FUnrealMCPRecord> EditResult;
         FUnrealMCPError EditError;
         return GraphEditor.Execute(Arguments, EditResult, EditError);
     };
@@ -134,7 +134,7 @@ bool FUnrealMCPPhase11GraphNodeLifecycleTest::RunTest(const FString& Parameters)
     const bool bDirtyBeforeInvalid = Blueprint->GetOutermost()->IsDirty();
     const EBlueprintStatus StatusBeforeInvalid = Blueprint->Status;
     const int32 TransactionsBeforeInvalid = GEditor != nullptr && GEditor->Trans != nullptr ? GEditor->Trans->GetQueueLength() : 0;
-    TSharedRef<FJsonObject> InvalidAction = EditArguments(TEXT("add_node"), EventGraphId);
+    TSharedRef<FUnrealMCPRecord> InvalidAction = EditArguments(TEXT("add_node"), EventGraphId);
     InvalidAction->SetStringField(TEXT("action_id"), TEXT("ffffffffffffffffffffffffffffffff"));
     InvalidAction->SetObjectField(TEXT("position"), Position(0, 0));
     TestFalse(TEXT("unknown action identity rejects"), GraphEditor.Execute(InvalidAction, Result, Error));
@@ -159,7 +159,7 @@ bool FUnrealMCPPhase11GraphNodeLifecycleTest::RunTest(const FString& Parameters)
     if (!TestNotNull(TEXT("created node identity survives Redo"), VariableNode)) return false;
 
     const FString BeforeMoveSnapshot = InspectSnapshot(Inspector, AssetPath);
-    TSharedRef<FJsonObject> Move = EditArguments(TEXT("move_node"), EventGraphId);
+    TSharedRef<FUnrealMCPRecord> Move = EditArguments(TEXT("move_node"), EventGraphId);
     Move->SetStringField(TEXT("node_id"), VariableNodeId);
     Move->SetObjectField(TEXT("position"), Position(320, -160));
     TestTrue(TEXT("node movement executes"), GraphEditor.Execute(Move, Result, Error));
@@ -171,13 +171,13 @@ bool FUnrealMCPPhase11GraphNodeLifecycleTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Redo restores node movement"), GEditor->RedoTransaction());
     TestEqual(TEXT("Redo restores moved x position"), NodeById(EventGraph, VariableNodeId)->NodePosX, 320);
 
-    TSharedRef<FJsonObject> OutOfBounds = EditArguments(TEXT("move_node"), EventGraphId);
+    TSharedRef<FUnrealMCPRecord> OutOfBounds = EditArguments(TEXT("move_node"), EventGraphId);
     OutOfBounds->SetStringField(TEXT("node_id"), VariableNodeId);
     OutOfBounds->SetObjectField(TEXT("position"), Position(UnrealMCP::MaxGraphCoordinate + 1, 0));
     TestFalse(TEXT("out-of-bounds move rejects"), GraphEditor.Execute(OutOfBounds, Result, Error));
     TestEqual(TEXT("out-of-bounds move uses invalid argument"), Error.Code, FString(TEXT("invalid_argument")));
 
-    TSharedRef<FJsonObject> StaleMove = EditArguments(TEXT("move_node"), EventGraphId);
+    TSharedRef<FUnrealMCPRecord> StaleMove = EditArguments(TEXT("move_node"), EventGraphId);
     StaleMove->SetStringField(TEXT("expected_snapshot"), BeforeMoveSnapshot);
     StaleMove->SetStringField(TEXT("node_id"), VariableNodeId);
     StaleMove->SetObjectField(TEXT("position"), Position(0, 0));
@@ -188,12 +188,12 @@ bool FUnrealMCPPhase11GraphNodeLifecycleTest::RunTest(const FString& Parameters)
     if (!TestNotNull(TEXT("function graph remains available"), FunctionGraph)) return false;
     UK2Node_FunctionEntry* Entry = Cast<UK2Node_FunctionEntry>(FBlueprintEditorUtils::GetEntryNode(FunctionGraph));
     if (!TestNotNull(TEXT("function graph has a protected entry"), Entry)) return false;
-    TSharedRef<FJsonObject> ProtectedRemove = EditArguments(TEXT("remove_node"), FunctionGraphId);
+    TSharedRef<FUnrealMCPRecord> ProtectedRemove = EditArguments(TEXT("remove_node"), FunctionGraphId);
     ProtectedRemove->SetStringField(TEXT("node_id"), Entry->NodeGuid.ToString(EGuidFormats::Digits).ToLower());
     TestFalse(TEXT("protected signature-node deletion rejects"), GraphEditor.Execute(ProtectedRemove, Result, Error));
     TestEqual(TEXT("protected deletion uses stable error"), Error.Code, FString(TEXT("protected_node")));
 
-    TSharedRef<FJsonObject> MissingNode = EditArguments(TEXT("remove_node"), EventGraphId);
+    TSharedRef<FUnrealMCPRecord> MissingNode = EditArguments(TEXT("remove_node"), EventGraphId);
     MissingNode->SetStringField(TEXT("node_id"), TEXT("eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"));
     TestFalse(TEXT("stale node identity rejects"), GraphEditor.Execute(MissingNode, Result, Error));
     TestEqual(TEXT("stale node uses stable error"), Error.Code, FString(TEXT("invalid_node")));
@@ -207,7 +207,7 @@ bool FUnrealMCPPhase11GraphNodeLifecycleTest::RunTest(const FString& Parameters)
     const bool bDirtyBeforeFailure = Blueprint->GetOutermost()->IsDirty();
     const EBlueprintStatus StatusBeforeFailure = Blueprint->Status;
     const int32 TransactionsBeforeFailure = GEditor->Trans->GetQueueLength();
-    TSharedRef<FJsonObject> SpawnerFailure = EditArguments(TEXT("add_node"), EventGraphId);
+    TSharedRef<FUnrealMCPRecord> SpawnerFailure = EditArguments(TEXT("add_node"), EventGraphId);
     SpawnerFailure->SetStringField(TEXT("action_id"), TEXT("dddddddddddddddddddddddddddddddd"));
     SpawnerFailure->SetObjectField(TEXT("position"), Position(0, 0));
     TestFalse(TEXT("spawner failure rejects"), FailingEditor.Execute(SpawnerFailure, Result, Error));
@@ -222,7 +222,7 @@ bool FUnrealMCPPhase11GraphNodeLifecycleTest::RunTest(const FString& Parameters)
         [](const FString&, UBlueprint*, UEdGraph*, const FString&, const FString&, const FString&,
             FUnrealMCPBlueprintActionCatalog::FResolvedAction&, FUnrealMCPError&) { return true; },
         [VariableNode](const FUnrealMCPBlueprintActionCatalog::FResolvedAction&, UEdGraph*, const FVector2D&) { return VariableNode; });
-    TSharedRef<FJsonObject> ExistingAction = EditArguments(TEXT("add_node"), EventGraphId);
+    TSharedRef<FUnrealMCPRecord> ExistingAction = EditArguments(TEXT("add_node"), EventGraphId);
     ExistingAction->SetStringField(TEXT("action_id"), TEXT("cccccccccccccccccccccccccccccccc"));
     ExistingAction->SetObjectField(TEXT("position"), Position(900, 900));
     TestTrue(TEXT("returned-existing action is detected"), ExistingEditor.Execute(ExistingAction, Result, Error));
@@ -282,13 +282,13 @@ bool FUnrealMCPPhase11GraphNodeLifecycleTest::RunTest(const FString& Parameters)
     TestNull(TEXT("removed node is absent after Redo"), NodeById(EventGraph, VariableNodeId));
 
     Snapshot = InspectSnapshot(Inspector, AssetPath);
-    TSharedRef<FJsonObject> Compile = AssetArguments(AssetPath);
+    TSharedRef<FUnrealMCPRecord> Compile = AssetArguments(AssetPath);
     Compile->SetStringField(TEXT("operation_id"), FGuid::NewGuid().ToString(EGuidFormats::Digits).ToLower());
     Compile->SetStringField(TEXT("expected_snapshot"), Snapshot);
     TestTrue(TEXT("Phase 11 Blueprint compiles"), Mutator.Execute(TEXT("blueprint_compile"), Compile, Result, Error));
     TestTrue(TEXT("Phase 11 compile succeeds"), Result->GetBoolField(TEXT("compile_succeeded")));
     Snapshot = Result->GetStringField(TEXT("snapshot_id"));
-    TSharedRef<FJsonObject> Save = AssetArguments(AssetPath);
+    TSharedRef<FUnrealMCPRecord> Save = AssetArguments(AssetPath);
     Save->SetStringField(TEXT("operation_id"), FGuid::NewGuid().ToString(EGuidFormats::Digits).ToLower());
     Save->SetStringField(TEXT("expected_snapshot"), Snapshot);
     TestTrue(TEXT("Phase 11 Blueprint saves"), Mutator.Execute(TEXT("blueprint_save"), Save, Result, Error));

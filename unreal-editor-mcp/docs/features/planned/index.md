@@ -1,6 +1,5 @@
 # Planned features
 
-- [`native-wire-contracts` — Typed native request and result records](native-wire-contracts.md).
 - [`native-command-catalog` — Fixed native command routing and capabilities](native-command-catalog.md).
 - [`asset-family-foundation` — Built-in asset-family adapter contracts](asset-family-foundation.md).
 - [`asset-inspection-adapters` — Asset inspection service decomposition](asset-inspection-adapters.md).

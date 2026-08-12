@@ -12,9 +12,9 @@ FString HashReferenceText(const FString& Text)
     return BytesToHex(Digest, FSHA1::DigestSize).ToLower();
 }
 
-FString RecordFingerprint(const TSharedPtr<FJsonValue>& Value)
+FString RecordFingerprint(const TSharedPtr<FUnrealMCPValue>& Value)
 {
-    const TSharedPtr<FJsonObject> Record =
+    const TSharedPtr<FUnrealMCPRecord> Record =
         Value.IsValid() ? Value->AsObject() : nullptr;
     if (!Record.IsValid())
     {
@@ -56,11 +56,11 @@ FString RecordFingerprint(const TSharedPtr<FJsonValue>& Value)
     for (const TCHAR* Field : {
         TEXT("dependency_properties"), TEXT("properties")})
     {
-        const TArray<TSharedPtr<FJsonValue>>* Values = nullptr;
+        const TArray<TSharedPtr<FUnrealMCPValue>>* Values = nullptr;
         FString ArrayText;
         if (Record->TryGetArrayField(Field, Values) && Values != nullptr)
         {
-            for (const TSharedPtr<FJsonValue>& ArrayValue : *Values)
+            for (const TSharedPtr<FUnrealMCPValue>& ArrayValue : *Values)
             {
                 ArrayText +=
                     ArrayValue.IsValid()
@@ -99,7 +99,7 @@ bool FUnrealMCPAssetReferenceSnapshotBuilder::Capture(
         CurrentRegistrySerial,
         OutSnapshot.Records,
         OutSnapshot.Scans);
-    TSharedPtr<FJsonObject> LiveStatus;
+    TSharedPtr<FUnrealMCPRecord> LiveStatus;
     int32 OpenEditorCount = 0;
     LiveScanner.Scan(
         Target.LoadedObject,
@@ -114,8 +114,8 @@ bool FUnrealMCPAssetReferenceSnapshotBuilder::Capture(
         OpenEditorCount);
 
     OutSnapshot.Records.Sort(
-        [](const TSharedPtr<FJsonValue>& Left,
-           const TSharedPtr<FJsonValue>& Right)
+        [](const TSharedPtr<FUnrealMCPValue>& Left,
+           const TSharedPtr<FUnrealMCPValue>& Right)
         {
             return RecordFingerprint(Left) < RecordFingerprint(Right);
         });
@@ -132,7 +132,7 @@ bool FUnrealMCPAssetReferenceSnapshotBuilder::Capture(
         Target.Asset.IsRedirector() ? TEXT("redirector") : TEXT("asset"),
         PrimaryId.IsValid() ? PrimaryId.ToString() : FString(),
         LexToString(OpenEditorCount)};
-    for (const TSharedPtr<FJsonValue>& Record : OutSnapshot.Records)
+    for (const TSharedPtr<FUnrealMCPValue>& Record : OutSnapshot.Records)
     {
         Fingerprint.Add(RecordFingerprint(Record));
     }
@@ -140,7 +140,7 @@ bool FUnrealMCPAssetReferenceSnapshotBuilder::Capture(
         TEXT("serialized"), TEXT("management"), TEXT("searchable_name"),
         TEXT("live_memory")})
     {
-        const TSharedPtr<FJsonObject> Status =
+        const TSharedPtr<FUnrealMCPRecord> Status =
             OutSnapshot.Scans->GetObjectField(ScanName);
         Fingerprint.Add(
             FString(ScanName) + TEXT("|")

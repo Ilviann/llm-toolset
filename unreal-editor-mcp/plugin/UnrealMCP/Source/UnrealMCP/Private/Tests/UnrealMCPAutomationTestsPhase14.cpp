@@ -11,13 +11,13 @@ bool FUnrealMCPPhase14GameplayFrameworkFamiliesTest::RunTest(const FString& Para
     using namespace UnrealMCP::Tests;
     using namespace UnrealMCP::BlueprintFamilyPolicy;
 
-    const TArray<TSharedPtr<FJsonValue>> Matrix = BuildPublishedMatrix();
+    const TArray<TSharedPtr<FUnrealMCPValue>> Matrix = BuildPublishedMatrix();
     TestEqual(TEXT("family matrix retains released Blueprint families"), Matrix.Num(), 7);
-    for (const TSharedPtr<FJsonValue>& Value : Matrix)
+    for (const TSharedPtr<FUnrealMCPValue>& Value : Matrix)
     {
-        const TSharedPtr<FJsonObject> Record = Value->AsObject();
+        const TSharedPtr<FUnrealMCPRecord> Record = Value->AsObject();
         if (!TestTrue(TEXT("family matrix records are objects"), Record.IsValid())) return false;
-        const TSharedPtr<FJsonObject> Operations = Record->GetObjectField(TEXT("operations"));
+        const TSharedPtr<FUnrealMCPRecord> Operations = Record->GetObjectField(TEXT("operations"));
         TestTrue(TEXT("published families support the shared authoring path"), Operations->GetBoolField(TEXT("graph_edit")));
         TestFalse(TEXT("Blueprint parent changes stay excluded"), Operations->GetBoolField(TEXT("parent_change")));
         const FString Family = Record->GetStringField(TEXT("family"));
@@ -34,7 +34,7 @@ bool FUnrealMCPPhase14GameplayFrameworkFamiliesTest::RunTest(const FString& Para
         UClass* Parent;
         const TCHAR* Family;
         const TCHAR* DefaultProperty;
-        TSharedPtr<FJsonValue> DefaultValue;
+        TSharedPtr<FUnrealMCPValue> DefaultValue;
         const TCHAR* CallableOwner;
         const TCHAR* CallableFunction;
         const TCHAR* CallbackOwner;
@@ -42,23 +42,23 @@ bool FUnrealMCPPhase14GameplayFrameworkFamiliesTest::RunTest(const FString& Para
     };
     const TArray<FFixture> Fixtures = {
         {AGameModeBase::StaticClass(), TEXT("game_mode_base"), TEXT("bUseSeamlessTravel"),
-            MakeShared<FJsonValueBoolean>(true), TEXT("/Script/Engine.GameModeBase"), TEXT("GetDefaultPawnClassForController"),
+            MakeShared<FUnrealMCPValueBoolean>(true), TEXT("/Script/Engine.GameModeBase"), TEXT("GetDefaultPawnClassForController"),
             TEXT("/Script/Engine.GameModeBase"), TEXT("K2_PostLogin")},
         {AGameMode::StaticClass(), TEXT("game_mode"), TEXT("bDelayedStart"),
-            MakeShared<FJsonValueBoolean>(true), TEXT("/Script/Engine.GameMode"), TEXT("GetMatchState"),
+            MakeShared<FUnrealMCPValueBoolean>(true), TEXT("/Script/Engine.GameMode"), TEXT("GetMatchState"),
             TEXT("/Script/Engine.GameMode"), TEXT("K2_OnSetMatchState")},
         {AGameStateBase::StaticClass(), TEXT("game_state_base"), TEXT("ServerWorldTimeSecondsUpdateFrequency"),
-            MakeShared<FJsonValueNumber>(0.25), TEXT("/Script/Engine.GameStateBase"), TEXT("GetServerWorldTimeSeconds"),
+            MakeShared<FUnrealMCPValueNumber>(0.25), TEXT("/Script/Engine.GameStateBase"), TEXT("GetServerWorldTimeSeconds"),
             TEXT("/Script/Engine.Actor"), TEXT("ReceiveActorBeginOverlap")},
         {AGameState::StaticClass(), TEXT("game_state"), TEXT("ServerWorldTimeSecondsUpdateFrequency"),
-            MakeShared<FJsonValueNumber>(0.75), TEXT("/Script/Engine.GameStateBase"), TEXT("GetServerWorldTimeSeconds"),
+            MakeShared<FUnrealMCPValueNumber>(0.75), TEXT("/Script/Engine.GameStateBase"), TEXT("GetServerWorldTimeSeconds"),
             TEXT("/Script/Engine.Actor"), TEXT("ReceiveActorBeginOverlap")}};
 
     const FString Base = TEXT("/Game/UnrealMCPTests/") + FGuid::NewGuid().ToString(EGuidFormats::Digits);
     FUnrealMCPBlueprintInspector Inspector;
     FUnrealMCPBlueprintMutator Mutator(Inspector);
     FUnrealMCPBlueprintActionCatalog Catalog(Inspector, TEXT("14141414141414141414141414141414"));
-    TSharedPtr<FJsonObject> Result;
+    TSharedPtr<FUnrealMCPRecord> Result;
     FUnrealMCPError Error;
 
     for (int32 Index = 0; Index < Fixtures.Num(); ++Index)
@@ -79,23 +79,23 @@ bool FUnrealMCPPhase14GameplayFrameworkFamiliesTest::RunTest(const FString& Para
         TestEqual(*FString::Printf(TEXT("%s live classifier is exact"), Fixture.Family),
             Classify(Blueprint->GeneratedClass).Name, FString(Fixture.Family));
 
-        TSharedRef<FJsonObject> Inspect = InspectArguments(AssetPath);
+        TSharedRef<FUnrealMCPRecord> Inspect = InspectArguments(AssetPath);
         Inspect->SetArrayField(TEXT("sections"), {
-            MakeShared<FJsonValueString>(TEXT("summary")), MakeShared<FJsonValueString>(TEXT("components")),
-            MakeShared<FJsonValueString>(TEXT("functions")), MakeShared<FJsonValueString>(TEXT("local_variables")),
-            MakeShared<FJsonValueString>(TEXT("graphs"))});
+            MakeShared<FUnrealMCPValueString>(TEXT("summary")), MakeShared<FUnrealMCPValueString>(TEXT("components")),
+            MakeShared<FUnrealMCPValueString>(TEXT("functions")), MakeShared<FUnrealMCPValueString>(TEXT("local_variables")),
+            MakeShared<FUnrealMCPValueString>(TEXT("graphs"))});
         if (!TestTrue(*FString::Printf(TEXT("%s inspection succeeds"), Fixture.Family),
             Inspector.Execute(Inspect, Result, Error))) return false;
         TestEqual(*FString::Printf(TEXT("%s inspection is family-aware"), Fixture.Family),
             Result->GetStringField(TEXT("blueprint_family")), FString(Fixture.Family));
-        const TSharedPtr<FJsonObject> Live = Result->GetObjectField(TEXT("family_capabilities"));
+        const TSharedPtr<FUnrealMCPRecord> Live = Result->GetObjectField(TEXT("family_capabilities"));
         TestTrue(TEXT("family class defaults are live"), Live->GetBoolField(TEXT("class_defaults")));
         TestTrue(TEXT("family component authoring is live"), Live->GetBoolField(TEXT("components")));
         TestTrue(TEXT("family event graphs are live"), Live->GetBoolField(TEXT("event_graphs")));
         TestTrue(TEXT("family local variables are supported"), Live->GetBoolField(TEXT("local_variables")));
         TestTrue(TEXT("family overrides are available"), Live->GetBoolField(TEXT("overrides")));
 
-        TSharedRef<FJsonObject> Default = MakeShared<FJsonObject>();
+        TSharedRef<FUnrealMCPRecord> Default = MakeShared<FUnrealMCPRecord>();
         Default->SetStringField(TEXT("operation_id"), FGuid::NewGuid().ToString(EGuidFormats::Digits).ToLower());
         Default->SetStringField(TEXT("asset_path"), AssetPath);
         Default->SetStringField(TEXT("expected_snapshot"), Result->GetStringField(TEXT("snapshot_id")));
@@ -109,7 +109,7 @@ bool FUnrealMCPPhase14GameplayFrameworkFamiliesTest::RunTest(const FString& Para
         }
         TestEqual(TEXT("default result retains family"), Result->GetStringField(TEXT("blueprint_family")), FString(Fixture.Family));
 
-        TSharedRef<FJsonObject> AddComponent = ComponentEditArguments(
+        TSharedRef<FUnrealMCPRecord> AddComponent = ComponentEditArguments(
             AssetPath, Result->GetStringField(TEXT("snapshot_id")), TEXT("add"));
         AddComponent->SetStringField(TEXT("component_class"), URotatingMovementComponent::StaticClass()->GetPathName());
         AddComponent->SetStringField(TEXT("name"), TEXT("FamilyMovement"));
@@ -120,7 +120,7 @@ bool FUnrealMCPPhase14GameplayFrameworkFamiliesTest::RunTest(const FString& Para
             return false;
         }
 
-        TSharedRef<FJsonObject> AddFunction = ScopedMemberEditArguments(
+        TSharedRef<FUnrealMCPRecord> AddFunction = ScopedMemberEditArguments(
             AssetPath, Result->GetStringField(TEXT("snapshot_id")), TEXT("function"), TEXT("add"));
         AddFunction->SetStringField(TEXT("name"), TEXT("FamilyLogic"));
         AddFunction->SetObjectField(TEXT("signature"), FunctionSignature(TEXT("public"), false, false, {}));
@@ -131,7 +131,7 @@ bool FUnrealMCPPhase14GameplayFrameworkFamiliesTest::RunTest(const FString& Para
             return false;
         }
         const FString FunctionId = Result->GetObjectField(TEXT("function"))->GetStringField(TEXT("id"));
-        TSharedRef<FJsonObject> AddLocal = ScopedMemberEditArguments(
+        TSharedRef<FUnrealMCPRecord> AddLocal = ScopedMemberEditArguments(
             AssetPath, Result->GetStringField(TEXT("snapshot_id")), TEXT("local_variable"), TEXT("add"));
         AddLocal->SetStringField(TEXT("function_id"), FunctionId);
         AddLocal->SetStringField(TEXT("name"), TEXT("FamilyCounter"));
@@ -146,7 +146,7 @@ bool FUnrealMCPPhase14GameplayFrameworkFamiliesTest::RunTest(const FString& Para
         UEdGraph* EventGraph = !Blueprint->UbergraphPages.IsEmpty() ? Blueprint->UbergraphPages[0] : nullptr;
         if (!TestNotNull(*FString::Printf(TEXT("%s event graph remains available"), Fixture.Family), EventGraph)) return false;
         const FString Snapshot = Result->GetStringField(TEXT("snapshot_id"));
-        const TSharedRef<FJsonObject> CatalogArguments = MakeShared<FJsonObject>();
+        const TSharedRef<FUnrealMCPRecord> CatalogArguments = MakeShared<FUnrealMCPRecord>();
         CatalogArguments->SetStringField(TEXT("asset_path"), AssetPath);
         CatalogArguments->SetStringField(TEXT("graph_id"), EventGraph->GraphGuid.ToString(EGuidFormats::Digits).ToLower());
         CatalogArguments->SetStringField(TEXT("expected_snapshot"), Snapshot);
@@ -167,13 +167,13 @@ bool FUnrealMCPPhase14GameplayFrameworkFamiliesTest::RunTest(const FString& Para
         TestTrue(*FString::Printf(TEXT("%s callback override is available"), Fixture.Family),
             Result->GetIntegerField(TEXT("returned_count")) > 0);
 
-        TSharedRef<FJsonObject> Compile = AssetArguments(AssetPath);
+        TSharedRef<FUnrealMCPRecord> Compile = AssetArguments(AssetPath);
         Compile->SetStringField(TEXT("operation_id"), FGuid::NewGuid().ToString(EGuidFormats::Digits).ToLower());
         Compile->SetStringField(TEXT("expected_snapshot"), Snapshot);
         if (!TestTrue(*FString::Printf(TEXT("%s compiles"), Fixture.Family),
             Mutator.Execute(TEXT("blueprint_compile"), Compile, Result, Error))) return false;
         TestTrue(TEXT("family compile succeeds"), Result->GetBoolField(TEXT("compile_succeeded")));
-        TSharedRef<FJsonObject> Save = AssetArguments(AssetPath);
+        TSharedRef<FUnrealMCPRecord> Save = AssetArguments(AssetPath);
         Save->SetStringField(TEXT("operation_id"), FGuid::NewGuid().ToString(EGuidFormats::Digits).ToLower());
         Save->SetStringField(TEXT("expected_snapshot"), Result->GetStringField(TEXT("snapshot_id")));
         if (!TestTrue(*FString::Printf(TEXT("%s saves"), Fixture.Family),

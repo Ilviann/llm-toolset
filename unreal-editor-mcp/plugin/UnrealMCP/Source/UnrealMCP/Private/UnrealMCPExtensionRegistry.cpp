@@ -15,6 +15,7 @@
 #include "Engine/Blueprint.h"
 #include "Kismet2/KismetEditorUtilities.h"
 #include "UnrealMCPProtocol.h"
+#include "UnrealMCPJsonCodec.h"
 #include "UnrealMCPVersion.h"
 #include "UObject/Class.h"
 #include "UObject/Package.h"
@@ -24,7 +25,7 @@ namespace
 {
 constexpr TCHAR CompanionMetadataField[] = TEXT("unreal_mcp_companion");
 
-bool ReadPositiveInteger(const FJsonObject& Object, const TCHAR* Field, int32& OutValue)
+bool ReadPositiveInteger(const FUnrealMCPRecord& Object, const TCHAR* Field, int32& OutValue)
 {
     double Number = 0.0;
     if (!Object.TryGetNumberField(Field, Number)
@@ -37,17 +38,17 @@ bool ReadPositiveInteger(const FJsonObject& Object, const TCHAR* Field, int32& O
     return true;
 }
 
-bool ReadStringArray(const FJsonObject& Object, const TCHAR* Field, TArray<FString>& OutValues)
+bool ReadStringArray(const FUnrealMCPRecord& Object, const TCHAR* Field, TArray<FString>& OutValues)
 {
     OutValues.Reset();
-    const TArray<TSharedPtr<FJsonValue>>* Values = nullptr;
+    const TArray<TSharedPtr<FUnrealMCPValue>>* Values = nullptr;
     if (!Object.TryGetArrayField(Field, Values) || Values == nullptr)
     {
         return false;
     }
     if (Values->Num() > 32) return false;
     TSet<FString> Seen;
-    for (const TSharedPtr<FJsonValue>& Value : *Values)
+    for (const TSharedPtr<FUnrealMCPValue>& Value : *Values)
     {
         FString Text;
         if (!Value.IsValid() || !Value->TryGetString(Text) || Text.IsEmpty() || Text.Len() > 64)
@@ -158,12 +159,12 @@ FString PersistenceName(EUnrealMCPExtensionPersistence Persistence)
     }
 }
 
-TArray<TSharedPtr<FJsonValue>> Strings(const TArray<FString>& Values)
+TArray<TSharedPtr<FUnrealMCPValue>> Strings(const TArray<FString>& Values)
 {
-    TArray<TSharedPtr<FJsonValue>> Result;
+    TArray<TSharedPtr<FUnrealMCPValue>> Result;
     for (const FString& Value : Values)
     {
-        Result.Add(MakeShared<FJsonValueString>(Value));
+        Result.Add(MakeShared<FUnrealMCPValueString>(Value));
     }
     return Result;
 }
@@ -226,8 +227,10 @@ void FUnrealMCPExtensionRegistry::DiscoverAndLoad()
     int32 SeenCompanions = 0;
     for (const TSharedRef<IPlugin>& Plugin : PluginManager.GetDiscoveredPlugins())
     {
-        const TSharedPtr<FJsonObject>& DescriptorJson = Plugin->GetDescriptorJson();
-        const TSharedPtr<FJsonObject>* Metadata = nullptr;
+        TSharedPtr<FUnrealMCPRecord> DescriptorJson;
+        FUnrealMCPError DescriptorError;
+        if (!UnrealMCP::JsonCodec::DecodeRecord(Plugin->GetDescriptorJson(), DescriptorJson, DescriptorError)) continue;
+        const TSharedPtr<FUnrealMCPRecord>* Metadata = nullptr;
         if (!DescriptorJson.IsValid()
             || !DescriptorJson->TryGetObjectField(CompanionMetadataField, Metadata)
             || Metadata == nullptr || !Metadata->IsValid())
@@ -546,9 +549,9 @@ void FUnrealMCPExtensionRegistry::BeginShutdown()
 }
 
 bool FUnrealMCPExtensionRegistry::HasExtensionRequest(
-    const TSharedPtr<FJsonObject>& Arguments) const
+    const TSharedPtr<FUnrealMCPRecord>& Arguments) const
 {
-    return Arguments.IsValid() && Arguments->HasTypedField<EJson::String>(TEXT("extension_id"));
+    return Arguments.IsValid() && Arguments->HasTypedField<EUnrealMCPValueType::String>(TEXT("extension_id"));
 }
 
 const FUnrealMCPExtensionContribution* FUnrealMCPExtensionRegistry::FindContribution(
@@ -626,10 +629,10 @@ bool FUnrealMCPExtensionRegistry::ClassifyBlueprintClass(
 
 bool FUnrealMCPExtensionRegistry::AppendBlueprintInspection(
     const UBlueprint& Blueprint,
-    const TSharedPtr<FJsonObject>& Arguments,
-    TArray<TSharedPtr<FJsonValue>>& OutRecords,
+    const TSharedPtr<FUnrealMCPRecord>& Arguments,
+    TArray<TSharedPtr<FUnrealMCPValue>>& OutRecords,
     TArray<FString>& OutFingerprint,
-    TSharedPtr<FJsonObject>& InOutFamilyCapabilities,
+    TSharedPtr<FUnrealMCPRecord>& InOutFamilyCapabilities,
     FUnrealMCPError& OutError) const
 {
     const UClass* BlueprintClass = Blueprint.GeneratedClass != nullptr
@@ -650,8 +653,9 @@ bool FUnrealMCPExtensionRegistry::AppendBlueprintInspection(
         return false;
     }
     FUnrealMCPExtensionError ExtensionError;
+    const TSharedPtr<FJsonObject> JsonArguments = UnrealMCP::JsonCodec::EncodeRecord(Arguments);
     if (!Contribution->Handler->ValidateArguments(
-        Contribution->Operation, Arguments, ExtensionError))
+        Contribution->Operation, JsonArguments, ExtensionError))
     {
         ConvertError(ExtensionError, OutError);
         return false;
@@ -663,9 +667,9 @@ bool FUnrealMCPExtensionRegistry::AppendBlueprintInspection(
         ConvertError(ExtensionError, OutError);
         return false;
     }
-    TSharedPtr<FJsonObject> ExtensionResult;
+    TSharedPtr<FJsonObject> JsonExtensionResult;
     if (!Contribution->Handler->Inspect(
-        *Target, Contribution->Operation, Arguments, ExtensionResult, ExtensionError))
+        *Target, Contribution->Operation, JsonArguments, JsonExtensionResult, ExtensionError))
     {
         ConvertError(ExtensionError, OutError);
         return false;
@@ -683,13 +687,20 @@ bool FUnrealMCPExtensionRegistry::AppendBlueprintInspection(
             TEXT("The companion changed its target during Blueprint inspection")};
         return false;
     }
-    if (!ExtensionResult.IsValid())
+    if (!JsonExtensionResult.IsValid())
     {
         OutError = {TEXT("extension_contract_violation"),
             TEXT("The companion returned no Blueprint inspection result")};
         return false;
     }
-    const TArray<TSharedPtr<FJsonValue>>* Records = nullptr;
+    TSharedPtr<FUnrealMCPRecord> ExtensionResult;
+    if (!UnrealMCP::JsonCodec::DecodeRecord(JsonExtensionResult, ExtensionResult, OutError))
+    {
+        OutError = {TEXT("extension_contract_violation"),
+            TEXT("The companion returned an invalid Blueprint inspection result")};
+        return false;
+    }
+    const TArray<TSharedPtr<FUnrealMCPValue>>* Records = nullptr;
     const int32* RecordLimit = Contribution->StableLimits.Find(TEXT("records"));
     if (!ExtensionResult->TryGetArrayField(TEXT("records"), Records) || Records == nullptr
         || Records->Num() > (RecordLimit != nullptr ? *RecordLimit : 32)
@@ -699,9 +710,9 @@ bool FUnrealMCPExtensionRegistry::AppendBlueprintInspection(
             TEXT("The companion Blueprint inspection records exceed their stable bound")};
         return false;
     }
-    for (const TSharedPtr<FJsonValue>& Value : *Records)
+    for (const TSharedPtr<FUnrealMCPValue>& Value : *Records)
     {
-        const TSharedPtr<FJsonObject>* RecordObject = nullptr;
+        const TSharedPtr<FUnrealMCPRecord>* RecordObject = nullptr;
         if (!Value.IsValid() || !Value->TryGetObject(RecordObject)
             || RecordObject == nullptr || !RecordObject->IsValid())
         {
@@ -711,13 +722,13 @@ bool FUnrealMCPExtensionRegistry::AppendBlueprintInspection(
         }
         OutRecords.Add(Value);
     }
-    const TSharedPtr<FJsonObject>* Capabilities = nullptr;
+    const TSharedPtr<FUnrealMCPRecord>* Capabilities = nullptr;
     if (ExtensionResult->TryGetObjectField(TEXT("family_capabilities"), Capabilities)
         && Capabilities != nullptr && Capabilities->IsValid())
     {
         if (!InOutFamilyCapabilities.IsValid())
         {
-            InOutFamilyCapabilities = MakeShared<FJsonObject>();
+            InOutFamilyCapabilities = MakeShared<FUnrealMCPRecord>();
         }
         InOutFamilyCapabilities->SetObjectField(
             Contribution->TargetFamily, Capabilities->ToSharedRef());
@@ -727,9 +738,9 @@ bool FUnrealMCPExtensionRegistry::AppendBlueprintInspection(
     return true;
 }
 
-TArray<TSharedPtr<FJsonValue>> FUnrealMCPExtensionRegistry::BuildBlueprintFamilyCapabilities() const
+TArray<TSharedPtr<FUnrealMCPValue>> FUnrealMCPExtensionRegistry::BuildBlueprintFamilyCapabilities() const
 {
-    TArray<TSharedPtr<FJsonValue>> Result;
+    TArray<TSharedPtr<FUnrealMCPValue>> Result;
     TSet<FString> AddedFamilies;
     if (!bFrozen || bShuttingDown)
     {
@@ -748,7 +759,7 @@ TArray<TSharedPtr<FJsonValue>> FUnrealMCPExtensionRegistry::BuildBlueprintFamily
             {
                 continue;
             }
-            const TSharedRef<FJsonObject> Operations = MakeShared<FJsonObject>();
+            const TSharedRef<FUnrealMCPRecord> Operations = MakeShared<FUnrealMCPRecord>();
             for (const TCHAR* Name : {TEXT("discover"), TEXT("inspect")})
             {
                 Operations->SetBoolField(Name, true);
@@ -761,20 +772,20 @@ TArray<TSharedPtr<FJsonValue>> FUnrealMCPExtensionRegistry::BuildBlueprintFamily
             {
                 Operations->SetBoolField(Name, false);
             }
-            const TSharedRef<FJsonObject> Family = MakeShared<FJsonObject>();
+            const TSharedRef<FUnrealMCPRecord> Family = MakeShared<FUnrealMCPRecord>();
             Family->SetStringField(TEXT("family"), Contribution.TargetFamily);
             Family->SetStringField(TEXT("native_base_class"), Contribution.TargetClassPath);
             Family->SetStringField(TEXT("inheritance_category"), TEXT("uobject_derived"));
             Family->SetStringField(TEXT("extension_id"), Record.Registration.ExtensionId);
             Family->SetObjectField(TEXT("operations"), Operations);
-            const TSharedRef<FJsonObject> Multiplayer = MakeShared<FJsonObject>();
+            const TSharedRef<FUnrealMCPRecord> Multiplayer = MakeShared<FUnrealMCPRecord>();
             Multiplayer->SetBoolField(TEXT("actor_replication"), false);
             Multiplayer->SetBoolField(TEXT("component_replication"), false);
             Multiplayer->SetBoolField(TEXT("replicated_variables"), false);
             Multiplayer->SetArrayField(TEXT("rpc_modes"), {
-                MakeShared<FJsonValueString>(TEXT("not_replicated"))});
+                MakeShared<FUnrealMCPValueString>(TEXT("not_replicated"))});
             Family->SetObjectField(TEXT("multiplayer"), Multiplayer);
-            Result.Add(MakeShared<FJsonValueObject>(Family));
+            Result.Add(MakeShared<FUnrealMCPValueObject>(Family));
             AddedFamilies.Add(Contribution.TargetFamily);
         }
     }
@@ -805,13 +816,13 @@ bool FUnrealMCPExtensionRegistry::HasReadyFamilyCapability(
 }
 
 bool FUnrealMCPExtensionRegistry::HasOnlyAllowedFields(
-    const FJsonObject& Arguments,
+    const FUnrealMCPRecord& Arguments,
     const FUnrealMCPExtensionContribution& Contribution)
 {
     TSet<FString> Allowed(Contribution.AllowedArgumentFields);
     Allowed.Append({TEXT("extension_id"), TEXT("extension_schema_revision"), TEXT("operation"),
         TEXT("asset_path"), TEXT("operation_id"), TEXT("expected_snapshot")});
-    for (const TPair<FString, TSharedPtr<FJsonValue>>& Pair : Arguments.Values)
+    for (const TPair<FString, TSharedPtr<FUnrealMCPValue>>& Pair : Arguments.Values)
     {
         if (!Allowed.Contains(Pair.Key)) return false;
     }
@@ -910,14 +921,20 @@ void FUnrealMCPExtensionRegistry::ConvertError(
 {
     Output.Code = Input.Code.IsEmpty() ? TEXT("internal_error") : Input.Code.Left(64);
     Output.Message = Input.Message.IsEmpty() ? TEXT("Companion operation failed") : Input.Message.Left(512);
-    Output.Details = Input.Details.IsValid() ? Input.Details : MakeShared<FJsonObject>();
+    Output.Details = MakeShared<FUnrealMCPRecord>();
+    if (Input.Details.IsValid())
+    {
+        FUnrealMCPError DecodeError;
+        TSharedPtr<FUnrealMCPRecord> Details;
+        if (UnrealMCP::JsonCodec::DecodeRecord(Input.Details, Details, DecodeError)) Output.Details = MoveTemp(Details);
+    }
     Output.bRetryable = Input.bRetryable;
 }
 
 bool FUnrealMCPExtensionRegistry::Execute(
     const FString& ToolFamily,
-    const TSharedPtr<FJsonObject>& Arguments,
-    TSharedPtr<FJsonObject>& OutResult,
+    const TSharedPtr<FUnrealMCPRecord>& Arguments,
+    TSharedPtr<FUnrealMCPRecord>& OutResult,
     FUnrealMCPError& OutError) const
 {
     check(IsInGameThread());
@@ -956,7 +973,8 @@ bool FUnrealMCPExtensionRegistry::Execute(
         return false;
     }
     FUnrealMCPExtensionError ExtensionError;
-    if (!Contribution->Handler->ValidateArguments(Operation, Arguments, ExtensionError))
+    const TSharedPtr<FJsonObject> JsonArguments = UnrealMCP::JsonCodec::EncodeRecord(Arguments);
+    if (!Contribution->Handler->ValidateArguments(Operation, JsonArguments, ExtensionError))
     {
         ConvertError(ExtensionError, OutError);
         return false;
@@ -987,9 +1005,15 @@ bool FUnrealMCPExtensionRegistry::Execute(
     }
     if (Contribution->Access == EUnrealMCPExtensionAccess::Read)
     {
-        if (!Contribution->Handler->Inspect(*Target, Operation, Arguments, OutResult, ExtensionError))
+        TSharedPtr<FJsonObject> JsonResult;
+        if (!Contribution->Handler->Inspect(*Target, Operation, JsonArguments, JsonResult, ExtensionError))
         {
             ConvertError(ExtensionError, OutError);
+            return false;
+        }
+        if (!UnrealMCP::JsonCodec::DecodeRecord(JsonResult, OutResult, OutError))
+        {
+            OutError = {TEXT("extension_contract_violation"), TEXT("The companion returned an invalid inspection result")};
             return false;
         }
         const FString AfterInspection = SnapshotFor(
@@ -1000,7 +1024,7 @@ bool FUnrealMCPExtensionRegistry::Execute(
                 TEXT("The companion changed its target during a read operation")};
             return false;
         }
-        if (!OutResult.IsValid()) OutResult = MakeShared<FJsonObject>();
+        if (!OutResult.IsValid()) OutResult = MakeShared<FUnrealMCPRecord>();
         OutResult->SetStringField(TEXT("extension_id"), ExtensionId);
         OutResult->SetNumberField(TEXT("extension_schema_revision"), Owner->Registration.ExtensionSchemaRevision);
         OutResult->SetStringField(TEXT("snapshot"), BeforeSnapshot);
@@ -1024,19 +1048,37 @@ bool FUnrealMCPExtensionRegistry::Execute(
     }
     if (GEditor == nullptr)
     {
-        OutError = {TEXT("editor_unavailable"), TEXT("The editor transaction subsystem is unavailable"), MakeShared<FJsonObject>(), true};
+        OutError = {TEXT("editor_unavailable"), TEXT("The editor transaction subsystem is unavailable"), MakeShared<FUnrealMCPRecord>(), true};
         return false;
     }
     TUniquePtr<FScopedTransaction> Transaction = MakeUnique<FScopedTransaction>(
         FText::FromString(TEXT("Unreal MCP companion operation")));
     Target->Modify();
-    TSharedPtr<FJsonObject> Change;
-    if (!Contribution->Handler->ApplyMutation(*Target, Operation, Arguments, Change, ExtensionError))
+    TSharedPtr<FJsonObject> JsonChange;
+    if (!Contribution->Handler->ApplyMutation(*Target, Operation, JsonArguments, JsonChange, ExtensionError))
     {
         Transaction->Cancel();
         Transaction.Reset();
         ConvertError(ExtensionError, OutError);
         return false;
+    }
+    TSharedPtr<FUnrealMCPRecord> Change;
+    if (JsonChange.IsValid())
+    {
+        FUnrealMCPError DecodeError;
+        if (!UnrealMCP::JsonCodec::DecodeRecord(JsonChange, Change, DecodeError))
+        {
+            Transaction.Reset();
+            const bool bUndone = GEditor->UndoTransaction(false);
+            FUnrealMCPExtensionError RestoreError;
+            const FString RestoredSnapshot = SnapshotFor(
+                *Target, Operation, *Contribution->Handler, RestoreError);
+            OutError = {TEXT("rollback_failed"),
+                bUndone && RestoredSnapshot == BeforeSnapshot
+                    ? TEXT("The companion returned an invalid change record and the mutation was rolled back")
+                    : TEXT("The companion returned an invalid change record and exact rollback could not be verified")};
+            return false;
+        }
     }
     UBlueprint* BlueprintToCompile = nullptr;
     if (Contribution->Persistence == EUnrealMCPExtensionPersistence::BlueprintCompileAndSave)
@@ -1052,12 +1094,12 @@ bool FUnrealMCPExtensionRegistry::Execute(
         }
         FKismetEditorUtilities::CompileBlueprint(BlueprintToCompile);
     }
-    TSharedPtr<FJsonObject> ReadBack;
+    TSharedPtr<FJsonObject> JsonReadBack;
     const FString AfterSnapshot = SnapshotFor(*Target, Operation, *Contribution->Handler, ExtensionError);
     const bool bCompileSucceeded = BlueprintToCompile == nullptr
         || BlueprintToCompile->Status != BS_Error;
     const bool bReadBack = bCompileSucceeded && !AfterSnapshot.IsEmpty()
-        && Contribution->Handler->ReadBack(*Target, Operation, Arguments, ReadBack, ExtensionError);
+        && Contribution->Handler->ReadBack(*Target, Operation, JsonArguments, JsonReadBack, ExtensionError);
     if (!bReadBack)
     {
         Transaction.Reset();
@@ -1099,7 +1141,12 @@ bool FUnrealMCPExtensionRegistry::Execute(
             return false;
         }
     }
-    OutResult = ReadBack.IsValid() ? ReadBack : MakeShared<FJsonObject>();
+    if (JsonReadBack.IsValid() && !UnrealMCP::JsonCodec::DecodeRecord(JsonReadBack, OutResult, OutError))
+    {
+        OutError = {TEXT("extension_contract_violation"), TEXT("The companion returned an invalid mutation read-back")};
+        return false;
+    }
+    if (!OutResult.IsValid()) OutResult = MakeShared<FUnrealMCPRecord>();
     OutResult->SetStringField(TEXT("extension_id"), ExtensionId);
     OutResult->SetNumberField(TEXT("extension_schema_revision"), Owner->Registration.ExtensionSchemaRevision);
     OutResult->SetStringField(TEXT("previous_snapshot"), BeforeSnapshot);
@@ -1130,13 +1177,13 @@ FString FUnrealMCPExtensionRegistry::RegistrySignature() const
     return BytesToHex(Hash, UE_ARRAY_COUNT(Hash)).ToLower();
 }
 
-TSharedPtr<FJsonObject> FUnrealMCPExtensionRegistry::BuildCapabilities() const
+TSharedPtr<FUnrealMCPRecord> FUnrealMCPExtensionRegistry::BuildCapabilities() const
 {
-    const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Result = MakeShared<FUnrealMCPRecord>();
     Result->SetNumberField(TEXT("companion_api_version"), UnrealMCP::CompanionApiVersion);
     Result->SetNumberField(TEXT("extension_schema_revision"), UnrealMCP::ExtensionSchemaRevision);
     Result->SetStringField(TEXT("registry_signature"), RegistrySignature());
-    TArray<TSharedPtr<FJsonValue>> CompanionValues;
+    TArray<TSharedPtr<FUnrealMCPValue>> CompanionValues;
     for (const FDescriptorRecord& Descriptor : Descriptors)
     {
         const FAcceptedRecord* AcceptedRecord = Accepted.FindByPredicate([&](const FAcceptedRecord& Value)
@@ -1157,7 +1204,7 @@ TSharedPtr<FJsonObject> FUnrealMCPExtensionRegistry::BuildCapabilities() const
             }
         }
         const bool bReady = AcceptedRecord != nullptr && bHandlersReady && !bShuttingDown;
-        const TSharedRef<FJsonObject> Companion = MakeShared<FJsonObject>();
+        const TSharedRef<FUnrealMCPRecord> Companion = MakeShared<FUnrealMCPRecord>();
         Companion->SetStringField(TEXT("plugin_name"), Descriptor.PluginName);
         Companion->SetStringField(TEXT("extension_id"), Descriptor.ExtensionId);
         Companion->SetStringField(TEXT("semantic_version"), Descriptor.SemanticVersion);
@@ -1173,12 +1220,12 @@ TSharedPtr<FJsonObject> FUnrealMCPExtensionRegistry::BuildCapabilities() const
                     ? TEXT("live_capability_unavailable")
                     : Descriptor.UnavailableReason.Left(128))));
         Companion->SetArrayField(TEXT("required_engine_plugins"), Strings(Descriptor.RequiredEnginePlugins));
-        TArray<TSharedPtr<FJsonValue>> Contributions;
+        TArray<TSharedPtr<FUnrealMCPValue>> Contributions;
         if (AcceptedRecord != nullptr)
         {
             for (const FUnrealMCPExtensionContribution& Contribution : AcceptedRecord->Registration.Contributions)
             {
-                const TSharedRef<FJsonObject> Value = MakeShared<FJsonObject>();
+                const TSharedRef<FUnrealMCPRecord> Value = MakeShared<FUnrealMCPRecord>();
                 Value->SetStringField(TEXT("contribution_id"), Contribution.ContributionId);
                 Value->SetStringField(TEXT("category"), CategoryName(Contribution.Category));
                 Value->SetStringField(TEXT("access"), AccessName(Contribution.Access));
@@ -1187,7 +1234,7 @@ TSharedPtr<FJsonObject> FUnrealMCPExtensionRegistry::BuildCapabilities() const
                 Value->SetStringField(TEXT("operation"), Contribution.Operation);
                 Value->SetStringField(TEXT("target_family"), Contribution.TargetFamily);
                 Value->SetStringField(TEXT("required_live_capability"), Contribution.RequiredLiveCapability);
-                const TSharedRef<FJsonObject> Limits = MakeShared<FJsonObject>();
+                const TSharedRef<FUnrealMCPRecord> Limits = MakeShared<FUnrealMCPRecord>();
                 for (const TPair<FString, int32>& Limit : Contribution.StableLimits)
                 {
                     Limits->SetNumberField(Limit.Key, Limit.Value);
@@ -1195,13 +1242,13 @@ TSharedPtr<FJsonObject> FUnrealMCPExtensionRegistry::BuildCapabilities() const
                 Value->SetObjectField(TEXT("limits"), Limits);
                 bReadSupport |= Contribution.Access == EUnrealMCPExtensionAccess::Read;
                 bMutationSupport |= Contribution.Access == EUnrealMCPExtensionAccess::Mutation;
-                Contributions.Add(MakeShared<FJsonValueObject>(Value));
+                Contributions.Add(MakeShared<FUnrealMCPValueObject>(Value));
             }
         }
         Companion->SetArrayField(TEXT("contributions"), Contributions);
         Companion->SetBoolField(TEXT("read_support"), bReadSupport);
         Companion->SetBoolField(TEXT("mutation_support"), bMutationSupport);
-        CompanionValues.Add(MakeShared<FJsonValueObject>(Companion));
+        CompanionValues.Add(MakeShared<FUnrealMCPValueObject>(Companion));
     }
     Result->SetArrayField(TEXT("companions"), CompanionValues);
     Result->SetArrayField(TEXT("registration_diagnostics"), Strings(Diagnostics));

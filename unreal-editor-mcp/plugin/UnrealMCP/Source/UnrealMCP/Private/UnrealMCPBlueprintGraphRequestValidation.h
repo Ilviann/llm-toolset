@@ -1,7 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Dom/JsonObject.h"
+#include "UnrealMCPWireTypes.h"
 #include "UnrealMCPProtocol.h"
 
 namespace UnrealMCP::BlueprintGraphRequestValidation
@@ -20,14 +20,14 @@ struct FRequest
     FString FromPinId;
     FString ToNodeId;
     FString ToPinId;
-    TSharedPtr<FJsonObject> Default;
+    TSharedPtr<FUnrealMCPRecord> Default;
     bool bAutomaticConversion = false;
     int32 X = 0;
     int32 Y = 0;
 };
 
 bool Decode(
-    const TSharedPtr<FJsonObject>& Arguments,
+    const TSharedPtr<FUnrealMCPRecord>& Arguments,
     FRequest& OutRequest,
     FUnrealMCPError& OutError);
 }

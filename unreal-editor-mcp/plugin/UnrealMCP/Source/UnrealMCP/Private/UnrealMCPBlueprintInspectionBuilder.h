@@ -1,7 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Dom/JsonObject.h"
+#include "UnrealMCPWireTypes.h"
 #include "UnrealMCPProtocol.h"
 
 class FUnrealMCPExtensionRegistry;
@@ -9,20 +9,20 @@ class FUnrealMCPExtensionRegistry;
 namespace UnrealMCP::BlueprintInspectionPrivate
 {
 bool BuildDiscovery(
-    const FJsonObject& Arguments,
+    const FUnrealMCPRecord& Arguments,
     const FUnrealMCPExtensionRegistry* ExtensionRegistry,
-    TArray<TSharedPtr<FJsonValue>>& OutRecords,
+    TArray<TSharedPtr<FUnrealMCPValue>>& OutRecords,
     FString& OutSnapshot,
     bool& OutScanTruncated,
     FUnrealMCPError& OutError);
 
 bool BuildInspection(
-    const FJsonObject& Arguments,
+    const FUnrealMCPRecord& Arguments,
     const FUnrealMCPExtensionRegistry* ExtensionRegistry,
-    TArray<TSharedPtr<FJsonValue>>& OutRecords,
+    TArray<TSharedPtr<FUnrealMCPValue>>& OutRecords,
     FString& OutSnapshot,
     FString& OutBlueprintFamily,
-    TSharedPtr<FJsonObject>& OutFamilyCapabilities,
+    TSharedPtr<FUnrealMCPRecord>& OutFamilyCapabilities,
     bool& OutScanTruncated,
     FUnrealMCPError& OutError);
 }

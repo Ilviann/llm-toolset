@@ -23,14 +23,14 @@
 
 namespace UnrealMCPAssetDeletionPrivate
 {
-bool HasOnlyFields(const FJsonObject& Object, std::initializer_list<const TCHAR*> Allowed)
+bool HasOnlyFields(const FUnrealMCPRecord& Object, std::initializer_list<const TCHAR*> Allowed)
 {
     TSet<FString> Names;
     for (const TCHAR* Name : Allowed)
     {
         Names.Add(Name);
     }
-    for (const TPair<FString, TSharedPtr<FJsonValue>>& Pair : Object.Values)
+    for (const TPair<FString, TSharedPtr<FUnrealMCPValue>>& Pair : Object.Values)
     {
         if (!Names.Contains(Pair.Key))
         {
@@ -177,13 +177,13 @@ bool ReferenceScansSufficient(
     for (const TCHAR* Name : {
         TEXT("serialized"), TEXT("management"), TEXT("searchable_name")})
     {
-        const TSharedPtr<FJsonObject>* Status = nullptr;
+        const TSharedPtr<FUnrealMCPRecord>* Status = nullptr;
         bool bComplete = false;
         if (!Snapshot.Scans->TryGetObjectField(Name, Status) || Status == nullptr
             || !Status->IsValid() || !(*Status)->TryGetBoolField(TEXT("complete"), bComplete)
             || !bComplete)
         {
-            const TSharedRef<FJsonObject> Details = MakeShared<FJsonObject>();
+            const TSharedRef<FUnrealMCPRecord> Details = MakeShared<FUnrealMCPRecord>();
             Details->SetStringField(TEXT("scan"), Name);
             if (Status != nullptr && Status->IsValid())
             {
@@ -197,7 +197,7 @@ bool ReferenceScansSufficient(
             return false;
         }
     }
-    const TSharedPtr<FJsonObject>* LiveStatus = nullptr;
+    const TSharedPtr<FUnrealMCPRecord>* LiveStatus = nullptr;
     bool bUnsupported = true;
     bool bStale = true;
     if (!Snapshot.Scans->TryGetObjectField(TEXT("live_memory"), LiveStatus)
@@ -206,7 +206,7 @@ bool ReferenceScansSufficient(
         || !(*LiveStatus)->TryGetBoolField(TEXT("stale"), bStale)
         || bUnsupported || bStale)
     {
-        const TSharedRef<FJsonObject> Details = MakeShared<FJsonObject>();
+        const TSharedRef<FUnrealMCPRecord> Details = MakeShared<FUnrealMCPRecord>();
         Details->SetStringField(TEXT("scan"), TEXT("live_memory"));
         OutError = {
             TEXT("reference_preflight_incomplete"),
@@ -234,7 +234,7 @@ bool HasUnsafeEditorWork(FUnrealMCPError& OutError)
     {
         return false;
     }
-    const TSharedRef<FJsonObject> Details = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Details = MakeShared<FUnrealMCPRecord>();
     Details->SetBoolField(TEXT("is_playing"), bPlaying);
     Details->SetBoolField(TEXT("is_simulating"), bSimulating);
     Details->SetBoolField(TEXT("is_saving"), bSaving);
@@ -262,7 +262,7 @@ bool IsCurrentMapPackage(const FString& PackageName)
         && World->GetOutermost()->GetName() == PackageName;
 }
 
-TSharedRef<FJsonObject> BuildResult(
+TSharedRef<FUnrealMCPRecord> BuildResult(
     const FString& AssetPath,
     const FString& PackageName,
     const FString& ExpectedSnapshot,
@@ -272,7 +272,7 @@ TSharedRef<FJsonObject> BuildResult(
     bool bLiveScanComplete,
     const FString& OperationState)
 {
-    const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Result = MakeShared<FUnrealMCPRecord>();
     Result->SetStringField(TEXT("asset_path"), AssetPath);
     Result->SetStringField(TEXT("package_name"), PackageName);
     Result->SetStringField(TEXT("expected_reference_snapshot"), ExpectedSnapshot);
@@ -380,7 +380,7 @@ bool HasExternalClosureReferencers(
 {
     if (Registry.IsGathering())
     {
-        OutError = {TEXT("reference_preflight_incomplete"), TEXT("Map deletion requires a current complete Asset Registry"), MakeShared<FJsonObject>(), true};
+        OutError = {TEXT("reference_preflight_incomplete"), TEXT("Map deletion requires a current complete Asset Registry"), MakeShared<FUnrealMCPRecord>(), true};
         return true;
     }
     int32 CandidateCount = 0;
@@ -401,7 +401,7 @@ bool HasExternalClosureReferencers(
             const FString ReferencerPackage = Referencer.PackageName.ToString();
             if (ReferencerPackage.IsEmpty() || !Closure.Contains(ReferencerPackage))
             {
-                const TSharedRef<FJsonObject> Details = MakeShared<FJsonObject>();
+                const TSharedRef<FUnrealMCPRecord> Details = MakeShared<FUnrealMCPRecord>();
                 Details->SetStringField(TEXT("owned_package"), PackageName);
                 Details->SetStringField(TEXT("referencer"), Referencer.ToString().Left(512));
                 OutError = {TEXT("asset_referenced"), TEXT("A map-owned package has an external registry referencer"), Details};
@@ -417,9 +417,9 @@ bool RecordsContainExternalReferences(
     const TSet<FString>& Closure,
     FUnrealMCPError& OutError)
 {
-    for (const TSharedPtr<FJsonValue>& Value : Snapshot.Records)
+    for (const TSharedPtr<FUnrealMCPValue>& Value : Snapshot.Records)
     {
-        const TSharedPtr<FJsonObject> Record = Value.IsValid() ? Value->AsObject() : nullptr;
+        const TSharedPtr<FUnrealMCPRecord> Record = Value.IsValid() ? Value->AsObject() : nullptr;
         FString ReferencerPackage;
         if (!Record.IsValid() || !Record->TryGetStringField(TEXT("referencer_package"), ReferencerPackage)
             || ReferencerPackage.IsEmpty() || !Closure.Contains(ReferencerPackage))
@@ -436,7 +436,7 @@ bool DeleteMap(
     const FAssetData& Asset,
     const FString& AssetPath,
     const FString& ExpectedSnapshot,
-    TSharedPtr<FJsonObject>& OutResult,
+    TSharedPtr<FUnrealMCPRecord>& OutResult,
     FUnrealMCPError& OutError)
 {
     const FString PackageName = Asset.PackageName.ToString();
@@ -494,7 +494,7 @@ bool DeleteMap(
     if (HasUnsafeEditorWork(OutError)) return false;
     const TArray<FAssetData> Assets{Asset};
     const int32 DeletedCount = ObjectTools::DeleteAssets(Assets, false);
-    TArray<TSharedPtr<FJsonValue>> PackageResults;
+    TArray<TSharedPtr<FUnrealMCPValue>> PackageResults;
     bool bAllRegistryAbsent = true;
     bool bAllStorageAbsent = true;
     TArray<FString> Sorted = Closure.Array();
@@ -509,14 +509,14 @@ bool DeleteMap(
             && !IFileManager::Get().FileExists(*OriginalFiles.FindChecked(OwnedPackage));
         bAllRegistryAbsent &= bRegistryAbsent;
         bAllStorageAbsent &= bStorageAbsent;
-        const TSharedRef<FJsonObject> Record = MakeShared<FJsonObject>();
+        const TSharedRef<FUnrealMCPRecord> Record = MakeShared<FUnrealMCPRecord>();
         Record->SetStringField(TEXT("package_name"), OwnedPackage);
         Record->SetBoolField(TEXT("asset_registry_absent"), bRegistryAbsent);
         Record->SetBoolField(TEXT("storage_absent"), bStorageAbsent);
-        PackageResults.Add(MakeShared<FJsonValueObject>(Record));
+        PackageResults.Add(MakeShared<FUnrealMCPValueObject>(Record));
     }
     const bool bDeleted = DeletedCount > 0 && bAllRegistryAbsent && bAllStorageAbsent;
-    const TSharedRef<FJsonObject> Result = BuildResult(
+    const TSharedRef<FUnrealMCPRecord> Result = BuildResult(
         AssetPath, PackageName, ExpectedSnapshot, Final.SnapshotId,
         bAllRegistryAbsent, bAllStorageAbsent, bLiveScanComplete,
         bDeleted ? TEXT("committed") : TEXT("partial"));
@@ -538,8 +538,8 @@ FUnrealMCPAssetDeletionService::FUnrealMCPAssetDeletionService(
 }
 
 bool FUnrealMCPAssetDeletionService::Delete(
-    const TSharedPtr<FJsonObject>& Arguments,
-    TSharedPtr<FJsonObject>& OutResult,
+    const TSharedPtr<FUnrealMCPRecord>& Arguments,
+    TSharedPtr<FUnrealMCPRecord>& OutResult,
     FUnrealMCPError& OutError)
 {
     check(IsInGameThread());
@@ -578,7 +578,7 @@ bool FUnrealMCPAssetDeletionService::Delete(
     }
     if (Initial.SnapshotId != ExpectedSnapshot)
     {
-        const TSharedRef<FJsonObject> Details = MakeShared<FJsonObject>();
+        const TSharedRef<FUnrealMCPRecord> Details = MakeShared<FUnrealMCPRecord>();
         Details->SetStringField(TEXT("expected_snapshot"), ExpectedSnapshot);
         Details->SetStringField(TEXT("actual_snapshot"), Initial.SnapshotId);
         OutError = {
@@ -702,7 +702,7 @@ bool FUnrealMCPAssetDeletionService::Delete(
     }
     if (!Final.Records.IsEmpty())
     {
-        const TSharedRef<FJsonObject> Details = MakeShared<FJsonObject>();
+        const TSharedRef<FUnrealMCPRecord> Details = MakeShared<FUnrealMCPRecord>();
         Details->SetNumberField(TEXT("reference_count"), Final.Records.Num());
         Details->SetStringField(TEXT("snapshot_id"), Final.SnapshotId);
         OutError = {
@@ -717,7 +717,7 @@ bool FUnrealMCPAssetDeletionService::Delete(
         Target, bReferenced, bReferencedByUndo, nullptr, false);
     if (bReferenced || bReferencedByUndo)
     {
-        const TSharedRef<FJsonObject> Details = MakeShared<FJsonObject>();
+        const TSharedRef<FUnrealMCPRecord> Details = MakeShared<FUnrealMCPRecord>();
         Details->SetBoolField(TEXT("referenced"), bReferenced);
         Details->SetBoolField(TEXT("referenced_by_undo"), bReferencedByUndo);
         OutError = {

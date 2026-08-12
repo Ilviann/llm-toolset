@@ -5,16 +5,16 @@
 
 namespace UnrealMCP::GameDataRequestValidation
 {
-bool HasOnlyFields(const FJsonObject& Object, std::initializer_list<const TCHAR*> Allowed)
+bool HasOnlyFields(const FUnrealMCPRecord& Object, std::initializer_list<const TCHAR*> Allowed)
 {
     TSet<FString> Names;
     for (const TCHAR* Name : Allowed) Names.Add(Name);
-    for (const TPair<FString, TSharedPtr<FJsonValue>>& Pair : Object.Values)
+    for (const TPair<FString, TSharedPtr<FUnrealMCPValue>>& Pair : Object.Values)
         if (!Names.Contains(Pair.Key)) return false;
     return true;
 }
 
-bool ValidateEditShape(const FJsonObject& Arguments, const FString& Target, const FString& Operation, FUnrealMCPError& OutError)
+bool ValidateEditShape(const FUnrealMCPRecord& Arguments, const FString& Target, const FString& Operation, FUnrealMCPError& OutError)
 {
     bool bValid = false;
     if (Target == TEXT("user_defined_struct"))
@@ -93,7 +93,7 @@ bool NormalizeAssetPath(const FString& Input, FString& OutObject, FString& OutPa
         && FPackageName::ObjectPathToObjectName(OutObject) == FPackageName::GetLongPackageAssetName(OutPackage);
 }
 
-bool ReadPageSize(const FJsonObject& Arguments, int32& Out, FUnrealMCPError& OutError)
+bool ReadPageSize(const FUnrealMCPRecord& Arguments, int32& Out, FUnrealMCPError& OutError)
 {
     Out = UnrealMCP::DefaultInspectPageSize;
     if (Arguments.HasField(TEXT("page_size")))
@@ -110,7 +110,7 @@ bool ReadPageSize(const FJsonObject& Arguments, int32& Out, FUnrealMCPError& Out
     return true;
 }
 
-bool ParseGuidField(const FJsonObject& Arguments, const TCHAR* Name, FGuid& Out, FUnrealMCPError& OutError)
+bool ParseGuidField(const FUnrealMCPRecord& Arguments, const TCHAR* Name, FGuid& Out, FUnrealMCPError& OutError)
 {
     FString Text;
     if (!Arguments.TryGetStringField(Name, Text) || !FGuid::ParseExact(Text, EGuidFormats::Digits, Out))

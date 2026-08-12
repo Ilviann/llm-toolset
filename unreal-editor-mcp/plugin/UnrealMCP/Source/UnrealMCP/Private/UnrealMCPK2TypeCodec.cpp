@@ -9,11 +9,11 @@ namespace
 {
 constexpr int32 MaxContainerItems = 64;
 
-bool HasOnlyFields(const FJsonObject& Object, std::initializer_list<const TCHAR*> Allowed)
+bool HasOnlyFields(const FUnrealMCPRecord& Object, std::initializer_list<const TCHAR*> Allowed)
 {
     TSet<FString> Names;
     for (const TCHAR* Name : Allowed) Names.Add(Name);
-    for (const TPair<FString, TSharedPtr<FJsonValue>>& Pair : Object.Values)
+    for (const TPair<FString, TSharedPtr<FUnrealMCPValue>>& Pair : Object.Values)
     {
         if (!Names.Contains(Pair.Key)) return false;
     }
@@ -152,9 +152,9 @@ bool ResolveCategory(
     return true;
 }
 
-TSharedRef<FJsonObject> EncodeTerminal(FName Category, FName Subcategory, const UObject* TypeObject)
+TSharedRef<FUnrealMCPRecord> EncodeTerminal(FName Category, FName Subcategory, const UObject* TypeObject)
 {
-    const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Result = MakeShared<FUnrealMCPRecord>();
     FString WireCategory = Category.ToString().ToLower();
     if (Category == UEdGraphSchema_K2::PC_Boolean) WireCategory = TEXT("boolean");
     else if (Category == UEdGraphSchema_K2::PC_Byte && Cast<UEnum>(TypeObject) != nullptr) WireCategory = TEXT("enum");
@@ -164,7 +164,7 @@ TSharedRef<FJsonObject> EncodeTerminal(FName Category, FName Subcategory, const 
     return Result;
 }
 
-bool DecodeTerminal(const FJsonObject& Object, FEdGraphTerminalType& Out, FUnrealMCPError& OutError)
+bool DecodeTerminal(const FUnrealMCPRecord& Object, FEdGraphTerminalType& Out, FUnrealMCPError& OutError)
 {
     if (!HasOnlyFields(Object, {TEXT("category"), TEXT("subcategory"), TEXT("type_object")}))
     {
@@ -244,7 +244,7 @@ bool SplitTopLevel(const FString& Input, TArray<FString>& Out)
 bool ReadAtom(
     FName Category,
     const UObject* TypeObject,
-    const TSharedPtr<FJsonObject>& Value,
+    const TSharedPtr<FUnrealMCPRecord>& Value,
     bool bContainerElement,
     FString& Out,
     FUnrealMCPError& OutError)
@@ -292,7 +292,7 @@ bool ReadAtom(
         OutError = {TEXT("invalid_argument"), TEXT("This K2 type requires an explicit literal default")};
         return false;
     }
-    const TSharedPtr<FJsonValue> Literal = Value->Values.FindRef(TEXT("value"));
+    const TSharedPtr<FUnrealMCPValue> Literal = Value->Values.FindRef(TEXT("value"));
     if (!Literal.IsValid())
     {
         OutError = {TEXT("invalid_argument"), TEXT("literal default is missing value")};
@@ -353,9 +353,9 @@ bool ReadAtom(
     return true;
 }
 
-TSharedRef<FJsonObject> EncodeAtom(FName Category, const UObject* TypeObject, const FString& Text)
+TSharedRef<FUnrealMCPRecord> EncodeAtom(FName Category, const UObject* TypeObject, const FString& Text)
 {
-    const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Result = MakeShared<FUnrealMCPRecord>();
     if (IsReferenceCategory(Category))
     {
         Result->SetStringField(TEXT("kind"), TEXT("reference"));
@@ -395,9 +395,9 @@ TSharedRef<FJsonObject> EncodeAtom(FName Category, const UObject* TypeObject, co
 
 namespace UnrealMCP::K2TypeCodec
 {
-TSharedRef<FJsonObject> EncodeType(const FEdGraphPinType& Type)
+TSharedRef<FUnrealMCPRecord> EncodeType(const FEdGraphPinType& Type)
 {
-    const TSharedRef<FJsonObject> Result = EncodeTerminal(Type.PinCategory, Type.PinSubCategory, Type.PinSubCategoryObject.Get());
+    const TSharedRef<FUnrealMCPRecord> Result = EncodeTerminal(Type.PinCategory, Type.PinSubCategory, Type.PinSubCategoryObject.Get());
     Result->SetStringField(TEXT("container"), ContainerName(Type.ContainerType));
     if (Type.IsMap())
     {
@@ -414,7 +414,7 @@ TSharedRef<FJsonObject> EncodeType(const FEdGraphPinType& Type)
     return Result;
 }
 
-bool DecodeType(const TSharedPtr<FJsonObject>& Value, FEdGraphPinType& OutType, FUnrealMCPError& OutError)
+bool DecodeType(const TSharedPtr<FUnrealMCPRecord>& Value, FEdGraphPinType& OutType, FUnrealMCPError& OutError)
 {
     if (!Value.IsValid() || !HasOnlyFields(*Value, {TEXT("category"), TEXT("subcategory"), TEXT("type_object"), TEXT("container"), TEXT("value_type"), TEXT("reference"), TEXT("const")}))
     {
@@ -440,7 +440,7 @@ bool DecodeType(const TSharedPtr<FJsonObject>& Value, FEdGraphPinType& OutType, 
     UObject* TypeObject = nullptr;
     if (!ResolveCategory(Category, Subcategory, TypeObjectPath, OutType.PinCategory, OutType.PinSubCategory, TypeObject, OutError)) return false;
     OutType.PinSubCategoryObject = TypeObject;
-    const TSharedPtr<FJsonObject>* ValueType = nullptr;
+    const TSharedPtr<FUnrealMCPRecord>* ValueType = nullptr;
     if (OutType.IsMap())
     {
         if (!Value->TryGetObjectField(TEXT("value_type"), ValueType) || ValueType == nullptr
@@ -462,17 +462,17 @@ bool DecodeType(const TSharedPtr<FJsonObject>& Value, FEdGraphPinType& OutType, 
     return true;
 }
 
-TSharedRef<FJsonObject> EncodeDefault(const FEdGraphPinType& Type, const FString& DefaultText)
+TSharedRef<FUnrealMCPRecord> EncodeDefault(const FEdGraphPinType& Type, const FString& DefaultText)
 {
     if (!EncodeType(Type)->GetBoolField(TEXT("supported")))
     {
-        const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+        const TSharedRef<FUnrealMCPRecord> Result = MakeShared<FUnrealMCPRecord>();
         Result->SetStringField(TEXT("kind"), TEXT("unavailable"));
         return Result;
     }
     if (DefaultText.IsEmpty())
     {
-        const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+        const TSharedRef<FUnrealMCPRecord> Result = MakeShared<FUnrealMCPRecord>();
         Result->SetStringField(TEXT("kind"), TEXT("engine_default"));
         return Result;
     }
@@ -480,7 +480,7 @@ TSharedRef<FJsonObject> EncodeDefault(const FEdGraphPinType& Type, const FString
     FString Interior = DefaultText.TrimStartAndEnd();
     if (Interior.Len() < 2 || Interior[0] != TCHAR('(') || Interior[Interior.Len() - 1] != TCHAR(')'))
     {
-        const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+        const TSharedRef<FUnrealMCPRecord> Result = MakeShared<FUnrealMCPRecord>();
         Result->SetStringField(TEXT("kind"), TEXT("unavailable"));
         return Result;
     }
@@ -488,21 +488,21 @@ TSharedRef<FJsonObject> EncodeDefault(const FEdGraphPinType& Type, const FString
     TArray<FString> Parts;
     if (!SplitTopLevel(Interior, Parts) || Parts.Num() > MaxContainerItems)
     {
-        const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+        const TSharedRef<FUnrealMCPRecord> Result = MakeShared<FUnrealMCPRecord>();
         Result->SetStringField(TEXT("kind"), TEXT("unavailable"));
         return Result;
     }
-    const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Result = MakeShared<FUnrealMCPRecord>();
     if (!Type.IsMap())
     {
         Result->SetStringField(TEXT("kind"), Type.IsArray() ? TEXT("array") : TEXT("set"));
-        TArray<TSharedPtr<FJsonValue>> Items;
-        for (const FString& Part : Parts) Items.Add(MakeShared<FJsonValueObject>(EncodeAtom(Type.PinCategory, Type.PinSubCategoryObject.Get(), Part)));
+        TArray<TSharedPtr<FUnrealMCPValue>> Items;
+        for (const FString& Part : Parts) Items.Add(MakeShared<FUnrealMCPValueObject>(EncodeAtom(Type.PinCategory, Type.PinSubCategoryObject.Get(), Part)));
         Result->SetArrayField(TEXT("items"), Items);
         return Result;
     }
     Result->SetStringField(TEXT("kind"), TEXT("map"));
-    TArray<TSharedPtr<FJsonValue>> Entries;
+    TArray<TSharedPtr<FUnrealMCPValue>> Entries;
     for (FString Part : Parts)
     {
         Part.TrimStartAndEndInline();
@@ -517,16 +517,16 @@ TSharedRef<FJsonObject> EncodeDefault(const FEdGraphPinType& Type, const FString
             Result->SetStringField(TEXT("kind"), TEXT("unavailable"));
             return Result;
         }
-        const TSharedRef<FJsonObject> Entry = MakeShared<FJsonObject>();
+        const TSharedRef<FUnrealMCPRecord> Entry = MakeShared<FUnrealMCPRecord>();
         Entry->SetObjectField(TEXT("key"), EncodeAtom(Type.PinCategory, Type.PinSubCategoryObject.Get(), Pair[0]));
         Entry->SetObjectField(TEXT("value"), EncodeAtom(Type.PinValueType.TerminalCategory, Type.PinValueType.TerminalSubCategoryObject.Get(), Pair[1]));
-        Entries.Add(MakeShared<FJsonValueObject>(Entry));
+        Entries.Add(MakeShared<FUnrealMCPValueObject>(Entry));
     }
     Result->SetArrayField(TEXT("entries"), Entries);
     return Result;
 }
 
-bool DecodeDefault(const FEdGraphPinType& Type, const TSharedPtr<FJsonObject>& Value, FString& OutDefaultText, FUnrealMCPError& OutError)
+bool DecodeDefault(const FEdGraphPinType& Type, const TSharedPtr<FUnrealMCPRecord>& Value, FString& OutDefaultText, FUnrealMCPError& OutError)
 {
     if (!Value.IsValid())
     {
@@ -556,7 +556,7 @@ bool DecodeDefault(const FEdGraphPinType& Type, const TSharedPtr<FJsonObject>& V
     else if (Type.IsArray() || Type.IsSet())
     {
         const TCHAR* Expected = Type.IsArray() ? TEXT("array") : TEXT("set");
-        const TArray<TSharedPtr<FJsonValue>>* Items = nullptr;
+        const TArray<TSharedPtr<FUnrealMCPValue>>* Items = nullptr;
         if (Kind != Expected || !HasOnlyFields(*Value, {TEXT("kind"), TEXT("items")})
             || !Value->TryGetArrayField(TEXT("items"), Items) || Items == nullptr || Items->Num() > MaxContainerItems)
         {
@@ -564,9 +564,9 @@ bool DecodeDefault(const FEdGraphPinType& Type, const TSharedPtr<FJsonObject>& V
             return false;
         }
         TArray<FString> Encoded;
-        for (const TSharedPtr<FJsonValue>& Item : *Items)
+        for (const TSharedPtr<FUnrealMCPValue>& Item : *Items)
         {
-            const TSharedPtr<FJsonObject>* Object = nullptr;
+            const TSharedPtr<FUnrealMCPRecord>* Object = nullptr;
             FString Atom;
             if (!Item.IsValid() || !Item->TryGetObject(Object) || Object == nullptr
                 || !ReadAtom(Type.PinCategory, Type.PinSubCategoryObject.Get(), *Object, true, Atom, OutError)) return false;
@@ -576,7 +576,7 @@ bool DecodeDefault(const FEdGraphPinType& Type, const TSharedPtr<FJsonObject>& V
     }
     else
     {
-        const TArray<TSharedPtr<FJsonValue>>* Entries = nullptr;
+        const TArray<TSharedPtr<FUnrealMCPValue>>* Entries = nullptr;
         if (Kind != TEXT("map") || !HasOnlyFields(*Value, {TEXT("kind"), TEXT("entries")})
             || !Value->TryGetArrayField(TEXT("entries"), Entries) || Entries == nullptr || Entries->Num() > MaxContainerItems)
         {
@@ -584,11 +584,11 @@ bool DecodeDefault(const FEdGraphPinType& Type, const TSharedPtr<FJsonObject>& V
             return false;
         }
         TArray<FString> Encoded;
-        for (const TSharedPtr<FJsonValue>& Item : *Entries)
+        for (const TSharedPtr<FUnrealMCPValue>& Item : *Entries)
         {
-            const TSharedPtr<FJsonObject>* Entry = nullptr;
-            const TSharedPtr<FJsonObject>* Key = nullptr;
-            const TSharedPtr<FJsonObject>* MapValue = nullptr;
+            const TSharedPtr<FUnrealMCPRecord>* Entry = nullptr;
+            const TSharedPtr<FUnrealMCPRecord>* Key = nullptr;
+            const TSharedPtr<FUnrealMCPRecord>* MapValue = nullptr;
             FString KeyText;
             FString ValueText;
             if (!Item.IsValid() || !Item->TryGetObject(Entry) || Entry == nullptr

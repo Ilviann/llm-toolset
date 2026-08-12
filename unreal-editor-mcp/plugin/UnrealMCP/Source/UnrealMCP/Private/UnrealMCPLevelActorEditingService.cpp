@@ -3,7 +3,7 @@
 #include "AssetCompilingManager.h"
 #include "Components/ActorComponent.h"
 #include "DataLayer/DataLayerEditorSubsystem.h"
-#include "Dom/JsonValue.h"
+#include "UnrealMCPWireTypes.h"
 #include "Editor.h"
 #include "EditorLevelUtils.h"
 #include "Engine/Level.h"
@@ -32,10 +32,10 @@
 
 namespace UnrealMCPLevelActorEditingPrivate
 {
-bool EditHasOnlyFields(const FJsonObject& Object, std::initializer_list<const TCHAR*> Allowed)
+bool EditHasOnlyFields(const FUnrealMCPRecord& Object, std::initializer_list<const TCHAR*> Allowed)
 {
     if (Object.Values.Num() != static_cast<int32>(Allowed.size())) return false;
-    for (const TPair<FString, TSharedPtr<FJsonValue>>& Pair : Object.Values)
+    for (const TPair<FString, TSharedPtr<FUnrealMCPValue>>& Pair : Object.Values)
     {
         bool bFound = false;
         for (const TCHAR* Field : Allowed) bFound |= Pair.Key == Field;
@@ -44,9 +44,9 @@ bool EditHasOnlyFields(const FJsonObject& Object, std::initializer_list<const TC
     return true;
 }
 
-bool EditHasAllowedFields(const FJsonObject& Object, std::initializer_list<const TCHAR*> Allowed)
+bool EditHasAllowedFields(const FUnrealMCPRecord& Object, std::initializer_list<const TCHAR*> Allowed)
 {
-    for (const TPair<FString, TSharedPtr<FJsonValue>>& Pair : Object.Values)
+    for (const TPair<FString, TSharedPtr<FUnrealMCPValue>>& Pair : Object.Values)
     {
         bool bFound = false;
         for (const TCHAR* Field : Allowed) bFound |= Pair.Key == Field;
@@ -179,21 +179,21 @@ FString EditComponentId(const FString& OwnerEditActorId, const UActorComponent* 
         + TEXT("|") + (Component != nullptr ? EditCreationMethodName(Component->CreationMethod) : FString()));
 }
 
-TSharedRef<FJsonObject> EditVectorRecord(const FVector& Value)
+TSharedRef<FUnrealMCPRecord> EditVectorRecord(const FVector& Value)
 {
-    const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Result = MakeShared<FUnrealMCPRecord>();
     Result->SetNumberField(TEXT("x"), Value.X);
     Result->SetNumberField(TEXT("y"), Value.Y);
     Result->SetNumberField(TEXT("z"), Value.Z);
     return Result;
 }
 
-TSharedRef<FJsonObject> EditTransformRecord(const FTransform& Value)
+TSharedRef<FUnrealMCPRecord> EditTransformRecord(const FTransform& Value)
 {
-    const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Result = MakeShared<FUnrealMCPRecord>();
     Result->SetObjectField(TEXT("location"), EditVectorRecord(Value.GetLocation()));
     const FRotator Rotation = Value.Rotator();
-    const TSharedRef<FJsonObject> RotationRecord = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> RotationRecord = MakeShared<FUnrealMCPRecord>();
     RotationRecord->SetNumberField(TEXT("pitch"), Rotation.Pitch);
     RotationRecord->SetNumberField(TEXT("yaw"), Rotation.Yaw);
     RotationRecord->SetNumberField(TEXT("roll"), Rotation.Roll);
@@ -202,7 +202,7 @@ TSharedRef<FJsonObject> EditTransformRecord(const FTransform& Value)
     return Result;
 }
 
-bool EditReadVector(const TSharedPtr<FJsonObject>& Object, FVector& Out, double Bound)
+bool EditReadVector(const TSharedPtr<FUnrealMCPRecord>& Object, FVector& Out, double Bound)
 {
     double X = 0.0;
     double Y = 0.0;
@@ -218,11 +218,11 @@ bool EditReadVector(const TSharedPtr<FJsonObject>& Object, FVector& Out, double 
     return true;
 }
 
-bool EditReadTransform(const FJsonObject& Object, FTransform& Out, FUnrealMCPError& OutError)
+bool EditReadTransform(const FUnrealMCPRecord& Object, FTransform& Out, FUnrealMCPError& OutError)
 {
-    const TSharedPtr<FJsonObject>* Location = nullptr;
-    const TSharedPtr<FJsonObject>* Rotation = nullptr;
-    const TSharedPtr<FJsonObject>* Scale = nullptr;
+    const TSharedPtr<FUnrealMCPRecord>* Location = nullptr;
+    const TSharedPtr<FUnrealMCPRecord>* Rotation = nullptr;
+    const TSharedPtr<FUnrealMCPRecord>* Scale = nullptr;
     FVector LocationValue;
     FVector ScaleValue;
     double Pitch = 0.0;
@@ -270,11 +270,11 @@ TArray<FString> EditDataLayerNames(const TArray<UDataLayerInstance*>& Instances)
     return Result;
 }
 
-TArray<TSharedPtr<FJsonValue>> EditStringValues(const TArray<FString>& Values)
+TArray<TSharedPtr<FUnrealMCPValue>> EditStringValues(const TArray<FString>& Values)
 {
-    TArray<TSharedPtr<FJsonValue>> Result;
+    TArray<TSharedPtr<FUnrealMCPValue>> Result;
     Result.Reserve(Values.Num());
-    for (const FString& Value : Values) Result.Add(MakeShared<FJsonValueString>(Value));
+    for (const FString& Value : Values) Result.Add(MakeShared<FUnrealMCPValueString>(Value));
     return Result;
 }
 
@@ -290,7 +290,7 @@ bool EditUnsafeEditorState(FUnrealMCPError& OutError)
     const bool bLoading = IsAsyncLoading();
     if (!bPlaying && !bSimulating && !bSaving && !bCollecting && !bTransaction
         && !bUndoRedo && !bCompiling && !bLoading) return false;
-    const TSharedRef<FJsonObject> Details = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Details = MakeShared<FUnrealMCPRecord>();
     Details->SetBoolField(TEXT("is_playing"), bPlaying);
     Details->SetBoolField(TEXT("is_simulating"), bSimulating);
     Details->SetBoolField(TEXT("is_saving"), bSaving);
@@ -308,15 +308,15 @@ bool EditCurrentState(
     const FString& ExpectedMapId,
     const FString& ExpectedSnapshot,
     UWorld*& OutWorld,
-    TSharedPtr<FJsonObject>& OutRecord,
+    TSharedPtr<FUnrealMCPRecord>& OutRecord,
     FString& OutActualSnapshot,
     FUnrealMCPError& OutError)
 {
-    const TSharedRef<FJsonObject> Arguments = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Arguments = MakeShared<FUnrealMCPRecord>();
     Arguments->SetStringField(TEXT("mode"), TEXT("current"));
-    TSharedPtr<FJsonObject> Result;
+    TSharedPtr<FUnrealMCPRecord> Result;
     if (!Levels.Inspect(Arguments, Result, OutError)) return false;
-    const TArray<TSharedPtr<FJsonValue>>* Records = nullptr;
+    const TArray<TSharedPtr<FUnrealMCPValue>>* Records = nullptr;
     if (!Result->TryGetArrayField(TEXT("records"), Records) || Records == nullptr || Records->Num() != 1
         || !(*Records)[0].IsValid() || !(*Records)[0]->AsObject().IsValid())
     {
@@ -328,7 +328,7 @@ bool EditCurrentState(
     const FString ActualMapId = OutRecord->GetStringField(TEXT("map_id"));
     if (ActualMapId != ExpectedMapId || OutActualSnapshot != ExpectedSnapshot)
     {
-        const TSharedRef<FJsonObject> Details = MakeShared<FJsonObject>();
+        const TSharedRef<FUnrealMCPRecord> Details = MakeShared<FUnrealMCPRecord>();
         Details->SetStringField(TEXT("expected_map_id"), ExpectedMapId);
         Details->SetStringField(TEXT("actual_map_id"), ActualMapId);
         Details->SetStringField(TEXT("expected_snapshot"), ExpectedSnapshot);
@@ -339,7 +339,7 @@ bool EditCurrentState(
     OutWorld = GEditor != nullptr ? GEditor->GetEditorWorldContext().World() : nullptr;
     if (OutWorld == nullptr || OutWorld->PersistentLevel == nullptr)
     {
-        OutError = {TEXT("editor_unavailable"), TEXT("No current persistent editor level is available"), MakeShared<FJsonObject>(), true};
+        OutError = {TEXT("editor_unavailable"), TEXT("No current persistent editor level is available"), MakeShared<FUnrealMCPRecord>(), true};
         return false;
     }
     return true;
@@ -401,7 +401,7 @@ bool EditResolveActor(UWorld* World, const FString& MapId, const FString& Id, FR
         }
         if (Actor == nullptr || !IsValid(Actor))
         {
-            OutError = {TEXT("actor_unavailable"), TEXT("The exact World Partition actor could not be loaded for editing"), MakeShared<FJsonObject>(), true};
+            OutError = {TEXT("actor_unavailable"), TEXT("The exact World Partition actor could not be loaded for editing"), MakeShared<FUnrealMCPRecord>(), true};
             return false;
         }
         Out.Actor = Actor;
@@ -440,7 +440,7 @@ UActorComponent* EditResolveComponent(AActor* Actor, const FString& EditActorIde
 
 bool EditResolveDataLayers(
     UWorld* World,
-    const TArray<TSharedPtr<FJsonValue>>& Values,
+    const TArray<TSharedPtr<FUnrealMCPValue>>& Values,
     TArray<UDataLayerInstance*>& Out,
     FUnrealMCPError& OutError)
 {
@@ -451,7 +451,7 @@ bool EditResolveDataLayers(
     }
     UDataLayerManager* Manager = World != nullptr ? World->GetDataLayerManager() : nullptr;
     TSet<FName> Seen;
-    for (const TSharedPtr<FJsonValue>& Value : Values)
+    for (const TSharedPtr<FUnrealMCPValue>& Value : Values)
     {
         FString Name;
         if (!Value.IsValid() || !Value->TryGetString(Name) || Name.IsEmpty() || Name.Len() > 512 || Seen.Contains(FName(*Name)))
@@ -508,7 +508,7 @@ bool EditValidateClassPath(const FString& Path, UClass*& OutClass, FUnrealMCPErr
         || OutClass->HasAnyClassFlags(CLASS_Abstract | CLASS_Deprecated | CLASS_NewerVersionExists)
         || bTransientClass || IsEditorOnlyObject(OutClass))
     {
-        const TSharedRef<FJsonObject> Details = MakeShared<FJsonObject>();
+        const TSharedRef<FUnrealMCPRecord> Details = MakeShared<FUnrealMCPRecord>();
         Details->SetStringField(TEXT("class_path"), Path);
         Details->SetBoolField(TEXT("found"), OutClass != nullptr);
         Details->SetBoolField(TEXT("actor_class"), OutClass != nullptr && OutClass->IsChildOf(AActor::StaticClass()));
@@ -550,21 +550,21 @@ bool EditRestoreActorGuid(AActor* Actor, const FGuid& Guid)
 }
 
 bool EditReadStringArray(
-    const FJsonObject& Object,
+    const FUnrealMCPRecord& Object,
     const TCHAR* Field,
     int32 Maximum,
     int32 CharacterLimit,
     TArray<FString>& Out,
     FUnrealMCPError& OutError)
 {
-    const TArray<TSharedPtr<FJsonValue>>* Values = nullptr;
+    const TArray<TSharedPtr<FUnrealMCPValue>>* Values = nullptr;
     if (!Object.TryGetArrayField(Field, Values) || Values == nullptr || Values->Num() > Maximum)
     {
         OutError = {TEXT("invalid_argument"), FString::Printf(TEXT("%s must be a bounded array"), Field)};
         return false;
     }
     TSet<FString> Seen;
-    for (const TSharedPtr<FJsonValue>& Value : *Values)
+    for (const TSharedPtr<FUnrealMCPValue>& Value : *Values)
     {
         FString Text;
         if (!Value.IsValid() || !Value->TryGetString(Text) || Text.IsEmpty() || Text.Len() > CharacterLimit || Seen.Contains(Text))
@@ -580,15 +580,15 @@ bool EditReadStringArray(
 
 bool EditReadCurrentResult(
     FUnrealMCPLevelService& Levels,
-    TSharedPtr<FJsonObject>& OutRecord,
+    TSharedPtr<FUnrealMCPRecord>& OutRecord,
     FString& OutSnapshot,
     FUnrealMCPError& OutError)
 {
-    const TSharedRef<FJsonObject> Arguments = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Arguments = MakeShared<FUnrealMCPRecord>();
     Arguments->SetStringField(TEXT("mode"), TEXT("current"));
-    TSharedPtr<FJsonObject> Result;
+    TSharedPtr<FUnrealMCPRecord> Result;
     if (!Levels.Inspect(Arguments, Result, OutError)) return false;
-    const TArray<TSharedPtr<FJsonValue>>* Records = nullptr;
+    const TArray<TSharedPtr<FUnrealMCPValue>>* Records = nullptr;
     if (!Result->TryGetArrayField(TEXT("records"), Records) || Records == nullptr || Records->Num() != 1
         || !(*Records)[0].IsValid() || !(*Records)[0]->AsObject().IsValid())
     {
@@ -600,7 +600,7 @@ bool EditReadCurrentResult(
     return true;
 }
 
-TSharedPtr<FJsonValue> EditEncodedPropertyValue(UObject* Object, const FString& Name)
+TSharedPtr<FUnrealMCPValue> EditEncodedPropertyValue(UObject* Object, const FString& Name)
 {
     FProperty* Property = Object != nullptr ? Object->GetClass()->FindPropertyByName(FName(*Name)) : nullptr;
     return Property != nullptr ? UnrealMCP::PropertyCodec::Encode(Object, Property)->TryGetField(TEXT("value")) : nullptr;
@@ -612,15 +612,15 @@ void EditAddAffectedPackage(TSet<FString>& Packages, const UObject* Object)
     if (Package != nullptr && FPackageName::IsValidLongPackageName(Package->GetName())) Packages.Add(Package->GetName());
 }
 
-bool EditJsonEqual(const TSharedPtr<FJsonValue>& Left, const TSharedPtr<FJsonValue>& Right)
+bool EditJsonEqual(const TSharedPtr<FUnrealMCPValue>& Left, const TSharedPtr<FUnrealMCPValue>& Right)
 {
-    return Left.IsValid() && Right.IsValid() && FJsonValue::CompareEqual(*Left, *Right);
+    return Left.IsValid() && Right.IsValid() && FUnrealMCPValue::CompareEqual(*Left, *Right);
 }
 
 struct FPlannedOperation
 {
     FString Kind;
-    TSharedPtr<FJsonObject> Request;
+    TSharedPtr<FUnrealMCPRecord> Request;
     FResolvedActor* Target = nullptr;
     FResolvedActor* Parent = nullptr;
     UActorComponent* Component = nullptr;
@@ -686,13 +686,13 @@ bool EditRollbackAndVerify(
 bool EditVerifyExpectedActors(
     UWorld* World,
     const FString& MapId,
-    const TArray<TSharedPtr<FJsonValue>>& ExpectedActors,
-    TArray<TSharedPtr<FJsonValue>>& OutRecords,
+    const TArray<TSharedPtr<FUnrealMCPValue>>& ExpectedActors,
+    TArray<TSharedPtr<FUnrealMCPValue>>& OutRecords,
     FUnrealMCPError& OutError)
 {
-    for (const TSharedPtr<FJsonValue>& ExpectedValue : ExpectedActors)
+    for (const TSharedPtr<FUnrealMCPValue>& ExpectedValue : ExpectedActors)
     {
-        const TSharedPtr<FJsonObject> Expected = ExpectedValue.IsValid() ? ExpectedValue->AsObject() : nullptr;
+        const TSharedPtr<FUnrealMCPRecord> Expected = ExpectedValue.IsValid() ? ExpectedValue->AsObject() : nullptr;
         FString Id;
         if (!Expected.IsValid()
             || !EditHasAllowedFields(*Expected, {TEXT("actor_id"), TEXT("label"), TEXT("transform"), TEXT("tags"), TEXT("folder"), TEXT("actor_properties"), TEXT("components")})
@@ -725,7 +725,7 @@ bool EditVerifyExpectedActors(
         }
         if (Expected->HasField(TEXT("transform")))
         {
-            const TSharedPtr<FJsonObject>* ExpectedTransform = nullptr;
+            const TSharedPtr<FUnrealMCPRecord>* ExpectedTransform = nullptr;
             FTransform Transform;
             if (!Expected->TryGetObjectField(TEXT("transform"), ExpectedTransform) || ExpectedTransform == nullptr
                 || !EditReadTransform(**ExpectedTransform, Transform, OutError)
@@ -748,10 +748,10 @@ bool EditVerifyExpectedActors(
         }
         if (Expected->HasField(TEXT("actor_properties")))
         {
-            const TArray<TSharedPtr<FJsonValue>>& Properties = Expected->GetArrayField(TEXT("actor_properties"));
-            for (const TSharedPtr<FJsonValue>& PropertyValue : Properties)
+            const TArray<TSharedPtr<FUnrealMCPValue>>& Properties = Expected->GetArrayField(TEXT("actor_properties"));
+            for (const TSharedPtr<FUnrealMCPValue>& PropertyValue : Properties)
             {
-                const TSharedPtr<FJsonObject> Property = PropertyValue.IsValid() ? PropertyValue->AsObject() : nullptr;
+                const TSharedPtr<FUnrealMCPRecord> Property = PropertyValue.IsValid() ? PropertyValue->AsObject() : nullptr;
                 FString Name;
                 if (!Property.IsValid() || !Property->TryGetStringField(TEXT("property_name"), Name)
                     || !EditValidateEditableProperty(Actor, Name, OutError)
@@ -764,10 +764,10 @@ bool EditVerifyExpectedActors(
         }
         if (Expected->HasField(TEXT("components")))
         {
-            const TArray<TSharedPtr<FJsonValue>>& Components = Expected->GetArrayField(TEXT("components"));
-            for (const TSharedPtr<FJsonValue>& ComponentValue : Components)
+            const TArray<TSharedPtr<FUnrealMCPValue>>& Components = Expected->GetArrayField(TEXT("components"));
+            for (const TSharedPtr<FUnrealMCPValue>& ComponentValue : Components)
             {
-                const TSharedPtr<FJsonObject> ExpectedComponent = ComponentValue.IsValid() ? ComponentValue->AsObject() : nullptr;
+                const TSharedPtr<FUnrealMCPRecord> ExpectedComponent = ComponentValue.IsValid() ? ComponentValue->AsObject() : nullptr;
                 FString IdValue;
                 if (!ExpectedComponent.IsValid() || !ExpectedComponent->TryGetStringField(TEXT("component_id"), IdValue))
                 {
@@ -780,10 +780,10 @@ bool EditVerifyExpectedActors(
                     OutError = {TEXT("verification_failed"), TEXT("An expected component identity is unavailable")};
                     return false;
                 }
-                const TArray<TSharedPtr<FJsonValue>>& Properties = ExpectedComponent->GetArrayField(TEXT("properties"));
-                for (const TSharedPtr<FJsonValue>& PropertyValue : Properties)
+                const TArray<TSharedPtr<FUnrealMCPValue>>& Properties = ExpectedComponent->GetArrayField(TEXT("properties"));
+                for (const TSharedPtr<FUnrealMCPValue>& PropertyValue : Properties)
                 {
-                    const TSharedPtr<FJsonObject> Property = PropertyValue.IsValid() ? PropertyValue->AsObject() : nullptr;
+                    const TSharedPtr<FUnrealMCPRecord> Property = PropertyValue.IsValid() ? PropertyValue->AsObject() : nullptr;
                     FString Name;
                     if (!Property.IsValid() || !Property->TryGetStringField(TEXT("property_name"), Name)
                         || !EditValidateEditableProperty(Component, Name, OutError)
@@ -795,11 +795,11 @@ bool EditVerifyExpectedActors(
                 }
             }
         }
-        const TSharedRef<FJsonObject> Record = MakeShared<FJsonObject>();
+        const TSharedRef<FUnrealMCPRecord> Record = MakeShared<FUnrealMCPRecord>();
         Record->SetStringField(TEXT("actor_id"), Id);
         Record->SetBoolField(TEXT("verified"), true);
         Record->SetStringField(TEXT("package_name"), Actor->GetPackage()->GetName());
-        OutRecords.Add(MakeShared<FJsonValueObject>(Record));
+        OutRecords.Add(MakeShared<FUnrealMCPValueObject>(Record));
     }
     return true;
 }
@@ -813,8 +813,8 @@ FUnrealMCPLevelActorEditingService::FUnrealMCPLevelActorEditingService(FUnrealMC
 }
 
 bool FUnrealMCPLevelActorEditingService::Edit(
-    const TSharedPtr<FJsonObject>& Arguments,
-    TSharedPtr<FJsonObject>& OutResult,
+    const TSharedPtr<FUnrealMCPRecord>& Arguments,
+    TSharedPtr<FUnrealMCPRecord>& OutResult,
     FUnrealMCPError& OutError)
 {
     check(IsInGameThread());
@@ -827,7 +827,7 @@ bool FUnrealMCPLevelActorEditingService::Edit(
     FString OperationId;
     FString MapId;
     FString ExpectedSnapshot;
-    const TArray<TSharedPtr<FJsonValue>>* OperationValues = nullptr;
+    const TArray<TSharedPtr<FUnrealMCPValue>>* OperationValues = nullptr;
     if (!Arguments->TryGetStringField(TEXT("operation_id"), OperationId) || !EditIsLowerHex(OperationId, 32)
         || !Arguments->TryGetStringField(TEXT("map_id"), MapId) || !EditIsLowerHex(MapId, 40)
         || !Arguments->TryGetStringField(TEXT("expected_snapshot"), ExpectedSnapshot) || !EditIsLowerHex(ExpectedSnapshot, 40)
@@ -840,7 +840,7 @@ bool FUnrealMCPLevelActorEditingService::Edit(
     if (EditUnsafeEditorState(OutError)) return false;
 
     UWorld* World = nullptr;
-    TSharedPtr<FJsonObject> CurrentRecord;
+    TSharedPtr<FUnrealMCPRecord> CurrentRecord;
     FString ActualSnapshot;
     if (!EditCurrentState(Levels, MapId, ExpectedSnapshot, World, CurrentRecord, ActualSnapshot, OutError)) return false;
     if (World->GetPackage() == nullptr
@@ -878,9 +878,9 @@ bool FUnrealMCPLevelActorEditingService::Edit(
     TSet<FString> DeletedActors;
     TSet<FString> OtherActors;
     TMap<FGuid, FGuid> DesiredParents;
-    for (const TSharedPtr<FJsonValue>& Value : *OperationValues)
+    for (const TSharedPtr<FUnrealMCPValue>& Value : *OperationValues)
     {
-        const TSharedPtr<FJsonObject> Request = Value.IsValid() ? Value->AsObject() : nullptr;
+        const TSharedPtr<FUnrealMCPRecord> Request = Value.IsValid() ? Value->AsObject() : nullptr;
         FString Kind;
         if (!Request.IsValid() || !Request->TryGetStringField(TEXT("operation"), Kind))
         {
@@ -907,7 +907,7 @@ bool FUnrealMCPLevelActorEditingService::Edit(
                 return false;
             }
             FString ClassPath;
-            const TSharedPtr<FJsonObject>* Transform = nullptr;
+            const TSharedPtr<FUnrealMCPRecord>* Transform = nullptr;
             if (!Request->TryGetStringField(TEXT("class_path"), ClassPath)
                 || !Request->TryGetObjectField(TEXT("transform"), Transform) || Transform == nullptr
                 || !EditValidateClassPath(ClassPath, Item.SpawnClass, OutError)
@@ -924,13 +924,13 @@ bool FUnrealMCPLevelActorEditingService::Edit(
             if (Request->HasField(TEXT("tags")) && !EditReadStringArray(*Request, TEXT("tags"), UnrealMCP::MaxLevelActorTags, 128, IgnoredStrings, OutError)) return false;
             if (Request->HasField(TEXT("data_layers")))
             {
-                const TArray<TSharedPtr<FJsonValue>>* DataLayerValues = nullptr;
+                const TArray<TSharedPtr<FUnrealMCPValue>>* DataLayerValues = nullptr;
                 if (!Request->TryGetArrayField(TEXT("data_layers"), DataLayerValues) || DataLayerValues == nullptr
                     || !EditResolveDataLayers(World, *DataLayerValues, Item.DataLayers, OutError)) return false;
             }
             if (Request->HasField(TEXT("actor_properties")))
             {
-                const TArray<TSharedPtr<FJsonValue>>* Properties = nullptr;
+                const TArray<TSharedPtr<FUnrealMCPValue>>* Properties = nullptr;
                 if (!Request->TryGetArrayField(TEXT("actor_properties"), Properties) || Properties == nullptr
                     || Properties->Num() > UnrealMCP::MaxPropertyNames)
                 {
@@ -939,9 +939,9 @@ bool FUnrealMCPLevelActorEditingService::Edit(
                 }
                 TSet<FString> Seen;
                 UObject* Defaults = Item.SpawnClass->GetDefaultObject();
-                for (const TSharedPtr<FJsonValue>& PropertyValue : *Properties)
+                for (const TSharedPtr<FUnrealMCPValue>& PropertyValue : *Properties)
                 {
-                    const TSharedPtr<FJsonObject> Property = PropertyValue.IsValid() ? PropertyValue->AsObject() : nullptr;
+                    const TSharedPtr<FUnrealMCPRecord> Property = PropertyValue.IsValid() ? PropertyValue->AsObject() : nullptr;
                     FString Name;
                     if (!Property.IsValid() || !EditHasOnlyFields(*Property, {TEXT("property_name"), TEXT("value")})
                         || !Property->TryGetStringField(TEXT("property_name"), Name) || !Property->HasField(TEXT("value"))
@@ -952,7 +952,7 @@ bool FUnrealMCPLevelActorEditingService::Edit(
         }
         else if (Kind == TEXT("transform"))
         {
-            const TSharedPtr<FJsonObject>* Transform = nullptr;
+            const TSharedPtr<FUnrealMCPRecord>* Transform = nullptr;
             if (!EditHasOnlyFields(*Request, {TEXT("operation"), TEXT("actor_id"), TEXT("transform")})
                 || !Request->TryGetObjectField(TEXT("transform"), Transform) || Transform == nullptr
                 || !EditReadTransform(**Transform, Item.Transform, OutError)) return false;
@@ -985,7 +985,7 @@ bool FUnrealMCPLevelActorEditingService::Edit(
         }
         else if (Kind == TEXT("data_layers"))
         {
-            const TArray<TSharedPtr<FJsonValue>>* Values = nullptr;
+            const TArray<TSharedPtr<FUnrealMCPValue>>* Values = nullptr;
             if (!EditHasOnlyFields(*Request, {TEXT("operation"), TEXT("actor_id"), TEXT("data_layers")})
                 || !Request->TryGetArrayField(TEXT("data_layers"), Values) || Values == nullptr
                 || !EditResolveDataLayers(World, *Values, Item.DataLayers, OutError)) return false;
@@ -1121,7 +1121,7 @@ bool FUnrealMCPLevelActorEditingService::Edit(
         Journal.Add({Entry.Guid, Package, Package != nullptr && Package->IsDirty()});
     }
     TArray<FGuid> Created;
-    TArray<TSharedPtr<FJsonValue>> Readback;
+    TArray<TSharedPtr<FUnrealMCPValue>> Readback;
     TUniquePtr<FScopedTransaction> Transaction = MakeUnique<FScopedTransaction>(
         NSLOCTEXT("UnrealMCP", "LevelActorEdit", "Edit level actors"));
     const auto FailMutation = [&](const FUnrealMCPError& Failure) -> bool
@@ -1134,7 +1134,7 @@ bool FUnrealMCPLevelActorEditingService::Edit(
     for (int32 Index = 0; Index < Plan.Num(); ++Index)
     {
         FPlannedOperation& Item = Plan[Index];
-        const TSharedRef<FJsonObject> Record = MakeShared<FJsonObject>();
+        const TSharedRef<FUnrealMCPRecord> Record = MakeShared<FUnrealMCPRecord>();
         Record->SetNumberField(TEXT("operation_index"), Index);
         Record->SetStringField(TEXT("operation"), Item.Kind);
         AActor* Actor = Item.Target != nullptr ? Item.Target->Actor : nullptr;
@@ -1176,11 +1176,11 @@ bool FUnrealMCPLevelActorEditingService::Edit(
             }
             if (Item.Request->HasField(TEXT("actor_properties")))
             {
-                const TArray<TSharedPtr<FJsonValue>>& Properties = Item.Request->GetArrayField(TEXT("actor_properties"));
-                for (const TSharedPtr<FJsonValue>& PropertyValue : Properties)
+                const TArray<TSharedPtr<FUnrealMCPValue>>& Properties = Item.Request->GetArrayField(TEXT("actor_properties"));
+                for (const TSharedPtr<FUnrealMCPValue>& PropertyValue : Properties)
                 {
-                    const TSharedPtr<FJsonObject> Property = PropertyValue->AsObject();
-                    TSharedPtr<FJsonObject> Changed;
+                    const TSharedPtr<FUnrealMCPRecord> Property = PropertyValue->AsObject();
+                    TSharedPtr<FUnrealMCPRecord> Changed;
                     FUnrealMCPError Failure;
                     if (!UnrealMCP::PropertyCodec::Set(Actor, Property->GetStringField(TEXT("property_name")), Property->TryGetField(TEXT("value")), Changed, Failure))
                     {
@@ -1286,7 +1286,7 @@ bool FUnrealMCPLevelActorEditingService::Edit(
                 UObject* TargetObject = Item.Kind == TEXT("component_property")
                     ? static_cast<UObject*>(Item.Component) : static_cast<UObject*>(Actor);
                 TargetObject->Modify();
-                TSharedPtr<FJsonObject> Changed;
+                TSharedPtr<FUnrealMCPRecord> Changed;
                 FUnrealMCPError Failure;
                 if (!UnrealMCP::PropertyCodec::Set(
                     TargetObject,
@@ -1335,11 +1335,11 @@ bool FUnrealMCPLevelActorEditingService::Edit(
                 EditAddAffectedPackage(AffectedPackages, Actor);
             }
         }
-        Readback.Add(MakeShared<FJsonValueObject>(Record));
+        Readback.Add(MakeShared<FUnrealMCPValueObject>(Record));
     }
     Transaction.Reset();
 
-    TSharedPtr<FJsonObject> UpdatedCurrent;
+    TSharedPtr<FUnrealMCPRecord> UpdatedCurrent;
     FString UpdatedSnapshot;
     if (!EditReadCurrentResult(Levels, UpdatedCurrent, UpdatedSnapshot, OutError)) return false;
     // World Partition folder edits may dirty an external actor-folder object package
@@ -1372,7 +1372,7 @@ bool FUnrealMCPLevelActorEditingService::Edit(
         OutError = {TEXT("data_limit_exceeded"), TEXT("The affected package set exceeds the published save bound")};
         return false;
     }
-    OutResult = MakeShared<FJsonObject>();
+    OutResult = MakeShared<FUnrealMCPRecord>();
     OutResult->SetStringField(TEXT("map_id"), MapId);
     OutResult->SetStringField(TEXT("snapshot_id"), UpdatedSnapshot);
     OutResult->SetNumberField(TEXT("operation_count"), Plan.Num());
@@ -1385,8 +1385,8 @@ bool FUnrealMCPLevelActorEditingService::Edit(
 }
 
 bool FUnrealMCPLevelActorEditingService::Save(
-    const TSharedPtr<FJsonObject>& Arguments,
-    TSharedPtr<FJsonObject>& OutResult,
+    const TSharedPtr<FUnrealMCPRecord>& Arguments,
+    TSharedPtr<FUnrealMCPRecord>& OutResult,
     FUnrealMCPError& OutError)
 {
     check(IsInGameThread());
@@ -1399,8 +1399,8 @@ bool FUnrealMCPLevelActorEditingService::Save(
     FString OperationId;
     FString MapId;
     FString ExpectedSnapshot;
-    const TArray<TSharedPtr<FJsonValue>>* PackageValues = nullptr;
-    const TSharedPtr<FJsonObject>* Verification = nullptr;
+    const TArray<TSharedPtr<FUnrealMCPValue>>* PackageValues = nullptr;
+    const TSharedPtr<FUnrealMCPRecord>* Verification = nullptr;
     if (!Arguments->TryGetStringField(TEXT("operation_id"), OperationId) || !EditIsLowerHex(OperationId, 32)
         || !Arguments->TryGetStringField(TEXT("map_id"), MapId) || !EditIsLowerHex(MapId, 40)
         || !Arguments->TryGetStringField(TEXT("expected_snapshot"), ExpectedSnapshot) || !EditIsLowerHex(ExpectedSnapshot, 40)
@@ -1413,7 +1413,7 @@ bool FUnrealMCPLevelActorEditingService::Save(
         return false;
     }
     FString VerificationMode;
-    const TArray<TSharedPtr<FJsonValue>>* ExpectedActors = nullptr;
+    const TArray<TSharedPtr<FUnrealMCPValue>>* ExpectedActors = nullptr;
     if (!(*Verification)->TryGetStringField(TEXT("mode"), VerificationMode)
         || (VerificationMode != TEXT("inspect") && VerificationMode != TEXT("reload"))
         || !(*Verification)->TryGetArrayField(TEXT("actors"), ExpectedActors) || ExpectedActors == nullptr
@@ -1425,7 +1425,7 @@ bool FUnrealMCPLevelActorEditingService::Save(
     if (EditUnsafeEditorState(OutError)) return false;
 
     UWorld* World = nullptr;
-    TSharedPtr<FJsonObject> CurrentRecord;
+    TSharedPtr<FUnrealMCPRecord> CurrentRecord;
     FString ActualSnapshot;
     if (!EditCurrentState(Levels, MapId, ExpectedSnapshot, World, CurrentRecord, ActualSnapshot, OutError)) return false;
     const FString RootPackageName = World->GetPackage()->GetName();
@@ -1443,7 +1443,7 @@ bool FUnrealMCPLevelActorEditingService::Save(
     TSet<FString> SeenPackages;
     TArray<UPackage*> Packages;
     Packages.Reserve(PackageValues->Num());
-    for (const TSharedPtr<FJsonValue>& PackageValue : *PackageValues)
+    for (const TSharedPtr<FUnrealMCPValue>& PackageValue : *PackageValues)
     {
         FString PackageName;
         if (!PackageValue.IsValid() || !PackageValue->TryGetString(PackageName)
@@ -1480,7 +1480,7 @@ bool FUnrealMCPLevelActorEditingService::Save(
         return false;
     }
 
-    TArray<TSharedPtr<FJsonValue>> PackageResults;
+    TArray<TSharedPtr<FUnrealMCPValue>> PackageResults;
     TArray<FString> SavedPackages;
     TArray<FString> FailedPackages;
     for (UPackage* Package : Packages)
@@ -1505,19 +1505,19 @@ bool FUnrealMCPLevelActorEditingService::Save(
         const bool bVerified = bSaveSucceeded && bClean && (bStoragePresent || bDeletedFromStorage);
         if (bVerified) SavedPackages.Add(PackageName);
         else FailedPackages.Add(PackageName);
-        const TSharedRef<FJsonObject> PackageResult = MakeShared<FJsonObject>();
+        const TSharedRef<FUnrealMCPRecord> PackageResult = MakeShared<FUnrealMCPRecord>();
         PackageResult->SetStringField(TEXT("package_name"), PackageName);
         PackageResult->SetBoolField(TEXT("save_succeeded"), bSaveSucceeded);
         PackageResult->SetBoolField(TEXT("storage_present"), bStoragePresent);
         PackageResult->SetBoolField(TEXT("deleted_from_storage"), bDeletedFromStorage);
         PackageResult->SetBoolField(TEXT("clean"), bClean);
         PackageResult->SetBoolField(TEXT("verified"), bVerified);
-        PackageResults.Add(MakeShared<FJsonValueObject>(PackageResult));
+        PackageResults.Add(MakeShared<FUnrealMCPValueObject>(PackageResult));
     }
 
     bool bReloaded = false;
     FUnrealMCPError VerificationError;
-    TArray<TSharedPtr<FJsonValue>> VerificationRecords;
+    TArray<TSharedPtr<FUnrealMCPValue>> VerificationRecords;
     bool bVerificationSucceeded = FailedPackages.IsEmpty();
     if (bVerificationSucceeded && VerificationMode == TEXT("reload"))
     {
@@ -1540,13 +1540,13 @@ bool FUnrealMCPLevelActorEditingService::Save(
         VerificationError = {TEXT("partial_persistence"), TEXT("One or more affected packages failed save verification")};
     }
 
-    TSharedPtr<FJsonObject> UpdatedCurrent;
+    TSharedPtr<FUnrealMCPRecord> UpdatedCurrent;
     FString UpdatedSnapshot;
     FUnrealMCPError CurrentError;
     const bool bCurrentAvailable = EditReadCurrentResult(Levels, UpdatedCurrent, UpdatedSnapshot, CurrentError);
     SavedPackages.Sort();
     FailedPackages.Sort();
-    OutResult = MakeShared<FJsonObject>();
+    OutResult = MakeShared<FUnrealMCPRecord>();
     OutResult->SetStringField(TEXT("map_id"), MapId);
     OutResult->SetStringField(TEXT("snapshot_id"), bCurrentAvailable ? UpdatedSnapshot : FString());
     OutResult->SetBoolField(TEXT("saved"), FailedPackages.IsEmpty());
@@ -1560,7 +1560,7 @@ bool FUnrealMCPLevelActorEditingService::Save(
     if (!bVerificationSucceeded)
     {
         OutResult->SetStringField(TEXT("operation_state"), TEXT("partial"));
-        const TSharedRef<FJsonObject> ErrorRecord = MakeShared<FJsonObject>();
+        const TSharedRef<FUnrealMCPRecord> ErrorRecord = MakeShared<FUnrealMCPRecord>();
         ErrorRecord->SetStringField(TEXT("code"), VerificationError.Code.Left(64));
         ErrorRecord->SetStringField(TEXT("message"), VerificationError.Message.Left(512));
         OutResult->SetObjectField(TEXT("verification_error"), ErrorRecord);

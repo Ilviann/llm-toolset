@@ -58,24 +58,24 @@ bool FUnrealMCPLevelInspectTest::RunTest(const FString& Parameters)
     }
 
     FUnrealMCPLevelService Service(TEXT("2222222222222222222222222222222222222222"));
-    TSharedPtr<FJsonObject> Result;
+    TSharedPtr<FUnrealMCPRecord> Result;
     FUnrealMCPError Error;
-    const TSharedRef<FJsonObject> Current = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Current = MakeShared<FUnrealMCPRecord>();
     Current->SetStringField(TEXT("mode"), TEXT("current"));
     TestTrue(TEXT("current map snapshot succeeds"), Service.Inspect(Current, Result, Error));
-    const TSharedPtr<FJsonObject> CurrentRecord = Result->GetArrayField(TEXT("records"))[0]->AsObject();
+    const TSharedPtr<FUnrealMCPRecord> CurrentRecord = Result->GetArrayField(TEXT("records"))[0]->AsObject();
     FString MapId = CurrentRecord->GetStringField(TEXT("map_id"));
     FString Snapshot = Result->GetStringField(TEXT("snapshot_id"));
 
-    const TSharedRef<FJsonObject> Filters = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Filters = MakeShared<FUnrealMCPRecord>();
     Filters->SetStringField(TEXT("label"), TEXT("InspectableActor"));
     Filters->SetStringField(TEXT("tag"), TEXT("Inspectable"));
     Filters->SetStringField(TEXT("folder"), TEXT("MCP/Inspection"));
     Filters->SetBoolField(TEXT("loaded"), true);
-    const TSharedRef<FJsonObject> Region = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Region = MakeShared<FUnrealMCPRecord>();
     const auto Vector = [](double X, double Y, double Z)
     {
-        const TSharedRef<FJsonObject> Value = MakeShared<FJsonObject>();
+        const TSharedRef<FUnrealMCPRecord> Value = MakeShared<FUnrealMCPRecord>();
         Value->SetNumberField(TEXT("x"), X);
         Value->SetNumberField(TEXT("y"), Y);
         Value->SetNumberField(TEXT("z"), Z);
@@ -84,7 +84,7 @@ bool FUnrealMCPLevelInspectTest::RunTest(const FString& Parameters)
     Region->SetObjectField(TEXT("min"), Vector(0.0, 100.0, 200.0));
     Region->SetObjectField(TEXT("max"), Vector(200.0, 300.0, 400.0));
     Filters->SetObjectField(TEXT("region"), Region);
-    const TSharedRef<FJsonObject> Actors = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Actors = MakeShared<FUnrealMCPRecord>();
     Actors->SetStringField(TEXT("mode"), TEXT("actors"));
     Actors->SetStringField(TEXT("map_id"), MapId);
     Actors->SetStringField(TEXT("expected_snapshot"), Snapshot);
@@ -92,7 +92,7 @@ bool FUnrealMCPLevelInspectTest::RunTest(const FString& Parameters)
 
     TestTrue(TEXT("exact actor filters succeed"), Service.Inspect(Actors, Result, Error));
     TestEqual(TEXT("filters return one actor"), Result->GetIntegerField(TEXT("record_count")), 1);
-    const TSharedPtr<FJsonObject> ActorRecord = Result->GetArrayField(TEXT("records"))[0]->AsObject();
+    const TSharedPtr<FUnrealMCPRecord> ActorRecord = Result->GetArrayField(TEXT("records"))[0]->AsObject();
     const FString ActorId = ActorRecord->GetStringField(TEXT("actor_id"));
     TestEqual(TEXT("actor identity is map-qualified"), ActorId.Left(40), MapId);
     TestTrue(TEXT("World Partition descriptor is reported"), ActorRecord->GetBoolField(TEXT("descriptor_available")));
@@ -106,7 +106,7 @@ bool FUnrealMCPLevelInspectTest::RunTest(const FString& Parameters)
     World = GEditor->GetEditorWorldContext().World();
     TestNotNull(TEXT("reloaded fixture world exists"), World);
     TestTrue(TEXT("reloaded current map snapshot succeeds"), Service.Inspect(Current, Result, Error));
-    const TSharedPtr<FJsonObject> ReloadedCurrent =
+    const TSharedPtr<FUnrealMCPRecord> ReloadedCurrent =
         Result->GetArrayField(TEXT("records"))[0]->AsObject();
     TestEqual(TEXT("map identity survives reload"),
         ReloadedCurrent->GetStringField(TEXT("map_id")), MapId);
@@ -141,20 +141,20 @@ bool FUnrealMCPLevelInspectTest::RunTest(const FString& Parameters)
     TestFalse(TEXT("broad descriptor query does not load its match"),
         IsFixtureActorRegistered());
 
-    const TSharedRef<FJsonObject> ActorInspect = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> ActorInspect = MakeShared<FUnrealMCPRecord>();
     ActorInspect->SetStringField(TEXT("mode"), TEXT("actor"));
     ActorInspect->SetStringField(TEXT("map_id"), MapId);
     ActorInspect->SetStringField(TEXT("expected_snapshot"), Snapshot);
     ActorInspect->SetStringField(TEXT("actor_id"), ActorId);
-    ActorInspect->SetArrayField(TEXT("property_names"), {MakeShared<FJsonValueString>(TEXT("Tags"))});
+    ActorInspect->SetArrayField(TEXT("property_names"), {MakeShared<FUnrealMCPValueString>(TEXT("Tags"))});
     TestTrue(TEXT("exact live actor inspection succeeds"), Service.Inspect(ActorInspect, Result, Error));
     FString TextComponentId;
     FString InstanceComponentId;
     int32 ComponentCount = 0;
     int32 PropertyCount = 0;
-    for (const TSharedPtr<FJsonValue>& Value : Result->GetArrayField(TEXT("records")))
+    for (const TSharedPtr<FUnrealMCPValue>& Value : Result->GetArrayField(TEXT("records")))
     {
-        const TSharedPtr<FJsonObject> Record = Value->AsObject();
+        const TSharedPtr<FUnrealMCPRecord> Record = Value->AsObject();
         const FString Section = Record->GetStringField(TEXT("section"));
         if (Section == TEXT("component"))
         {
@@ -182,13 +182,13 @@ bool FUnrealMCPLevelInspectTest::RunTest(const FString& Parameters)
     TestFalse(TEXT("exact actor load is released after inspection"),
         IsFixtureActorRegistered());
 
-    const TSharedRef<FJsonObject> ComponentInspect = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> ComponentInspect = MakeShared<FUnrealMCPRecord>();
     ComponentInspect->SetStringField(TEXT("mode"), TEXT("component"));
     ComponentInspect->SetStringField(TEXT("map_id"), MapId);
     ComponentInspect->SetStringField(TEXT("expected_snapshot"), Snapshot);
     ComponentInspect->SetStringField(TEXT("actor_id"), ActorId);
     ComponentInspect->SetStringField(TEXT("component_id"), TextComponentId);
-    ComponentInspect->SetArrayField(TEXT("property_names"), {MakeShared<FJsonValueString>(TEXT("Text"))});
+    ComponentInspect->SetArrayField(TEXT("property_names"), {MakeShared<FUnrealMCPValueString>(TEXT("Text"))});
     TestTrue(TEXT("exact component property inspection succeeds"), Service.Inspect(ComponentInspect, Result, Error));
     TestEqual(TEXT("component query returns actor, component, and property"),
         Result->GetIntegerField(TEXT("record_count")), 3);
@@ -199,21 +199,21 @@ bool FUnrealMCPLevelInspectTest::RunTest(const FString& Parameters)
     TestFalse(TEXT("exact component load is released after inspection"),
         IsFixtureActorRegistered());
 
-    const TSharedRef<FJsonObject> Unsupported = MakeShared<FJsonObject>(*ActorInspect);
+    const TSharedRef<FUnrealMCPRecord> Unsupported = MakeShared<FUnrealMCPRecord>(*ActorInspect);
     Unsupported->SetArrayField(
-        TEXT("property_names"), {MakeShared<FJsonValueString>(TEXT("DefinitelyMissing"))});
+        TEXT("property_names"), {MakeShared<FUnrealMCPValueString>(TEXT("DefinitelyMissing"))});
     TestFalse(TEXT("unsupported reflected property rejects"), Service.Inspect(Unsupported, Result, Error));
     TestEqual(TEXT("unsupported property error is stable"),
         Error.Code, FString(TEXT("unsupported_property")));
 
-    const TSharedRef<FJsonObject> Broad = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Broad = MakeShared<FUnrealMCPRecord>();
     Broad->SetStringField(TEXT("mode"), TEXT("actors"));
     Broad->SetStringField(TEXT("map_id"), MapId);
     Broad->SetStringField(TEXT("expected_snapshot"), Snapshot);
     Broad->SetNumberField(TEXT("page_size"), 1);
     TestTrue(TEXT("bounded actor page succeeds"), Service.Inspect(Broad, Result, Error));
     TestTrue(TEXT("actor page has a continuation"), Result->GetBoolField(TEXT("has_more")));
-    const TSharedRef<FJsonObject> Continue = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Continue = MakeShared<FUnrealMCPRecord>();
     Continue->SetStringField(TEXT("cursor"), Result->GetStringField(TEXT("next_cursor")));
     Continue->SetNumberField(TEXT("page_size"), 1);
     TestTrue(TEXT("actor cursor continues"), Service.Inspect(Continue, Result, Error));

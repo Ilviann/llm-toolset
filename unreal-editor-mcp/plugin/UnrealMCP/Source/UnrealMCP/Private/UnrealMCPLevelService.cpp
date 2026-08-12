@@ -28,14 +28,14 @@ FString HashLevelText(const FString& Text)
     return BytesToHex(Digest, FSHA1::DigestSize).ToLower();
 }
 
-bool LevelHasOnlyFields(const FJsonObject& Object, std::initializer_list<const TCHAR*> Allowed)
+bool LevelHasOnlyFields(const FUnrealMCPRecord& Object, std::initializer_list<const TCHAR*> Allowed)
 {
     TSet<FString> Names;
     for (const TCHAR* Name : Allowed)
     {
         Names.Add(Name);
     }
-    for (const TPair<FString, TSharedPtr<FJsonValue>>& Pair : Object.Values)
+    for (const TPair<FString, TSharedPtr<FUnrealMCPValue>>& Pair : Object.Values)
     {
         if (!Names.Contains(Pair.Key))
         {
@@ -45,7 +45,7 @@ bool LevelHasOnlyFields(const FJsonObject& Object, std::initializer_list<const T
     return true;
 }
 
-bool ReadLevelPageSize(const FJsonObject& Object, int32& OutPageSize, FUnrealMCPError& OutError)
+bool ReadLevelPageSize(const FUnrealMCPRecord& Object, int32& OutPageSize, FUnrealMCPError& OutError)
 {
     OutPageSize = UnrealMCP::DefaultInspectPageSize;
     if (!Object.HasField(TEXT("page_size")))
@@ -89,10 +89,10 @@ FString LevelObjectPathForAsset(const FAssetData& Asset)
     return Asset.GetObjectPathString();
 }
 
-TSharedRef<FJsonObject> LevelDiscoveryRecord(const FAssetData& Asset)
+TSharedRef<FUnrealMCPRecord> LevelDiscoveryRecord(const FAssetData& Asset)
 {
     const FString PackageName = Asset.PackageName.ToString();
-    const TSharedRef<FJsonObject> Record = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Record = MakeShared<FUnrealMCPRecord>();
     Record->SetStringField(TEXT("section"), TEXT("map"));
     Record->SetStringField(TEXT("map_path"), LevelObjectPathForAsset(Asset));
     Record->SetStringField(TEXT("package_name"), PackageName);
@@ -150,8 +150,8 @@ void FUnrealMCPLevelService::RemoveExpiredCursors(double CurrentTime)
 }
 
 bool FUnrealMCPLevelService::Inspect(
-    const TSharedPtr<FJsonObject>& Arguments,
-    TSharedPtr<FJsonObject>& OutResult,
+    const TSharedPtr<FUnrealMCPRecord>& Arguments,
+    TSharedPtr<FUnrealMCPRecord>& OutResult,
     FUnrealMCPError& OutError)
 {
     check(IsInGameThread());
@@ -179,7 +179,7 @@ bool FUnrealMCPLevelService::Inspect(
     FCursorState* State = Cursors.Find(Cursor);
     if (State == nullptr)
     {
-        OutError = {TEXT("cursor_expired"), TEXT("The level cursor is missing or expired"), MakeShared<FJsonObject>(), true};
+        OutError = {TEXT("cursor_expired"), TEXT("The level cursor is missing or expired"), MakeShared<FUnrealMCPRecord>(), true};
         return false;
     }
     int32 PageSize = UnrealMCP::DefaultInspectPageSize;
@@ -193,11 +193,11 @@ bool FUnrealMCPLevelService::Inspect(
 }
 
 bool FUnrealMCPLevelService::InspectInitial(
-    const TSharedPtr<FJsonObject>& Arguments,
+    const TSharedPtr<FUnrealMCPRecord>& Arguments,
     int32 Offset,
     const FString& ExpectedSnapshot,
     int32 PageSizeOverride,
-    TSharedPtr<FJsonObject>& OutResult,
+    TSharedPtr<FUnrealMCPRecord>& OutResult,
     FUnrealMCPError& OutError)
 {
     FString Mode;
@@ -215,16 +215,16 @@ bool FUnrealMCPLevelService::InspectInitial(
             OutError = {TEXT("invalid_argument"), TEXT("Current-map inspection accepts only mode")};
             return false;
         }
-        TSharedPtr<FJsonObject> Record;
+        TSharedPtr<FUnrealMCPRecord> Record;
         FString Snapshot;
         if (!BuildCurrent(Record, Snapshot, OutError))
         {
             return false;
         }
-        const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+        const TSharedRef<FUnrealMCPRecord> Result = MakeShared<FUnrealMCPRecord>();
         Result->SetStringField(TEXT("mode"), Mode);
         Result->SetStringField(TEXT("snapshot_id"), Snapshot);
-        Result->SetArrayField(TEXT("records"), {MakeShared<FJsonValueObject>(Record.ToSharedRef())});
+        Result->SetArrayField(TEXT("records"), {MakeShared<FUnrealMCPValueObject>(Record.ToSharedRef())});
         Result->SetNumberField(TEXT("record_count"), 1);
         Result->SetNumberField(TEXT("page_offset"), 0);
         Result->SetBoolField(TEXT("scan_truncated"), false);
@@ -242,7 +242,7 @@ bool FUnrealMCPLevelService::InspectInitial(
     {
         PageSize = PageSizeOverride;
     }
-    TArray<TSharedPtr<FJsonValue>> Records;
+    TArray<TSharedPtr<FUnrealMCPValue>> Records;
     FString Snapshot;
     bool bScanTruncated = false;
     if (Mode == TEXT("discover"))
@@ -254,7 +254,7 @@ bool FUnrealMCPLevelService::InspectInitial(
     }
     else
     {
-        TSharedPtr<FJsonObject> CurrentRecord;
+        TSharedPtr<FUnrealMCPRecord> CurrentRecord;
         if (!BuildCurrent(CurrentRecord, Snapshot, OutError))
         {
             return false;
@@ -282,12 +282,12 @@ bool FUnrealMCPLevelService::InspectInitial(
         return false;
     }
     const int32 End = FMath::Min(Offset + PageSize, Records.Num());
-    TArray<TSharedPtr<FJsonValue>> Page;
+    TArray<TSharedPtr<FUnrealMCPValue>> Page;
     for (int32 Index = Offset; Index < End; ++Index)
     {
         Page.Add(Records[Index]);
     }
-    const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Result = MakeShared<FUnrealMCPRecord>();
     Result->SetStringField(TEXT("mode"), Mode);
     Result->SetStringField(TEXT("snapshot_id"), Snapshot);
     Result->SetArrayField(TEXT("records"), Page);
@@ -324,8 +324,8 @@ bool FUnrealMCPLevelService::InspectInitial(
 }
 
 bool FUnrealMCPLevelService::BuildDiscovery(
-    const FJsonObject& Arguments,
-    TArray<TSharedPtr<FJsonValue>>& OutRecords,
+    const FUnrealMCPRecord& Arguments,
+    TArray<TSharedPtr<FUnrealMCPValue>>& OutRecords,
     FString& OutSnapshot,
     bool& OutScanTruncated,
     FUnrealMCPError& OutError) const
@@ -390,12 +390,12 @@ bool FUnrealMCPLevelService::BuildDiscovery(
     Fingerprint.Add(OutScanTruncated ? TEXT("truncated") : TEXT("complete"));
     for (const FAssetData& Asset : Assets)
     {
-        const TSharedRef<FJsonObject> Record = LevelDiscoveryRecord(Asset);
+        const TSharedRef<FUnrealMCPRecord> Record = LevelDiscoveryRecord(Asset);
         Fingerprint.Add(
             Record->GetStringField(TEXT("map_path"))
             + TEXT("|") + (Record->GetBoolField(TEXT("world_partition")) ? TEXT("1") : TEXT("0"))
             + TEXT("|") + (Record->GetBoolField(TEXT("external_actors")) ? TEXT("1") : TEXT("0")));
-        OutRecords.Add(MakeShared<FJsonValueObject>(Record));
+        OutRecords.Add(MakeShared<FUnrealMCPValueObject>(Record));
     }
     OutSnapshot = HashLevelText(FString::Join(Fingerprint, TEXT("\n")));
     return true;
@@ -484,7 +484,7 @@ FString FUnrealMCPLevelService::MapRevision(UWorld* World, const FDirtyState& Di
 }
 
 bool FUnrealMCPLevelService::BuildCurrent(
-    TSharedPtr<FJsonObject>& OutRecord,
+    TSharedPtr<FUnrealMCPRecord>& OutRecord,
     FString& OutSnapshot,
     FUnrealMCPError& OutError)
 {
@@ -492,7 +492,7 @@ bool FUnrealMCPLevelService::BuildCurrent(
     UWorld* World = CurrentEditorWorld();
     if (World == nullptr || World->GetPackage() == nullptr)
     {
-        OutError = {TEXT("editor_unavailable"), TEXT("No editor world is available"), MakeShared<FJsonObject>(), true};
+        OutError = {TEXT("editor_unavailable"), TEXT("No editor world is available"), MakeShared<FUnrealMCPRecord>(), true};
         return false;
     }
     const FString PackageName = CurrentMapPackageName(World);
@@ -501,7 +501,7 @@ bool FUnrealMCPLevelService::BuildCurrent(
     const FString Revision = MapRevision(World, DirtyState);
     const bool bMounted = FPackageName::IsValidLongPackageName(PackageName)
         && FAssetRegistryModule::GetRegistry().GetAssetByObjectPath(FSoftObjectPath(MapPath)).IsValid();
-    const TSharedRef<FJsonObject> Record = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Record = MakeShared<FUnrealMCPRecord>();
     Record->SetStringField(TEXT("section"), TEXT("current_map"));
     Record->SetStringField(TEXT("map_id"), MapIdentity(MapPath));
     Record->SetStringField(TEXT("map_path"), MapPath);
@@ -518,10 +518,10 @@ bool FUnrealMCPLevelService::BuildCurrent(
     Record->SetBoolField(
         TEXT("external_actors"),
         World->PersistentLevel != nullptr && World->PersistentLevel->IsUsingExternalActors());
-    TArray<TSharedPtr<FJsonValue>> DirtyPackages;
+    TArray<TSharedPtr<FUnrealMCPValue>> DirtyPackages;
     for (const FString& DirtyPackage : DirtyState.DirtyPackages)
     {
-        DirtyPackages.Add(MakeShared<FJsonValueString>(DirtyPackage));
+        DirtyPackages.Add(MakeShared<FUnrealMCPValueString>(DirtyPackage));
     }
     Record->SetArrayField(TEXT("dirty_packages"), DirtyPackages);
     OutSnapshot = HashLevelText(
@@ -533,8 +533,8 @@ bool FUnrealMCPLevelService::BuildCurrent(
 }
 
 bool FUnrealMCPLevelService::Open(
-    const TSharedPtr<FJsonObject>& Arguments,
-    TSharedPtr<FJsonObject>& OutResult,
+    const TSharedPtr<FUnrealMCPRecord>& Arguments,
+    TSharedPtr<FUnrealMCPRecord>& OutResult,
     FUnrealMCPError& OutError)
 {
     check(IsInGameThread());
@@ -569,7 +569,7 @@ bool FUnrealMCPLevelService::Open(
         return false;
     }
 
-    TSharedPtr<FJsonObject> BeforeRecord;
+    TSharedPtr<FUnrealMCPRecord> BeforeRecord;
     FString BeforeSnapshot;
     if (!BuildCurrent(BeforeRecord, BeforeSnapshot, OutError))
     {
@@ -589,7 +589,7 @@ bool FUnrealMCPLevelService::Open(
         if (bPlaying || bSimulating || bSaving || bCollecting || bTransaction || bCompiling
             || bAsyncLoading || DirtyState.bDirty || !DirtyState.bComplete)
         {
-            const TSharedRef<FJsonObject> Details = MakeShared<FJsonObject>();
+            const TSharedRef<FUnrealMCPRecord> Details = MakeShared<FUnrealMCPRecord>();
             Details->SetBoolField(TEXT("is_playing"), bPlaying);
             Details->SetBoolField(TEXT("is_simulating"), bSimulating);
             Details->SetBoolField(TEXT("is_saving"), bSaving);
@@ -620,12 +620,12 @@ bool FUnrealMCPLevelService::Open(
         MutationSerial = 0;
         if (!bLoaded)
         {
-            OutError = {TEXT("open_failed"), TEXT("Unreal Editor could not open the requested map"), MakeShared<FJsonObject>(), true};
+            OutError = {TEXT("open_failed"), TEXT("Unreal Editor could not open the requested map"), MakeShared<FUnrealMCPRecord>(), true};
             return false;
         }
     }
 
-    TSharedPtr<FJsonObject> CurrentRecord;
+    TSharedPtr<FUnrealMCPRecord> CurrentRecord;
     FString CurrentSnapshot;
     if (!BuildCurrent(CurrentRecord, CurrentSnapshot, OutError))
     {
@@ -636,7 +636,7 @@ bool FUnrealMCPLevelService::Open(
         OutError = {TEXT("open_failed"), TEXT("The editor current map does not match the requested map after opening")};
         return false;
     }
-    const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Result = MakeShared<FUnrealMCPRecord>();
     Result->SetStringField(TEXT("map_path"), MapPath);
     Result->SetBoolField(TEXT("opened"), !bAlreadyCurrent);
     Result->SetBoolField(TEXT("already_current"), bAlreadyCurrent);

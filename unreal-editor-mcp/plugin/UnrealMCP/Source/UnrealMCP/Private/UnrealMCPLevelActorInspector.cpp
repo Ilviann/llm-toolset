@@ -46,11 +46,11 @@ AActor* LoadedDescriptorActor(const FWorldPartitionActorDescInstance* Descriptor
         : nullptr;
 }
 
-bool HasOnlyFields(const FJsonObject& Object, std::initializer_list<const TCHAR*> Allowed)
+bool HasOnlyFields(const FUnrealMCPRecord& Object, std::initializer_list<const TCHAR*> Allowed)
 {
     TSet<FString> Names;
     for (const TCHAR* Name : Allowed) Names.Add(Name);
-    for (const TPair<FString, TSharedPtr<FJsonValue>>& Pair : Object.Values)
+    for (const TPair<FString, TSharedPtr<FUnrealMCPValue>>& Pair : Object.Values)
     {
         if (!Names.Contains(Pair.Key)) return false;
     }
@@ -68,7 +68,7 @@ bool IsLowerHex(const FString& Value, int32 Length)
 }
 
 bool ReadBoundedString(
-    const FJsonObject& Object,
+    const FUnrealMCPRecord& Object,
     const TCHAR* Name,
     int32 Maximum,
     bool bRequired,
@@ -89,7 +89,7 @@ bool ReadBoundedString(
     return true;
 }
 
-bool ReadVector(const FJsonObject& Object, FVector& Out)
+bool ReadVector(const FUnrealMCPRecord& Object, FVector& Out)
 {
     if (!HasOnlyFields(Object, {TEXT("x"), TEXT("y"), TEXT("z")}))
     {
@@ -133,21 +133,21 @@ FString StableId(const FString& Text)
     return BytesToHex(Digest, FSHA1::DigestSize).ToLower().Left(32);
 }
 
-TSharedRef<FJsonObject> VectorRecord(const FVector& Value)
+TSharedRef<FUnrealMCPRecord> VectorRecord(const FVector& Value)
 {
-    const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Result = MakeShared<FUnrealMCPRecord>();
     Result->SetNumberField(TEXT("x"), Value.X);
     Result->SetNumberField(TEXT("y"), Value.Y);
     Result->SetNumberField(TEXT("z"), Value.Z);
     return Result;
 }
 
-TSharedRef<FJsonObject> TransformRecord(const FTransform& Value)
+TSharedRef<FUnrealMCPRecord> TransformRecord(const FTransform& Value)
 {
-    const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Result = MakeShared<FUnrealMCPRecord>();
     Result->SetObjectField(TEXT("location"), VectorRecord(Value.GetLocation()));
     const FRotator Rotation = Value.Rotator();
-    const TSharedRef<FJsonObject> RotationRecord = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> RotationRecord = MakeShared<FUnrealMCPRecord>();
     RotationRecord->SetNumberField(TEXT("roll"), Rotation.Roll);
     RotationRecord->SetNumberField(TEXT("pitch"), Rotation.Pitch);
     RotationRecord->SetNumberField(TEXT("yaw"), Rotation.Yaw);
@@ -156,12 +156,12 @@ TSharedRef<FJsonObject> TransformRecord(const FTransform& Value)
     return Result;
 }
 
-void SetBounds(const TSharedRef<FJsonObject>& Record, const FBox& Bounds)
+void SetBounds(const TSharedRef<FUnrealMCPRecord>& Record, const FBox& Bounds)
 {
     Record->SetBoolField(TEXT("bounds_available"), Bounds.IsValid != 0);
     if (Bounds.IsValid)
     {
-        const TSharedRef<FJsonObject> Value = MakeShared<FJsonObject>();
+        const TSharedRef<FUnrealMCPRecord> Value = MakeShared<FUnrealMCPRecord>();
         Value->SetObjectField(TEXT("min"), VectorRecord(Bounds.Min));
         Value->SetObjectField(TEXT("max"), VectorRecord(Bounds.Max));
         Record->SetObjectField(TEXT("bounds"), Value);
@@ -252,14 +252,14 @@ bool Matches(const FActorCandidate& Candidate, const FActorFilters& Filters, con
     return true;
 }
 
-TSharedRef<FJsonObject> ActorRecord(const FActorCandidate& Candidate, const FString& MapId)
+TSharedRef<FUnrealMCPRecord> ActorRecord(const FActorCandidate& Candidate, const FString& MapId)
 {
     const bool bLoaded = Candidate.Actor != nullptr;
     const FString PackageName = Candidate.Descriptor != nullptr
         ? Candidate.Descriptor->GetActorPackage().ToString()
         : (Candidate.Actor != nullptr && Candidate.Actor->GetPackage() != nullptr
             ? Candidate.Actor->GetPackage()->GetName() : FString());
-    const TSharedRef<FJsonObject> Record = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Record = MakeShared<FUnrealMCPRecord>();
     Record->SetStringField(TEXT("section"), TEXT("actor"));
     Record->SetStringField(TEXT("actor_id"), ActorId(MapId, Candidate.Guid));
     Record->SetStringField(TEXT("actor_guid"), Candidate.Guid.ToString(EGuidFormats::Digits).ToLower());
@@ -288,14 +288,14 @@ TSharedRef<FJsonObject> ActorRecord(const FActorCandidate& Candidate, const FStr
             : (Candidate.Actor != nullptr ? Candidate.Actor->GetActorTransform() : FTransform::Identity)));
     SetBounds(Record, CandidateBounds(Candidate));
 
-    TArray<TSharedPtr<FJsonValue>> Tags;
-    for (const FString& Tag : CandidateTags(Candidate)) Tags.Add(MakeShared<FJsonValueString>(Tag));
+    TArray<TSharedPtr<FUnrealMCPValue>> Tags;
+    for (const FString& Tag : CandidateTags(Candidate)) Tags.Add(MakeShared<FUnrealMCPValueString>(Tag));
     Record->SetArrayField(TEXT("tags"), Tags);
     Record->SetBoolField(TEXT("tags_truncated"), (Candidate.Descriptor != nullptr
         ? Candidate.Descriptor->GetTags().Num()
         : (Candidate.Actor != nullptr ? Candidate.Actor->Tags.Num() : 0)) > UnrealMCP::MaxLevelActorTags);
-    TArray<TSharedPtr<FJsonValue>> DataLayers;
-    for (const FString& Name : CandidateDataLayers(Candidate)) DataLayers.Add(MakeShared<FJsonValueString>(Name));
+    TArray<TSharedPtr<FUnrealMCPValue>> DataLayers;
+    for (const FString& Name : CandidateDataLayers(Candidate)) DataLayers.Add(MakeShared<FUnrealMCPValueString>(Name));
     Record->SetArrayField(TEXT("data_layers"), DataLayers);
     const int32 DataLayerCount = Candidate.Descriptor != nullptr
         ? Candidate.Descriptor->GetDataLayers().Num()
@@ -336,11 +336,11 @@ FString ComponentId(const FString& OwnerActorId, const UActorComponent* Componen
         + (Component != nullptr ? CreationMethodName(Component->CreationMethod) : FString()));
 }
 
-TSharedRef<FJsonObject> ComponentRecord(
+TSharedRef<FUnrealMCPRecord> ComponentRecord(
     UActorComponent* Component,
     const FString& OwnerActorId)
 {
-    const TSharedRef<FJsonObject> Record = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Record = MakeShared<FUnrealMCPRecord>();
     Record->SetStringField(TEXT("section"), TEXT("component"));
     Record->SetStringField(TEXT("actor_id"), OwnerActorId);
     Record->SetStringField(TEXT("component_id"), ComponentId(OwnerActorId, Component));
@@ -362,12 +362,12 @@ TSharedRef<FJsonObject> ComponentRecord(
 }
 
 bool ReadPropertyNames(
-    const FJsonObject& Arguments,
+    const FUnrealMCPRecord& Arguments,
     TArray<FString>& OutNames,
     FUnrealMCPError& OutError)
 {
     if (!Arguments.HasField(TEXT("property_names"))) return true;
-    const TArray<TSharedPtr<FJsonValue>>* Values = nullptr;
+    const TArray<TSharedPtr<FUnrealMCPValue>>* Values = nullptr;
     if (!Arguments.TryGetArrayField(TEXT("property_names"), Values)
         || Values == nullptr || Values->IsEmpty() || Values->Num() > UnrealMCP::MaxPropertyNames)
     {
@@ -375,7 +375,7 @@ bool ReadPropertyNames(
         return false;
     }
     TSet<FString> Seen;
-    for (const TSharedPtr<FJsonValue>& Value : *Values)
+    for (const TSharedPtr<FUnrealMCPValue>& Value : *Values)
     {
         FString Name;
         if (!Value.IsValid() || !Value->TryGetString(Name) || Name.IsEmpty()
@@ -396,7 +396,7 @@ bool AddProperties(
     const FString& OwnerKind,
     const FString& OwnerId,
     const TArray<FString>& Names,
-    TArray<TSharedPtr<FJsonValue>>& OutRecords,
+    TArray<TSharedPtr<FUnrealMCPValue>>& OutRecords,
     FUnrealMCPError& OutError)
 {
     for (const FString& Name : Names)
@@ -412,7 +412,7 @@ bool AddProperties(
             && !Property->IsA<FDelegateProperty>()
             && !Property->IsA<FMulticastDelegateProperty>()
             && !Property->IsA<FInterfaceProperty>();
-        TSharedPtr<FJsonValue> Encoded;
+        TSharedPtr<FUnrealMCPValue> Encoded;
         FUnrealMCPError CodecError;
         if (!bVisible || !UnrealMCP::GameDataValueCodec::Encode(
                 Property,
@@ -422,7 +422,7 @@ bool AddProperties(
                 Encoded,
                 CodecError))
         {
-            const TSharedRef<FJsonObject> Details = MakeShared<FJsonObject>();
+            const TSharedRef<FUnrealMCPRecord> Details = MakeShared<FUnrealMCPRecord>();
             Details->SetStringField(TEXT("property_name"), Name);
             if (!CodecError.Message.IsEmpty()) Details->SetStringField(TEXT("reason"), CodecError.Message.Left(512));
             OutError = {
@@ -431,7 +431,7 @@ bool AddProperties(
                 Details};
             return false;
         }
-        const TSharedRef<FJsonObject> Record = MakeShared<FJsonObject>();
+        const TSharedRef<FUnrealMCPRecord> Record = MakeShared<FUnrealMCPRecord>();
         Record->SetStringField(TEXT("section"), TEXT("property"));
         Record->SetStringField(TEXT("owner_kind"), OwnerKind);
         Record->SetStringField(TEXT("owner_id"), OwnerId);
@@ -441,19 +441,19 @@ bool AddProperties(
         Record->SetBoolField(TEXT("blueprint_visible"), Property->HasAnyPropertyFlags(CPF_BlueprintVisible));
         Record->SetObjectField(TEXT("type"), UnrealMCP::GameDataValueCodec::EncodeType(Property));
         Record->SetField(TEXT("value"), Encoded);
-        OutRecords.Add(MakeShared<FJsonValueObject>(Record));
+        OutRecords.Add(MakeShared<FUnrealMCPValueObject>(Record));
     }
     return true;
 }
 
 bool ReadFilters(
-    const FJsonObject& Arguments,
+    const FUnrealMCPRecord& Arguments,
     const FString& MapId,
     FActorFilters& Out,
     FUnrealMCPError& OutError)
 {
     if (!Arguments.HasField(TEXT("filters"))) return true;
-    const TSharedPtr<FJsonObject>* Filters = nullptr;
+    const TSharedPtr<FUnrealMCPRecord>* Filters = nullptr;
     if (!Arguments.TryGetObjectField(TEXT("filters"), Filters)
         || Filters == nullptr || !(*Filters).IsValid()
         || !HasOnlyFields(**Filters, {
@@ -505,9 +505,9 @@ bool ReadFilters(
     }
     if ((*Filters)->HasField(TEXT("region")))
     {
-        const TSharedPtr<FJsonObject>* Region = nullptr;
-        const TSharedPtr<FJsonObject>* Min = nullptr;
-        const TSharedPtr<FJsonObject>* Max = nullptr;
+        const TSharedPtr<FUnrealMCPRecord>* Region = nullptr;
+        const TSharedPtr<FUnrealMCPRecord>* Min = nullptr;
+        const TSharedPtr<FUnrealMCPRecord>* Max = nullptr;
         FVector MinValue;
         FVector MaxValue;
         if (!(*Filters)->TryGetObjectField(TEXT("region"), Region) || Region == nullptr || !(*Region).IsValid()
@@ -533,7 +533,7 @@ bool CollectCandidates(
 {
     if (World == nullptr || World->PersistentLevel == nullptr)
     {
-        OutError = {TEXT("editor_unavailable"), TEXT("No current persistent editor level is available"), MakeShared<FJsonObject>(), true};
+        OutError = {TEXT("editor_unavailable"), TEXT("No current persistent editor level is available"), MakeShared<FUnrealMCPRecord>(), true};
         return false;
     }
     int32 Scanned = 0;
@@ -606,7 +606,7 @@ bool ResolveTarget(
         }
         if (Actor == nullptr)
         {
-            const TSharedRef<FJsonObject> Details = MakeShared<FJsonObject>();
+            const TSharedRef<FUnrealMCPRecord> Details = MakeShared<FUnrealMCPRecord>();
             Details->SetStringField(TEXT("actor_id"), RequestedActorId);
             Details->SetStringField(TEXT("unloaded_reason"), Descriptor->GetUnloadedReason().ToString().Left(512));
             OutError = {
@@ -638,11 +638,11 @@ bool ResolveTarget(
 using namespace UnrealMCPLevelActorInspectorPrivate;
 
 bool FUnrealMCPLevelActorInspector::BuildRecords(
-    const FJsonObject& Arguments,
+    const FUnrealMCPRecord& Arguments,
     UWorld* World,
     const FString& MapId,
     const FString& SnapshotId,
-    TArray<TSharedPtr<FJsonValue>>& OutRecords,
+    TArray<TSharedPtr<FUnrealMCPValue>>& OutRecords,
     bool& OutScanTruncated,
     FUnrealMCPError& OutError)
 {
@@ -661,7 +661,7 @@ bool FUnrealMCPLevelActorInspector::BuildRecords(
     }
     if (RequestedMapId != MapId || ExpectedSnapshot != SnapshotId)
     {
-        const TSharedRef<FJsonObject> Details = MakeShared<FJsonObject>();
+        const TSharedRef<FUnrealMCPRecord> Details = MakeShared<FUnrealMCPRecord>();
         Details->SetStringField(TEXT("current_map_id"), MapId);
         Details->SetStringField(TEXT("current_snapshot"), SnapshotId);
         OutError = {TEXT("stale_precondition"), TEXT("The current map identity or snapshot does not match the request"), Details};
@@ -692,7 +692,7 @@ bool FUnrealMCPLevelActorInspector::BuildRecords(
                 OutScanTruncated = true;
                 break;
             }
-            OutRecords.Add(MakeShared<FJsonValueObject>(ActorRecord(Candidate, MapId)));
+            OutRecords.Add(MakeShared<FUnrealMCPValueObject>(ActorRecord(Candidate, MapId)));
         }
         return true;
     }
@@ -719,7 +719,7 @@ bool FUnrealMCPLevelActorInspector::BuildRecords(
     FActorCandidate Candidate;
     TUniquePtr<FWorldPartitionReference> TemporaryReference;
     if (!ResolveTarget(World, MapId, RequestedActorId, Candidate, TemporaryReference, OutError)) return false;
-    OutRecords.Add(MakeShared<FJsonValueObject>(ActorRecord(Candidate, MapId)));
+    OutRecords.Add(MakeShared<FUnrealMCPValueObject>(ActorRecord(Candidate, MapId)));
 
     TArray<UActorComponent*> Components;
     Candidate.Actor->GetComponents(Components);
@@ -739,7 +739,7 @@ bool FUnrealMCPLevelActorInspector::BuildRecords(
     {
         for (UActorComponent* Component : Components)
         {
-            OutRecords.Add(MakeShared<FJsonValueObject>(ComponentRecord(Component, RequestedActorId)));
+            OutRecords.Add(MakeShared<FUnrealMCPValueObject>(ComponentRecord(Component, RequestedActorId)));
         }
         return AddProperties(
             Candidate.Actor,
@@ -772,7 +772,7 @@ bool FUnrealMCPLevelActorInspector::BuildRecords(
         OutError = {TEXT("not_found"), TEXT("The requested actor-scoped component was not found")};
         return false;
     }
-    OutRecords.Add(MakeShared<FJsonValueObject>(ComponentRecord(Selected, RequestedActorId)));
+    OutRecords.Add(MakeShared<FUnrealMCPValueObject>(ComponentRecord(Selected, RequestedActorId)));
     return AddProperties(
         Selected,
         TEXT("component"),

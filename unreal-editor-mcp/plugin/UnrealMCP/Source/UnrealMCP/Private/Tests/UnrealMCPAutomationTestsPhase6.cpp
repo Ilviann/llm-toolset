@@ -13,23 +13,23 @@ bool FUnrealMCPPhase6FunctionAndLocalTest::RunTest(const FString& Parameters)
     const FString AssetPath = Blueprint->GetPathName();
     FUnrealMCPBlueprintInspector Inspector;
     FUnrealMCPBlueprintMutator Mutator(Inspector);
-    TSharedPtr<FJsonObject> Result;
+    TSharedPtr<FUnrealMCPRecord> Result;
     FUnrealMCPError Error;
 
     FString Snapshot = InspectSnapshot(Inspector, AssetPath);
-    TSharedRef<FJsonObject> IntType = K2Type(TEXT("int"));
-    TSharedRef<FJsonObject> ConstRefString = K2Type(TEXT("string"));
+    TSharedRef<FUnrealMCPRecord> IntType = K2Type(TEXT("int"));
+    TSharedRef<FUnrealMCPRecord> ConstRefString = K2Type(TEXT("string"));
     ConstRefString->SetBoolField(TEXT("reference"), true);
     ConstRefString->SetBoolField(TEXT("const"), true);
-    TArray<TSharedPtr<FJsonValue>> ParametersJson = {
-        MakeShared<FJsonValueObject>(FunctionParameter(TEXT("Count"), TEXT("input"), IntType,
-            LiteralDefault(MakeShared<FJsonValueNumber>(3)))),
-        MakeShared<FJsonValueObject>(FunctionParameter(TEXT("Label"), TEXT("input"), ConstRefString)),
-        MakeShared<FJsonValueObject>(FunctionParameter(TEXT("Succeeded"), TEXT("output"), K2Type(TEXT("boolean"))))};
-    TSharedRef<FJsonObject> AddFunction = ScopedMemberEditArguments(AssetPath, Snapshot, TEXT("function"), TEXT("add"));
+    TArray<TSharedPtr<FUnrealMCPValue>> ParametersJson = {
+        MakeShared<FUnrealMCPValueObject>(FunctionParameter(TEXT("Count"), TEXT("input"), IntType,
+            LiteralDefault(MakeShared<FUnrealMCPValueNumber>(3)))),
+        MakeShared<FUnrealMCPValueObject>(FunctionParameter(TEXT("Label"), TEXT("input"), ConstRefString)),
+        MakeShared<FUnrealMCPValueObject>(FunctionParameter(TEXT("Succeeded"), TEXT("output"), K2Type(TEXT("boolean"))))};
+    TSharedRef<FUnrealMCPRecord> AddFunction = ScopedMemberEditArguments(AssetPath, Snapshot, TEXT("function"), TEXT("add"));
     AddFunction->SetStringField(TEXT("name"), TEXT("Compute"));
     AddFunction->SetObjectField(TEXT("signature"), FunctionSignature(TEXT("protected"), false, true, ParametersJson));
-    const TSharedRef<FJsonObject> FunctionMetadata = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> FunctionMetadata = MakeShared<FUnrealMCPRecord>();
     FunctionMetadata->SetStringField(TEXT("category"), TEXT("Unreal MCP"));
     FunctionMetadata->SetStringField(TEXT("tooltip"), TEXT("Computes one bounded result"));
     FunctionMetadata->SetStringField(TEXT("keywords"), TEXT("compute bounded"));
@@ -41,7 +41,7 @@ bool FUnrealMCPPhase6FunctionAndLocalTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("function gets stable graph identity"), FunctionId.Len(), 32);
     TestEqual(TEXT("function signature reads all parameter directions"),
         Result->GetObjectField(TEXT("function"))->GetObjectField(TEXT("signature"))->GetArrayField(TEXT("parameters")).Num(), 3);
-    const TArray<TSharedPtr<FJsonValue>>& ReadParameters =
+    const TArray<TSharedPtr<FUnrealMCPValue>>& ReadParameters =
         Result->GetObjectField(TEXT("function"))->GetObjectField(TEXT("signature"))->GetArrayField(TEXT("parameters"));
     TestTrue(TEXT("ordinary input retains its tagged default"), ReadParameters[0]->AsObject()->HasField(TEXT("default")));
     TestFalse(TEXT("reference input does not invent a default"), ReadParameters[1]->AsObject()->HasField(TEXT("default")));
@@ -55,14 +55,14 @@ bool FUnrealMCPPhase6FunctionAndLocalTest::RunTest(const FString& Parameters)
     const bool bDirtyBeforeInvalidSignature = Blueprint->GetOutermost()->IsDirty();
     const EBlueprintStatus StatusBeforeInvalidSignature = Blueprint->Status;
     const int32 TransactionsBeforeInvalidSignature = GEditor != nullptr && GEditor->Trans != nullptr ? GEditor->Trans->GetQueueLength() : 0;
-    TSharedRef<FJsonObject> OutputReference = K2Type(TEXT("boolean"));
+    TSharedRef<FUnrealMCPRecord> OutputReference = K2Type(TEXT("boolean"));
     OutputReference->SetBoolField(TEXT("reference"), true);
-    TSharedRef<FJsonObject> InvalidOutputSignature = ScopedMemberEditArguments(AssetPath, Snapshot, TEXT("function"), TEXT("update"));
+    TSharedRef<FUnrealMCPRecord> InvalidOutputSignature = ScopedMemberEditArguments(AssetPath, Snapshot, TEXT("function"), TEXT("update"));
     InvalidOutputSignature->SetStringField(TEXT("function_id"), FunctionId);
     InvalidOutputSignature->SetStringField(TEXT("field"), TEXT("signature"));
     InvalidOutputSignature->SetStringField(TEXT("policy"), TEXT("reject_if_referenced"));
     InvalidOutputSignature->SetObjectField(TEXT("signature"), FunctionSignature(TEXT("public"), false, false, {
-        MakeShared<FJsonValueObject>(FunctionParameter(TEXT("Invalid"), TEXT("output"), OutputReference))}));
+        MakeShared<FUnrealMCPValueObject>(FunctionParameter(TEXT("Invalid"), TEXT("output"), OutputReference))}));
     TestFalse(TEXT("unsupported output-reference signature rejects before mutation"),
         Mutator.Execute(TEXT("blueprint_member_edit"), InvalidOutputSignature, Result, Error));
     TestEqual(TEXT("invalid signature preserves snapshot"), InspectSnapshot(Inspector, AssetPath), Snapshot);
@@ -71,7 +71,7 @@ bool FUnrealMCPPhase6FunctionAndLocalTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("invalid signature creates no transaction"),
         GEditor != nullptr && GEditor->Trans != nullptr ? GEditor->Trans->GetQueueLength() : 0, TransactionsBeforeInvalidSignature);
 
-    TSharedRef<FJsonObject> RenameFunction = ScopedMemberEditArguments(AssetPath, Snapshot, TEXT("function"), TEXT("rename"));
+    TSharedRef<FUnrealMCPRecord> RenameFunction = ScopedMemberEditArguments(AssetPath, Snapshot, TEXT("function"), TEXT("rename"));
     RenameFunction->SetStringField(TEXT("function_id"), FunctionId);
     RenameFunction->SetStringField(TEXT("new_name"), TEXT("ComputeHealth"));
     if (!TestTrue(TEXT("function rename succeeds and preserves graph identity"),
@@ -80,7 +80,7 @@ bool FUnrealMCPPhase6FunctionAndLocalTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("function rename preserves stable identity"),
         ScopedIdByName(Inspector, AssetPath, TEXT("functions"), TEXT("ComputeHealth")), FunctionId);
 
-    TSharedRef<FJsonObject> UpdateSignature = ScopedMemberEditArguments(
+    TSharedRef<FUnrealMCPRecord> UpdateSignature = ScopedMemberEditArguments(
         AssetPath, Result->GetStringField(TEXT("snapshot_id")), TEXT("function"), TEXT("update"));
     UpdateSignature->SetStringField(TEXT("function_id"), FunctionId);
     UpdateSignature->SetStringField(TEXT("field"), TEXT("signature"));
@@ -89,16 +89,16 @@ bool FUnrealMCPPhase6FunctionAndLocalTest::RunTest(const FString& Parameters)
     if (!TestTrue(TEXT("unreferenced complete-signature update succeeds"),
         Mutator.Execute(TEXT("blueprint_member_edit"), UpdateSignature, Result, Error)))
     { AddError(Error.Code + TEXT(": ") + Error.Message); return false; }
-    const TSharedPtr<FJsonObject> UpdatedSignature = Result->GetObjectField(TEXT("function"))->GetObjectField(TEXT("signature"));
+    const TSharedPtr<FUnrealMCPRecord> UpdatedSignature = Result->GetObjectField(TEXT("function"))->GetObjectField(TEXT("signature"));
     TestEqual(TEXT("signature access updates exactly"), UpdatedSignature->GetStringField(TEXT("access")), FString(TEXT("public")));
     TestTrue(TEXT("signature pure flag updates exactly"), UpdatedSignature->GetBoolField(TEXT("pure")));
     TestFalse(TEXT("signature const flag updates exactly"), UpdatedSignature->GetBoolField(TEXT("const")));
 
-    TSharedRef<FJsonObject> UpdateFunctionMetadata = ScopedMemberEditArguments(
+    TSharedRef<FUnrealMCPRecord> UpdateFunctionMetadata = ScopedMemberEditArguments(
         AssetPath, Result->GetStringField(TEXT("snapshot_id")), TEXT("function"), TEXT("update"));
     UpdateFunctionMetadata->SetStringField(TEXT("function_id"), FunctionId);
     UpdateFunctionMetadata->SetStringField(TEXT("field"), TEXT("metadata"));
-    const TSharedRef<FJsonObject> UpdatedMetadata = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> UpdatedMetadata = MakeShared<FUnrealMCPRecord>();
     UpdatedMetadata->SetStringField(TEXT("category"), TEXT("Utilities"));
     UpdatedMetadata->SetBoolField(TEXT("call_in_editor"), true);
     UpdateFunctionMetadata->SetObjectField(TEXT("metadata"), UpdatedMetadata);
@@ -112,7 +112,7 @@ bool FUnrealMCPPhase6FunctionAndLocalTest::RunTest(const FString& Parameters)
 
     Snapshot = Result->GetStringField(TEXT("snapshot_id"));
     const int32 TransactionsBeforeCollision = GEditor != nullptr && GEditor->Trans != nullptr ? GEditor->Trans->GetQueueLength() : 0;
-    TSharedRef<FJsonObject> CollidingLocal = ScopedMemberEditArguments(AssetPath, Snapshot, TEXT("local_variable"), TEXT("add"));
+    TSharedRef<FUnrealMCPRecord> CollidingLocal = ScopedMemberEditArguments(AssetPath, Snapshot, TEXT("local_variable"), TEXT("add"));
     CollidingLocal->SetStringField(TEXT("function_id"), FunctionId);
     CollidingLocal->SetStringField(TEXT("name"), TEXT("Count"));
     CollidingLocal->SetObjectField(TEXT("type"), K2Type(TEXT("int")));
@@ -122,11 +122,11 @@ bool FUnrealMCPPhase6FunctionAndLocalTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("local collision creates no transaction"),
         GEditor != nullptr && GEditor->Trans != nullptr ? GEditor->Trans->GetQueueLength() : 0, TransactionsBeforeCollision);
 
-    TSharedRef<FJsonObject> AddLocal = ScopedMemberEditArguments(AssetPath, Snapshot, TEXT("local_variable"), TEXT("add"));
+    TSharedRef<FUnrealMCPRecord> AddLocal = ScopedMemberEditArguments(AssetPath, Snapshot, TEXT("local_variable"), TEXT("add"));
     AddLocal->SetStringField(TEXT("function_id"), FunctionId);
     AddLocal->SetStringField(TEXT("name"), TEXT("Accumulator"));
     AddLocal->SetObjectField(TEXT("type"), K2Type(TEXT("int")));
-    AddLocal->SetObjectField(TEXT("default"), LiteralDefault(MakeShared<FJsonValueNumber>(9)));
+    AddLocal->SetObjectField(TEXT("default"), LiteralDefault(MakeShared<FUnrealMCPValueNumber>(9)));
     if (!TestTrue(TEXT("typed function-local variable add succeeds"),
         Mutator.Execute(TEXT("blueprint_member_edit"), AddLocal, Result, Error)))
     { AddError(Error.Code + TEXT(": ") + Error.Message); return false; }
@@ -138,7 +138,7 @@ bool FUnrealMCPPhase6FunctionAndLocalTest::RunTest(const FString& Parameters)
         Result->GetObjectField(TEXT("local_variable"))->GetObjectField(TEXT("default"))->GetNumberField(TEXT("value")), 9.0);
 
     const FString BeforeRename = Result->GetStringField(TEXT("snapshot_id"));
-    TSharedRef<FJsonObject> RenameLocal = ScopedMemberEditArguments(AssetPath, BeforeRename, TEXT("local_variable"), TEXT("rename"));
+    TSharedRef<FUnrealMCPRecord> RenameLocal = ScopedMemberEditArguments(AssetPath, BeforeRename, TEXT("local_variable"), TEXT("rename"));
     RenameLocal->SetStringField(TEXT("function_id"), FunctionId);
     RenameLocal->SetStringField(TEXT("local_id"), LocalId);
     RenameLocal->SetStringField(TEXT("new_name"), TEXT("RunningTotal"));
@@ -153,7 +153,7 @@ bool FUnrealMCPPhase6FunctionAndLocalTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("local redo restores snapshot"), InspectSnapshot(Inspector, AssetPath), AfterRename);
 
     Snapshot = AfterRename;
-    TSharedRef<FJsonObject> UpdateLocalType = ScopedMemberEditArguments(AssetPath, Snapshot, TEXT("local_variable"), TEXT("update"));
+    TSharedRef<FUnrealMCPRecord> UpdateLocalType = ScopedMemberEditArguments(AssetPath, Snapshot, TEXT("local_variable"), TEXT("update"));
     UpdateLocalType->SetStringField(TEXT("function_id"), FunctionId);
     UpdateLocalType->SetStringField(TEXT("local_id"), LocalId);
     UpdateLocalType->SetStringField(TEXT("field"), TEXT("type"));
@@ -165,19 +165,19 @@ bool FUnrealMCPPhase6FunctionAndLocalTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("local type reads back exactly"),
         Result->GetObjectField(TEXT("local_variable"))->GetObjectField(TEXT("type"))->GetStringField(TEXT("category")), FString(TEXT("string")));
 
-    TSharedRef<FJsonObject> UpdateLocalDefault = ScopedMemberEditArguments(
+    TSharedRef<FUnrealMCPRecord> UpdateLocalDefault = ScopedMemberEditArguments(
         AssetPath, Result->GetStringField(TEXT("snapshot_id")), TEXT("local_variable"), TEXT("update"));
     UpdateLocalDefault->SetStringField(TEXT("function_id"), FunctionId);
     UpdateLocalDefault->SetStringField(TEXT("local_id"), LocalId);
     UpdateLocalDefault->SetStringField(TEXT("field"), TEXT("default"));
-    UpdateLocalDefault->SetObjectField(TEXT("default"), LiteralDefault(MakeShared<FJsonValueString>(TEXT("ready"))));
+    UpdateLocalDefault->SetObjectField(TEXT("default"), LiteralDefault(MakeShared<FUnrealMCPValueString>(TEXT("ready"))));
     if (!TestTrue(TEXT("local tagged-default update succeeds"),
         Mutator.Execute(TEXT("blueprint_member_edit"), UpdateLocalDefault, Result, Error)))
     { AddError(Error.Code + TEXT(": ") + Error.Message); return false; }
     TestEqual(TEXT("local default reads back after update"),
         Result->GetObjectField(TEXT("local_variable"))->GetObjectField(TEXT("default"))->GetStringField(TEXT("value")), FString(TEXT("ready")));
 
-    TSharedRef<FJsonObject> AddTemporaryLocal = ScopedMemberEditArguments(
+    TSharedRef<FUnrealMCPRecord> AddTemporaryLocal = ScopedMemberEditArguments(
         AssetPath, Result->GetStringField(TEXT("snapshot_id")), TEXT("local_variable"), TEXT("add"));
     AddTemporaryLocal->SetStringField(TEXT("function_id"), FunctionId);
     AddTemporaryLocal->SetStringField(TEXT("name"), TEXT("Scratch"));
@@ -186,7 +186,7 @@ bool FUnrealMCPPhase6FunctionAndLocalTest::RunTest(const FString& Parameters)
         Mutator.Execute(TEXT("blueprint_member_edit"), AddTemporaryLocal, Result, Error)))
     { AddError(Error.Code + TEXT(": ") + Error.Message); return false; }
     const FString TemporaryLocalId = Result->GetObjectField(TEXT("local_variable"))->GetStringField(TEXT("id"));
-    TSharedRef<FJsonObject> RemoveTemporaryLocal = ScopedMemberEditArguments(
+    TSharedRef<FUnrealMCPRecord> RemoveTemporaryLocal = ScopedMemberEditArguments(
         AssetPath, Result->GetStringField(TEXT("snapshot_id")), TEXT("local_variable"), TEXT("remove"));
     RemoveTemporaryLocal->SetStringField(TEXT("function_id"), FunctionId);
     RemoveTemporaryLocal->SetStringField(TEXT("local_id"), TemporaryLocalId);
@@ -196,13 +196,13 @@ bool FUnrealMCPPhase6FunctionAndLocalTest::RunTest(const FString& Parameters)
     { AddError(Error.Code + TEXT(": ") + Error.Message); return false; }
 
     Snapshot = Result->GetStringField(TEXT("snapshot_id"));
-    TSharedRef<FJsonObject> AddTemporary = ScopedMemberEditArguments(AssetPath, Snapshot, TEXT("function"), TEXT("add"));
+    TSharedRef<FUnrealMCPRecord> AddTemporary = ScopedMemberEditArguments(AssetPath, Snapshot, TEXT("function"), TEXT("add"));
     AddTemporary->SetStringField(TEXT("name"), TEXT("Temporary"));
     AddTemporary->SetObjectField(TEXT("signature"), FunctionSignature(TEXT("private"), true, false, {}));
     if (!TestTrue(TEXT("temporary pure function add succeeds"), Mutator.Execute(TEXT("blueprint_member_edit"), AddTemporary, Result, Error)))
     { AddError(Error.Code + TEXT(": ") + Error.Message); return false; }
     const FString TemporaryId = Result->GetObjectField(TEXT("function"))->GetStringField(TEXT("id"));
-    TSharedRef<FJsonObject> RemoveTemporary = ScopedMemberEditArguments(
+    TSharedRef<FUnrealMCPRecord> RemoveTemporary = ScopedMemberEditArguments(
         AssetPath, Result->GetStringField(TEXT("snapshot_id")), TEXT("function"), TEXT("remove"));
     RemoveTemporary->SetStringField(TEXT("function_id"), TemporaryId);
     RemoveTemporary->SetStringField(TEXT("policy"), TEXT("reject_if_referenced"));
@@ -210,17 +210,17 @@ bool FUnrealMCPPhase6FunctionAndLocalTest::RunTest(const FString& Parameters)
     { AddError(Error.Code + TEXT(": ") + Error.Message); return false; }
 
     Snapshot = Result->GetStringField(TEXT("snapshot_id"));
-    TSharedRef<FJsonObject> AddNotify = ScopedMemberEditArguments(AssetPath, Snapshot, TEXT("function"), TEXT("add"));
+    TSharedRef<FUnrealMCPRecord> AddNotify = ScopedMemberEditArguments(AssetPath, Snapshot, TEXT("function"), TEXT("add"));
     AddNotify->SetStringField(TEXT("name"), TEXT("OnRep_Health"));
     AddNotify->SetObjectField(TEXT("signature"), FunctionSignature(TEXT("private"), false, false, {}));
     if (!TestTrue(TEXT("RepNotify-compatible function add succeeds"), Mutator.Execute(TEXT("blueprint_member_edit"), AddNotify, Result, Error)))
     { AddError(Error.Code + TEXT(": ") + Error.Message); return false; }
     const FString NotifyId = Result->GetObjectField(TEXT("function"))->GetStringField(TEXT("id"));
 
-    TSharedRef<FJsonObject> AddHealth = MemberEditArguments(AssetPath, Result->GetStringField(TEXT("snapshot_id")), TEXT("add"));
+    TSharedRef<FUnrealMCPRecord> AddHealth = MemberEditArguments(AssetPath, Result->GetStringField(TEXT("snapshot_id")), TEXT("add"));
     AddHealth->SetStringField(TEXT("name"), TEXT("Health"));
     AddHealth->SetObjectField(TEXT("type"), K2Type(TEXT("int")));
-    const TSharedRef<FJsonObject> RepNotifyMetadata = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> RepNotifyMetadata = MakeShared<FUnrealMCPRecord>();
     RepNotifyMetadata->SetStringField(TEXT("replication"), TEXT("rep_notify"));
     RepNotifyMetadata->SetStringField(TEXT("rep_notify_function"), TEXT("OnRep_Health"));
     RepNotifyMetadata->SetStringField(TEXT("replication_condition"), TEXT("COND_OwnerOnly"));
@@ -233,32 +233,32 @@ bool FUnrealMCPPhase6FunctionAndLocalTest::RunTest(const FString& Parameters)
         Result->GetObjectField(TEXT("member"))->GetObjectField(TEXT("replication"))->GetStringField(TEXT("rep_notify_function_id")), NotifyId);
     const FString HealthId = Result->GetObjectField(TEXT("member"))->GetStringField(TEXT("id"));
 
-    TSharedRef<FJsonObject> RenameNotify = ScopedMemberEditArguments(
+    TSharedRef<FUnrealMCPRecord> RenameNotify = ScopedMemberEditArguments(
         AssetPath, Result->GetStringField(TEXT("snapshot_id")), TEXT("function"), TEXT("rename"));
     RenameNotify->SetStringField(TEXT("function_id"), NotifyId);
     RenameNotify->SetStringField(TEXT("new_name"), TEXT("OnRep_CurrentHealth"));
     if (!TestTrue(TEXT("RepNotify function rename succeeds"),
         Mutator.Execute(TEXT("blueprint_member_edit"), RenameNotify, Result, Error)))
     { AddError(Error.Code + TEXT(": ") + Error.Message); return false; }
-    TSharedPtr<FJsonObject> RepNotifyInspection;
-    const TSharedRef<FJsonObject> InspectHealth = InspectArguments(AssetPath);
+    TSharedPtr<FUnrealMCPRecord> RepNotifyInspection;
+    const TSharedRef<FUnrealMCPRecord> InspectHealth = InspectArguments(AssetPath);
     InspectHealth->SetStringField(TEXT("member_id"), HealthId);
-    InspectHealth->SetArrayField(TEXT("sections"), {MakeShared<FJsonValueString>(TEXT("variables"))});
+    InspectHealth->SetArrayField(TEXT("sections"), {MakeShared<FUnrealMCPValueString>(TEXT("variables"))});
     if (!TestTrue(TEXT("renamed RepNotify relationship remains inspectable"),
         Inspector.Execute(InspectHealth, RepNotifyInspection, Error)) || !RepNotifyInspection.IsValid()) return false;
-    const TSharedPtr<FJsonObject> RenamedHealth = RepNotifyInspection->GetArrayField(TEXT("records"))[0]->AsObject();
+    const TSharedPtr<FUnrealMCPRecord> RenamedHealth = RepNotifyInspection->GetArrayField(TEXT("records"))[0]->AsObject();
     TestEqual(TEXT("RepNotify rename updates member relationship"),
         RenamedHealth->GetObjectField(TEXT("replication"))->GetStringField(TEXT("rep_notify_function")), FString(TEXT("OnRep_CurrentHealth")));
     TestEqual(TEXT("RepNotify rename preserves function identity"),
         RenamedHealth->GetObjectField(TEXT("replication"))->GetStringField(TEXT("rep_notify_function_id")), NotifyId);
 
     Snapshot = Result->GetStringField(TEXT("snapshot_id"));
-    TSharedRef<FJsonObject> InvalidNotifySignature = ScopedMemberEditArguments(AssetPath, Snapshot, TEXT("function"), TEXT("update"));
+    TSharedRef<FUnrealMCPRecord> InvalidNotifySignature = ScopedMemberEditArguments(AssetPath, Snapshot, TEXT("function"), TEXT("update"));
     InvalidNotifySignature->SetStringField(TEXT("function_id"), NotifyId);
     InvalidNotifySignature->SetStringField(TEXT("field"), TEXT("signature"));
     InvalidNotifySignature->SetStringField(TEXT("policy"), TEXT("reject_if_referenced"));
     InvalidNotifySignature->SetObjectField(TEXT("signature"), FunctionSignature(TEXT("private"), false, false, {
-        MakeShared<FJsonValueObject>(FunctionParameter(TEXT("Invalid"), TEXT("input"), K2Type(TEXT("int"))))}));
+        MakeShared<FUnrealMCPValueObject>(FunctionParameter(TEXT("Invalid"), TEXT("input"), K2Type(TEXT("int"))))}));
     TestFalse(TEXT("invalid RepNotify signature change rejects"),
         Mutator.Execute(TEXT("blueprint_member_edit"), InvalidNotifySignature, Result, Error));
     TestEqual(TEXT("RepNotify signature rejection preserves snapshot"), InspectSnapshot(Inspector, AssetPath), Snapshot);
@@ -301,7 +301,7 @@ bool FUnrealMCPPhase6FunctionAndLocalTest::RunTest(const FString& Parameters)
     const EBlueprintStatus StatusBeforeReferenceRejections = Blueprint->Status;
     const int32 TransactionsBeforeReferenceRejections = GEditor != nullptr && GEditor->Trans != nullptr ? GEditor->Trans->GetQueueLength() : 0;
 
-    TSharedRef<FJsonObject> UpdateUsedFunction = ScopedMemberEditArguments(AssetPath, Snapshot, TEXT("function"), TEXT("update"));
+    TSharedRef<FUnrealMCPRecord> UpdateUsedFunction = ScopedMemberEditArguments(AssetPath, Snapshot, TEXT("function"), TEXT("update"));
     UpdateUsedFunction->SetStringField(TEXT("function_id"), FunctionId);
     UpdateUsedFunction->SetStringField(TEXT("field"), TEXT("signature"));
     UpdateUsedFunction->SetStringField(TEXT("policy"), TEXT("reject_if_referenced"));
@@ -311,7 +311,7 @@ bool FUnrealMCPPhase6FunctionAndLocalTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("referenced signature rejection uses stable error"), Error.Code, FString(TEXT("referenced_member")));
     TestEqual(TEXT("referenced signature rejection preserves snapshot"), InspectSnapshot(Inspector, AssetPath), Snapshot);
 
-    TSharedRef<FJsonObject> UpdateUsedLocal = ScopedMemberEditArguments(AssetPath, Snapshot, TEXT("local_variable"), TEXT("update"));
+    TSharedRef<FUnrealMCPRecord> UpdateUsedLocal = ScopedMemberEditArguments(AssetPath, Snapshot, TEXT("local_variable"), TEXT("update"));
     UpdateUsedLocal->SetStringField(TEXT("function_id"), FunctionId);
     UpdateUsedLocal->SetStringField(TEXT("local_id"), LocalId);
     UpdateUsedLocal->SetStringField(TEXT("field"), TEXT("type"));
@@ -322,13 +322,13 @@ bool FUnrealMCPPhase6FunctionAndLocalTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("referenced local type rejection uses stable error"), Error.Code, FString(TEXT("referenced_member")));
     TestEqual(TEXT("referenced local type rejection preserves snapshot"), InspectSnapshot(Inspector, AssetPath), Snapshot);
 
-    TSharedRef<FJsonObject> RemoveUsedFunction = ScopedMemberEditArguments(AssetPath, Snapshot, TEXT("function"), TEXT("remove"));
+    TSharedRef<FUnrealMCPRecord> RemoveUsedFunction = ScopedMemberEditArguments(AssetPath, Snapshot, TEXT("function"), TEXT("remove"));
     RemoveUsedFunction->SetStringField(TEXT("function_id"), FunctionId);
     RemoveUsedFunction->SetStringField(TEXT("policy"), TEXT("reject_if_referenced"));
     TestFalse(TEXT("referenced function removal rejects"), Mutator.Execute(TEXT("blueprint_member_edit"), RemoveUsedFunction, Result, Error));
     TestEqual(TEXT("referenced function rejection preserves snapshot"), InspectSnapshot(Inspector, AssetPath), Snapshot);
 
-    TSharedRef<FJsonObject> RemoveUsedLocal = ScopedMemberEditArguments(AssetPath, Snapshot, TEXT("local_variable"), TEXT("remove"));
+    TSharedRef<FUnrealMCPRecord> RemoveUsedLocal = ScopedMemberEditArguments(AssetPath, Snapshot, TEXT("local_variable"), TEXT("remove"));
     RemoveUsedLocal->SetStringField(TEXT("function_id"), FunctionId);
     RemoveUsedLocal->SetStringField(TEXT("local_id"), LocalId);
     RemoveUsedLocal->SetStringField(TEXT("policy"), TEXT("reject_if_referenced"));

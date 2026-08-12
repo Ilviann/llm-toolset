@@ -2,7 +2,7 @@
 
 #include "AssetRegistry/AssetData.h"
 #include "CoreMinimal.h"
-#include "Dom/JsonObject.h"
+#include "UnrealMCPWireTypes.h"
 #include "UnrealMCPProtocol.h"
 
 struct FUnrealMCPResolvedAssetReferenceTarget
@@ -11,7 +11,7 @@ struct FUnrealMCPResolvedAssetReferenceTarget
     FString PackageName;
     FAssetData Asset;
     UObject* LoadedObject = nullptr;
-    TSharedPtr<FJsonObject> Metadata;
+    TSharedPtr<FUnrealMCPRecord> Metadata;
 };
 
 class FUnrealMCPAssetReferenceTargetResolver

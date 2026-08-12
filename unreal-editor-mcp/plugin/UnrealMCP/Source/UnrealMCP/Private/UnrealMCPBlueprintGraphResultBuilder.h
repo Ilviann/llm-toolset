@@ -1,7 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Dom/JsonObject.h"
+#include "UnrealMCPWireTypes.h"
 #include "UnrealMCPBlueprintGraphRequestValidation.h"
 
 class UBlueprint;
@@ -10,13 +10,13 @@ class UEdGraphNode;
 
 namespace UnrealMCP::BlueprintGraphResultBuilder
 {
-TSharedRef<FJsonObject> EncodeNode(UEdGraph* Graph, UEdGraphNode* Node);
+TSharedRef<FUnrealMCPRecord> EncodeNode(UEdGraph* Graph, UEdGraphNode* Node);
 
-TSharedRef<FJsonObject> Build(
+TSharedRef<FUnrealMCPRecord> Build(
     UBlueprint* Blueprint,
     const BlueprintGraphRequestValidation::FRequest& Request,
     const FString& Snapshot,
-    const TSharedRef<FJsonObject>& Changed,
+    const TSharedRef<FUnrealMCPRecord>& Changed,
     const TSet<FString>& CreatedIdentities,
     const TSet<FString>& ReconstructedIdentities);
 }

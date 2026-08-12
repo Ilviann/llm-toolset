@@ -30,8 +30,8 @@ bool ReadNumberProperty(UObject* Object, const TCHAR* Name, double& Out)
 
 
 bool FUnrealMCPBlueprintMutator::ComponentEdit(
-    const TSharedPtr<FJsonObject>& Arguments,
-    TSharedPtr<FJsonObject>& OutResult,
+    const TSharedPtr<FUnrealMCPRecord>& Arguments,
+    TSharedPtr<FUnrealMCPRecord>& OutResult,
     FUnrealMCPError& OutError)
 {
     using namespace UnrealMCP::BlueprintMutationPrivate;
@@ -55,7 +55,7 @@ bool FUnrealMCPBlueprintMutator::ComponentEdit(
         OutError = {TEXT("invalid_argument"), TEXT("Unknown component edit operation")};
         return false;
     }
-    for (const TPair<FString, TSharedPtr<FJsonValue>>& Pair : Arguments->Values)
+    for (const TPair<FString, TSharedPtr<FUnrealMCPValue>>& Pair : Arguments->Values)
     {
         if (!Allowed.Contains(Pair.Key))
         {
@@ -70,7 +70,7 @@ bool FUnrealMCPBlueprintMutator::ComponentEdit(
         OutError = {TEXT("invalid_argument"), TEXT("asset_path must identify one exact Blueprint asset")};
         return false;
     }
-    const TSharedRef<FJsonObject> AssetOnly = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> AssetOnly = MakeShared<FUnrealMCPRecord>();
     AssetOnly->SetStringField(TEXT("asset_path"), RawAsset);
     UBlueprint* Blueprint = nullptr;
     FString ObjectPath;
@@ -240,7 +240,7 @@ bool FUnrealMCPBlueprintMutator::ComponentEdit(
     }
 
     bool bApplied = false;
-    TSharedPtr<FJsonObject> Changed = MakeShared<FJsonObject>();
+    TSharedPtr<FUnrealMCPRecord> Changed = MakeShared<FUnrealMCPRecord>();
     {
         const FScopedTransaction Transaction(FText::FromString(TEXT("Unreal MCP component edit")));
         Blueprint->Modify();
@@ -305,7 +305,7 @@ bool FUnrealMCPBlueprintMutator::ComponentEdit(
             Node->ComponentTemplate->Modify();
             bApplied = UnrealMCP::PropertyCodec::Set(
                 Node->ComponentTemplate, PropertyName,
-                Operation == TEXT("set_replication") ? MakeShared<FJsonValueBoolean>(bReplicates) : Arguments->Values.FindRef(TEXT("value")),
+                Operation == TEXT("set_replication") ? MakeShared<FUnrealMCPValueBoolean>(bReplicates) : Arguments->Values.FindRef(TEXT("value")),
                 Changed, OutError);
             if (bApplied)
             {
@@ -338,8 +338,8 @@ bool FUnrealMCPBlueprintMutator::ComponentEdit(
 }
 
 bool FUnrealMCPBlueprintMutator::DefaultEdit(
-    const TSharedPtr<FJsonObject>& Arguments,
-    TSharedPtr<FJsonObject>& OutResult,
+    const TSharedPtr<FUnrealMCPRecord>& Arguments,
+    TSharedPtr<FUnrealMCPRecord>& OutResult,
     FUnrealMCPError& OutError)
 {
     using namespace UnrealMCP::BlueprintMutationPrivate;
@@ -361,7 +361,7 @@ bool FUnrealMCPBlueprintMutator::DefaultEdit(
         OutError = {TEXT("invalid_argument"), TEXT("blueprint_default_edit requires asset_path, one setting, and value")};
         return false;
     }
-    const TSharedRef<FJsonObject> AssetOnly = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> AssetOnly = MakeShared<FUnrealMCPRecord>();
     AssetOnly->SetStringField(TEXT("asset_path"), RawAsset);
     UBlueprint* Blueprint = nullptr;
     FString ObjectPath;
@@ -375,7 +375,7 @@ bool FUnrealMCPBlueprintMutator::DefaultEdit(
     UObject* Defaults = Blueprint->GeneratedClass != nullptr ? Blueprint->GeneratedClass->GetDefaultObject(false) : nullptr;
     if (Defaults == nullptr)
     {
-        OutError = {TEXT("busy"), TEXT("The generated-class default object is unavailable"), MakeShared<FJsonObject>(), true};
+        OutError = {TEXT("busy"), TEXT("The generated-class default object is unavailable"), MakeShared<FUnrealMCPRecord>(), true};
         return false;
     }
     if (bReplication)
@@ -456,7 +456,7 @@ bool FUnrealMCPBlueprintMutator::DefaultEdit(
         OutError = {TEXT("invalid_argument"), TEXT("Use replication_setting for bounded Actor replication defaults")};
         return false;
     }
-    TSharedPtr<FJsonObject> Changed;
+    TSharedPtr<FUnrealMCPRecord> Changed;
     bool bApplied = false;
     {
         const FScopedTransaction Transaction(FText::FromString(TEXT("Unreal MCP Blueprint default edit")));

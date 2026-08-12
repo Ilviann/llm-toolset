@@ -2,8 +2,8 @@
 
 
 bool FUnrealMCPBlueprintMutator::LocalVariableEdit(
-    const TSharedPtr<FJsonObject>& Arguments,
-    TSharedPtr<FJsonObject>& OutResult,
+    const TSharedPtr<FUnrealMCPRecord>& Arguments,
+    TSharedPtr<FUnrealMCPRecord>& OutResult,
     FUnrealMCPError& OutError)
 {
     using namespace UnrealMCP::BlueprintMutationPrivate;
@@ -27,7 +27,7 @@ bool FUnrealMCPBlueprintMutator::LocalVariableEdit(
         OutError = {TEXT("invalid_argument"), TEXT("Unknown local-variable edit operation")};
         return false;
     }
-    for (const TPair<FString, TSharedPtr<FJsonValue>>& Pair : Arguments->Values)
+    for (const TPair<FString, TSharedPtr<FUnrealMCPValue>>& Pair : Arguments->Values)
     {
         if (!Allowed.Contains(Pair.Key))
         {
@@ -42,7 +42,7 @@ bool FUnrealMCPBlueprintMutator::LocalVariableEdit(
         OutError = {TEXT("invalid_argument"), TEXT("asset_path must identify one exact Blueprint asset")};
         return false;
     }
-    const TSharedRef<FJsonObject> AssetOnly = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> AssetOnly = MakeShared<FUnrealMCPRecord>();
     AssetOnly->SetStringField(TEXT("asset_path"), RawAsset);
     UBlueprint* Blueprint = nullptr;
     FString ObjectPath;
@@ -66,8 +66,8 @@ bool FUnrealMCPBlueprintMutator::LocalVariableEdit(
     FBPVariableDescription* Variable = nullptr;
     FEdGraphPinType NewType;
     FString NewDefault;
-    const TSharedPtr<FJsonObject>* TypeObject = nullptr;
-    const TSharedPtr<FJsonObject>* DefaultObject = nullptr;
+    const TSharedPtr<FUnrealMCPRecord>* TypeObject = nullptr;
+    const TSharedPtr<FUnrealMCPRecord>* DefaultObject = nullptr;
     UnrealMCP::BlueprintReferences::FScanResult ReferenceScan;
 
     if (Operation == TEXT("add"))
@@ -155,7 +155,7 @@ bool FUnrealMCPBlueprintMutator::LocalVariableEdit(
         ? Blueprint->SkeletonGeneratedClass->FindFunctionByName(Graph->GetFName()) : nullptr;
     if (Operation != TEXT("add") && Scope == nullptr)
     {
-        OutError = {TEXT("busy"), TEXT("The live generated function scope is unavailable; compile and inspect before retrying"), MakeShared<FJsonObject>(), true};
+        OutError = {TEXT("busy"), TEXT("The live generated function scope is unavailable; compile and inspect before retrying"), MakeShared<FUnrealMCPRecord>(), true};
         return false;
     }
     bool bApplied = false;
@@ -202,11 +202,11 @@ bool FUnrealMCPBlueprintMutator::LocalVariableEdit(
         return false;
     }
 
-    TSharedPtr<FJsonObject> Local;
-    TSharedPtr<FJsonObject> ResultReferences = UnrealMCP::BlueprintReferences::Encode(ReferenceScan);
+    TSharedPtr<FUnrealMCPRecord> Local;
+    TSharedPtr<FUnrealMCPRecord> ResultReferences = UnrealMCP::BlueprintReferences::Encode(ReferenceScan);
     if (Operation == TEXT("remove"))
     {
-        Local = MakeShared<FJsonObject>();
+        Local = MakeShared<FUnrealMCPRecord>();
         Local->SetStringField(TEXT("id"), LocalId);
         Local->SetStringField(TEXT("name"), Name);
         Local->SetBoolField(TEXT("removed"), true);
@@ -218,7 +218,7 @@ bool FUnrealMCPBlueprintMutator::LocalVariableEdit(
             RestoreFailedTransaction(OutError);
             return false;
         }
-        const TSharedPtr<FJsonObject>* ReadReferences = nullptr;
+        const TSharedPtr<FUnrealMCPRecord>* ReadReferences = nullptr;
         if (Local->TryGetObjectField(TEXT("reference_summary"), ReadReferences) && ReadReferences != nullptr) ResultReferences = *ReadReferences;
     }
     FString Snapshot;

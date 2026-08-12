@@ -21,7 +21,7 @@ struct FFunctionSignatureSpec
 };
 
 static bool DecodeFunctionSignature(
-    const TSharedPtr<FJsonObject>& Signature,
+    const TSharedPtr<FUnrealMCPRecord>& Signature,
     FFunctionSignatureSpec& Out,
     FUnrealMCPError& OutError)
 {
@@ -34,16 +34,16 @@ static bool DecodeFunctionSignature(
         OutError = {TEXT("invalid_argument"), TEXT("signature requires exact access, pure, const, and parameters fields")};
         return false;
     }
-    const TArray<TSharedPtr<FJsonValue>>* Parameters = nullptr;
+    const TArray<TSharedPtr<FUnrealMCPValue>>* Parameters = nullptr;
     if (!Signature->TryGetArrayField(TEXT("parameters"), Parameters) || Parameters == nullptr || Parameters->Num() > 32)
     {
         OutError = {TEXT("invalid_argument"), TEXT("signature parameters must be one bounded array")};
         return false;
     }
     TSet<FName> Names;
-    for (const TSharedPtr<FJsonValue>& Value : *Parameters)
+    for (const TSharedPtr<FUnrealMCPValue>& Value : *Parameters)
     {
-        const TSharedPtr<FJsonObject>* Parameter = nullptr;
+        const TSharedPtr<FUnrealMCPRecord>* Parameter = nullptr;
         if (!Value.IsValid() || !Value->TryGetObject(Parameter) || Parameter == nullptr
             || !HasOnlyFields(**Parameter, {TEXT("name"), TEXT("direction"), TEXT("type"), TEXT("default")}))
         {
@@ -52,7 +52,7 @@ static bool DecodeFunctionSignature(
         }
         FString Name;
         FFunctionParameterSpec Spec;
-        const TSharedPtr<FJsonObject>* Type = nullptr;
+        const TSharedPtr<FUnrealMCPRecord>* Type = nullptr;
         if (!(*Parameter)->TryGetStringField(TEXT("name"), Name) || Name.IsEmpty() || Name.Len() > 128
             || FName(*Name).IsNone() || !FName(*Name).IsValidXName() || Names.Contains(FName(*Name))
             || !(*Parameter)->TryGetStringField(TEXT("direction"), Spec.Direction)
@@ -76,7 +76,7 @@ static bool DecodeFunctionSignature(
         }
         if ((*Parameter)->HasField(TEXT("default")))
         {
-            const TSharedPtr<FJsonObject>* Default = nullptr;
+            const TSharedPtr<FUnrealMCPRecord>* Default = nullptr;
             if (!(*Parameter)->TryGetObjectField(TEXT("default"), Default) || Default == nullptr
                 || !UnrealMCP::K2TypeCodec::DecodeDefault(Spec.Type, *Default, Spec.DefaultValue, OutError)) return false;
         }
@@ -97,7 +97,7 @@ struct FCustomEventSignatureSpec
     TArray<FFunctionParameterSpec> Parameters;
 };
 
-static bool DecodeMacroSignature(const TSharedPtr<FJsonObject>& Signature, FMacroSignatureSpec& Out, FUnrealMCPError& OutError)
+static bool DecodeMacroSignature(const TSharedPtr<FUnrealMCPRecord>& Signature, FMacroSignatureSpec& Out, FUnrealMCPError& OutError)
 {
     if (!Signature.IsValid() || !HasOnlyFields(*Signature, {TEXT("pure"), TEXT("parameters")})
         || !Signature->TryGetBoolField(TEXT("pure"), Out.bPure))
@@ -105,16 +105,16 @@ static bool DecodeMacroSignature(const TSharedPtr<FJsonObject>& Signature, FMacr
         OutError = {TEXT("invalid_argument"), TEXT("Macro signature requires exact pure and parameters fields")};
         return false;
     }
-    const TArray<TSharedPtr<FJsonValue>>* Parameters = nullptr;
+    const TArray<TSharedPtr<FUnrealMCPValue>>* Parameters = nullptr;
     if (!Signature->TryGetArrayField(TEXT("parameters"), Parameters) || Parameters == nullptr || Parameters->Num() > 32)
     {
         OutError = {TEXT("invalid_argument"), TEXT("Macro signature parameters must be one bounded array")};
         return false;
     }
     TSet<FName> Names;
-    for (const TSharedPtr<FJsonValue>& Value : *Parameters)
+    for (const TSharedPtr<FUnrealMCPValue>& Value : *Parameters)
     {
-        const TSharedPtr<FJsonObject>* Parameter = nullptr;
+        const TSharedPtr<FUnrealMCPRecord>* Parameter = nullptr;
         if (!Value.IsValid() || !Value->TryGetObject(Parameter) || Parameter == nullptr
             || !HasOnlyFields(**Parameter, {TEXT("name"), TEXT("direction"), TEXT("type"), TEXT("default")}))
         {
@@ -123,7 +123,7 @@ static bool DecodeMacroSignature(const TSharedPtr<FJsonObject>& Signature, FMacr
         }
         FString Name;
         FFunctionParameterSpec Spec;
-        const TSharedPtr<FJsonObject>* Type = nullptr;
+        const TSharedPtr<FUnrealMCPRecord>* Type = nullptr;
         if (!(*Parameter)->TryGetStringField(TEXT("name"), Name) || Name.IsEmpty() || Name.Len() > 128
             || FName(*Name).IsNone() || !FName(*Name).IsValidXName() || Names.Contains(FName(*Name))
             || !(*Parameter)->TryGetStringField(TEXT("direction"), Spec.Direction)
@@ -144,7 +144,7 @@ static bool DecodeMacroSignature(const TSharedPtr<FJsonObject>& Signature, FMacr
         }
         if ((*Parameter)->HasField(TEXT("default")))
         {
-            const TSharedPtr<FJsonObject>* Default = nullptr;
+            const TSharedPtr<FUnrealMCPRecord>* Default = nullptr;
             if (!(*Parameter)->TryGetObjectField(TEXT("default"), Default) || Default == nullptr
                 || !UnrealMCP::K2TypeCodec::DecodeDefault(Spec.Type, *Default, Spec.DefaultValue, OutError)) return false;
         }
@@ -155,7 +155,7 @@ static bool DecodeMacroSignature(const TSharedPtr<FJsonObject>& Signature, FMacr
 }
 
 static bool DecodeCustomEventSignature(
-    const TSharedPtr<FJsonObject>& Signature,
+    const TSharedPtr<FUnrealMCPRecord>& Signature,
     FCustomEventSignatureSpec& Out,
     FUnrealMCPError& OutError)
 {
@@ -164,16 +164,16 @@ static bool DecodeCustomEventSignature(
         OutError = {TEXT("invalid_argument"), TEXT("Custom-event signature requires one exact parameters field")};
         return false;
     }
-    const TArray<TSharedPtr<FJsonValue>>* Parameters = nullptr;
+    const TArray<TSharedPtr<FUnrealMCPValue>>* Parameters = nullptr;
     if (!Signature->TryGetArrayField(TEXT("parameters"), Parameters) || Parameters == nullptr || Parameters->Num() > 32)
     {
         OutError = {TEXT("invalid_argument"), TEXT("Custom-event signature parameters must be one bounded array")};
         return false;
     }
     TSet<FName> Names;
-    for (const TSharedPtr<FJsonValue>& Value : *Parameters)
+    for (const TSharedPtr<FUnrealMCPValue>& Value : *Parameters)
     {
-        const TSharedPtr<FJsonObject>* Parameter = nullptr;
+        const TSharedPtr<FUnrealMCPRecord>* Parameter = nullptr;
         if (!Value.IsValid() || !Value->TryGetObject(Parameter) || Parameter == nullptr
             || !HasOnlyFields(**Parameter, {TEXT("name"), TEXT("type"), TEXT("default")}))
         {
@@ -182,7 +182,7 @@ static bool DecodeCustomEventSignature(
         }
         FString Name;
         FFunctionParameterSpec Spec;
-        const TSharedPtr<FJsonObject>* Type = nullptr;
+        const TSharedPtr<FUnrealMCPRecord>* Type = nullptr;
         if (!(*Parameter)->TryGetStringField(TEXT("name"), Name) || Name.IsEmpty() || Name.Len() > 128
             || FName(*Name).IsNone() || !FName(*Name).IsValidXName() || Names.Contains(FName(*Name))
             || !(*Parameter)->TryGetObjectField(TEXT("type"), Type) || Type == nullptr
@@ -200,7 +200,7 @@ static bool DecodeCustomEventSignature(
         }
         if ((*Parameter)->HasField(TEXT("default")))
         {
-            const TSharedPtr<FJsonObject>* Default = nullptr;
+            const TSharedPtr<FUnrealMCPRecord>* Default = nullptr;
             if (!(*Parameter)->TryGetObjectField(TEXT("default"), Default) || Default == nullptr
                 || !UnrealMCP::K2TypeCodec::DecodeDefault(Spec.Type, *Default, Spec.DefaultValue, OutError)) return false;
         }
@@ -210,7 +210,7 @@ static bool DecodeCustomEventSignature(
     return true;
 }
 
-static bool ValidateFunctionMetadata(const TSharedPtr<FJsonObject>& Metadata, FUnrealMCPError& OutError)
+static bool ValidateFunctionMetadata(const TSharedPtr<FUnrealMCPRecord>& Metadata, FUnrealMCPError& OutError)
 {
     if (!Metadata.IsValid() || Metadata->Values.IsEmpty()
         || !HasOnlyFields(*Metadata, {TEXT("category"), TEXT("tooltip"), TEXT("keywords"), TEXT("call_in_editor")}))
@@ -262,7 +262,7 @@ static bool ReadCustomEventRpc(const UK2Node_CustomEvent* Event, FCustomEventRpc
 static bool ValidateCustomEventMetadata(
     UBlueprint* Blueprint,
     const UK2Node_CustomEvent* Event,
-    const TSharedPtr<FJsonObject>& Metadata,
+    const TSharedPtr<FUnrealMCPRecord>& Metadata,
     FCustomEventRpcSpec& OutRpc,
     FUnrealMCPError& OutError)
 {
@@ -333,7 +333,7 @@ static void ApplyCustomEventRpc(UK2Node_CustomEvent* Event, const FCustomEventRp
     }
 }
 
-static bool ValidateMacroMetadata(const TSharedPtr<FJsonObject>& Metadata, FUnrealMCPError& OutError)
+static bool ValidateMacroMetadata(const TSharedPtr<FUnrealMCPRecord>& Metadata, FUnrealMCPError& OutError)
 {
     if (!Metadata.IsValid() || Metadata->Values.IsEmpty()
         || !HasOnlyFields(*Metadata, {TEXT("category"), TEXT("tooltip"), TEXT("keywords")}))
@@ -352,7 +352,7 @@ static bool ValidateMacroMetadata(const TSharedPtr<FJsonObject>& Metadata, FUnre
     return true;
 }
 
-static void ApplyFunctionMetadata(UK2Node_FunctionEntry* Entry, const TSharedPtr<FJsonObject>& Metadata)
+static void ApplyFunctionMetadata(UK2Node_FunctionEntry* Entry, const TSharedPtr<FUnrealMCPRecord>& Metadata)
 {
     FString Text;
     bool Flag = false;
@@ -363,7 +363,7 @@ static void ApplyFunctionMetadata(UK2Node_FunctionEntry* Entry, const TSharedPtr
     if (Metadata->TryGetBoolField(TEXT("call_in_editor"), Flag)) Entry->MetaData.bCallInEditor = Flag;
 }
 
-static void ApplyCallableMetadata(FKismetUserDeclaredFunctionMetadata& Target, bool* bCallInEditor, const TSharedPtr<FJsonObject>& Metadata)
+static void ApplyCallableMetadata(FKismetUserDeclaredFunctionMetadata& Target, bool* bCallInEditor, const TSharedPtr<FUnrealMCPRecord>& Metadata)
 {
     FString Text;
     bool Flag = false;
@@ -580,7 +580,7 @@ static void SetPropertyFlag(uint64& Flags, EPropertyFlags Flag, bool bEnabled)
     else Flags &= ~static_cast<uint64>(Flag);
 }
 
-static bool ReadMetadataBool(const FJsonObject& Metadata, const TCHAR* Name, bool& InOut, FUnrealMCPError& OutError)
+static bool ReadMetadataBool(const FUnrealMCPRecord& Metadata, const TCHAR* Name, bool& InOut, FUnrealMCPError& OutError)
 {
     if (!Metadata.HasField(Name)) return true;
     if (!Metadata.TryGetBoolField(Name, InOut))
@@ -594,7 +594,7 @@ static bool ReadMetadataBool(const FJsonObject& Metadata, const TCHAR* Name, boo
 static bool ValidateAndApplyMetadata(
     UBlueprint* Blueprint,
     FBPVariableDescription& Variable,
-    const TSharedPtr<FJsonObject>& Metadata,
+    const TSharedPtr<FUnrealMCPRecord>& Metadata,
     bool bApply,
     FUnrealMCPError& OutError)
 {
@@ -725,24 +725,24 @@ static bool ReadInspectedMember(
     FUnrealMCPBlueprintInspector& Inspector,
     const FString& ObjectPath,
     const FString& MemberId,
-    TSharedPtr<FJsonObject>& OutMember,
+    TSharedPtr<FUnrealMCPRecord>& OutMember,
     FUnrealMCPError& OutError)
 {
-    const TSharedRef<FJsonObject> Arguments = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Arguments = MakeShared<FUnrealMCPRecord>();
     Arguments->SetStringField(TEXT("mode"), TEXT("inspect"));
     Arguments->SetStringField(TEXT("asset_path"), ObjectPath);
     Arguments->SetStringField(TEXT("member_id"), MemberId);
-    Arguments->SetArrayField(TEXT("sections"), {MakeShared<FJsonValueString>(TEXT("variables"))});
+    Arguments->SetArrayField(TEXT("sections"), {MakeShared<FUnrealMCPValueString>(TEXT("variables"))});
     Arguments->SetNumberField(TEXT("page_size"), 1);
-    TSharedPtr<FJsonObject> Inspection;
+    TSharedPtr<FUnrealMCPRecord> Inspection;
     if (!Inspector.Execute(Arguments, Inspection, OutError) || !Inspection.IsValid()) return false;
-    const TArray<TSharedPtr<FJsonValue>>* Records = nullptr;
+    const TArray<TSharedPtr<FUnrealMCPValue>>* Records = nullptr;
     if (!Inspection->TryGetArrayField(TEXT("records"), Records) || Records == nullptr || Records->Num() != 1)
     {
         OutError = {TEXT("internal_error"), TEXT("Member read-back did not return one exact variable record")};
         return false;
     }
-    const TSharedPtr<FJsonObject>* Record = nullptr;
+    const TSharedPtr<FUnrealMCPRecord>* Record = nullptr;
     if (!(*Records)[0].IsValid() || !(*Records)[0]->TryGetObject(Record) || Record == nullptr || !Record->IsValid())
     {
         OutError = {TEXT("internal_error"), TEXT("Member read-back returned an invalid variable record")};
@@ -759,24 +759,24 @@ static bool ReadInspectedScopedRecord(
     const TCHAR* FilterName,
     const FString& Identity,
     const TCHAR* Section,
-    TSharedPtr<FJsonObject>& OutRecord,
+    TSharedPtr<FUnrealMCPRecord>& OutRecord,
     FUnrealMCPError& OutError)
 {
-    const TSharedRef<FJsonObject> Arguments = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Arguments = MakeShared<FUnrealMCPRecord>();
     Arguments->SetStringField(TEXT("mode"), TEXT("inspect"));
     Arguments->SetStringField(TEXT("asset_path"), ObjectPath);
     Arguments->SetStringField(FilterName, Identity);
-    Arguments->SetArrayField(TEXT("sections"), {MakeShared<FJsonValueString>(Section)});
+    Arguments->SetArrayField(TEXT("sections"), {MakeShared<FUnrealMCPValueString>(Section)});
     Arguments->SetNumberField(TEXT("page_size"), 1);
-    TSharedPtr<FJsonObject> Inspection;
+    TSharedPtr<FUnrealMCPRecord> Inspection;
     if (!Inspector.Execute(Arguments, Inspection, OutError) || !Inspection.IsValid()) return false;
-    const TArray<TSharedPtr<FJsonValue>>* Records = nullptr;
+    const TArray<TSharedPtr<FUnrealMCPValue>>* Records = nullptr;
     if (!Inspection->TryGetArrayField(TEXT("records"), Records) || Records == nullptr || Records->Num() != 1)
     {
         OutError = {TEXT("internal_error"), TEXT("Scoped member read-back did not return one exact record")};
         return false;
     }
-    const TSharedPtr<FJsonObject>* Record = nullptr;
+    const TSharedPtr<FUnrealMCPRecord>* Record = nullptr;
     if (!(*Records)[0].IsValid() || !(*Records)[0]->TryGetObject(Record) || Record == nullptr || !Record->IsValid())
     {
         OutError = {TEXT("internal_error"), TEXT("Scoped member read-back returned an invalid record")};

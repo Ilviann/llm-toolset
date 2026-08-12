@@ -242,7 +242,7 @@ bool PlanAndApply(
                 EdgeKinds.FindOrAdd(Identity) = EdgeKinds.FindRef(Identity) || bExecution;
                 if (!Consume())
                 {
-                    OutError = {TEXT("timeout"), TEXT("Automatic layout exceeded its bounded graph-analysis work"), MakeShared<FJsonObject>(), true};
+                    OutError = {TEXT("timeout"), TEXT("Automatic layout exceeded its bounded graph-analysis work"), MakeShared<FUnrealMCPRecord>(), true};
                     return false;
                 }
             }
@@ -322,7 +322,7 @@ bool PlanAndApply(
     for (int32 NodeIndex = 0; NodeIndex < Nodes.Num(); ++NodeIndex)
         if (Indices[NodeIndex] == INDEX_NONE && !StrongConnect(NodeIndex))
         {
-            OutError = {TEXT("timeout"), TEXT("Automatic layout exceeded its bounded cycle-analysis work"), MakeShared<FJsonObject>(), true};
+            OutError = {TEXT("timeout"), TEXT("Automatic layout exceeded its bounded cycle-analysis work"), MakeShared<FUnrealMCPRecord>(), true};
             return false;
         }
 
@@ -376,7 +376,7 @@ bool PlanAndApply(
             if (--ComponentIndegree[Target] == 0) Ready.Add(Target);
             if (!Consume())
             {
-                OutError = {TEXT("timeout"), TEXT("Automatic layout exceeded its bounded layer-assignment work"), MakeShared<FJsonObject>(), true};
+                OutError = {TEXT("timeout"), TEXT("Automatic layout exceeded its bounded layer-assignment work"), MakeShared<FUnrealMCPRecord>(), true};
                 return false;
             }
         }
@@ -441,7 +441,7 @@ bool PlanAndApply(
         ++OutResult.Iterations;
         if (!Consume(Nodes.Num() + Edges.Num()))
         {
-            OutError = {TEXT("timeout"), TEXT("Automatic layout exceeded its bounded crossing-reduction work"), MakeShared<FJsonObject>(), true};
+            OutError = {TEXT("timeout"), TEXT("Automatic layout exceeded its bounded crossing-reduction work"), MakeShared<FUnrealMCPRecord>(), true};
             return false;
         }
     }
@@ -506,7 +506,7 @@ bool PlanAndApply(
                         if (Rect.Intersects(Existing)) { bCollision = true; break; }
                 if (!Consume(1 + Obstacles.Num() + Occupied.Num()))
                 {
-                    OutError = {TEXT("timeout"), TEXT("Automatic layout exceeded its bounded collision-search work"), MakeShared<FJsonObject>(), true};
+                    OutError = {TEXT("timeout"), TEXT("Automatic layout exceeded its bounded collision-search work"), MakeShared<FUnrealMCPRecord>(), true};
                     return false;
                 }
                 if (bCollision || !ValidateCoordinate(X, Y, Node.Width, Node.Height)) continue;

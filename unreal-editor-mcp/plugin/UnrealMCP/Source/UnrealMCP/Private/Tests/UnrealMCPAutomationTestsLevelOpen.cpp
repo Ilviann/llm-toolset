@@ -49,10 +49,10 @@ bool FUnrealMCPLevelOpenTest::RunTest(const FString& Parameters)
     FUnrealMCPLevelService Service(
         TEXT("1111111111111111111111111111111111111111"),
         [&CurrentTime] { return CurrentTime; });
-    TSharedPtr<FJsonObject> Result;
+    TSharedPtr<FUnrealMCPRecord> Result;
     FUnrealMCPError Error;
 
-    const TSharedRef<FJsonObject> Discover = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Discover = MakeShared<FUnrealMCPRecord>();
     Discover->SetStringField(TEXT("mode"), TEXT("discover"));
     Discover->SetStringField(TEXT("package_path"), PackageRoot);
     Discover->SetNumberField(TEXT("page_size"), 1);
@@ -63,7 +63,7 @@ bool FUnrealMCPLevelOpenTest::RunTest(const FString& Parameters)
     const FString Cursor = Result->GetStringField(TEXT("next_cursor"));
     TestEqual(TEXT("discovery snapshot is exact"), DiscoverySnapshot.Len(), 40);
 
-    const TSharedRef<FJsonObject> Continue = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Continue = MakeShared<FUnrealMCPRecord>();
     Continue->SetStringField(TEXT("cursor"), Cursor);
     Continue->SetNumberField(TEXT("page_size"), 1);
     TestTrue(TEXT("discovery cursor continues once"), Service.Inspect(Continue, Result, Error));
@@ -75,15 +75,15 @@ bool FUnrealMCPLevelOpenTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("a fresh discovery cursor is issued"), Service.Inspect(Discover, Result, Error));
     const FString ExpiringCursor = Result->GetStringField(TEXT("next_cursor"));
     CurrentTime += UnrealMCP::CursorLifetimeSeconds + 1.0;
-    const TSharedRef<FJsonObject> Expired = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Expired = MakeShared<FUnrealMCPRecord>();
     Expired->SetStringField(TEXT("cursor"), ExpiringCursor);
     TestFalse(TEXT("expired cursor cannot continue"), Service.Inspect(Expired, Result, Error));
     TestEqual(TEXT("expired cursor reports expiry"), Error.Code, FString(TEXT("cursor_expired")));
 
-    const TSharedRef<FJsonObject> Current = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Current = MakeShared<FUnrealMCPRecord>();
     Current->SetStringField(TEXT("mode"), TEXT("current"));
     TestTrue(TEXT("current map inspection succeeds"), Service.Inspect(Current, Result, Error));
-    const TSharedPtr<FJsonObject> CurrentRecord = Result->GetArrayField(TEXT("records"))[0]->AsObject();
+    const TSharedPtr<FUnrealMCPRecord> CurrentRecord = Result->GetArrayField(TEXT("records"))[0]->AsObject();
     TestEqual(TEXT("current map is LevelA"), CurrentRecord->GetStringField(TEXT("map_path")), PathA);
     TestEqual(TEXT("map identity is exact"), CurrentRecord->GetStringField(TEXT("map_id")).Len(), 40);
     TestEqual(TEXT("map revision is exact"), CurrentRecord->GetStringField(TEXT("map_revision")).Len(), 40);
@@ -91,7 +91,7 @@ bool FUnrealMCPLevelOpenTest::RunTest(const FString& Parameters)
 
     const auto OpenArguments = [](const FString& Path)
     {
-        const TSharedRef<FJsonObject> Arguments = MakeShared<FJsonObject>();
+        const TSharedRef<FUnrealMCPRecord> Arguments = MakeShared<FUnrealMCPRecord>();
         Arguments->SetStringField(TEXT("operation_id"), FGuid::NewGuid().ToString(EGuidFormats::Digits).ToLower());
         Arguments->SetStringField(TEXT("map_path"), Path);
         return Arguments;
@@ -120,7 +120,7 @@ bool FUnrealMCPLevelOpenTest::RunTest(const FString& Parameters)
         Result->GetObjectField(TEXT("current_map"))->GetStringField(TEXT("map_path")),
         PathB);
 
-    const TSharedRef<FJsonObject> Invalid = OpenArguments(TEXT("/Game/Missing.Missing"));
+    const TSharedRef<FUnrealMCPRecord> Invalid = OpenArguments(TEXT("/Game/Missing.Missing"));
     TestFalse(TEXT("missing map rejects"), Service.Open(Invalid, Result, Error));
     TestEqual(TEXT("missing map is explicit"), Error.Code, FString(TEXT("not_found")));
     TestFalse(

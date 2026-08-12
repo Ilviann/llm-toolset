@@ -1,7 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Dom/JsonObject.h"
+#include "UnrealMCPWireTypes.h"
 #include "UnrealMCPProtocol.h"
 
 struct FAssetData;
@@ -18,18 +18,18 @@ public:
     ~FUnrealMCPLevelService();
 
     bool Inspect(
-        const TSharedPtr<FJsonObject>& Arguments,
-        TSharedPtr<FJsonObject>& OutResult,
+        const TSharedPtr<FUnrealMCPRecord>& Arguments,
+        TSharedPtr<FUnrealMCPRecord>& OutResult,
         FUnrealMCPError& OutError);
     bool Open(
-        const TSharedPtr<FJsonObject>& Arguments,
-        TSharedPtr<FJsonObject>& OutResult,
+        const TSharedPtr<FUnrealMCPRecord>& Arguments,
+        TSharedPtr<FUnrealMCPRecord>& OutResult,
         FUnrealMCPError& OutError);
 
 private:
     struct FCursorState
     {
-        TSharedPtr<FJsonObject> Arguments;
+        TSharedPtr<FUnrealMCPRecord> Arguments;
         FString SnapshotId;
         int32 Offset = 0;
         double ExpiresAt = 0.0;
@@ -45,20 +45,20 @@ private:
     };
 
     bool InspectInitial(
-        const TSharedPtr<FJsonObject>& Arguments,
+        const TSharedPtr<FUnrealMCPRecord>& Arguments,
         int32 Offset,
         const FString& ExpectedSnapshot,
         int32 PageSizeOverride,
-        TSharedPtr<FJsonObject>& OutResult,
+        TSharedPtr<FUnrealMCPRecord>& OutResult,
         FUnrealMCPError& OutError);
     bool BuildDiscovery(
-        const FJsonObject& Arguments,
-        TArray<TSharedPtr<FJsonValue>>& OutRecords,
+        const FUnrealMCPRecord& Arguments,
+        TArray<TSharedPtr<FUnrealMCPValue>>& OutRecords,
         FString& OutSnapshot,
         bool& OutScanTruncated,
         FUnrealMCPError& OutError) const;
     bool BuildCurrent(
-        TSharedPtr<FJsonObject>& OutRecord,
+        TSharedPtr<FUnrealMCPRecord>& OutRecord,
         FString& OutSnapshot,
         FUnrealMCPError& OutError);
     FDirtyState ReadDirtyState(UWorld* World) const;

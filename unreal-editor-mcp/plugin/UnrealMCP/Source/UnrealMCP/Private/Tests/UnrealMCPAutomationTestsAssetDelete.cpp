@@ -9,11 +9,11 @@
 
 namespace
 {
-TSharedRef<FJsonObject> DataCreateArguments(
+TSharedRef<FUnrealMCPRecord> DataCreateArguments(
     const FString& Target,
     const FString& AssetPath)
 {
-    const TSharedRef<FJsonObject> Arguments = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Arguments = MakeShared<FUnrealMCPRecord>();
     Arguments->SetStringField(
         TEXT("operation_id"),
         FGuid::NewGuid().ToString(EGuidFormats::Digits).ToLower());
@@ -40,11 +40,11 @@ bool SaveCurve(UCurveFloat* Curve, FString& OutFilename)
         Curve->GetOutermost(), Curve, *OutFilename, SaveArgs);
 }
 
-TSharedRef<FJsonObject> DeleteArguments(
+TSharedRef<FUnrealMCPRecord> DeleteArguments(
     const FString& AssetPath,
     const FString& Snapshot)
 {
-    const TSharedRef<FJsonObject> Arguments = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Arguments = MakeShared<FUnrealMCPRecord>();
     Arguments->SetStringField(
         TEXT("operation_id"),
         FGuid::NewGuid().ToString(EGuidFormats::Digits).ToLower());
@@ -83,9 +83,9 @@ bool FUnrealMCPAssetDeleteTest::RunTest(const FString& Parameters)
 
     FUnrealMCPAssetReferenceService References;
     FUnrealMCPAssetDeletionService Deletion(References);
-    TSharedPtr<FJsonObject> Result;
+    TSharedPtr<FUnrealMCPRecord> Result;
     FUnrealMCPError Error;
-    const TSharedRef<FJsonObject> Inspect = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Inspect = MakeShared<FUnrealMCPRecord>();
     Inspect->SetStringField(TEXT("asset_path"), AssetPath);
     Inspect->SetNumberField(TEXT("page_size"), 100);
     if (!TestTrue(
@@ -111,17 +111,17 @@ bool FUnrealMCPAssetDeleteTest::RunTest(const FString& Parameters)
         TEXT("/Game/UnrealMCPAssetDeleteReferenceTests/")
         + FGuid::NewGuid().ToString(EGuidFormats::Digits);
     FUnrealMCPGameDataService GameData;
-    TSharedRef<FJsonObject> CreateStruct =
+    TSharedRef<FUnrealMCPRecord> CreateStruct =
         DataCreateArguments(TEXT("user_defined_struct"), ReferencePrefix + TEXT("/ST_Target"));
-    const TSharedRef<FJsonObject> Member = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Member = MakeShared<FUnrealMCPRecord>();
     Member->SetStringField(TEXT("name"), TEXT("Value"));
     Member->SetObjectField(TEXT("type"), K2Type(TEXT("int")));
     Member->SetObjectField(
         TEXT("default"),
-        LiteralDefault(MakeShared<FJsonValueNumber>(1)));
+        LiteralDefault(MakeShared<FUnrealMCPValueNumber>(1)));
     CreateStruct->SetArrayField(
         TEXT("members"),
-        {MakeShared<FJsonValueObject>(Member)});
+        {MakeShared<FUnrealMCPValueObject>(Member)});
     if (!TestTrue(
         TEXT("referenced deletion target creates"),
         GameData.Edit(CreateStruct, Result, Error)))
@@ -130,7 +130,7 @@ bool FUnrealMCPAssetDeleteTest::RunTest(const FString& Parameters)
         return false;
     }
     const FString ReferencedPath = Result->GetStringField(TEXT("asset_path"));
-    TSharedRef<FJsonObject> CreateTable =
+    TSharedRef<FUnrealMCPRecord> CreateTable =
         DataCreateArguments(TEXT("data_table"), ReferencePrefix + TEXT("/DT_Referencer"));
     CreateTable->SetStringField(TEXT("row_struct"), ReferencedPath);
     if (!TestTrue(
@@ -140,7 +140,7 @@ bool FUnrealMCPAssetDeleteTest::RunTest(const FString& Parameters)
         AddError(Error.Code + TEXT(": ") + Error.Message);
         return false;
     }
-    const TSharedRef<FJsonObject> InspectReferenced = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> InspectReferenced = MakeShared<FUnrealMCPRecord>();
     InspectReferenced->SetStringField(TEXT("asset_path"), ReferencedPath);
     InspectReferenced->SetNumberField(TEXT("page_size"), 100);
     if (!TestTrue(

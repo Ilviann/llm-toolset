@@ -25,16 +25,16 @@ FFamilyInfo MakeFamily(const TCHAR* Name, const UClass* NativeBase)
     return {Name, NativeBase != nullptr ? NativeBase->GetPathName() : FString(), true};
 }
 
-TArray<TSharedPtr<FJsonValue>> StringValues(std::initializer_list<const TCHAR*> Values)
+TArray<TSharedPtr<FUnrealMCPValue>> StringValues(std::initializer_list<const TCHAR*> Values)
 {
-    TArray<TSharedPtr<FJsonValue>> Result;
-    for (const TCHAR* Value : Values) Result.Add(MakeShared<FJsonValueString>(Value));
+    TArray<TSharedPtr<FUnrealMCPValue>> Result;
+    for (const TCHAR* Value : Values) Result.Add(MakeShared<FUnrealMCPValueString>(Value));
     return Result;
 }
 
-TSharedRef<FJsonObject> PublishedOperations(const FFamilyInfo& Family)
+TSharedRef<FUnrealMCPRecord> PublishedOperations(const FFamilyInfo& Family)
 {
-    const TSharedRef<FJsonObject> Operations = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Operations = MakeShared<FUnrealMCPRecord>();
     for (const TCHAR* Name : {TEXT("discover"), TEXT("inspect"), TEXT("create"), TEXT("compile"), TEXT("save"),
         TEXT("class_defaults"), TEXT("member_variables"), TEXT("functions"),
         TEXT("local_variables"), TEXT("macros"), TEXT("custom_events"), TEXT("action_catalog"), TEXT("graph_edit")})
@@ -52,9 +52,9 @@ TSharedRef<FJsonObject> PublishedOperations(const FFamilyInfo& Family)
     return Operations;
 }
 
-TSharedRef<FJsonObject> PublishedMultiplayer(const FFamilyInfo& Family)
+TSharedRef<FUnrealMCPRecord> PublishedMultiplayer(const FFamilyInfo& Family)
 {
-    const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Result = MakeShared<FUnrealMCPRecord>();
     const bool bActorReplication = Family.Name == TEXT("actor") || Family.Name == TEXT("game_state_base")
         || Family.Name == TEXT("game_state");
     Result->SetBoolField(TEXT("actor_replication"), bActorReplication);
@@ -165,18 +165,18 @@ bool SupportsRpcMode(const UClass* Class, const FString& Mode)
     return false;
 }
 
-TSharedRef<FJsonObject> BuildLiveCapabilities(const UBlueprint* Blueprint)
+TSharedRef<FUnrealMCPRecord> BuildLiveCapabilities(const UBlueprint* Blueprint)
 {
     return BuildLiveCapabilities(
         Blueprint,
         Classify(Blueprint != nullptr ? Blueprint->ParentClass : nullptr));
 }
 
-TSharedRef<FJsonObject> BuildLiveCapabilities(
+TSharedRef<FUnrealMCPRecord> BuildLiveCapabilities(
     const UBlueprint* Blueprint,
     const FFamilyInfo& Family)
 {
-    const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Result = MakeShared<FUnrealMCPRecord>();
     const UClass* ParentClass = Blueprint != nullptr ? Blueprint->ParentClass : nullptr;
     const bool bNormalBlueprint = Blueprint != nullptr && Blueprint->BlueprintType == BPTYPE_Normal;
     const bool bDefaults = Blueprint != nullptr && Blueprint->GeneratedClass != nullptr
@@ -217,8 +217,8 @@ TSharedRef<FJsonObject> BuildLiveCapabilities(
     Result->SetBoolField(TEXT("event_graphs"), Family.bSupported && bEventGraph);
     Result->SetBoolField(TEXT("local_variables"), Family.bSupported && bNormalBlueprint);
     Result->SetBoolField(TEXT("overrides"), Family.bSupported && bOverrides);
-    const TSharedRef<FJsonObject> Multiplayer = PublishedMultiplayer(Family);
-    TArray<TSharedPtr<FJsonValue>> Settings;
+    const TSharedRef<FUnrealMCPRecord> Multiplayer = PublishedMultiplayer(Family);
+    TArray<TSharedPtr<FUnrealMCPValue>> Settings;
     UObject* Defaults = Blueprint != nullptr && Blueprint->GeneratedClass != nullptr
         ? Blueprint->GeneratedClass->GetDefaultObject(false) : nullptr;
     if (Defaults != nullptr && SupportsActorReplication(ParentClass))
@@ -232,12 +232,12 @@ TSharedRef<FJsonObject> BuildLiveCapabilities(
         {
             FString Kind;
             if (UnrealMCP::PropertyCodec::IsSupportedEditable(Defaults->GetClass()->FindPropertyByName(Entry.Value), Kind))
-                Settings.Add(MakeShared<FJsonValueString>(Entry.Key));
+                Settings.Add(MakeShared<FUnrealMCPValueString>(Entry.Key));
         }
     }
     Multiplayer->SetArrayField(TEXT("actor_replication_settings"), Settings);
     Result->SetObjectField(TEXT("multiplayer"), Multiplayer);
-    const TSharedRef<FJsonObject> GraphTypes = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> GraphTypes = MakeShared<FUnrealMCPRecord>();
     GraphTypes->SetBoolField(TEXT("event"), Family.bSupported && bEventGraph);
     GraphTypes->SetBoolField(TEXT("function"), Family.bSupported && bNormalBlueprint);
     GraphTypes->SetBoolField(TEXT("macro"), Family.bSupported && bNormalBlueprint);
@@ -245,7 +245,7 @@ TSharedRef<FJsonObject> BuildLiveCapabilities(
     return Result;
 }
 
-TArray<TSharedPtr<FJsonValue>> BuildPublishedMatrix()
+TArray<TSharedPtr<FUnrealMCPValue>> BuildPublishedMatrix()
 {
     const TArray<FFamilyInfo> Families = {
         MakeFamily(TEXT("actor"), AActor::StaticClass()),
@@ -255,10 +255,10 @@ TArray<TSharedPtr<FJsonValue>> BuildPublishedMatrix()
         MakeFamily(TEXT("game_state"), AGameState::StaticClass()),
         MakeFamily(TEXT("game_instance"), UGameInstance::StaticClass()),
         MakeFamily(TEXT("widget"), UUserWidget::StaticClass())};
-    TArray<TSharedPtr<FJsonValue>> Result;
+    TArray<TSharedPtr<FUnrealMCPValue>> Result;
     for (const FFamilyInfo& Family : Families)
     {
-        const TSharedRef<FJsonObject> Record = MakeShared<FJsonObject>();
+        const TSharedRef<FUnrealMCPRecord> Record = MakeShared<FUnrealMCPRecord>();
         Record->SetStringField(TEXT("family"), Family.Name);
         Record->SetStringField(TEXT("native_base_class"), Family.NativeBaseClass);
         Record->SetStringField(TEXT("inheritance_category"),
@@ -266,7 +266,7 @@ TArray<TSharedPtr<FJsonValue>> BuildPublishedMatrix()
             : Family.Name == TEXT("game_instance") ? TEXT("uobject_derived") : TEXT("actor_derived"));
         Record->SetObjectField(TEXT("operations"), PublishedOperations(Family));
         Record->SetObjectField(TEXT("multiplayer"), PublishedMultiplayer(Family));
-        Result.Add(MakeShared<FJsonValueObject>(Record));
+        Result.Add(MakeShared<FUnrealMCPValueObject>(Record));
     }
     return Result;
 }

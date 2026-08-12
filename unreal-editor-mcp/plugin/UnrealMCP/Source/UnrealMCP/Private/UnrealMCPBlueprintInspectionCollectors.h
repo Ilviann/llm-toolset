@@ -41,11 +41,11 @@ for (const TPair<UBlueprint*, FString>& Owner : Owners)
             const bool bReplaceableBoundary =
                 UnrealMCP::BlueprintLogicUnitFingerprint::DescribeEventHandler(
                     EventGraph, Event, ReplacementBoundary);
-            const TSharedRef<FJsonObject> Signature = CustomEventSignature(Event);
-            const TSharedRef<FJsonObject> References = CustomEventReferences(Blueprint, Event);
+            const TSharedRef<FUnrealMCPRecord> Signature = CustomEventSignature(Event);
+            const TSharedRef<FUnrealMCPRecord> References = CustomEventReferences(Blueprint, Event);
             if (Sections.Contains(TEXT("custom_events")))
             {
-                const TSharedRef<FJsonObject> Value = Record(TEXT("custom_event"));
+                const TSharedRef<FUnrealMCPRecord> Value = Record(TEXT("custom_event"));
                 Value->SetStringField(TEXT("id"), EventId);
                 Value->SetBoolField(TEXT("identity_stable"), !EventId.IsEmpty());
                 Value->SetStringField(TEXT("name"), Event->CustomFunctionName.ToString());
@@ -57,11 +57,11 @@ for (const TPair<UBlueprint*, FString>& Owner : Owners)
                 Value->SetObjectField(TEXT("signature"), Signature);
                 Value->SetObjectField(TEXT("metadata"), CustomEventMetadata(Event));
                 Value->SetObjectField(TEXT("reference_summary"), References);
-                const TSharedRef<FJsonObject> Relationship = MakeShared<FJsonObject>();
+                const TSharedRef<FUnrealMCPRecord> Relationship = MakeShared<FUnrealMCPRecord>();
                 Relationship->SetStringField(TEXT("graph_id"), GuidString(EventGraph->GraphGuid));
                 Relationship->SetStringField(TEXT("graph_kind"), TEXT("event"));
                 Value->SetObjectField(TEXT("graph_relationship"), Relationship);
-                const TSharedRef<FJsonObject> Required = MakeShared<FJsonObject>();
+                const TSharedRef<FUnrealMCPRecord> Required = MakeShared<FUnrealMCPRecord>();
                 Required->SetStringField(TEXT("event_node_id"), EventId);
                 Required->SetBoolField(TEXT("event_node_present"), true);
                 Required->SetBoolField(TEXT("valid"), FBlueprintEditorUtils::IsEventGraph(EventGraph));
@@ -78,7 +78,7 @@ for (const TPair<UBlueprint*, FString>& Owner : Owners)
                 if (Sections.Contains(TEXT("parameters")) && FunctionFilter.IsEmpty()
                     && LocalFilter.IsEmpty() && MacroFilter.IsEmpty())
                 {
-                    const TSharedRef<FJsonObject> Value = Record(TEXT("parameter"));
+                    const TSharedRef<FUnrealMCPRecord> Value = Record(TEXT("parameter"));
                     Value->SetStringField(TEXT("id"), LivePin != nullptr ? GuidString(LivePin->PinId) : FString());
                     Value->SetBoolField(TEXT("identity_stable"), LivePin != nullptr && LivePin->PinId.IsValid());
                     Value->SetStringField(TEXT("owner_kind"), TEXT("custom_event"));
@@ -145,7 +145,7 @@ for (const TPair<UEdGraph*, FString>& Entry : Graphs)
     const FString Kind = OwnerBlueprint != nullptr ? GraphKind(OwnerBlueprint, Graph) : TEXT("other");
     if (Sections.Contains(TEXT("graphs")))
     {
-        const TSharedRef<FJsonObject> Value = Record(TEXT("graph"));
+        const TSharedRef<FUnrealMCPRecord> Value = Record(TEXT("graph"));
         Value->SetStringField(TEXT("id"), GraphId);
         Value->SetBoolField(TEXT("identity_stable"), !GraphId.IsEmpty());
         Value->SetStringField(TEXT("name"), Graph->GetName());
@@ -162,7 +162,7 @@ for (const TPair<UEdGraph*, FString>& Entry : Graphs)
         const FString NodeId = GuidString(Node->NodeGuid);
         if (Sections.Contains(TEXT("nodes")))
         {
-            const TSharedRef<FJsonObject> Value = Record(TEXT("node"));
+            const TSharedRef<FUnrealMCPRecord> Value = Record(TEXT("node"));
             Value->SetStringField(TEXT("graph_id"), GraphId);
             Value->SetStringField(TEXT("id"), NodeId);
             Value->SetBoolField(TEXT("identity_stable"), !NodeId.IsEmpty());
@@ -194,7 +194,7 @@ for (const TPair<UEdGraph*, FString>& Entry : Graphs)
             const FString PinId = GuidString(Pin->PinId);
             if (Sections.Contains(TEXT("pins")))
             {
-                const TSharedRef<FJsonObject> Value = Record(TEXT("pin"));
+                const TSharedRef<FUnrealMCPRecord> Value = Record(TEXT("pin"));
                 Value->SetStringField(TEXT("graph_id"), GraphId);
                 Value->SetStringField(TEXT("node_id"), NodeId);
                 Value->SetStringField(TEXT("id"), PinId);
@@ -221,7 +221,7 @@ for (const TPair<UEdGraph*, FString>& Entry : Graphs)
                     if (Linked == nullptr || Linked->GetOwningNodeUnchecked() == nullptr) continue;
                     if (Sections.Contains(TEXT("connections")))
                     {
-                        const TSharedRef<FJsonObject> Value = Record(TEXT("connection"));
+                        const TSharedRef<FUnrealMCPRecord> Value = Record(TEXT("connection"));
                         Value->SetStringField(TEXT("graph_id"), GraphId);
                         Value->SetStringField(TEXT("from_node_id"), NodeId);
                         Value->SetStringField(TEXT("from_pin_id"), PinId);

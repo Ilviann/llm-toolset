@@ -80,13 +80,13 @@ bool HasBindingCapacity(
     return true;
 }
 
-TSharedRef<FJsonObject> ChangedBinding(
+TSharedRef<FUnrealMCPRecord> ChangedBinding(
     const FString& Kind,
     const FString& Name,
     const FString& SourceKind = FString(),
     const FString& SourceName = FString())
 {
-    const TSharedRef<FJsonObject> Changed = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Changed = MakeShared<FUnrealMCPRecord>();
     Changed->SetStringField(TEXT("binding_kind"), Kind);
     Changed->SetStringField(TEXT("name"), Name);
     if (!SourceKind.IsEmpty())
@@ -132,7 +132,7 @@ bool FUnrealMCPWidgetBindingService::Collect(
                 : Binding.SourceProperty.ToString();
         FDelegateProperty* Target =
             FindTargetDelegate(Widget, Binding.PropertyName.ToString());
-        const TSharedRef<FJsonObject> Record = MakeShared<FJsonObject>();
+        const TSharedRef<FUnrealMCPRecord> Record = MakeShared<FUnrealMCPRecord>();
         Record->SetStringField(TEXT("section"), TEXT("widget_bindings"));
         Record->SetStringField(TEXT("record_type"), TEXT("property_binding"));
         Record->SetStringField(
@@ -178,7 +178,7 @@ bool FUnrealMCPWidgetBindingService::Collect(
             {
                 continue;
             }
-            const TSharedRef<FJsonObject> Record = MakeShared<FJsonObject>();
+            const TSharedRef<FUnrealMCPRecord> Record = MakeShared<FUnrealMCPRecord>();
             Record->SetStringField(TEXT("section"), TEXT("widget_bindings"));
             Record->SetStringField(TEXT("record_type"), TEXT("event_binding"));
             Record->SetStringField(TEXT("id"), GuidString(Event->NodeGuid));
@@ -217,8 +217,8 @@ bool FUnrealMCPWidgetBindingService::Collect(
 }
 
 bool FUnrealMCPWidgetBindingService::Execute(
-    const TSharedPtr<FJsonObject>& Arguments,
-    TSharedPtr<FJsonObject>& OutResult,
+    const TSharedPtr<FUnrealMCPRecord>& Arguments,
+    TSharedPtr<FUnrealMCPRecord>& OutResult,
     FUnrealMCPError& OutError)
 {
     using namespace UnrealMCP::BlueprintMutationPrivate;
@@ -293,7 +293,7 @@ bool FUnrealMCPWidgetBindingService::Execute(
         return false;
     }
     const FString StableWidgetId = WidgetId(Blueprint, Widget);
-    TSharedPtr<FJsonObject> Changed;
+    TSharedPtr<FUnrealMCPRecord> Changed;
 
     if (bBindProperty || bUnbindProperty)
     {

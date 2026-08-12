@@ -83,8 +83,8 @@ void MarkForNode(UBlueprint* Blueprint, UEdGraphNode* Node)
 }
 
 bool FUnrealMCPBlueprintGraphEditor::Execute(
-    const TSharedPtr<FJsonObject>& Arguments,
-    TSharedPtr<FJsonObject>& OutResult,
+    const TSharedPtr<FUnrealMCPRecord>& Arguments,
+    TSharedPtr<FUnrealMCPRecord>& OutResult,
     FUnrealMCPError& OutError)
 {
     using namespace UnrealMCP::BlueprintGraphOperationHandlersPrivate;
@@ -104,7 +104,7 @@ bool FUnrealMCPBlueprintGraphEditor::Execute(
     }
     if (Blueprint->bBeingCompiled)
     {
-        OutError = {TEXT("busy"), TEXT("The requested Blueprint is compiling"), MakeShared<FJsonObject>(), true};
+        OutError = {TEXT("busy"), TEXT("The requested Blueprint is compiling"), MakeShared<FUnrealMCPRecord>(), true};
         return false;
     }
     FString Snapshot;
@@ -161,7 +161,7 @@ bool FUnrealMCPBlueprintGraphEditor::Execute(
         }
     }
 
-    TSharedRef<FJsonObject> ChangedNode = TargetNode != nullptr ? EncodeNode(Graph, TargetNode) : MakeShared<FJsonObject>();
+    TSharedRef<FUnrealMCPRecord> ChangedNode = TargetNode != nullptr ? EncodeNode(Graph, TargetNode) : MakeShared<FUnrealMCPRecord>();
     TSet<FString> CreatedIdentities;
     bool bCreated = false;
     bool bReturnedExisting = false;
@@ -269,7 +269,7 @@ bool FUnrealMCPBlueprintGraphEditor::Execute(
         RestoreFailedTransaction(OutError);
         return false;
     }
-    const TSharedRef<FJsonObject> Changed = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Changed = MakeShared<FUnrealMCPRecord>();
     Changed->SetStringField(TEXT("operation"), Request.Operation);
     Changed->SetObjectField(TEXT("node"), ChangedNode);
     Changed->SetBoolField(TEXT("created"), bCreated);

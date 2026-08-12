@@ -16,8 +16,8 @@ void FUnrealMCPGameDataService::RemoveExpired(double CurrentTime)
 }
 
 bool FUnrealMCPGameDataService::Inspect(
-    const TSharedPtr<FJsonObject>& Arguments,
-    TSharedPtr<FJsonObject>& OutResult,
+    const TSharedPtr<FUnrealMCPRecord>& Arguments,
+    TSharedPtr<FUnrealMCPRecord>& OutResult,
     FUnrealMCPError& OutError)
 {
     using namespace UnrealMCP::GameDataRequestValidation;
@@ -44,7 +44,7 @@ bool FUnrealMCPGameDataService::Inspect(
     FCursorState* State = Cursors.Find(Cursor);
     if (State == nullptr)
     {
-        OutError = {TEXT("cursor_expired"), TEXT("The game-data cursor is missing or expired"), MakeShared<FJsonObject>(), true};
+        OutError = {TEXT("cursor_expired"), TEXT("The game-data cursor is missing or expired"), MakeShared<FUnrealMCPRecord>(), true};
         return false;
     }
     int32 PageSize = 0;
@@ -55,11 +55,11 @@ bool FUnrealMCPGameDataService::Inspect(
 }
 
 bool FUnrealMCPGameDataService::InspectInitial(
-    const TSharedPtr<FJsonObject>& Arguments,
+    const TSharedPtr<FUnrealMCPRecord>& Arguments,
     int32 Offset,
     const FString& ExpectedSnapshot,
     int32 PageSizeOverride,
-    TSharedPtr<FJsonObject>& OutResult,
+    TSharedPtr<FUnrealMCPRecord>& OutResult,
     FUnrealMCPError& OutError)
 {
     using namespace UnrealMCP::GameDataRequestValidation;
@@ -70,9 +70,9 @@ bool FUnrealMCPGameDataService::InspectInitial(
     FString ObjectPath;
     FString Package;
     FString Snapshot;
-    TArray<TSharedPtr<FJsonValue>> Records;
-    TArray<TSharedPtr<FJsonValue>> Schema;
-    TSharedPtr<FJsonObject> Metadata;
+    TArray<TSharedPtr<FUnrealMCPValue>> Records;
+    TArray<TSharedPtr<FUnrealMCPValue>> Schema;
+    TSharedPtr<FUnrealMCPRecord> Metadata;
     if (!UnrealMCP::GameDataInspectionBuilder::Build(
         *Arguments, Target, ObjectPath, Package, Records, Schema, Snapshot, Metadata, OutError))
     {
@@ -89,9 +89,9 @@ bool FUnrealMCPGameDataService::InspectInitial(
         return false;
     }
     const int32 End = FMath::Min(Offset + PageSize, Records.Num());
-    TArray<TSharedPtr<FJsonValue>> Page;
+    TArray<TSharedPtr<FUnrealMCPValue>> Page;
     for (int32 Index = Offset; Index < End; ++Index) Page.Add(Records[Index]);
-    const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Result = MakeShared<FUnrealMCPRecord>();
     Result->SetStringField(TEXT("target"), Target);
     Result->SetStringField(TEXT("asset_path"), ObjectPath);
     Result->SetStringField(TEXT("snapshot_id"), Snapshot);

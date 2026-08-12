@@ -47,14 +47,14 @@
 
 namespace UnrealMCP::BlueprintMutationPrivate
 {
-static bool HasOnlyFields(const FJsonObject& Object, std::initializer_list<const TCHAR*> Allowed)
+static bool HasOnlyFields(const FUnrealMCPRecord& Object, std::initializer_list<const TCHAR*> Allowed)
 {
     TSet<FString> Names;
     for (const TCHAR* Name : Allowed)
     {
         Names.Add(Name);
     }
-    for (const TPair<FString, TSharedPtr<FJsonValue>>& Pair : Object.Values)
+    for (const TPair<FString, TSharedPtr<FUnrealMCPValue>>& Pair : Object.Values)
     {
         if (!Names.Contains(Pair.Key))
         {
@@ -299,17 +299,17 @@ static FString SeverityName(EMessageSeverity::Type Severity)
     return TEXT("note");
 }
 
-static void AddDiagnostics(const FCompilerResultsLog& Log, const TSharedRef<FJsonObject>& Result)
+static void AddDiagnostics(const FCompilerResultsLog& Log, const TSharedRef<FUnrealMCPRecord>& Result)
 {
-    TArray<TSharedPtr<FJsonValue>> Diagnostics;
+    TArray<TSharedPtr<FUnrealMCPValue>> Diagnostics;
     const int32 Count = FMath::Min(Log.Messages.Num(), UnrealMCP::MaxCompilerDiagnostics);
     Diagnostics.Reserve(Count);
     for (int32 Index = 0; Index < Count; ++Index)
     {
-        const TSharedRef<FJsonObject> Diagnostic = MakeShared<FJsonObject>();
+        const TSharedRef<FUnrealMCPRecord> Diagnostic = MakeShared<FUnrealMCPRecord>();
         Diagnostic->SetStringField(TEXT("severity"), SeverityName(Log.Messages[Index]->GetSeverity()));
         Diagnostic->SetStringField(TEXT("message"), Log.Messages[Index]->ToText().ToString().Left(UnrealMCP::MaxDiagnosticChars));
-        Diagnostics.Add(MakeShared<FJsonValueObject>(Diagnostic));
+        Diagnostics.Add(MakeShared<FUnrealMCPValueObject>(Diagnostic));
     }
     Result->SetArrayField(TEXT("diagnostics"), Diagnostics);
     Result->SetNumberField(TEXT("diagnostic_count"), Log.Messages.Num());
@@ -317,7 +317,7 @@ static void AddDiagnostics(const FCompilerResultsLog& Log, const TSharedRef<FJso
 }
 
 static bool ResolveMutableBlueprint(
-    const FJsonObject& Arguments,
+    const FUnrealMCPRecord& Arguments,
     UBlueprint*& OutBlueprint,
     FString& OutObjectPath,
     FString& OutPackageName,
@@ -373,7 +373,7 @@ static bool ResolveMutableBlueprint(
     }
     if (OutBlueprint->bBeingCompiled)
     {
-        OutError = {TEXT("busy"), TEXT("The requested Blueprint is already compiling"), MakeShared<FJsonObject>(), true};
+        OutError = {TEXT("busy"), TEXT("The requested Blueprint is already compiling"), MakeShared<FUnrealMCPRecord>(), true};
         return false;
     }
     return true;
@@ -385,12 +385,12 @@ static bool ReadSnapshot(
     FString& OutSnapshot,
     FUnrealMCPError& OutError)
 {
-    const TSharedRef<FJsonObject> Arguments = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Arguments = MakeShared<FUnrealMCPRecord>();
     Arguments->SetStringField(TEXT("mode"), TEXT("inspect"));
     Arguments->SetStringField(TEXT("asset_path"), ObjectPath);
-    Arguments->SetArrayField(TEXT("sections"), {MakeShared<FJsonValueString>(TEXT("summary"))});
+    Arguments->SetArrayField(TEXT("sections"), {MakeShared<FUnrealMCPValueString>(TEXT("summary"))});
     Arguments->SetNumberField(TEXT("page_size"), 1);
-    TSharedPtr<FJsonObject> Inspection;
+    TSharedPtr<FUnrealMCPRecord> Inspection;
     if (!Inspector.Execute(Arguments, Inspection, OutError) || !Inspection.IsValid()
         || !Inspection->TryGetStringField(TEXT("snapshot_id"), OutSnapshot))
     {
@@ -403,7 +403,7 @@ static bool ReadSnapshot(
     return true;
 }
 
-static TSharedRef<FJsonObject> BuildResult(
+static TSharedRef<FUnrealMCPRecord> BuildResult(
     UBlueprint* Blueprint,
     const FString& ObjectPath,
     const FString& Snapshot,
@@ -411,7 +411,7 @@ static TSharedRef<FJsonObject> BuildResult(
     bool bCompileSucceeded,
     bool bSaved)
 {
-    const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Result = MakeShared<FUnrealMCPRecord>();
     const UnrealMCP::BlueprintFamilyPolicy::FFamilyInfo Family =
         UnrealMCP::BlueprintFamilyPolicy::Classify(Blueprint->ParentClass);
     Result->SetStringField(TEXT("asset_path"), ObjectPath);
@@ -485,7 +485,7 @@ static void CleanupFailedCreation(UPackage* Package, UBlueprint* Blueprint, cons
 
 static bool ValidateExpectedSnapshot(
     FUnrealMCPBlueprintInspector& Inspector,
-    const FJsonObject& Arguments,
+    const FUnrealMCPRecord& Arguments,
     const FString& ObjectPath,
     FUnrealMCPError& OutError)
 {
@@ -507,7 +507,7 @@ static bool ValidateExpectedSnapshot(
     return true;
 }
 
-static bool RequireMutationPreconditions(const FJsonObject& Arguments, FUnrealMCPError& OutError)
+static bool RequireMutationPreconditions(const FUnrealMCPRecord& Arguments, FUnrealMCPError& OutError)
 {
     FString OperationId;
     FString ExpectedSnapshot;
@@ -559,7 +559,7 @@ static bool GatherComponentHandles(UBlueprint* Blueprint, USubobjectDataSubsyste
 {
     if (Blueprint == nullptr || Subsystem == nullptr || Blueprint->SimpleConstructionScript == nullptr)
     {
-        OutError = {TEXT("busy"), TEXT("The Blueprint component subsystem is unavailable"), MakeShared<FJsonObject>(), true};
+        OutError = {TEXT("busy"), TEXT("The Blueprint component subsystem is unavailable"), MakeShared<FUnrealMCPRecord>(), true};
         return false;
     }
     TArray<FSubobjectDataHandle> Handles;
@@ -576,7 +576,7 @@ static bool GatherComponentHandles(UBlueprint* Blueprint, USubobjectDataSubsyste
     if (!Out.Context.IsValid() && !Handles.IsEmpty()) Out.Context = Handles[0];
     if (!Out.Context.IsValid())
     {
-        OutError = {TEXT("busy"), TEXT("The Blueprint component context is unavailable"), MakeShared<FJsonObject>(), true};
+        OutError = {TEXT("busy"), TEXT("The Blueprint component context is unavailable"), MakeShared<FUnrealMCPRecord>(), true};
         return false;
     }
     for (USCS_Node* Node : Blueprint->SimpleConstructionScript->GetAllNodes())
@@ -620,15 +620,15 @@ static bool ResolveComponentClass(const FString& Path, UClass*& OutClass, FUnrea
     return true;
 }
 
-static TSharedRef<FJsonObject> BuildEditResult(
+static TSharedRef<FUnrealMCPRecord> BuildEditResult(
     UBlueprint* Blueprint,
     const FString& ObjectPath,
     const FString& Snapshot,
     const FString& Edit,
-    const TSharedPtr<FJsonObject>& Changed,
+    const TSharedPtr<FUnrealMCPRecord>& Changed,
     const TArray<FString>& ReconstructedIds = {})
 {
-    const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Result = MakeShared<FUnrealMCPRecord>();
     const UnrealMCP::BlueprintFamilyPolicy::FFamilyInfo Family =
         UnrealMCP::BlueprintFamilyPolicy::Classify(Blueprint->ParentClass);
     Result->SetStringField(TEXT("asset_path"), ObjectPath);
@@ -637,9 +637,9 @@ static TSharedRef<FJsonObject> BuildEditResult(
     Result->SetStringField(TEXT("edit"), Edit);
     Result->SetStringField(TEXT("snapshot_id"), Snapshot);
     Result->SetBoolField(TEXT("package_dirty"), Blueprint->GetOutermost()->IsDirty());
-    Result->SetObjectField(TEXT("changed"), Changed.IsValid() ? Changed : MakeShared<FJsonObject>());
-    TArray<TSharedPtr<FJsonValue>> Ids;
-    for (const FString& Id : ReconstructedIds) Ids.Add(MakeShared<FJsonValueString>(Id));
+    Result->SetObjectField(TEXT("changed"), Changed.IsValid() ? Changed : MakeShared<FUnrealMCPRecord>());
+    TArray<TSharedPtr<FUnrealMCPValue>> Ids;
+    for (const FString& Id : ReconstructedIds) Ids.Add(MakeShared<FUnrealMCPValueString>(Id));
     Result->SetArrayField(TEXT("reconstructed_identities"), Ids);
     return Result;
 }

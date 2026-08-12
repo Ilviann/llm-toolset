@@ -29,20 +29,20 @@ FString PinDefaultText(const UEdGraphPin* Pin)
     return Pin->DefaultValue;
 }
 
-TArray<TSharedPtr<FJsonValue>> EncodeIdentities(const TSet<FString>& Identities)
+TArray<TSharedPtr<FUnrealMCPValue>> EncodeIdentities(const TSet<FString>& Identities)
 {
     TArray<FString> Sorted = Identities.Array();
     Sorted.Sort();
-    TArray<TSharedPtr<FJsonValue>> Result;
+    TArray<TSharedPtr<FUnrealMCPValue>> Result;
     Result.Reserve(Sorted.Num());
-    for (const FString& Id : Sorted) Result.Add(MakeShared<FJsonValueString>(Id));
+    for (const FString& Id : Sorted) Result.Add(MakeShared<FUnrealMCPValueString>(Id));
     return Result;
 }
 }
 
-TSharedRef<FJsonObject> EncodeNode(UEdGraph* Graph, UEdGraphNode* Node)
+TSharedRef<FUnrealMCPRecord> EncodeNode(UEdGraph* Graph, UEdGraphNode* Node)
 {
-    const TSharedRef<FJsonObject> Record = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Record = MakeShared<FUnrealMCPRecord>();
     Record->SetStringField(TEXT("graph_id"), Graph != nullptr ? GuidString(Graph->GraphGuid) : FString());
     Record->SetStringField(TEXT("id"), Node != nullptr ? GuidString(Node->NodeGuid) : FString());
     Record->SetBoolField(TEXT("identity_stable"), Node != nullptr && Node->NodeGuid.IsValid());
@@ -50,13 +50,13 @@ TSharedRef<FJsonObject> EncodeNode(UEdGraph* Graph, UEdGraphNode* Node)
     Record->SetStringField(TEXT("title"), Node != nullptr ? Node->GetNodeTitle(ENodeTitleType::ListView).ToString().Left(256) : FString());
     Record->SetNumberField(TEXT("x"), Node != nullptr ? Node->NodePosX : 0);
     Record->SetNumberField(TEXT("y"), Node != nullptr ? Node->NodePosY : 0);
-    TArray<TSharedPtr<FJsonValue>> Pins;
+    TArray<TSharedPtr<FUnrealMCPValue>> Pins;
     if (Node != nullptr)
     {
         for (const UEdGraphPin* Pin : Node->Pins)
         {
             if (!IsStructuralGraphPin(Node, Pin) || Pins.Num() >= UnrealMCP::MaxGraphPinsPerNode) continue;
-            const TSharedRef<FJsonObject> PinRecord = MakeShared<FJsonObject>();
+            const TSharedRef<FUnrealMCPRecord> PinRecord = MakeShared<FUnrealMCPRecord>();
             PinRecord->SetStringField(TEXT("id"), GuidString(Pin->PinId));
             PinRecord->SetBoolField(TEXT("identity_stable"), Pin->PinId.IsValid());
             PinRecord->SetStringField(TEXT("name"), Pin->PinName.ToString().Left(128));
@@ -66,7 +66,7 @@ TSharedRef<FJsonObject> EncodeNode(UEdGraph* Graph, UEdGraphNode* Node)
             if (Pin->DefaultObject != nullptr) PinRecord->SetStringField(TEXT("default_object"), Pin->DefaultObject->GetPathName().Left(512));
             if (!Pin->DefaultTextValue.IsEmpty()) PinRecord->SetStringField(TEXT("default_text"), Pin->DefaultTextValue.ToString().Left(512));
             PinRecord->SetObjectField(TEXT("default"), UnrealMCP::K2TypeCodec::EncodeDefault(Pin->PinType, PinDefaultText(Pin)));
-            Pins.Add(MakeShared<FJsonValueObject>(PinRecord));
+            Pins.Add(MakeShared<FUnrealMCPValueObject>(PinRecord));
         }
     }
     Record->SetArrayField(TEXT("pins"), Pins);
@@ -74,15 +74,15 @@ TSharedRef<FJsonObject> EncodeNode(UEdGraph* Graph, UEdGraphNode* Node)
     return Record;
 }
 
-TSharedRef<FJsonObject> Build(
+TSharedRef<FUnrealMCPRecord> Build(
     UBlueprint* Blueprint,
     const BlueprintGraphRequestValidation::FRequest& Request,
     const FString& Snapshot,
-    const TSharedRef<FJsonObject>& Changed,
+    const TSharedRef<FUnrealMCPRecord>& Changed,
     const TSet<FString>& CreatedIdentities,
     const TSet<FString>& ReconstructedIdentities)
 {
-    const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Result = MakeShared<FUnrealMCPRecord>();
     Result->SetStringField(TEXT("asset_path"), Request.AssetPath);
     Result->SetStringField(TEXT("blueprint_family"), UnrealMCP::BlueprintFamilyPolicy::Classify(Blueprint->ParentClass).Name);
     Result->SetObjectField(TEXT("family_capabilities"), UnrealMCP::BlueprintFamilyPolicy::BuildLiveCapabilities(Blueprint));

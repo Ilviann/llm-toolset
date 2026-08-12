@@ -3,7 +3,7 @@
 #include "CoreMinimal.h"
 #include "HAL/CriticalSection.h"
 
-class FJsonObject;
+class FUnrealMCPRecord;
 struct FUnrealMCPError;
 
 enum class EUnrealMCPOperationAdmission : uint8
@@ -20,7 +20,7 @@ struct FUnrealMCPOperationAdmission
     EUnrealMCPOperationAdmission Kind = EUnrealMCPOperationAdmission::Busy;
     FString OperationId;
     FString RequestDigest;
-    TSharedPtr<FJsonObject> Result;
+    TSharedPtr<FUnrealMCPRecord> Result;
     FUnrealMCPError* Error = nullptr;
     TSharedPtr<FUnrealMCPError> OwnedError;
 };
@@ -30,21 +30,21 @@ class FUnrealMCPOperationLedger
 public:
     FUnrealMCPOperationLedger(FString InBridgeInstanceId, FString InContextBinding, TFunction<double()> InNow = [] { return FPlatformTime::Seconds(); });
 
-    FUnrealMCPOperationAdmission Admit(const FString& Command, const TSharedPtr<FJsonObject>& Arguments);
+    FUnrealMCPOperationAdmission Admit(const FString& Command, const TSharedPtr<FUnrealMCPRecord>& Arguments);
     bool MarkExecuting(const FString& OperationId, FUnrealMCPError& OutError);
-    void Commit(const FString& OperationId, const TSharedPtr<FJsonObject>& Result);
+    void Commit(const FString& OperationId, const TSharedPtr<FUnrealMCPRecord>& Result);
     void Complete(
         const FString& OperationId,
         const FString& State,
-        const TSharedPtr<FJsonObject>& Result);
+        const TSharedPtr<FUnrealMCPRecord>& Result);
     void Reject(const FString& OperationId, const FUnrealMCPError& Error);
-    bool Status(const TSharedPtr<FJsonObject>& Arguments, TSharedPtr<FJsonObject>& OutResult, FUnrealMCPError& OutError);
-    bool Cancel(const TSharedPtr<FJsonObject>& Arguments, TSharedPtr<FJsonObject>& OutResult, FUnrealMCPError& OutError);
+    bool Status(const TSharedPtr<FUnrealMCPRecord>& Arguments, TSharedPtr<FUnrealMCPRecord>& OutResult, FUnrealMCPError& OutError);
+    bool Cancel(const TSharedPtr<FUnrealMCPRecord>& Arguments, TSharedPtr<FUnrealMCPRecord>& OutResult, FUnrealMCPError& OutError);
     void CancelQueued();
-    TSharedPtr<FJsonObject> CurrentState() const;
+    TSharedPtr<FUnrealMCPRecord> CurrentState() const;
 
     const FString& GetBridgeInstanceId() const { return BridgeInstanceId; }
-    static FString DigestRequest(const FString& Command, const TSharedPtr<FJsonObject>& Arguments, const FString& ContextBinding);
+    static FString DigestRequest(const FString& Command, const TSharedPtr<FUnrealMCPRecord>& Arguments, const FString& ContextBinding);
 
 private:
     struct FEntry
@@ -54,13 +54,13 @@ private:
         FString State;
         double CreatedAt = 0.0;
         double ExpiresAt = 0.0;
-        TSharedPtr<FJsonObject> Result;
+        TSharedPtr<FUnrealMCPRecord> Result;
         TSharedPtr<FUnrealMCPError> Error;
     };
 
     void RemoveExpiredLocked(double CurrentTime);
     bool MakeRoomLocked();
-    TSharedRef<FJsonObject> EntryStatusLocked(const FString& OperationId, const FEntry& Entry) const;
+    TSharedRef<FUnrealMCPRecord> EntryStatusLocked(const FString& OperationId, const FEntry& Entry) const;
 
     FString BridgeInstanceId;
     FString ContextBinding;

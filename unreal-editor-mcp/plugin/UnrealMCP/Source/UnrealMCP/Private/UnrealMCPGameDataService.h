@@ -1,7 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Dom/JsonObject.h"
+#include "UnrealMCPWireTypes.h"
 #include "UnrealMCPProtocol.h"
 
 class FUnrealMCPGameDataService
@@ -9,20 +9,20 @@ class FUnrealMCPGameDataService
 public:
     explicit FUnrealMCPGameDataService(TFunction<double()> InNow = [] { return FPlatformTime::Seconds(); });
 
-    bool Inspect(const TSharedPtr<FJsonObject>& Arguments, TSharedPtr<FJsonObject>& OutResult, FUnrealMCPError& OutError);
-    bool Edit(const TSharedPtr<FJsonObject>& Arguments, TSharedPtr<FJsonObject>& OutResult, FUnrealMCPError& OutError);
+    bool Inspect(const TSharedPtr<FUnrealMCPRecord>& Arguments, TSharedPtr<FUnrealMCPRecord>& OutResult, FUnrealMCPError& OutError);
+    bool Edit(const TSharedPtr<FUnrealMCPRecord>& Arguments, TSharedPtr<FUnrealMCPRecord>& OutResult, FUnrealMCPError& OutError);
 
 private:
     struct FCursorState
     {
-        TSharedPtr<FJsonObject> Arguments;
+        TSharedPtr<FUnrealMCPRecord> Arguments;
         FString Snapshot;
         int32 Offset = 0;
         double ExpiresAt = 0.0;
     };
 
-    bool InspectInitial(const TSharedPtr<FJsonObject>& Arguments, int32 Offset, const FString& ExpectedSnapshot,
-        int32 PageSizeOverride, TSharedPtr<FJsonObject>& OutResult, FUnrealMCPError& OutError);
+    bool InspectInitial(const TSharedPtr<FUnrealMCPRecord>& Arguments, int32 Offset, const FString& ExpectedSnapshot,
+        int32 PageSizeOverride, TSharedPtr<FUnrealMCPRecord>& OutResult, FUnrealMCPError& OutError);
     void RemoveExpired(double CurrentTime);
 
     TFunction<double()> Now;

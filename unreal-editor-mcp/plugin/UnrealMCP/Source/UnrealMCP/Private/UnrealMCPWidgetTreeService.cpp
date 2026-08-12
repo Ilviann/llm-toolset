@@ -19,22 +19,22 @@ namespace
 using namespace UnrealMCP::BlueprintMutationPrivate;
 using namespace UnrealMCP::WidgetTreePrivate;
 
-bool HasExactFields(const FJsonObject& Arguments, std::initializer_list<const TCHAR*> Fields)
+bool HasExactFields(const FUnrealMCPRecord& Arguments, std::initializer_list<const TCHAR*> Fields)
 {
     return UnrealMCP::BlueprintMutationPrivate::HasOnlyFields(Arguments, Fields);
 }
 
 bool ResolveWidgetBlueprint(
     FUnrealMCPBlueprintInspector& Inspector,
-    const FJsonObject& Arguments,
+    const FUnrealMCPRecord& Arguments,
     UWidgetBlueprint*& OutBlueprint,
     FString& OutObjectPath,
     FUnrealMCPError& OutError)
 {
-    const TSharedRef<FJsonObject> Common = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Common = MakeShared<FUnrealMCPRecord>();
     for (const TCHAR* Field : {TEXT("operation_id"), TEXT("asset_path"), TEXT("expected_snapshot")})
     {
-        if (const TSharedPtr<FJsonValue>* Value = Arguments.Values.Find(Field))
+        if (const TSharedPtr<FUnrealMCPValue>* Value = Arguments.Values.Find(Field))
         {
             Common->SetField(Field, *Value);
         }
@@ -92,7 +92,7 @@ bool FindNamedSlotById(
 
 bool ResolveStableWidget(
     UWidgetBlueprint* Blueprint,
-    const FJsonObject& Arguments,
+    const FUnrealMCPRecord& Arguments,
     const TCHAR* Field,
     UWidget*& OutWidget,
     FUnrealMCPError& OutError)
@@ -138,7 +138,7 @@ bool ResolveWidgetClass(
     return true;
 }
 
-bool ReadWidgetName(const FJsonObject& Arguments, FString& OutName, FUnrealMCPError& OutError)
+bool ReadWidgetName(const FUnrealMCPRecord& Arguments, FString& OutName, FUnrealMCPError& OutError)
 {
     if (!Arguments.TryGetStringField(TEXT("name"), OutName) || OutName.IsEmpty()
         || OutName.Len() > 128 || !FName::IsValidXName(OutName, INVALID_OBJECTNAME_CHARACTERS))
@@ -182,13 +182,13 @@ UWidget* ConstructWidget(
 
 bool ReadTarget(
     UWidgetBlueprint* Blueprint,
-    const FJsonObject& Arguments,
+    const FUnrealMCPRecord& Arguments,
     UPanelWidget*& OutPanel,
     FNamedSlotRef& OutNamedSlot,
     int32& OutIndex,
     FUnrealMCPError& OutError)
 {
-    const TSharedPtr<FJsonObject>* Target = nullptr;
+    const TSharedPtr<FUnrealMCPRecord>* Target = nullptr;
     if (!Arguments.TryGetObjectField(TEXT("target"), Target) || Target == nullptr || !Target->IsValid())
     {
         OutError = {TEXT("invalid_argument"), TEXT("target must select one panel or named slot")};
@@ -331,7 +331,7 @@ void DetachNamedSlotContent(UWidgetBlueprint* Blueprint, UWidget* Widget)
 bool HasDestructiveReferences(
     UWidgetBlueprint* Blueprint,
     UWidget* Widget,
-    TSharedRef<FJsonObject>& OutDetails)
+    TSharedRef<FUnrealMCPRecord>& OutDetails)
 {
     TArray<UWidget*> Subtree;
     Subtree.Add(Widget);
@@ -394,15 +394,15 @@ bool HasDestructiveReferences(
     return GraphReferences > 0 || BindingReferences > 0;
 }
 
-TSharedRef<FJsonObject> BuildWidgetResult(
+TSharedRef<FUnrealMCPRecord> BuildWidgetResult(
     UWidgetBlueprint* Blueprint,
     const FString& ObjectPath,
     const FString& Operation,
     const FString& Snapshot,
     const FString& WidgetIdentity,
-    const TSharedPtr<FJsonObject>& Changed = nullptr)
+    const TSharedPtr<FUnrealMCPRecord>& Changed = nullptr)
 {
-    const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Result = MakeShared<FUnrealMCPRecord>();
     Result->SetStringField(TEXT("asset_path"), ObjectPath);
     Result->SetStringField(TEXT("blueprint_family"), TEXT("widget"));
     Result->SetObjectField(
@@ -427,8 +427,8 @@ FUnrealMCPWidgetTreeService::FUnrealMCPWidgetTreeService(
 }
 
 bool FUnrealMCPWidgetTreeService::Execute(
-    const TSharedPtr<FJsonObject>& Arguments,
-    TSharedPtr<FJsonObject>& OutResult,
+    const TSharedPtr<FUnrealMCPRecord>& Arguments,
+    TSharedPtr<FUnrealMCPRecord>& OutResult,
     FUnrealMCPError& OutError)
 {
     check(IsInGameThread());
@@ -470,7 +470,7 @@ bool FUnrealMCPWidgetTreeService::Execute(
     }
 
     UWidget* AffectedWidget = nullptr;
-    TSharedPtr<FJsonObject> Changed;
+    TSharedPtr<FUnrealMCPRecord> Changed;
     if (Operation == TEXT("set_root") || Operation == TEXT("add"))
     {
         const bool bRoot = Operation == TEXT("set_root");
@@ -563,7 +563,7 @@ bool FUnrealMCPWidgetTreeService::Execute(
             OutError = {TEXT("invalid_widget_tree"), TEXT("The required root widget cannot be removed")};
             return false;
         }
-        TSharedRef<FJsonObject> Details = MakeShared<FJsonObject>();
+        TSharedRef<FUnrealMCPRecord> Details = MakeShared<FUnrealMCPRecord>();
         if (HasDestructiveReferences(Blueprint, AffectedWidget, Details))
         {
             OutError = {TEXT("referenced"), TEXT("The widget or its subtree is still referenced"), Details};
@@ -698,7 +698,7 @@ bool FUnrealMCPWidgetTreeService::Execute(
         }
         if (!bIsVariable)
         {
-            TSharedRef<FJsonObject> Details = MakeShared<FJsonObject>();
+            TSharedRef<FUnrealMCPRecord> Details = MakeShared<FUnrealMCPRecord>();
             if (HasDestructiveReferences(Blueprint, AffectedWidget, Details))
             {
                 OutError = {TEXT("referenced"), TEXT("A referenced widget cannot stop being exposed as a variable"), Details};
@@ -725,7 +725,7 @@ bool FUnrealMCPWidgetTreeService::Execute(
             return false;
         }
         FString PropertyName;
-        const TSharedPtr<FJsonValue>* Value = Arguments->Values.Find(TEXT("value"));
+        const TSharedPtr<FUnrealMCPValue>* Value = Arguments->Values.Find(TEXT("value"));
         if (!Arguments->TryGetStringField(TEXT("property_name"), PropertyName)
             || PropertyName.IsEmpty() || PropertyName.Len() > 128 || PropertyName.Contains(TEXT("."))
             || Value == nullptr || !Value->IsValid())
