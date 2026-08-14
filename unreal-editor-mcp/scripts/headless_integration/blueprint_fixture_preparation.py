@@ -6,6 +6,11 @@ import uuid
 
 from unreal_editor_mcp.bridge import UnrealBridge
 
+from scripts.asset_family_conformance import (
+    CrossProcessFamilyFixture,
+    verify_cross_process_family,
+)
+
 from .blueprint_declarations import (
     author_phase_fifteen_game_instance,
     author_phase_fourteen_families,
@@ -14,9 +19,16 @@ from .blueprint_declarations import (
 
 def prepare_blueprint_scenario(bridge: UnrealBridge) -> dict[str, object]:
     """Inspect the prepared fixture and create the authored Blueprint families."""
-    inspection = bridge.call("asset_inspect", {
-        "asset_path": "/Game/UnrealMCPPhase2/BP_InspectionFixture.BP_InspectionFixture",
-    })
+    fixture_path = "/Game/UnrealMCPPhase2/BP_InspectionFixture.BP_InspectionFixture"
+    inspection = verify_cross_process_family(bridge, CrossProcessFamilyFixture(
+        family_id="core-blueprint",
+        command="asset_inspect",
+        arguments={"asset_path": fixture_path},
+        expected_fields=(
+            (("asset", "path"), fixture_path),
+            (("asset", "type"), "actor_blueprint"),
+        ),
+    ))
     loaded_snapshot = inspection.get("snapshot_id")
     if not isinstance(loaded_snapshot, str) or len(loaded_snapshot) != 40:
         raise AssertionError("reloaded Phase 2 fixture did not report a structural snapshot")

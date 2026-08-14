@@ -6,6 +6,14 @@
 
 ## Native boundary
 
+`AssetFamilies.ConformanceMatrix` uses one fixture runner for inspection-only,
+creation-only, edit-only, combined, and missing-dependency descriptors, the
+built-in Blueprint and neutral families, and a Game Data authoring fixture. It
+covers deterministic adapter output, selectors, paging context, snapshots,
+bounds, cleanup, stale rejection, transaction recovery, persistence, Undo/Redo,
+and unrelated-state preservation without replacing family-specific semantic
+tests.
+
 `AssetFamilies.RegistrySelectionCapabilitiesAndFreeze` and `AssetFamilies.BoundedBuildersAndSyntheticAdapter` cover deterministic built-in family classification, independent adapter capabilities, unavailable dependencies, frozen ordering and fingerprints, and bounded semantic builders.
 
 `Private/Tests/UnrealMCPAutomationTestSupport.h` owns shared fixture construction, argument builders, inspection helpers, snapshot tracking, save support, and cleanup conventions. `Readonly.PreservationAcrossReadonlyFlows` starts from a saved clean Blueprint and verifies unchanged package dirtiness and Undo history after success, rejection, bounded timeout, cancellation, retained rejected/committed lookup, and reconstructed post-restart services. `LevelInspect.ActorsComponentsPropertiesAndSafety` covers exact filters, descriptor/live fields, actor/component identities and reflected values, unsupported properties, pagination, stale snapshots, and unchanged editor state. `FunctionReplace.PreflightTransactionPreservation` covers scratch compilation, exact boundaries, one-transaction apply, Undo/Redo, stale rejection, live rollback, compilation, and saving. `NodeLayout.DeterministicChangedNodes` covers branches, joins, cycles, conversion keys, containing comments, fixed obstacles, repeated planning, and exact live replay. `WidgetTree.FamilyInspectionMutationAndPersistence` covers specialized creation, hierarchy/default inspection and edits, transactions, stale/reference rejection, compilation, saving, and read-back. `AssetDelete.PreflightPersistenceAndReferences` covers stale/reference rejection and verified persisted deletion; `AssetReferences.RegistryLiveMemoryAndCursors` covers registry/live evidence, exact snapshots, single-use and stale cursors, validation, missing-target rejection, and unchanged dirtiness. Phase 13 also covers canonical omission of UE 5.8's regenerated inert promotable-operator tolerance pin. `UnrealMCPApiProbe.cpp` keeps public Widget Blueprint/tree operation, structure-editor, Data Table, asset dependency, asset-editor, live-reference, non-force deletion, map loading, World Partition descriptor/reference, external-actor, package-state, and editor-delegate APIs in the normal compatibility build.
@@ -13,6 +21,12 @@
 Normal/adaptive and forced-unity module builds are both required. Private implementation headers include their explicit Unreal dependencies, use named internal namespaces, and remain valid when Unreal Build Tool combines family translation units.
 
 ## Cross-process boundary
+
+`scripts/asset_family_conformance.py` supplies common production-bridge identity,
+determinism, snapshot, selector/page, retained-result, and restart read-back
+checks. The Blueprint fixture preparation, Widget restart, Game Data lost-response
+and restart, and test-companion scenarios opt into those checks through bounded
+fixture records.
 
 `widgets.py` owns focused Widget Blueprint creation, tree/default authoring, and exact restart read-back; keeping it separate avoids further growth of the already-large shared Blueprint scenario. Run `python scripts/run_headless_integration.py --widget-only` for the independent author/save/restart gate.
 

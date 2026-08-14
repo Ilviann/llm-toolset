@@ -6,6 +6,11 @@ import uuid
 
 from unreal_editor_mcp.bridge import UnrealBridge
 
+from scripts.asset_family_conformance import (
+    CrossProcessFamilyFixture,
+    verify_restart_read_back,
+)
+
 
 ASSET_PATH = "/Game/UnrealMCPWidgetTree/WBP_WidgetTree.WBP_WidgetTree"
 
@@ -59,7 +64,16 @@ def author_widget_scenario(bridge: UnrealBridge) -> dict[str, str]:
 
 
 def verify_restarted_widgets(bridge: UnrealBridge, scenario: dict[str, str]) -> None:
-    inspected = bridge.call("asset_inspect", {"asset_path": scenario["asset_path"]})
-    if inspected.get("snapshot_id") != scenario["snapshot_id"] \
-            or inspected.get("asset", {}).get("type") != "unsupported_blueprint":
-        raise AssertionError(f"Widget Blueprint snapshot changed after restart: {inspected!r}")
+    verify_restart_read_back(
+        bridge,
+        CrossProcessFamilyFixture(
+            family_id="widget-blueprint",
+            command="asset_inspect",
+            arguments={"asset_path": scenario["asset_path"]},
+            expected_fields=(
+                (("asset", "path"), scenario["asset_path"]),
+                (("asset", "type"), "unsupported_blueprint"),
+            ),
+        ),
+        scenario["snapshot_id"],
+    )

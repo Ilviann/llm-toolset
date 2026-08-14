@@ -12,7 +12,7 @@ released_in: null
 
 **Depends on:**
 
-- [`asset-family-conformance`](asset-family-conformance.md)
+- [`asset-family-conformance`](../completed/asset-family-conformance.md)
 
 ### Implementation
 

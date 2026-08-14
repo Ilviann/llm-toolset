@@ -9,6 +9,12 @@ from unreal_editor_mcp.bridge import UnrealBridge
 from unreal_editor_mcp.errors import BridgeError, ErrorCode
 from unreal_editor_mcp.project import ProjectLayout
 
+from scripts.asset_family_conformance import (
+    CrossProcessFamilyFixture,
+    verify_recovered_mutation,
+    verify_restart_read_back,
+)
+
 from .operations import reconcile_operation, send_without_reading
 from .pagination import collect_cursor_pages
 
@@ -124,9 +130,11 @@ def author_phase_seventeen_game_data(
         "remove_rows": ["Pistol"],
     })
     status = reconcile_operation(bridge, operation_id, bridge_instance_id)
-    batch = status.get("result") if status.get("state") == "committed" else None
-    if not isinstance(batch, dict) or batch.get("changed_count") != 2:
-        raise AssertionError(f"Phase 17 lost batch response did not reconcile: {status!r}")
+    batch = verify_recovered_mutation(
+        "game-data",
+        status,
+        expected_fields=((('changed_count',), 2),),
+    )
     final_table = collect_game_data(bridge, {
         "target": "data_table", "asset_path": table_path,
     })
@@ -173,6 +181,34 @@ def verify_restarted_game_data_and_level(
         raise AssertionError(
             f"actor identity changed across clean restart: {restarted_actor!r}")
 
+    verify_restart_read_back(
+        bridge,
+        CrossProcessFamilyFixture(
+            family_id="game-data-struct",
+            command="game_data_inspect",
+            arguments={
+                "target": "user_defined_struct",
+                "asset_path": game_data["struct_path"],
+                "page_size": 100,
+            },
+            expected_fields=(),
+        ),
+        game_data["struct_snapshot"],
+    )
+    verify_restart_read_back(
+        bridge,
+        CrossProcessFamilyFixture(
+            family_id="game-data-table",
+            command="game_data_inspect",
+            arguments={
+                "target": "data_table",
+                "asset_path": game_data["table_path"],
+                "page_size": 100,
+            },
+            expected_fields=(),
+        ),
+        game_data["table_snapshot"],
+    )
     reloaded_struct = collect_game_data(bridge, {
         "target": "user_defined_struct",
         "asset_path": game_data["struct_path"],
@@ -189,5 +225,4 @@ def verify_restarted_game_data_and_level(
             or rows[0].get("values", {}).get("Damage") != 45 \
             or rows[0].get("values", {}).get("AmmoType") != "Rifle":
         raise AssertionError(f"Phase 17 typed rows changed after restart: {reloaded_table!r}")
-
 

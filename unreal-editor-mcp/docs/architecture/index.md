@@ -42,3 +42,4 @@ Each file in this directory documents one implemented cohesive component: what i
 - [`windows-deployment-helper.md`](windows-deployment-helper.md) — tkinter project/Engine selection, installed Win64 packaging, optional matching-PDB deployment, and LM Studio/Codex configuration previews.
 - [`python-support-tooling.md`](python-support-tooling.md) — shared Unreal-local primitives and decomposed packaging, deployment, and headless support-tool ownership.
 - [`automated-verification.md`](automated-verification.md) — Python, native, public-API-probe, and cross-process verification boundaries.
+- [`asset-family-conformance.md`](asset-family-conformance.md) — reusable native, Python, packaging, and cross-process asset-family fixture gates.
