@@ -27,6 +27,8 @@ def run_automation(executable: Path, project: Path, environment: dict[str, str],
         "FailureCleanup",
         "CreationLiveFixture",
         "ComponentAndDefaultEdits",
+        "CodecValidation",
+        "BlueprintDefaultsAndComponents",
         "OperationLedger",
         "PropertyCodec",
         "K2TypeCodec",
@@ -104,6 +106,10 @@ def run_automation(executable: Path, project: Path, environment: dict[str, str],
         expected = tuple(name for name in all_expected if name in {"MultiplayerAuthoring", "FrameworkAssignment"})
     elif test_filter == "UnrealMCP.Phase17":
         expected = tuple(name for name in all_expected if name == "GameDataAuthoring")
+    elif test_filter == "UnrealMCP.GameplayTagProperties":
+        expected = tuple(name for name in all_expected if name in {
+            "CodecValidation", "BlueprintDefaultsAndComponents",
+        })
     elif test_filter == "UnrealMCP.AssetReferences":
         expected = tuple(name for name in all_expected if name == "RegistryLiveMemoryAndCursors")
     elif test_filter == "UnrealMCP.AssetInspect":

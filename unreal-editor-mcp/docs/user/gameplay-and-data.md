@@ -18,11 +18,27 @@ A practical GameInstance default is a user-defined instance-editable variable su
 
 Use `blueprint_action_catalog` to discover callbacks exposed by `UGameInstance`, including `ReceiveInit` (`Init`), `ReceiveShutdown` (`Shutdown`), `HandleNetworkError`, and `HandleTravelError`. Add the returned action through `blueprint_graph_edit`; the live catalog suppresses a unique callback once it exists. Assign a compatible, clean, saved class through `gameplay_framework_edit` when it should become the active project's default GameInstance. See [`examples/game-instance-workflow.json`](../../examples/game-instance-workflow.json).
 
+## Gameplay Tag property values
+
+Existing direct-property workflows recognize exact reflected `FGameplayTag` and `FGameplayTagContainer` values. This includes targeted Blueprint class/component defaults and any level, Widget, Data Asset, or Data Table path that already uses the shared reflected-value codecs; it does not make hidden properties editable or add nested Blueprint property traversal.
+
+Use one exact registered tag string, or `""` for an empty tag. Use a JSON array for a container; read-back sorts the explicit stored names case-sensitively and never adds derived parents. For example:
+
+```json
+{"operation_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","asset_path":"/Game/Actors/BP_Door.BP_Door","expected_snapshot":"0123456789abcdef0123456789abcdef01234567","property_name":"InteractionState","value":"Interaction.State.Open"}
+```
+
+```json
+{"operation_id":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","asset_path":"/Game/Actors/BP_Door.BP_Door","expected_snapshot":"89abcdef0123456789abcdef0123456789abcdef","operation":"set_property","component_id":"cccccccccccccccccccccccccccccccc","property_name":"GrantedTags","value":["Ability.Interact","State.Enabled"]}
+```
+
+Names are limited to 256 characters and containers to 64 explicit tags. Unknown, redirected, malformed, non-canonical, duplicate, and empty container items reject without changing the owning asset. Inspection still returns bounded exact names from legacy-invalid stored values. The base plugin depends only on Unreal's `GameplayTags` module; this support does not require the GAS companion and does not create tags or edit tag configuration. See [`examples/gameplay-tag-properties-workflow.json`](../../examples/gameplay-tag-properties-workflow.json) for Blueprint and Data Table request examples.
+
 ## User-defined structs and Data Tables
 
 Create a user-defined struct with one to 64 complete member declarations. Members use the shared canonical K2 type/default forms and retain stable Unreal GUID identities across rename and safe reorder operations. Add, rename, default update, and reorder compile the structure before saving; type changes and removals require `"policy": "reject_if_referenced"` and reject when the bounded dependency scan finds a Data Table, Blueprint, or other package referencer.
 
-Create a Data Table from one exact live native `FTableRowBase` descendant or user-defined struct, then inspect its reflected schema and sorted rows. Reads accept at most 64 exact `row_names`; pagination cursors are single-use and remain bound to the query-independent asset snapshot. Row writes resolve every field against the live `FProperty` and support finite scalars, enum names, tagged compatible references, tagged structs, arrays, sets, and maps. Instanced object graphs, delegates, interfaces, transient/editor-only references, unknown fields, incompatible values, and unrestricted serialization text reject.
+Create a Data Table from one exact live native `FTableRowBase` descendant or user-defined struct, then inspect its reflected schema and sorted rows. Reads accept at most 64 exact `row_names`; pagination cursors are single-use and remain bound to the query-independent asset snapshot. Row writes resolve every field against the live `FProperty` and support finite scalars, enum names, Gameplay Tag semantic values, tagged compatible references, tagged structs, arrays, sets, and maps. Instanced object graphs, delegates, interfaces, transient/editor-only references, unknown fields, incompatible values, and unrestricted serialization text reject.
 
 `add_row`, `replace_row`, `rename_row`, and `remove_row` affect one named row. A mixed `batch` stages at most 64 combined upserts and removals before opening its transaction, so duplicate names, case conflicts, missing fields, overlaps, or one invalid value reject without partial changes. `preserve_unspecified: true` is explicit and valid only for an existing row; otherwise omitted fields take the row struct's live defaults.
 

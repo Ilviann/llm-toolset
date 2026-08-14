@@ -1,5 +1,6 @@
 # Completed features
 
+- [`gameplay-tag-properties` — Gameplay Tag property values](gameplay-tag-properties.md).
 - [`asset-inspect-data` — Data Asset and Data Table inspection](asset-inspect-data.md).
 - [`companion-asset-adapters` — Unified companion asset integration](companion-asset-adapters.md).
 - [`companion-api-v2` — Typed asset-family companion API](companion-api-v2.md).

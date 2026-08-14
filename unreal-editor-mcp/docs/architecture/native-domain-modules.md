@@ -31,6 +31,9 @@ Asset Core is the inward shared boundary. Blueprint depends on Asset Core; UMG
 and Content depend on Asset Core and Blueprint; none depends on the host.
 `UnrealMCP` has a static Asset Core dependency, a private Blueprint dependency
 for its companion compatibility boundary, and dynamic UMG/Content dependencies.
+The Blueprint reflected-value boundary links the engine-wide `GameplayTags`
+module. The base does not link `GameplayAbilities` or `GameplayTasks`, and this
+dependency does not cross the companion API.
 
 ## Invariants
 

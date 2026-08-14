@@ -5,7 +5,6 @@
 - [`umg-mvvm-inspect` — UMG ViewModel and View Binding inspection](umg-mvvm-inspect.md).
 - [`umg-mvvm` — UMG ViewModel and View Binding authoring](umg-mvvm.md).
 - [`commonui-assets-authoring` — Create/update assets with CommonUI plugin dependencies](commonui-assets-authoring.md).
-- [`gameplay-tag-properties` — Gameplay Tag property values](gameplay-tag-properties.md).
 - [`gas-ability-blueprints` — Gameplay Ability Blueprint creation and updating](gas-ability-blueprints.md).
 - [`gas-gameplay-effects` — Gameplay Effect creation and updating](gas-gameplay-effects.md).
 - [`pcg-graph-inspect` — Procedural Content Generation graph inspection](pcg-graph-inspect.md).

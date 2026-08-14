@@ -463,6 +463,8 @@ bool FUnrealMCPAssetAuthoringKernel::ExecuteEdit(
         return false;
     }
 
+    UPackage* AssetPackage = Request.Asset->GetOutermost();
+    const bool bPackageWasDirty = AssetPackage != nullptr && AssetPackage->IsDirty();
     TUniquePtr<FScopedTransaction> Transaction = MakeUnique<FScopedTransaction>(
         FText::FromString(Request.TransactionLabel));
     Request.Asset->SetFlags(RF_Transactional);
@@ -480,6 +482,10 @@ bool FUnrealMCPAssetAuthoringKernel::ExecuteEdit(
         {
             Transaction->Cancel();
             Transaction.Reset();
+            if (AssetPackage != nullptr)
+            {
+                AssetPackage->SetDirtyFlag(bPackageWasDirty);
+            }
             return false;
         }
         RestoreEdit(Transaction, Request, Hooks, BeforeSnapshot, OutError);

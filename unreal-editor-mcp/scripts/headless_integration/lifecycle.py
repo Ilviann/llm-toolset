@@ -48,6 +48,18 @@ from .widgets import author_widget_scenario, verify_restarted_widgets
 ENGINE_ROOT_ENV = "UE58"
 TEST_PROJECT_ENV = "UNREAL_MCP_TEST_UPROJECT"
 
+GAMEPLAY_TAG_FIXTURE = """[/Script/GameplayTags.GameplayTagsList]
+GameplayTagList=(Tag="UnrealMCP.Test",DevComment="Unreal MCP automation fixture")
+GameplayTagList=(Tag="UnrealMCP.Test.Child",DevComment="Unreal MCP automation fixture")
+"""
+
+
+def prepare_gameplay_tag_fixture(layout: ProjectLayout) -> None:
+    """Install deterministic project-defined tags only in the disposable test project."""
+    fixture = layout.root / "Config" / "Tags" / "UnrealMCPTests.ini"
+    fixture.parent.mkdir(parents=True, exist_ok=True)
+    fixture.write_text(GAMEPLAY_TAG_FIXTURE, encoding="utf-8", newline="\n")
+
 def restore_framework_defaults(
     bridge: UnrealBridge,
     project_hash: str,
@@ -140,6 +152,7 @@ def main() -> int:
     executable = resolve_editor_executable(engine, host_system)
     environment = configure_editor_environment(host_system)
     layout = ProjectLayout.resolve(project)
+    prepare_gameplay_tag_fixture(layout)
     if sys.argv[1:] == ["--readonly-lifecycle-only"]:
         lifecycle_executable = resolve_lifecycle_editor_executable(engine, host_system)
         verify_windows_readonly_lifecycle(layout, lifecycle_executable)
@@ -158,7 +171,7 @@ def main() -> int:
     phase_fifteen_fixture = layout.root / "Content" / "UnrealMCPPhase15" / "BP_GameInstance.uasset"
     phase_fifteen_fixture.unlink(missing_ok=True)
     phase_seventeen_dir = layout.root / "Content" / "UnrealMCPPhase17"
-    for name in ("ST_WeaponStats", "DT_WeaponStats"):
+    for name in ("ST_WeaponStats", "DT_WeaponStats", "DT_GameplayTags"):
         (phase_seventeen_dir / f"{name}.uasset").unlink(missing_ok=True)
     (layout.root / "Content" / "UnrealMCPAssetDelete" / "DT_Disposable.uasset").unlink(
         missing_ok=True

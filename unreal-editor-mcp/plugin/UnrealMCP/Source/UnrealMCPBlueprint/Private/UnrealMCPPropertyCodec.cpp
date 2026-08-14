@@ -1,7 +1,8 @@
 #include "UnrealMCPPropertyCodec.h"
 
+#include "UnrealMCPGameplayTagValueCodec.h"
 #include "UnrealMCPWireTypes.h"
-#include "UnrealMCPWireTypes.h"
+#include "UnrealMCPVersion.h"
 #include "Misc/PackageName.h"
 #include "UObject/SoftObjectPath.h"
 #include "UObject/UnrealType.h"
@@ -79,6 +80,15 @@ UEnum* PropertyEnum(FProperty* Property)
 TSharedPtr<FUnrealMCPValue> EncodeValue(UObject* Object, FProperty* Property, const FString& Kind)
 {
     const void* Address = Property->ContainerPtrToValuePtr<void>(Object);
+    if (UnrealMCP::GameplayTagValueCodec::Classify(Property)
+        != UnrealMCP::GameplayTagValueCodec::EPropertyKind::None)
+    {
+        TSharedPtr<FUnrealMCPValue> Encoded;
+        FUnrealMCPError Error;
+        return UnrealMCP::GameplayTagValueCodec::Encode(Property, Address, Encoded, Error)
+            ? Encoded
+            : nullptr;
+    }
     if (const FBoolProperty* Bool = CastField<FBoolProperty>(Property)) return MakeShared<FUnrealMCPValueBoolean>(Bool->GetPropertyValue(Address));
     if (const FNumericProperty* Numeric = CastField<FNumericProperty>(Property); Numeric != nullptr && PropertyEnum(Property) == nullptr)
     {
@@ -248,8 +258,17 @@ bool UnrealMCP::PropertyCodec::IsSupportedEditable(const FProperty* Property, FS
     else if (PropertyEnum(const_cast<FProperty*>(Property)) != nullptr) OutKind = TEXT("enum");
     else if (const FStructProperty* Struct = CastField<FStructProperty>(Property))
     {
-        if (!SafeStructs.Contains(Struct->Struct->GetFName())) return false;
-        OutKind = TEXT("struct");
+        const UnrealMCP::GameplayTagValueCodec::EPropertyKind GameplayTagKind =
+            UnrealMCP::GameplayTagValueCodec::Classify(Property);
+        if (GameplayTagKind != UnrealMCP::GameplayTagValueCodec::EPropertyKind::None)
+        {
+            OutKind = UnrealMCP::GameplayTagValueCodec::TypeName(GameplayTagKind);
+        }
+        else
+        {
+            if (!SafeStructs.Contains(Struct->Struct->GetFName())) return false;
+            OutKind = TEXT("struct");
+        }
     }
     else if (Property->IsA<FClassProperty>() || Property->IsA<FSoftClassProperty>()) OutKind = TEXT("class_reference");
     else if (Property->IsA<FObjectPropertyBase>() || Property->IsA<FSoftObjectProperty>()) OutKind = TEXT("object_reference");
@@ -265,7 +284,19 @@ TSharedRef<FUnrealMCPRecord> UnrealMCP::PropertyCodec::Encode(UObject* Object, F
     const bool bSupported = Object != nullptr && IsSupportedEditable(Property, Kind);
     Result->SetBoolField(TEXT("supported"), bSupported);
     Result->SetStringField(TEXT("type"), bSupported ? Kind : TEXT("unsupported"));
-    if (bSupported) Result->SetField(TEXT("value"), EncodeValue(Object, Property, Kind));
+    if (bSupported)
+    {
+        const TSharedPtr<FUnrealMCPValue> Value = EncodeValue(Object, Property, Kind);
+        if (Value.IsValid())
+        {
+            Result->SetField(TEXT("value"), Value);
+        }
+        else
+        {
+            Result->SetBoolField(TEXT("supported"), false);
+            Result->SetStringField(TEXT("type"), TEXT("unsupported"));
+        }
+    }
     return Result;
 }
 
@@ -322,6 +353,13 @@ bool UnrealMCP::PropertyCodec::Set(
     {
         bImported = ReadString(Value, Text);
         if (bImported) TextProperty->SetPropertyValue(Address, FText::FromString(Text));
+    }
+    else if (UnrealMCP::GameplayTagValueCodec::Classify(Property)
+        != UnrealMCP::GameplayTagValueCodec::EPropertyKind::None)
+    {
+        bImported = UnrealMCP::GameplayTagValueCodec::Decode(
+            Property, Address, Value, TEXT("invalid_argument"), OutError);
+        if (!bImported) return false;
     }
     else if (UEnum* Enum = PropertyEnum(Property))
     {

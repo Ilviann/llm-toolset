@@ -24,6 +24,7 @@ Each file in this directory documents one implemented cohesive component: what i
 - [`blueprint-block-replacement.md`](blueprint-block-replacement.md) — complete logic-unit boundaries, scratch compilation, semantic parity, transactional apply, and rollback.
 - [`blueprint-node-layout.md`](blueprint-node-layout.md) — deterministic changed-node layering, cycle handling, obstacle placement, bounds, and scratch/live position reuse.
 - [`blueprint-mutator.md`](blueprint-mutator.md) — safe published-family Blueprint creation, compilation, package saving, diagnostics, cleanup, and read-back.
+- [`gameplay-tag-value-codec.md`](gameplay-tag-value-codec.md) — exact registered Gameplay Tag values, deterministic explicit containers, limits, and shared reflected-value integration.
 - [`widget-tree-service.md`](widget-tree-service.md) — bounded Widget Blueprint hierarchy/default inspection and stale-safe structural editing.
 - [`umg-layout-service.md`](umg-layout-service.md) — typed common panel-slot layout editing and inspection.
 - [`umg-style-service.md`](umg-style-service.md) — bounded reflected widget presentation editing.

@@ -6,7 +6,7 @@
 
 ## Dependency direction
 
-The HTTP bridge owns one lazily created service and admits `game_data_edit` through the shared operation ledger. The facade depends on request validation and the inspection builder; operation handlers depend on both, the asset-authoring kernel, and public Asset Registry, `FStructureEditorUtils`, `FDataTableEditorUtils`, package-saving, and user-defined-struct APIs. The inspection builder depends on the Asset Registry, request normalization, the row-value codec, and canonical K2 type/default encoding. The row-value codec depends only on reflected properties, live reference resolution, and K2 property-to-pin type conversion; Blueprint inspectors and mutators do not depend on game data.
+The HTTP bridge owns one lazily created service and admits `game_data_edit` through the shared operation ledger. The facade depends on request validation and the inspection builder; operation handlers depend on both, the asset-authoring kernel, and public Asset Registry, `FStructureEditorUtils`, `FDataTableEditorUtils`, package-saving, and user-defined-struct APIs. The inspection builder depends on the Asset Registry, request normalization, the row-value codec, and canonical K2 type/default encoding. The row-value codec depends only on reflected properties, live reference resolution, K2 property-to-pin type conversion, and the shared Gameplay Tag semantic adapter; Blueprint inspectors and mutators do not depend on game data.
 
 ## Invariants
 
@@ -18,6 +18,7 @@ The HTTP bridge owns one lazily created service and admits `game_data_edit` thro
 - Add, replace, rename, remove, and mixed batch upsert/remove operations prevalidate complete staged rows before mutation. Batch names must be unique ignoring `FName` case semantics, and upserts cannot overlap removals.
 - `preserve_unspecified` is explicit and valid only when a row already exists. Otherwise omitted fields receive the live row-struct defaults.
 - Row values are bounded reflected values, never unrestricted Unreal serialization text. Arbitrary instanced object graphs, interfaces, delegates, transient/editor-only references, unsupported properties, filesystem import/export, and code are rejected.
+- Exact `FGameplayTag` and `FGameplayTagContainer` fields use semantic strings and explicit-tag arrays recursively through supported row structs and collections.
 - Accepted edits save before returning and report `saved: true`, `dirty: false`, the new snapshot, and bounded changed names. Unexpected read-back/save failure performs explicit transaction restoration and re-saves restored state.
 - Inspection cursors are single-use, retained for 30 seconds, and bound to the full asset snapshot even when the initial query selects named rows.
 

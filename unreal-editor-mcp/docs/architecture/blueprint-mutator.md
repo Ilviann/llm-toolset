@@ -6,7 +6,7 @@
 
 ## Dependency direction
 
-The HTTP bridge owns one inspector and constructs the mutator facade with a reference to it. Family units depend inward on the asset-authoring kernel, private mutation support layer, shared reflected-property and K2 type/default codecs, and `UnrealMCPBlueprintReferenceScanner`; the inspector does not depend on the mutator. Compile and save collaborators remain injected only through the facade for deterministic native failure tests; production composition uses the public Unreal implementations.
+The HTTP bridge owns one inspector and constructs the mutator facade with a reference to it. Family units depend inward on the asset-authoring kernel, private mutation support layer, shared reflected-property and K2 type/default codecs, the Gameplay Tag semantic adapter, and `UnrealMCPBlueprintReferenceScanner`; the inspector does not depend on the mutator. Compile and save collaborators remain injected only through the facade for deterministic native failure tests; production composition uses the public Unreal implementations.
 
 ## Invariants
 
@@ -18,6 +18,7 @@ The HTTP bridge owns one inspector and constructs the mutator facade with a refe
 - Explicit compilation reports Blueprint compiler errors as `compile_succeeded: false` with at most 64 diagnostics rather than converting a completed compiler run into a transport error. Mandatory initial compilation failure returns `compile_failed` and cleans up.
 - Package saving is non-interactive. A pre-existing read-only file or unwritable existing directory returns `write_conflict`; an attempted save that fails returns `save_failed`.
 - Component edits add/remove/rename/reparent/set-root/set-property one local editable component by stable ID for families that publish component support. Native and inherited components remain inspectable but immutable. GameInstance rejects the command before component resolution. Class defaults edit one supported property on the generated CDO.
+- Exact editable `FGameplayTag` and `FGameplayTagContainer` defaults use the shared semantic forms and live registration policy without widening the direct-property allowlist.
 - Member edits add, identity-preserving rename, update, or safely remove one local `VarGuid` member. Types/defaults use the canonical K2 codec; metadata and replication are live-validated; type changes and removals use only `reject_if_referenced`.
 - Scoped member edits add/rename/update/remove one user-owned function, local variable, macro, or custom event. Complete signatures are prevalidated; function entry/results, macro tunnels, and custom-event event-graph placement are preserved. Call/macro references reject signature change/removal, and locals use public scope-aware Blueprint utilities.
 - Reference safety uses one typed bounded scanner for member variables, functions, locals, macros, and custom events. Mutation policy reads the typed result directly; JSON reference summaries are created only for returned wire records.

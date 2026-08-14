@@ -4,6 +4,7 @@
 
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "Engine/DataTable.h"
+#include "GameplayTagContainer.h"
 #include "Misc/AutomationTest.h"
 #include "UnrealMCPAssetFamilyRegistry.h"
 #include "UnrealMCPAssetInspectionService.h"
@@ -118,6 +119,45 @@ bool FUnrealMCPAssetInspectDataFamiliesTest::RunTest(const FString& Parameters)
         Service.Execute(Request(TablePackage, TEXT("rows/Axe/Tags"), 1, 1, true), Result, Error))) return false;
     TestEqual(TEXT("nested row page returns one tag"), Result->GetArrayField(TEXT("items")).Num(), 1);
 
+    const FGameplayTag ParentTag = FGameplayTag::RequestGameplayTag(FName(TEXT("UnrealMCP.Test")), false);
+    const FGameplayTag ChildTag = FGameplayTag::RequestGameplayTag(FName(TEXT("UnrealMCP.Test.Child")), false);
+    if (!TestTrue(TEXT("native Gameplay Tag fixtures are registered"), ParentTag.IsValid() && ChildTag.IsValid()))
+        return false;
+    const FString TagTablePackage = Root + TEXT("/DT_GameplayTags");
+    UPackage* TagTableOuter = CreatePackage(*TagTablePackage);
+    UDataTable* TagTable = NewObject<UDataTable>(
+        TagTableOuter, TEXT("DT_GameplayTags"), RF_Public | RF_Standalone);
+    TagTable->RowStruct = FUnrealMCPGameplayTagDataRow::StaticStruct();
+    FUnrealMCPGameplayTagDataRow TagRow;
+    TagRow.Tag = ChildTag;
+    TagRow.Tags.AddTag(ChildTag);
+    TagRow.Tags.AddTag(ParentTag);
+    TagRow.Nested.Tag = ParentTag;
+    TagRow.Nested.Tags.AddTag(ChildTag);
+    TagTable->AddRow(TEXT("Exact"), TagRow);
+    FAssetRegistryModule::AssetCreated(TagTable);
+
+    if (!TestTrue(TEXT("Gameplay Tag Data Table row inspects semantically"),
+        Service.Execute(Request(TagTablePackage, TEXT("rows/Exact")), Result, Error))) return false;
+    const TSharedPtr<FUnrealMCPRecord> TagValues =
+        Result->GetObjectField(TEXT("row"))->GetObjectField(TEXT("values"));
+    TestEqual(TEXT("Gameplay Tag is an exact string"),
+        TagValues->GetStringField(TEXT("Tag")), FString(TEXT("UnrealMCP.Test.Child")));
+    const TArray<TSharedPtr<FUnrealMCPValue>> ExplicitTags = TagValues->GetArrayField(TEXT("Tags"));
+    TestEqual(TEXT("Gameplay Tag Container exposes explicit tags only"), ExplicitTags.Num(), 2);
+    TestEqual(TEXT("Gameplay Tag Container is sorted"),
+        ExplicitTags[0]->AsString(), FString(TEXT("UnrealMCP.Test")));
+    TestEqual(TEXT("nested Gameplay Tag uses the same semantic form"),
+        TagValues->GetObjectField(TEXT("Nested"))->GetObjectField(TEXT("fields"))
+            ->GetStringField(TEXT("Tag")), FString(TEXT("UnrealMCP.Test")));
+
+    Error = {};
+    TestFalse(TEXT("Gameplay Tags are semantic selector leaves"),
+        Service.Execute(Request(TagTablePackage, TEXT("rows/Exact/Tag/TagName")), Result, Error));
+    TestEqual(TEXT("Gameplay Tag internal selector rejection is stable"),
+        Error.Code, FString(TEXT("not_found")));
+
+    Error = {};
     if (!TestTrue(TEXT("Data Table column projection pages"),
         Service.Execute(Request(TablePackage, TEXT("columns/Damage"), 1, 0, true), Result, Error))) return false;
     TestEqual(TEXT("column projection returns one row value"), Result->GetArrayField(TEXT("values")).Num(), 1);

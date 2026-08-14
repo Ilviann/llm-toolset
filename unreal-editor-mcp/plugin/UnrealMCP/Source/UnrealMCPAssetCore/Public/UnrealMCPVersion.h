@@ -7,7 +7,7 @@ namespace UnrealMCP
 inline constexpr int32 MaxAssetInspectPageSize = 100;
 inline constexpr int32 MaxAssetInspectSelectorBytes = 1024;
 inline constexpr int32 MaxAssetInspectCompleteGraphBytes = 64 * 1024;
-inline constexpr TCHAR Version[] = TEXT("0.46.0");
+inline constexpr TCHAR Version[] = TEXT("0.47.0");
 inline constexpr int32 CompanionApiVersion = 2;
 inline constexpr int32 ExtensionSchemaRevision = 2;
 inline constexpr int32 MaxDiscoveredCompanions = 64;
@@ -23,6 +23,8 @@ inline constexpr int32 MaxResponseBytes = 256 * 1024;
 inline constexpr int32 MaxQueuedRequests = 8;
 inline constexpr int32 MaxJsonDepth = 16;
 inline constexpr int32 MaxStringLength = 4096;
+inline constexpr int32 MaxGameplayTagChars = 256;
+inline constexpr int32 MaxGameplayTagsPerContainer = 64;
 inline constexpr double CommandDeadlineSeconds = 5.0;
 inline constexpr double HeartbeatIntervalSeconds = 2.0;
 inline constexpr int32 DefaultInspectPageSize = 25;

@@ -13,6 +13,7 @@ public class UnrealMCPBlueprint : ModuleRules
             "BlueprintGraph",
             "Engine",
             "EngineSettings",
+            "GameplayTags",
             "Kismet",
             "KismetCompiler",
             "Projects",

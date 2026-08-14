@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Engine/DataAsset.h"
 #include "Engine/DataTable.h"
+#include "GameplayTagContainer.h"
 #include "UnrealMCPAssetInspectDataTestTypes.generated.h"
 
 UCLASS(EditInlineNew, DefaultToInstanced)
@@ -40,4 +41,31 @@ struct FUnrealMCPAssetInspectDataRow : public FTableRowBase
 
     UPROPERTY(EditAnywhere, Category = "Asset Inspect Data Fixture")
     TMap<FName, float> Multipliers;
+};
+
+USTRUCT()
+struct FUnrealMCPGameplayTagNestedRowValue
+{
+    GENERATED_BODY()
+
+    UPROPERTY(EditAnywhere, Category = "Gameplay Tag Data Fixture")
+    FGameplayTag Tag;
+
+    UPROPERTY(EditAnywhere, Category = "Gameplay Tag Data Fixture")
+    FGameplayTagContainer Tags;
+};
+
+USTRUCT()
+struct FUnrealMCPGameplayTagDataRow : public FTableRowBase
+{
+    GENERATED_BODY()
+
+    UPROPERTY(EditAnywhere, Category = "Gameplay Tag Data Fixture")
+    FGameplayTag Tag;
+
+    UPROPERTY(EditAnywhere, Category = "Gameplay Tag Data Fixture")
+    FGameplayTagContainer Tags;
+
+    UPROPERTY(EditAnywhere, Category = "Gameplay Tag Data Fixture")
+    FUnrealMCPGameplayTagNestedRowValue Nested;
 };

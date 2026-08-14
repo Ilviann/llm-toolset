@@ -1,0 +1,39 @@
+[
+  {
+    "tool": "blueprint_default_edit",
+    "arguments": {
+      "operation_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "asset_path": "/Game/Actors/BP_Door.BP_Door",
+      "expected_snapshot": "0123456789abcdef0123456789abcdef01234567",
+      "property_name": "InteractionState",
+      "value": "Interaction.State.Open"
+    }
+  },
+  {
+    "tool": "blueprint_component_edit",
+    "arguments": {
+      "operation_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "asset_path": "/Game/Actors/BP_Door.BP_Door",
+      "expected_snapshot": "89abcdef0123456789abcdef0123456789abcdef",
+      "operation": "set_property",
+      "component_id": "cccccccccccccccccccccccccccccccc",
+      "property_name": "GrantedTags",
+      "value": ["Ability.Interact", "State.Enabled"]
+    }
+  },
+  {
+    "tool": "game_data_edit",
+    "arguments": {
+      "operation_id": "dddddddddddddddddddddddddddddddd",
+      "target": "data_table",
+      "operation": "replace_row",
+      "asset_path": "/Game/Data/DT_Interactions.DT_Interactions",
+      "expected_snapshot": "fedcba9876543210fedcba9876543210fedcba98",
+      "row_name": "Door",
+      "values": {
+        "InteractionTag": "Interaction.Door",
+        "RequiredTags": ["State.Enabled", "Tool.Key"]
+      }
+    }
+  }
+]

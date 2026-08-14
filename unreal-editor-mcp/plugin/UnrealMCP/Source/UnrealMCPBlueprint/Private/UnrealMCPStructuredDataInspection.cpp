@@ -2,6 +2,7 @@
 
 #include "Misc/SecureHash.h"
 #include "UnrealMCPGameDataValueCodec.h"
+#include "UnrealMCPGameplayTagValueCodec.h"
 #include "UnrealMCPJsonCodec.h"
 #include "UnrealMCPVersion.h"
 #include "UObject/Class.h"
@@ -137,6 +138,10 @@ bool SemanticValue(
     {
         OutError = {TEXT("data_limit_exceeded"), TEXT("Structured asset values exceed the supported depth")};
         return false;
+    }
+    if (GameplayTagValueCodec::Classify(Property) != GameplayTagValueCodec::EPropertyKind::None)
+    {
+        return GameDataValueCodec::Encode(Property, Address, Depth, OutValue, OutError);
     }
     int32 Count = 0;
     if (CollectionCount(Property, Address, Count))
@@ -297,6 +302,10 @@ bool Resolve(
     int32 Offset = 1;
     while (Offset < Segments.Num())
     {
+        if (GameplayTagValueCodec::Classify(Property) != GameplayTagValueCodec::EPropertyKind::None)
+        {
+            goto NotFound;
+        }
         if (const FStructProperty* Struct = CastField<FStructProperty>(Property))
         {
             FProperty* Child = nullptr;

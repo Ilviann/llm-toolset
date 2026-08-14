@@ -35,6 +35,8 @@ def verify_capability_contract(capabilities: dict[str, object], state: dict[str,
         raise AssertionError(f"asset inspection limits mismatch: {capabilities.get('limits')!r}")
     if capabilities.get("features", {}).get("blueprint_mutation") is not True:
         raise AssertionError("Phase 6 mutation capability is unavailable")
+    if capabilities.get("features", {}).get("gameplay_tag_properties") is not True:
+        raise AssertionError("Gameplay Tag property capability is unavailable")
     for feature in ("blueprint_functions", "blueprint_local_variables", "blueprint_rep_notify"):
         if capabilities.get("features", {}).get(feature) is not True:
             raise AssertionError(f"Phase 6 capability is unavailable: {feature}")
@@ -185,6 +187,13 @@ def verify_capability_contract(capabilities: dict[str, object], state: dict[str,
     }
     if any(capabilities.get("limits", {}).get(name) != value for name, value in expected_game_data_limits.items()):
         raise AssertionError(f"Phase 17 game-data limits mismatch: {capabilities.get('limits')!r}")
+    expected_gameplay_tag_limits = {
+        "gameplay_tag_chars": 256,
+        "gameplay_tags_per_container": 64,
+    }
+    if any(capabilities.get("limits", {}).get(name) != value
+           for name, value in expected_gameplay_tag_limits.items()):
+        raise AssertionError(f"Gameplay Tag property limits mismatch: {capabilities.get('limits')!r}")
     expected_widget_limits = {
         "widget_tree_widgets": 512,
         "widget_tree_depth": 32,

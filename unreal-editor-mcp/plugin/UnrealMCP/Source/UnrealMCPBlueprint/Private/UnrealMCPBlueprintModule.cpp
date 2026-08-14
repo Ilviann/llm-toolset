@@ -175,7 +175,7 @@ public:
             TEXT("blueprint_logic_unit_external_connections"), TEXT("blueprint_node_layout"), TEXT("blueprint_family_policy"),
             TEXT("game_mode_families"), TEXT("game_state_families"), TEXT("game_instance_family"),
             TEXT("widget_blueprint_family"), TEXT("multiplayer_blueprint_authoring"), TEXT("custom_event_rpcs"),
-            TEXT("typed_replication_settings"), TEXT("gameplay_framework_assignment")})
+            TEXT("typed_replication_settings"), TEXT("gameplay_framework_assignment"), TEXT("gameplay_tag_properties")})
         {
             if (!Registrar.RegisterFeature({Feature, [] { return true; }}, OutError)) return false;
         }
@@ -184,6 +184,8 @@ public:
             {TEXT("diagnostic_chars"), UnrealMCP::MaxDiagnosticChars},
             {TEXT("property_names"), UnrealMCP::MaxPropertyNames},
             {TEXT("variable_references"), UnrealMCP::MaxVariableReferences},
+            {TEXT("gameplay_tag_chars"), UnrealMCP::MaxGameplayTagChars},
+            {TEXT("gameplay_tags_per_container"), UnrealMCP::MaxGameplayTagsPerContainer},
             {TEXT("action_results"), UnrealMCP::MaxActionResults},
             {TEXT("action_scan"), UnrealMCP::MaxActionScan},
             {TEXT("retained_actions"), UnrealMCP::MaxRetainedActions},

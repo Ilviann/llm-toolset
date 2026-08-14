@@ -66,7 +66,7 @@ Feature identifiers are stable names, not execution indexes. Unfinished features
     - `commonui-assets-inspect`
     - `asset-authoring-kernel`
     - `companion-asset-adapters`
-- [ ] [`gameplay-tag-properties` — Gameplay Tag property values](docs/features/planned/gameplay-tag-properties.md) — Read and set exact `FGameplayTag` and `FGameplayTagContainer` values through existing asset property workflows.
+- [x] [`gameplay-tag-properties` — Gameplay Tag property values](docs/features/completed/gameplay-tag-properties.md) — Read and set exact `FGameplayTag` and `FGameplayTagContainer` values through existing asset property workflows.
   - Depends on:
     - `native-wire-contracts`
     - `asset-authoring-kernel`
@@ -189,5 +189,6 @@ Feature checkboxes record implementation completion after mandatory Windows veri
   - `companion-api-v2`
   - `companion-asset-adapters`
   - `asset-inspect-data`
+  - `gameplay-tag-properties`
 - Windows:
   - None

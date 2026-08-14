@@ -78,7 +78,7 @@ class ReleaseContractTests(unittest.TestCase):
         native = re.search(r'Version\[\].*TEXT\("([^"]+)"\)', header)
         self.assertIsNotNone(native)
         versions = {project["project"]["version"], plugin["VersionName"], native.group(1), unreal_editor_mcp.__version__}
-        self.assertEqual(versions, {"0.46.0"})
+        self.assertEqual(versions, {"0.47.0"})
 
     def test_companion_api_and_companion_versions_are_internally_consistent(self):
         base = json.loads((ROOT / "plugin/UnrealMCP/UnrealMCP.uplugin").read_text(encoding="utf-8"))
@@ -154,6 +154,50 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertNotIn("EUnrealMCPExtensionAccess::Mutation", gas_source)
         self.assertIn('TEXT("gameplay_effect")', inspection_query)
         self.assertIn('TEXT("gameplay_effect")', inspection_support)
+
+    def test_gameplay_tag_properties_are_base_owned_bounded_and_covered(self):
+        blueprint_build = (
+            ROOT / "plugin/UnrealMCP/Source/UnrealMCPBlueprint/UnrealMCPBlueprint.Build.cs"
+        ).read_text(encoding="utf-8")
+        content_build = (
+            ROOT / "plugin/UnrealMCP/Source/UnrealMCPContent/UnrealMCPContent.Build.cs"
+        ).read_text(encoding="utf-8")
+        host_build = (
+            ROOT / "plugin/UnrealMCP/Source/UnrealMCP/UnrealMCP.Build.cs"
+        ).read_text(encoding="utf-8")
+        adapter = (BLUEPRINT_PRIVATE / "UnrealMCPGameplayTagValueCodec.cpp").read_text(encoding="utf-8")
+        property_codec = (BLUEPRINT_PRIVATE / "UnrealMCPPropertyCodec.cpp").read_text(encoding="utf-8")
+        game_data_codec = (BLUEPRINT_PRIVATE / "UnrealMCPGameDataValueCodec.cpp").read_text(encoding="utf-8")
+        structured_inspection = (
+            BLUEPRINT_PRIVATE / "UnrealMCPStructuredDataInspection.cpp"
+        ).read_text(encoding="utf-8")
+        module = (BLUEPRINT_PRIVATE / "UnrealMCPBlueprintModule.cpp").read_text(encoding="utf-8")
+        native_test = (
+            BLUEPRINT_PRIVATE / "Tests/UnrealMCPAutomationTestsGameplayTagProperties.cpp"
+        ).read_text(encoding="utf-8")
+        lifecycle = (ROOT / "scripts/headless_integration/lifecycle.py").read_text(encoding="utf-8")
+        self.assertIn('"GameplayTags"', blueprint_build)
+        self.assertIn('"GameplayTags"', content_build)
+        for dependency in ['"GameplayAbilities"', '"GameplayTasks"']:
+            self.assertNotIn(dependency, blueprint_build)
+            self.assertNotIn(dependency, content_build)
+            self.assertNotIn(dependency, host_build)
+        for contract in [
+            "FGameplayTag::StaticStruct", "FGameplayTagContainer::StaticStruct",
+            "IsValidGameplayTagString", "RequestGameplayTag", "MaxGameplayTagChars",
+            "MaxGameplayTagsPerContainer", "CreateFromArray",
+        ]:
+            self.assertIn(contract, adapter)
+        self.assertIn("GameplayTagValueCodec::Encode", property_codec)
+        self.assertIn("GameplayTagValueCodec::Decode", property_codec)
+        self.assertIn("GameplayTagValueCodec::Encode", game_data_codec)
+        self.assertIn("GameplayTagValueCodec::Decode", game_data_codec)
+        self.assertIn("GameplayTagValueCodec::Classify", structured_inspection)
+        self.assertIn('TEXT("gameplay_tag_properties")', module)
+        self.assertIn("UnrealMCP.GameplayTagProperties.CodecValidation", native_test)
+        self.assertIn("UnrealMCP.GameplayTagProperties.BlueprintDefaultsAndComponents", native_test)
+        self.assertIn("Config\" / \"Tags\" / \"UnrealMCPTests.ini", lifecycle)
+        self.assertIn('Tag="UnrealMCP.Test.Child"', lifecycle)
 
     def test_commonui_companion_is_read_only_bounded_and_keeps_base_commonui_free(self):
         base_build = (ROOT / "plugin/UnrealMCP/Source/UnrealMCP/UnrealMCP.Build.cs").read_text(encoding="utf-8")

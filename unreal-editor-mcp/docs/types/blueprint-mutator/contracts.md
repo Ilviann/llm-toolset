@@ -39,8 +39,10 @@ Supported JSON forms are:
 - Vector/Vector2D/Vector4, Rotator, Quat, Transform, Color/LinearColor, IntPoint/IntVector/IntVector4: bounded canonical Unreal import-text string.
 - hard/soft class references: exact compatible class path string or an empty string for null.
 - hard/soft object references: exact compatible visible packageable asset path string or an empty string for null.
+- `FGameplayTag`: exact registered canonical tag-name string, or an empty string for an empty tag.
+- `FGameplayTagContainer`: case-sensitive sorted JSON array of at most 64 explicit registered tag-name strings; derived parents are omitted.
 
-References must resolve, satisfy the reflected property class, and not be transient or editor-only. Hard arbitrary UObject graphs, Actor/component instances, raw pointers, delegates, unsupported structs, and containers reject. Inspection returns `supported: false` for a named property outside this policy rather than recursively reflecting it.
+Gameplay Tag writes reject malformed, unknown, redirected, non-canonical, duplicate, empty-container-item, over-256-character, or over-limit values before assignment. Bounded stored legacy-invalid names remain visible during inspection. References must resolve, satisfy the reflected property class, and not be transient or editor-only. Hard arbitrary UObject graphs, Actor/component instances, raw pointers, delegates, unsupported structs, and other containers reject. Inspection returns `supported: false` for a named property outside this policy rather than recursively reflecting it.
 
 ## Canonical K2 member, parameter, and local type/default codec
 

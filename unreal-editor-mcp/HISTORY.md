@@ -7,6 +7,12 @@
 - Added an independent CommonUI companion checkbox to the Windows deployment helper, including fixed base-dependent packaging, project/Engine installation, and transactional multi-plugin handling without changing runtime or plugin versions.
 - Decomposed Python packaging, Windows deployment, and headless integration support tools behind stable entrypoints, with shared Unreal-local primitives, typed deployment and Blueprint scenario state, focused domain modules, and unchanged runtime/plugin versions.
 
+## 0.47.0 — 2026-08-14
+
+- Added bounded semantic `FGameplayTag` and `FGameplayTagContainer` values to existing Blueprint class-default/component-default, Game Data, and structured `asset_inspect` workflows, with exact strings, sorted explicit-tag arrays, empty values, recursive Data Table fields, and legacy-invalid inspection.
+- Added exact live-registration validation that rejects unknown, redirected, duplicate, malformed, overlong, and over-count input atomically; published the `gameplay_tag_properties` capability and limits while keeping the base dependent only on `GameplayTags` and leaving companion API v2 and companion versions unchanged.
+- Restored prior package dirty state on rejected same-snapshot authoring-kernel edits and added focused rejection coverage. Passed 178 Python tests, 62 native Automation cases, the production-socket restart lifecycle, adaptive/forced-unity/non-unity UE 5.8 Windows builds, and base-only Win64 packaging. macOS verification remains preferred follow-up work.
+
 ## 0.46.0 — 2026-08-14
 
 - Added built-in `asset_inspect` families for Data Asset/Primary Data Asset instances and Data Tables, plus Data Asset and Data-Only Blueprint class classification with existing graph/member inspection.

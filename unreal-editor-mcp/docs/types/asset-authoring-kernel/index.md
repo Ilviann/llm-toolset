@@ -14,4 +14,4 @@
 
 ## Lifecycle errors
 
-Shared admission retains stable `invalid_argument`, `mutation_scope_denied`, `write_conflict`, `already_exists`, `not_found`, `busy`, `stale_precondition`, `no_change`, `compile_failed`, `save_failed`, `internal_error`, and `rollback_failed` categories. Semantic adapters may return their narrower existing family errors. A failed mutation preserves its original error only when exact rollback succeeds; failed restoration becomes `rollback_failed`.
+Shared admission retains stable `invalid_argument`, `mutation_scope_denied`, `write_conflict`, `already_exists`, `not_found`, `busy`, `stale_precondition`, `no_change`, `compile_failed`, `save_failed`, `internal_error`, and `rollback_failed` categories. Semantic adapters may return their narrower existing family errors. A failed same-snapshot mutation preserves its original error and admitted package dirty state; a changed mutation preserves its original error only when exact rollback succeeds, otherwise it becomes `rollback_failed`.

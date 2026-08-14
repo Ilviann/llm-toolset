@@ -34,6 +34,8 @@ Top-level row `values` is an object of at most 64 live authored field names. Sup
 - maps as `{kind:"map",entries:[{key:…,value:…}]}`; and
 - common, native, or user-defined structs as `{kind:"struct",fields:{…}}`.
 
+Exact `FGameplayTag` fields are canonical strings and exact `FGameplayTagContainer` fields are sorted arrays of explicit tag strings. These semantic forms also apply recursively inside supported structs and collections. Empty tags use `""`; empty containers use `[]`; derived parents are omitted. Writes reject malformed, unknown, redirected, non-canonical, duplicate, over-256-character, or over-64-tag values atomically.
+
 Containers hold at most 64 items. Nested values have a maximum depth of four, each nested struct has at most 64 fields, one operation touches at most 64 rows, and inspection refuses tables above the 2,048-row scan ceiling. Numeric writes must be finite, integral for integer properties, within the reflected property's range, and exactly representable in JSON's safe integer range.
 
 Every field is resolved against the live `FProperty`. References must resolve to a compatible visible packageable object/class and must not be transient or editor-only. Instanced references, delegates, interfaces, arbitrary UObject graphs, raw import text, and properties outside the codec reject explicitly. `preserve_unspecified: true` begins from the existing row; otherwise staging begins from the row struct's live defaults.

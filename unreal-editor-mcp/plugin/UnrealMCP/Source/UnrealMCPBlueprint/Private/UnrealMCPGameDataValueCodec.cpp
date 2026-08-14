@@ -1,5 +1,6 @@
 #include "UnrealMCPGameDataValueCodec.h"
 
+#include "UnrealMCPGameplayTagValueCodec.h"
 #include "UnrealMCPWireTypes.h"
 #include "EdGraphSchema_K2.h"
 #include "Misc/PackageName.h"
@@ -177,6 +178,11 @@ bool UnrealMCP::GameDataValueCodec::Encode(
     {
         OutValue = MakeShared<FUnrealMCPValueString>(Text->GetPropertyValue(Value).ToString().Left(UnrealMCP::MaxStringLength)); return true;
     }
+    if (UnrealMCP::GameplayTagValueCodec::Classify(Property)
+        != UnrealMCP::GameplayTagValueCodec::EPropertyKind::None)
+    {
+        return UnrealMCP::GameplayTagValueCodec::Encode(Property, Value, OutValue, OutError);
+    }
     if (const FClassProperty* ClassProperty = CastField<FClassProperty>(Property))
     {
         const UClass* Class = Cast<UClass>(ClassProperty->GetObjectPropertyValue(Value));
@@ -294,6 +300,12 @@ bool UnrealMCP::GameDataValueCodec::Decode(
     if (const FNameProperty* Name = CastField<FNameProperty>(Property)) { if (!Input->TryGetString(String) || String.Len() > 128) goto InvalidString; Name->SetPropertyValue(Value, FName(*String)); return true; }
     if (const FStrProperty* Str = CastField<FStrProperty>(Property)) { if (!Input->TryGetString(String) || String.Len() > UnrealMCP::MaxStringLength) goto InvalidString; Str->SetPropertyValue(Value, String); return true; }
     if (const FTextProperty* Text = CastField<FTextProperty>(Property)) { if (!Input->TryGetString(String) || String.Len() > UnrealMCP::MaxStringLength) goto InvalidString; Text->SetPropertyValue(Value, FText::FromString(String)); return true; }
+    if (UnrealMCP::GameplayTagValueCodec::Classify(Property)
+        != UnrealMCP::GameplayTagValueCodec::EPropertyKind::None)
+    {
+        return UnrealMCP::GameplayTagValueCodec::Decode(
+            Property, Value, Input, TEXT("invalid_row"), OutError);
+    }
     if (const FClassProperty* ClassProperty = CastField<FClassProperty>(Property))
     {
         if (!ReadReference(Input, String, OutError)) return false;

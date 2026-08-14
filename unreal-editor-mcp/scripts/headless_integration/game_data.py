@@ -76,6 +76,8 @@ def author_phase_seventeen_game_data(
     struct_path = struct_package + ".ST_WeaponStats"
     table_package = "/Game/UnrealMCPPhase17/DT_WeaponStats"
     table_path = table_package + ".DT_WeaponStats"
+    tag_table_package = "/Game/UnrealMCPPhase17/DT_GameplayTags"
+    tag_table_path = tag_table_package + ".DT_GameplayTags"
     created_struct = bridge.call("game_data_edit", {
         "operation_id": uuid.uuid4().hex,
         "target": "user_defined_struct",
@@ -179,11 +181,74 @@ def author_phase_seventeen_game_data(
             or final_table.get("snapshot_id") != batch.get("snapshot_id"):
         raise AssertionError(f"Phase 17 batch read-back mismatch: {final_table!r}")
     verify_asset_inspect_data_table(bridge, table_path, final_table["snapshot_id"])
+
+    created_tag_table = bridge.call("game_data_edit", {
+        "operation_id": uuid.uuid4().hex,
+        "target": "data_table",
+        "operation": "create",
+        "asset_path": tag_table_package,
+        "row_struct": "/Script/UnrealMCPContent.UnrealMCPGameplayTagDataRow",
+        "rows": [{
+            "row_name": "Exact",
+            "values": {
+                "Tag": "UnrealMCP.Test.Child",
+                "Tags": ["UnrealMCP.Test.Child", "UnrealMCP.Test"],
+                "Nested": {
+                    "kind": "struct",
+                    "fields": {
+                        "Tag": "UnrealMCP.Test",
+                        "Tags": ["UnrealMCP.Test.Child"],
+                    },
+                },
+            },
+        }],
+    })
+    if created_tag_table.get("saved") is not True or created_tag_table.get("dirty") is not False:
+        raise AssertionError(f"Gameplay Tag table creation mismatch: {created_tag_table!r}")
+    tag_table = collect_game_data(bridge, {
+        "target": "data_table", "asset_path": tag_table_path,
+    })
+    tag_rows = tag_table.get("records", [])
+    tag_values = tag_rows[0].get("values", {}) if len(tag_rows) == 1 else {}
+    nested_values = tag_values.get("Nested", {}).get("fields", {})
+    if tag_values.get("Tag") != "UnrealMCP.Test.Child" \
+            or tag_values.get("Tags") != ["UnrealMCP.Test", "UnrealMCP.Test.Child"] \
+            or nested_values.get("Tag") != "UnrealMCP.Test" \
+            or nested_values.get("Tags") != ["UnrealMCP.Test.Child"]:
+        raise AssertionError(f"Gameplay Tag table semantic read-back mismatch: {tag_table!r}")
+    inspected_tag_row = bridge.call("asset_inspect", {
+        "asset_path": tag_table_path,
+        "selector": "rows/Exact",
+    })
+    if inspected_tag_row.get("row", {}).get("values", {}).get("Tags") \
+            != ["UnrealMCP.Test", "UnrealMCP.Test.Child"]:
+        raise AssertionError(f"asset_inspect Gameplay Tag row mismatch: {inspected_tag_row!r}")
+    try:
+        bridge.call("game_data_edit", {
+            "operation_id": uuid.uuid4().hex,
+            "target": "data_table",
+            "operation": "replace_row",
+            "asset_path": tag_table_path,
+            "expected_snapshot": tag_table["snapshot_id"],
+            "row_name": "Exact",
+            "values": {"Tag": "UnrealMCP.Test.Unknown"},
+        })
+    except BridgeError as error:
+        if error.code is not ErrorCode.INVALID_ROW:
+            raise
+    else:
+        raise AssertionError("unknown Gameplay Tag unexpectedly mutated a Data Table row")
+    if collect_game_data(bridge, {
+        "target": "data_table", "asset_path": tag_table_path,
+    }).get("snapshot_id") != tag_table.get("snapshot_id"):
+        raise AssertionError("rejected Gameplay Tag row edit changed the table snapshot")
     return {
         "struct_path": struct_path,
         "struct_snapshot": dependent_struct["snapshot_id"],
         "table_path": table_path,
         "table_snapshot": final_table["snapshot_id"],
+        "tag_table_path": tag_table_path,
+        "tag_table_snapshot": tag_table["snapshot_id"],
     }
 
 
@@ -252,8 +317,13 @@ def verify_restarted_game_data_and_level(
         "target": "data_table",
         "asset_path": game_data["table_path"],
     })
+    reloaded_tag_table = collect_game_data(bridge, {
+        "target": "data_table",
+        "asset_path": game_data["tag_table_path"],
+    })
     if reloaded_struct.get("snapshot_id") != game_data["struct_snapshot"] \
-            or reloaded_table.get("snapshot_id") != game_data["table_snapshot"]:
+            or reloaded_table.get("snapshot_id") != game_data["table_snapshot"] \
+            or reloaded_tag_table.get("snapshot_id") != game_data["tag_table_snapshot"]:
         raise AssertionError("Phase 17 game-data snapshots changed after restart")
     rows = reloaded_table.get("records", [])
     if len(rows) != 1 or rows[0].get("name") != "Rifle" \
@@ -261,3 +331,8 @@ def verify_restarted_game_data_and_level(
             or rows[0].get("values", {}).get("AmmoType") != "Rifle":
         raise AssertionError(f"Phase 17 typed rows changed after restart: {reloaded_table!r}")
     verify_asset_inspect_data_table(bridge, game_data["table_path"], game_data["table_snapshot"])
+    tag_rows = reloaded_tag_table.get("records", [])
+    tag_values = tag_rows[0].get("values", {}) if len(tag_rows) == 1 else {}
+    if tag_values.get("Tag") != "UnrealMCP.Test.Child" \
+            or tag_values.get("Tags") != ["UnrealMCP.Test", "UnrealMCP.Test.Child"]:
+        raise AssertionError(f"Gameplay Tag rows changed after restart: {reloaded_tag_table!r}")

@@ -14,6 +14,7 @@ public class UnrealMCPContent : ModuleRules
             "DataLayerEditor",
             "Engine",
             "EngineSettings",
+            "GameplayTags",
             "Kismet",
             "Projects",
             "UnrealEd"

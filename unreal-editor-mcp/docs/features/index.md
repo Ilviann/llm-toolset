@@ -114,7 +114,7 @@ Keep the authoritative checklist in [`ROADMAP.md`](../../ROADMAP.md) synchronize
     - `commonui-assets-inspect`
     - `asset-authoring-kernel`
     - `companion-asset-adapters`
-- [`gameplay-tag-properties` — Gameplay Tag property values](planned/gameplay-tag-properties.md) — Read and set exact `FGameplayTag` and `FGameplayTagContainer` values through existing asset property workflows.
+- [`gameplay-tag-properties` — Gameplay Tag property values](completed/gameplay-tag-properties.md) — Read and set exact `FGameplayTag` and `FGameplayTagContainer` values through existing asset property workflows.
   - Depends on:
     - `native-wire-contracts`
     - `asset-authoring-kernel`

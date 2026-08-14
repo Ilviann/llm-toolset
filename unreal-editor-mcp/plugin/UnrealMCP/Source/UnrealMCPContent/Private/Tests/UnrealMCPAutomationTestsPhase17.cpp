@@ -1,6 +1,7 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 #include "UnrealMCPAutomationTestSupport.h"
+#include "UnrealMCPAssetInspectDataTestTypes.h"
 #include "UnrealMCPGameDataService.h"
 
 namespace
@@ -44,6 +45,7 @@ bool FUnrealMCPPhase17GameDataAuthoringTest::RunTest(const FString& Parameters)
     const FString StructPackage = Prefix + TEXT("/ST_WeaponStats");
     const FString TablePackage = Prefix + TEXT("/DT_WeaponStats");
     const FString NativeTablePackage = Prefix + TEXT("/DT_MirrorRows");
+    const FString TagTablePackage = Prefix + TEXT("/DT_GameplayTags");
     FUnrealMCPGameDataService Service; TSharedPtr<FUnrealMCPRecord> Result; FUnrealMCPError Error;
 
     TSharedRef<FUnrealMCPRecord> CreateStruct = DataArguments(TEXT("user_defined_struct"), TEXT("create"), StructPackage);
@@ -135,6 +137,61 @@ bool FUnrealMCPPhase17GameDataAuthoringTest::RunTest(const FString& Parameters)
     const TSharedPtr<FUnrealMCPRecord> NativeReadBack = Result->GetArrayField(TEXT("records"))[0]->AsObject()->GetObjectField(TEXT("values"));
     TestEqual(TEXT("native name value reads back"), NativeReadBack->GetStringField(TEXT("Name")), FString(TEXT("hand_l")));
     TestEqual(TEXT("native mirrored-name value reads back"), NativeReadBack->GetStringField(TEXT("MirroredName")), FString(TEXT("hand_r")));
+
+    TSharedRef<FUnrealMCPRecord> CreateTagTable = DataArguments(TEXT("data_table"), TEXT("create"), TagTablePackage);
+    CreateTagTable->SetStringField(TEXT("row_struct"), FUnrealMCPGameplayTagDataRow::StaticStruct()->GetPathName());
+    const TSharedRef<FUnrealMCPRecord> NestedFields = MakeShared<FUnrealMCPRecord>();
+    NestedFields->SetStringField(TEXT("Tag"), TEXT("UnrealMCP.Test"));
+    NestedFields->SetArrayField(TEXT("Tags"), {
+        MakeShared<FUnrealMCPValueString>(TEXT("UnrealMCP.Test.Child"))});
+    const TSharedRef<FUnrealMCPRecord> Nested = MakeShared<FUnrealMCPRecord>();
+    Nested->SetStringField(TEXT("kind"), TEXT("struct"));
+    Nested->SetObjectField(TEXT("fields"), NestedFields);
+    const TSharedRef<FUnrealMCPRecord> TagValues = MakeShared<FUnrealMCPRecord>();
+    TagValues->SetStringField(TEXT("Tag"), TEXT("UnrealMCP.Test.Child"));
+    TagValues->SetArrayField(TEXT("Tags"), {
+        MakeShared<FUnrealMCPValueString>(TEXT("UnrealMCP.Test.Child")),
+        MakeShared<FUnrealMCPValueString>(TEXT("UnrealMCP.Test"))});
+    TagValues->SetObjectField(TEXT("Nested"), Nested);
+    const TSharedRef<FUnrealMCPRecord> TagRow = MakeShared<FUnrealMCPRecord>();
+    TagRow->SetStringField(TEXT("row_name"), TEXT("Exact"));
+    TagRow->SetObjectField(TEXT("values"), TagValues);
+    CreateTagTable->SetArrayField(TEXT("rows"), {MakeShared<FUnrealMCPValueObject>(TagRow)});
+    if (!TestTrue(TEXT("Gameplay Tag Data Table creates and saves"), Service.Edit(CreateTagTable, Result, Error)))
+    { AddError(Error.Code + TEXT(": ") + Error.Message); return false; }
+    const FString TagTablePath = Result->GetStringField(TEXT("asset_path"));
+    if (!TestTrue(TEXT("Gameplay Tag Data Table inspects"),
+        Inspect(Service, TEXT("data_table"), TagTablePath, Result, Error))) return false;
+    const TSharedPtr<FUnrealMCPRecord> TagReadBack =
+        Result->GetArrayField(TEXT("records"))[0]->AsObject()->GetObjectField(TEXT("values"));
+    TestEqual(TEXT("direct tag field reads back exactly"),
+        TagReadBack->GetStringField(TEXT("Tag")), FString(TEXT("UnrealMCP.Test.Child")));
+    TestEqual(TEXT("tag container retains explicit values"), TagReadBack->GetArrayField(TEXT("Tags")).Num(), 2);
+    TestEqual(TEXT("tag container order is deterministic"),
+        TagReadBack->GetArrayField(TEXT("Tags"))[0]->AsString(), FString(TEXT("UnrealMCP.Test")));
+    const TSharedPtr<FUnrealMCPRecord> NestedReadBack =
+        TagReadBack->GetObjectField(TEXT("Nested"))->GetObjectField(TEXT("fields"));
+    TestEqual(TEXT("nested tag reads back semantically"),
+        NestedReadBack->GetStringField(TEXT("Tag")), FString(TEXT("UnrealMCP.Test")));
+    const FString TagSnapshot = Result->GetStringField(TEXT("snapshot_id"));
+    UDataTable* LiveTagTable = FindObject<UDataTable>(nullptr, *TagTablePath);
+    if (!TestNotNull(TEXT("Gameplay Tag Data Table remains loaded"), LiveTagTable)) return false;
+    TestFalse(TEXT("saved Gameplay Tag Data Table begins clean"), LiveTagTable->GetOutermost()->IsDirty());
+
+    TSharedRef<FUnrealMCPRecord> InvalidTag = DataArguments(TEXT("data_table"), TEXT("replace_row"), TagTablePath);
+    InvalidTag->SetStringField(TEXT("expected_snapshot"), TagSnapshot);
+    InvalidTag->SetStringField(TEXT("row_name"), TEXT("Exact"));
+    const TSharedRef<FUnrealMCPRecord> InvalidTagValues = MakeShared<FUnrealMCPRecord>();
+    InvalidTagValues->SetStringField(TEXT("Tag"), TEXT("UnrealMCP.Test.Unknown"));
+    InvalidTag->SetObjectField(TEXT("values"), InvalidTagValues);
+    TestFalse(TEXT("unknown Data Table tag rejects"), Service.Edit(InvalidTag, Result, Error));
+    TestEqual(TEXT("unknown Data Table tag error is stable"), Error.Code, FString(TEXT("invalid_row")));
+    TestFalse(TEXT("rejected Gameplay Tag row preserves package dirty state"),
+        LiveTagTable->GetOutermost()->IsDirty());
+    if (!TestTrue(TEXT("rejected Gameplay Tag row remains inspectable"),
+        Inspect(Service, TEXT("data_table"), TagTablePath, Result, Error))) return false;
+    TestEqual(TEXT("rejected Gameplay Tag row preserves snapshot"),
+        Result->GetStringField(TEXT("snapshot_id")), TagSnapshot);
     return true;
 }
 
