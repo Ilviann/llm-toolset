@@ -150,6 +150,37 @@ class AssetFamilyCatalogTests(unittest.TestCase):
             companion["effective_unavailable_reason"], "python_schema_mismatch",
         )
 
+    def test_companion_capability_annotation_validates_typed_v2_family_records(self):
+        family = {
+            "family_id": "fixture", "native_class": "/Script/CoreUObject.Object",
+            "class_policy": "exact_and_derived", "priority": 25,
+            "operations": {"inspect": True, "create": False, "edit": False},
+            "creation_persistence": "none", "editing_persistence": "none",
+            "limits": {"records": 4}, "selector_routes": ["summary"],
+            "stable_nested_identity_kinds": ["entry"],
+        }
+        native = {
+            "companion_api_version": 2,
+            "companions": [{
+                "extension_id": "unreal-mcp-gas", "companion_api_version": 2,
+                "schema_revision": 2, "ready": True, "asset_families": [family],
+                "contributions": [],
+            }],
+        }
+        compose_companion_capabilities(native)
+        self.assertTrue(native["companions"][0]["effective_ready"])
+        native["companions"][0]["asset_families"][0]["operations"]["create"] = "yes"
+        compose_companion_capabilities(native)
+        self.assertFalse(native["companions"][0]["effective_ready"])
+        self.assertEqual(
+            native["companions"][0]["effective_unavailable_reason"],
+            "python_schema_mismatch",
+        )
+        family["operations"]["create"] = False
+        native["companions"][0]["asset_families"][0] = family | {"dynamic": True}
+        compose_companion_capabilities(native)
+        self.assertFalse(native["companions"][0]["effective_ready"])
+
 
 if __name__ == "__main__":
     unittest.main()

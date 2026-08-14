@@ -1,6 +1,5 @@
 #include "UnrealMCPExtensionRegistry.h"
 
-#include "Dom/JsonObject.h"
 #include "Editor.h"
 #include "FileHelpers.h"
 #include "HAL/PlatformFileManager.h"
@@ -14,8 +13,8 @@
 #include "ScopedTransaction.h"
 #include "Engine/Blueprint.h"
 #include "Kismet2/KismetEditorUtilities.h"
-#include "UnrealMCPProtocol.h"
 #include "UnrealMCPJsonCodec.h"
+#include "UnrealMCPProtocol.h"
 #include "UnrealMCPVersion.h"
 #include "UObject/Class.h"
 #include "UObject/Package.h"
@@ -157,6 +156,12 @@ FString PersistenceName(EUnrealMCPExtensionPersistence Persistence)
         return TEXT("blueprint_compile_and_save");
     default: return TEXT("none");
     }
+}
+
+FString ClassPolicyName(EUnrealMCPAssetFamilyClassPolicy Policy)
+{
+    return Policy == EUnrealMCPAssetFamilyClassPolicy::ExactAndDerived
+        ? TEXT("exact_and_derived") : TEXT("exact");
 }
 
 TArray<TSharedPtr<FUnrealMCPValue>> Strings(const TArray<FString>& Values)
@@ -386,7 +391,8 @@ FUnrealMCPRegistrationResult FUnrealMCPExtensionRegistry::Register(
         return Reject(TEXT("compiled_api_mismatch"));
     if (Registration.ExtensionSchemaRevision != UnrealMCP::ExtensionSchemaRevision)
         return Reject(TEXT("unsupported_schema_revision"));
-    if (Registration.Contributions.IsEmpty()
+    if ((Registration.AssetFamilies.IsEmpty() && Registration.Contributions.IsEmpty())
+        || Registration.AssetFamilies.Num() > UnrealMCP::MaxCompanionAssetFamilies
         || Registration.Contributions.Num() > UnrealMCP::MaxCompanionContributions)
     {
         return Reject(TEXT("contribution_limit_exceeded"));
@@ -414,12 +420,96 @@ FUnrealMCPRegistrationResult FUnrealMCPExtensionRegistry::Register(
     static const TSet<FString> ReadToolFamilies = {
         TEXT("blueprint_inspect"), TEXT("blueprint_action_catalog"),
         TEXT("game_data_inspect"), TEXT("level_inspect")};
+    TSet<FString> LocalFamilyIds;
+    TSet<FString> LocalClassPolicies;
+    for (const FUnrealMCPCompanionAssetFamily& Family : Registration.AssetFamilies)
+    {
+        UClass* NativeClass = LoadObject<UClass>(nullptr, *Family.NativeClassPath);
+        FUnrealMCPAssetFamilyDescriptor FamilyDescriptor;
+        FamilyDescriptor.FamilyId = Family.FamilyId;
+        FamilyDescriptor.NativeClass = NativeClass;
+        FamilyDescriptor.ClassPolicy = Family.ClassPolicy;
+        FamilyDescriptor.Priority = Family.Priority;
+        FamilyDescriptor.RequiredModules = Family.RequiredModules;
+        FamilyDescriptor.Bounds = Family.Bounds;
+        FamilyDescriptor.Limits = Family.Limits;
+        FamilyDescriptor.Capabilities = Family.Capabilities;
+        FamilyDescriptor.InspectionAdapter = Family.InspectionAdapter;
+        FamilyDescriptor.CreationAdapter = Family.CreationAdapter;
+        FamilyDescriptor.EditingAdapter = Family.EditingAdapter;
+        FamilyDescriptor.SnapshotBuilder = Family.SnapshotBuilder;
+        FUnrealMCPAssetFamilyRegistry Validator([](FName) { return true; });
+        FUnrealMCPError FamilyError;
+        FUnrealMCPAssetFamilySelectorRouter SelectorValidator(Family.Bounds);
+        const FString ClassPolicyKey = Family.NativeClassPath + TEXT("|")
+            + LexToString(static_cast<int32>(Family.ClassPolicy)) + TEXT("|")
+            + LexToString(Family.Priority);
+        const bool bHasCapability = Family.Capabilities.bInspection
+            || Family.Capabilities.bCreation || Family.Capabilities.bEditing;
+        bool bSelectorsValid = true;
+        for (const FUnrealMCPAssetFamilySelectorRoute& Route : Family.SelectorRoutes)
+        {
+            bSelectorsValid = bSelectorsValid && SelectorValidator.Register(Route, FamilyError);
+        }
+        bSelectorsValid = bSelectorsValid && SelectorValidator.Freeze(FamilyError);
+        TSet<FString> NestedIdentities;
+        bool bNestedIdentitiesValid = Family.StableNestedIdentityKinds.Num() <= 32;
+        for (const FString& Identity : Family.StableNestedIdentityKinds)
+        {
+            bNestedIdentitiesValid = bNestedIdentitiesValid && IsStableId(Identity)
+                && !NestedIdentities.Contains(Identity);
+            NestedIdentities.Add(Identity);
+        }
+        const bool bPersistenceValid =
+            static_cast<uint8>(Family.CreationPersistence)
+                <= static_cast<uint8>(EUnrealMCPExtensionPersistence::BlueprintCompileAndSave)
+            && static_cast<uint8>(Family.EditingPersistence)
+                <= static_cast<uint8>(EUnrealMCPExtensionPersistence::BlueprintCompileAndSave)
+            && (Family.Capabilities.bCreation
+                || Family.CreationPersistence == EUnrealMCPExtensionPersistence::None)
+            && (Family.Capabilities.bEditing
+                || Family.EditingPersistence == EUnrealMCPExtensionPersistence::None);
+        if (!bHasCapability || Family.NativeClassPath.IsEmpty() || Family.NativeClassPath.Len() > 512
+            || static_cast<uint8>(Family.ClassPolicy)
+                > static_cast<uint8>(EUnrealMCPAssetFamilyClassPolicy::ExactAndDerived)
+            || !Validator.Register(MoveTemp(FamilyDescriptor), FamilyError)
+            || !bSelectorsValid || !bNestedIdentitiesValid || !bPersistenceValid
+            || LocalFamilyIds.Contains(Family.FamilyId)
+            || LocalClassPolicies.Contains(ClassPolicyKey))
+        {
+            return Reject(TEXT("invalid_asset_family"));
+        }
+        for (const FName Module : Family.RequiredModules)
+        {
+            if (!FModuleManager::Get().IsModuleLoaded(Module))
+            {
+                return Reject(TEXT("engine_module_unloaded"));
+            }
+        }
+        for (const FAcceptedRecord& Existing : Accepted)
+        {
+            for (const FUnrealMCPCompanionAssetFamily& ExistingFamily : Existing.Registration.AssetFamilies)
+            {
+                if (ExistingFamily.FamilyId == Family.FamilyId
+                    || (ExistingFamily.NativeClassPath == Family.NativeClassPath
+                        && ExistingFamily.ClassPolicy == Family.ClassPolicy
+                        && ExistingFamily.Priority == Family.Priority))
+                {
+                    return Reject(TEXT("asset_family_collision"));
+                }
+            }
+        }
+        LocalFamilyIds.Add(Family.FamilyId);
+        LocalClassPolicies.Add(ClassPolicyKey);
+    }
     int32 ExistingCapabilityRecords = 0;
     for (const FAcceptedRecord& Existing : Accepted)
     {
-        ExistingCapabilityRecords += Existing.Registration.Contributions.Num();
+        ExistingCapabilityRecords += Existing.Registration.AssetFamilies.Num()
+            + Existing.Registration.Contributions.Num();
     }
-    if (ExistingCapabilityRecords + Registration.Contributions.Num()
+    if (ExistingCapabilityRecords + Registration.AssetFamilies.Num()
+        + Registration.Contributions.Num()
         > UnrealMCP::MaxCompanionCapabilityRecords)
     {
         return Reject(TEXT("capability_record_limit_exceeded"));
@@ -493,6 +583,30 @@ FUnrealMCPRegistrationResult FUnrealMCPExtensionRegistry::Register(
     FAcceptedRecord AcceptedRecord;
     AcceptedRecord.Handle.Value = NextHandle++;
     AcceptedRecord.Registration = Registration;
+    AcceptedRecord.Registration.AssetFamilies.Sort(
+        [](const FUnrealMCPCompanionAssetFamily& Left,
+           const FUnrealMCPCompanionAssetFamily& Right)
+        {
+            return Left.FamilyId < Right.FamilyId;
+        });
+    for (FUnrealMCPCompanionAssetFamily& Family : AcceptedRecord.Registration.AssetFamilies)
+    {
+        Family.RequiredModules.Sort([](FName Left, FName Right)
+        {
+            return Left.LexicalLess(Right);
+        });
+        Family.Limits.Sort([](const FUnrealMCPAssetFamilyLimit& Left,
+                              const FUnrealMCPAssetFamilyLimit& Right)
+        {
+            return Left.Name < Right.Name;
+        });
+        Family.SelectorRoutes.Sort([](const FUnrealMCPAssetFamilySelectorRoute& Left,
+                                     const FUnrealMCPAssetFamilySelectorRoute& Right)
+        {
+            return Left.Identity < Right.Identity;
+        });
+        Family.StableNestedIdentityKinds.Sort();
+    }
     AcceptedRecord.Registration.Contributions.Sort(
         [](const FUnrealMCPExtensionContribution& Left,
            const FUnrealMCPExtensionContribution& Right)
@@ -653,9 +767,8 @@ bool FUnrealMCPExtensionRegistry::AppendBlueprintInspection(
         return false;
     }
     FUnrealMCPExtensionError ExtensionError;
-    const TSharedPtr<FJsonObject> JsonArguments = UnrealMCP::JsonCodec::EncodeRecord(Arguments);
     if (!Contribution->Handler->ValidateArguments(
-        Contribution->Operation, JsonArguments, ExtensionError))
+        Contribution->Operation, Arguments, ExtensionError))
     {
         ConvertError(ExtensionError, OutError);
         return false;
@@ -667,9 +780,9 @@ bool FUnrealMCPExtensionRegistry::AppendBlueprintInspection(
         ConvertError(ExtensionError, OutError);
         return false;
     }
-    TSharedPtr<FJsonObject> JsonExtensionResult;
+    TSharedPtr<FUnrealMCPRecord> ExtensionResult;
     if (!Contribution->Handler->Inspect(
-        *Target, Contribution->Operation, JsonArguments, JsonExtensionResult, ExtensionError))
+        *Target, Contribution->Operation, Arguments, ExtensionResult, ExtensionError))
     {
         ConvertError(ExtensionError, OutError);
         return false;
@@ -687,17 +800,10 @@ bool FUnrealMCPExtensionRegistry::AppendBlueprintInspection(
             TEXT("The companion changed its target during Blueprint inspection")};
         return false;
     }
-    if (!JsonExtensionResult.IsValid())
+    if (!ExtensionResult.IsValid())
     {
         OutError = {TEXT("extension_contract_violation"),
             TEXT("The companion returned no Blueprint inspection result")};
-        return false;
-    }
-    TSharedPtr<FUnrealMCPRecord> ExtensionResult;
-    if (!UnrealMCP::JsonCodec::DecodeRecord(JsonExtensionResult, ExtensionResult, OutError))
-    {
-        OutError = {TEXT("extension_contract_violation"),
-            TEXT("The companion returned an invalid Blueprint inspection result")};
         return false;
     }
     const TArray<TSharedPtr<FUnrealMCPValue>>* Records = nullptr;
@@ -921,13 +1027,8 @@ void FUnrealMCPExtensionRegistry::ConvertError(
 {
     Output.Code = Input.Code.IsEmpty() ? TEXT("internal_error") : Input.Code.Left(64);
     Output.Message = Input.Message.IsEmpty() ? TEXT("Companion operation failed") : Input.Message.Left(512);
-    Output.Details = MakeShared<FUnrealMCPRecord>();
-    if (Input.Details.IsValid())
-    {
-        FUnrealMCPError DecodeError;
-        TSharedPtr<FUnrealMCPRecord> Details;
-        if (UnrealMCP::JsonCodec::DecodeRecord(Input.Details, Details, DecodeError)) Output.Details = MoveTemp(Details);
-    }
+    Output.Details = Input.Details.IsValid()
+        ? Input.Details : MakeShared<FUnrealMCPRecord>();
     Output.bRetryable = Input.bRetryable;
 }
 
@@ -973,8 +1074,7 @@ bool FUnrealMCPExtensionRegistry::Execute(
         return false;
     }
     FUnrealMCPExtensionError ExtensionError;
-    const TSharedPtr<FJsonObject> JsonArguments = UnrealMCP::JsonCodec::EncodeRecord(Arguments);
-    if (!Contribution->Handler->ValidateArguments(Operation, JsonArguments, ExtensionError))
+    if (!Contribution->Handler->ValidateArguments(Operation, Arguments, ExtensionError))
     {
         ConvertError(ExtensionError, OutError);
         return false;
@@ -1005,15 +1105,9 @@ bool FUnrealMCPExtensionRegistry::Execute(
     }
     if (Contribution->Access == EUnrealMCPExtensionAccess::Read)
     {
-        TSharedPtr<FJsonObject> JsonResult;
-        if (!Contribution->Handler->Inspect(*Target, Operation, JsonArguments, JsonResult, ExtensionError))
+        if (!Contribution->Handler->Inspect(*Target, Operation, Arguments, OutResult, ExtensionError))
         {
             ConvertError(ExtensionError, OutError);
-            return false;
-        }
-        if (!UnrealMCP::JsonCodec::DecodeRecord(JsonResult, OutResult, OutError))
-        {
-            OutError = {TEXT("extension_contract_violation"), TEXT("The companion returned an invalid inspection result")};
             return false;
         }
         const FString AfterInspection = SnapshotFor(
@@ -1054,31 +1148,13 @@ bool FUnrealMCPExtensionRegistry::Execute(
     TUniquePtr<FScopedTransaction> Transaction = MakeUnique<FScopedTransaction>(
         FText::FromString(TEXT("Unreal MCP companion operation")));
     Target->Modify();
-    TSharedPtr<FJsonObject> JsonChange;
-    if (!Contribution->Handler->ApplyMutation(*Target, Operation, JsonArguments, JsonChange, ExtensionError))
+    TSharedPtr<FUnrealMCPRecord> Change;
+    if (!Contribution->Handler->ApplyMutation(*Target, Operation, Arguments, Change, ExtensionError))
     {
         Transaction->Cancel();
         Transaction.Reset();
         ConvertError(ExtensionError, OutError);
         return false;
-    }
-    TSharedPtr<FUnrealMCPRecord> Change;
-    if (JsonChange.IsValid())
-    {
-        FUnrealMCPError DecodeError;
-        if (!UnrealMCP::JsonCodec::DecodeRecord(JsonChange, Change, DecodeError))
-        {
-            Transaction.Reset();
-            const bool bUndone = GEditor->UndoTransaction(false);
-            FUnrealMCPExtensionError RestoreError;
-            const FString RestoredSnapshot = SnapshotFor(
-                *Target, Operation, *Contribution->Handler, RestoreError);
-            OutError = {TEXT("rollback_failed"),
-                bUndone && RestoredSnapshot == BeforeSnapshot
-                    ? TEXT("The companion returned an invalid change record and the mutation was rolled back")
-                    : TEXT("The companion returned an invalid change record and exact rollback could not be verified")};
-            return false;
-        }
     }
     UBlueprint* BlueprintToCompile = nullptr;
     if (Contribution->Persistence == EUnrealMCPExtensionPersistence::BlueprintCompileAndSave)
@@ -1094,12 +1170,12 @@ bool FUnrealMCPExtensionRegistry::Execute(
         }
         FKismetEditorUtilities::CompileBlueprint(BlueprintToCompile);
     }
-    TSharedPtr<FJsonObject> JsonReadBack;
+    TSharedPtr<FUnrealMCPRecord> ReadBack;
     const FString AfterSnapshot = SnapshotFor(*Target, Operation, *Contribution->Handler, ExtensionError);
     const bool bCompileSucceeded = BlueprintToCompile == nullptr
         || BlueprintToCompile->Status != BS_Error;
     const bool bReadBack = bCompileSucceeded && !AfterSnapshot.IsEmpty()
-        && Contribution->Handler->ReadBack(*Target, Operation, JsonArguments, JsonReadBack, ExtensionError);
+        && Contribution->Handler->ReadBack(*Target, Operation, Arguments, ReadBack, ExtensionError);
     if (!bReadBack)
     {
         Transaction.Reset();
@@ -1141,11 +1217,7 @@ bool FUnrealMCPExtensionRegistry::Execute(
             return false;
         }
     }
-    if (JsonReadBack.IsValid() && !UnrealMCP::JsonCodec::DecodeRecord(JsonReadBack, OutResult, OutError))
-    {
-        OutError = {TEXT("extension_contract_violation"), TEXT("The companion returned an invalid mutation read-back")};
-        return false;
-    }
+    OutResult = ReadBack;
     if (!OutResult.IsValid()) OutResult = MakeShared<FUnrealMCPRecord>();
     OutResult->SetStringField(TEXT("extension_id"), ExtensionId);
     OutResult->SetNumberField(TEXT("extension_schema_revision"), Owner->Registration.ExtensionSchemaRevision);
@@ -1165,6 +1237,15 @@ FString FUnrealMCPExtensionRegistry::RegistrySignature() const
         Material += Record.Registration.ExtensionId + TEXT("|")
             + FString::FromInt(Record.Registration.ExtensionSchemaRevision) + TEXT("|")
             + FString::FromInt(Record.Registration.CompanionApiVersion) + TEXT(";");
+        for (const FUnrealMCPCompanionAssetFamily& Family : Record.Registration.AssetFamilies)
+        {
+            Material += Family.FamilyId + TEXT(":") + Family.NativeClassPath + TEXT(":")
+                + ClassPolicyName(Family.ClassPolicy) + TEXT(":")
+                + LexToString(Family.Priority) + TEXT(":")
+                + (Family.Capabilities.bInspection ? TEXT("i") : TEXT(""))
+                + (Family.Capabilities.bCreation ? TEXT("c") : TEXT(""))
+                + (Family.Capabilities.bEditing ? TEXT("e") : TEXT("")) + TEXT(";");
+        }
         for (const FUnrealMCPExtensionContribution& Contribution : Record.Registration.Contributions)
         {
             Material += Contribution.ToolFamily + TEXT(":") + Contribution.Operation + TEXT(":")
@@ -1220,6 +1301,45 @@ TSharedPtr<FUnrealMCPRecord> FUnrealMCPExtensionRegistry::BuildCapabilities() co
                     ? TEXT("live_capability_unavailable")
                     : Descriptor.UnavailableReason.Left(128))));
         Companion->SetArrayField(TEXT("required_engine_plugins"), Strings(Descriptor.RequiredEnginePlugins));
+        TArray<TSharedPtr<FUnrealMCPValue>> AssetFamilies;
+        if (AcceptedRecord != nullptr)
+        {
+            for (const FUnrealMCPCompanionAssetFamily& Family : AcceptedRecord->Registration.AssetFamilies)
+            {
+                const TSharedRef<FUnrealMCPRecord> Value = MakeShared<FUnrealMCPRecord>();
+                Value->SetStringField(TEXT("family_id"), Family.FamilyId);
+                Value->SetStringField(TEXT("native_class"), Family.NativeClassPath);
+                Value->SetStringField(TEXT("class_policy"), ClassPolicyName(Family.ClassPolicy));
+                Value->SetNumberField(TEXT("priority"), Family.Priority);
+                const TSharedRef<FUnrealMCPRecord> Operations = MakeShared<FUnrealMCPRecord>();
+                Operations->SetBoolField(TEXT("inspect"), Family.Capabilities.bInspection);
+                Operations->SetBoolField(TEXT("create"), Family.Capabilities.bCreation);
+                Operations->SetBoolField(TEXT("edit"), Family.Capabilities.bEditing);
+                Value->SetObjectField(TEXT("operations"), Operations);
+                Value->SetStringField(TEXT("creation_persistence"),
+                    PersistenceName(Family.CreationPersistence));
+                Value->SetStringField(TEXT("editing_persistence"),
+                    PersistenceName(Family.EditingPersistence));
+                Value->SetArrayField(TEXT("stable_nested_identity_kinds"),
+                    Strings(Family.StableNestedIdentityKinds));
+                TArray<FString> SelectorRoutes;
+                for (const FUnrealMCPAssetFamilySelectorRoute& Route : Family.SelectorRoutes)
+                {
+                    SelectorRoutes.Add(Route.Identity);
+                }
+                Value->SetArrayField(TEXT("selector_routes"), Strings(SelectorRoutes));
+                const TSharedRef<FUnrealMCPRecord> Limits = MakeShared<FUnrealMCPRecord>();
+                for (const FUnrealMCPAssetFamilyLimit& Limit : Family.Limits)
+                {
+                    Limits->SetNumberField(Limit.Name, Limit.Value);
+                }
+                Value->SetObjectField(TEXT("limits"), Limits);
+                bReadSupport |= Family.Capabilities.bInspection;
+                bMutationSupport |= Family.Capabilities.bCreation || Family.Capabilities.bEditing;
+                AssetFamilies.Add(MakeShared<FUnrealMCPValueObject>(Value));
+            }
+        }
+        Companion->SetArrayField(TEXT("asset_families"), AssetFamilies);
         TArray<TSharedPtr<FUnrealMCPValue>> Contributions;
         if (AcceptedRecord != nullptr)
         {

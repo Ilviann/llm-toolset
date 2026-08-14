@@ -4,7 +4,7 @@
 
 #include "Abilities/GameplayAbility.h"
 #include "Abilities/GameplayAbilityTriggerType.h"
-#include "Dom/JsonObject.h"
+#include "UnrealMCPWireTypes.h"
 #include "Engine/Blueprint.h"
 #include "GameplayEffect.h"
 #include "GameplayTagContainer.h"
@@ -31,7 +31,7 @@ void SetError(FUnrealMCPExtensionError& OutError, const TCHAR* Code, const TCHAR
 {
     OutError.Code = Code;
     OutError.Message = Message;
-    OutError.Details = MakeShared<FJsonObject>();
+    OutError.Details = MakeShared<FUnrealMCPRecord>();
 }
 
 FString StableIdentity(const FString& Seed)
@@ -110,17 +110,17 @@ FString PropertySource(const UGameplayAbility& Ability, const FProperty* Propert
         ? TEXT("inherited") : TEXT("local");
 }
 
-TSharedRef<FJsonObject> Scalar(const FString& Value, const FString& Source)
+TSharedRef<FUnrealMCPRecord> Scalar(const FString& Value, const FString& Source)
 {
-    const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Result = MakeShared<FUnrealMCPRecord>();
     Result->SetStringField(TEXT("value"), Value);
     Result->SetStringField(TEXT("source"), Source);
     return Result;
 }
 
-TSharedRef<FJsonObject> Boolean(bool Value, const FString& Source)
+TSharedRef<FUnrealMCPRecord> Boolean(bool Value, const FString& Source)
 {
-    const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Result = MakeShared<FUnrealMCPRecord>();
     Result->SetBoolField(TEXT("value"), Value);
     Result->SetStringField(TEXT("source"), Source);
     return Result;
@@ -156,7 +156,7 @@ const FGameplayTagContainer* ExactTagContainer(
     return Property->ContainerPtrToValuePtr<FGameplayTagContainer>(&Ability);
 }
 
-TSharedRef<FJsonObject> EncodeTags(
+TSharedRef<FUnrealMCPRecord> EncodeTags(
     const UGameplayAbility& Ability,
     const FGameplayTagContainer& Container,
     const FProperty* Property)
@@ -167,13 +167,13 @@ TSharedRef<FJsonObject> EncodeTags(
     {
         return Left.ToString() < Right.ToString();
     });
-    TArray<TSharedPtr<FJsonValue>> Values;
+    TArray<TSharedPtr<FUnrealMCPValue>> Values;
     const int32 Count = FMath::Min(Tags.Num(), UnrealMCPGAS::MaxTagsPerContainer);
     for (int32 Index = 0; Index < Count; ++Index)
     {
-        Values.Add(MakeShared<FJsonValueString>(Tags[Index].ToString()));
+        Values.Add(MakeShared<FUnrealMCPValueString>(Tags[Index].ToString()));
     }
-    const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Result = MakeShared<FUnrealMCPRecord>();
     Result->SetArrayField(TEXT("tags"), Values);
     Result->SetNumberField(TEXT("tag_count"), Tags.Num());
     Result->SetBoolField(TEXT("truncated"), Tags.Num() > Count);
@@ -181,14 +181,14 @@ TSharedRef<FJsonObject> EncodeTags(
     return Result;
 }
 
-TSharedRef<FJsonObject> EncodeEffectReference(
+TSharedRef<FUnrealMCPRecord> EncodeEffectReference(
     const UGameplayAbility& Ability,
     const TCHAR* PropertyName)
 {
     const FClassProperty* Property = FindFProperty<FClassProperty>(Ability.GetClass(), PropertyName);
     UClass* EffectClass = Property != nullptr
         ? Cast<UClass>(Property->GetObjectPropertyValue_InContainer(&Ability)) : nullptr;
-    const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Result = MakeShared<FUnrealMCPRecord>();
     Result->SetBoolField(TEXT("resolved"), EffectClass != nullptr);
     Result->SetStringField(TEXT("class_path"), EffectClass != nullptr ? EffectClass->GetPathName() : FString());
     FString AssetPath;
@@ -206,11 +206,11 @@ TSharedRef<FJsonObject> EncodeEffectReference(
 
 bool BuildPayload(
     const UGameplayAbility& Ability,
-    TArray<TSharedPtr<FJsonValue>>& OutRecords,
+    TArray<TSharedPtr<FUnrealMCPValue>>& OutRecords,
     FString& OutFingerprint,
     FUnrealMCPExtensionError& OutError)
 {
-    const TSharedRef<FJsonObject> Policies = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Policies = MakeShared<FUnrealMCPRecord>();
     Policies->SetStringField(TEXT("section"), TEXT("gameplay_ability_policies"));
     Policies->SetObjectField(TEXT("instancing_policy"), Scalar(
         InstancingPolicyName(Ability.GetInstancingPolicy()),
@@ -239,9 +239,9 @@ bool BuildPayload(
         Policies->SetObjectField(Field.Key, Boolean(
             Value, PropertySource(Ability, ExactProperty(Ability, Field.Value))));
     }
-    OutRecords.Add(MakeShared<FJsonValueObject>(Policies));
+    OutRecords.Add(MakeShared<FUnrealMCPValueObject>(Policies));
 
-    const TSharedRef<FJsonObject> Tags = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Tags = MakeShared<FUnrealMCPRecord>();
     Tags->SetStringField(TEXT("section"), TEXT("gameplay_ability_tags"));
     {
         const FProperty* AssetTagsProperty = ExactProperty(Ability, TEXT("AbilityTags"));
@@ -281,7 +281,7 @@ bool BuildPayload(
         }
         Tags->SetObjectField(Field.Key, EncodeTags(Ability, *Container, Property));
     }
-    OutRecords.Add(MakeShared<FJsonValueObject>(Tags));
+    OutRecords.Add(MakeShared<FUnrealMCPValueObject>(Tags));
 
     const FArrayProperty* TriggerProperty =
         FindFProperty<FArrayProperty>(Ability.GetClass(), TEXT("AbilityTriggers"));
@@ -302,14 +302,14 @@ bool BuildPayload(
             TEXT("Gameplay Ability triggers exceed the scan bound"));
         return false;
     }
-    const TSharedRef<FJsonObject> Triggers = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Triggers = MakeShared<FUnrealMCPRecord>();
     Triggers->SetStringField(TEXT("section"), TEXT("gameplay_ability_triggers"));
     Triggers->SetStringField(TEXT("source"), PropertySource(Ability, TriggerProperty));
     Triggers->SetNumberField(TEXT("trigger_count"), TriggerArray.Num());
     const int32 TriggerCount = FMath::Min(TriggerArray.Num(), UnrealMCPGAS::MaxAbilityTriggers);
     Triggers->SetBoolField(TEXT("truncated"), TriggerArray.Num() > TriggerCount);
     TMap<FString, int32> DuplicateCounts;
-    TArray<TSharedPtr<FJsonValue>> TriggerValues;
+    TArray<TSharedPtr<FUnrealMCPValue>> TriggerValues;
     for (int32 Index = 0; Index < TriggerCount; ++Index)
     {
         const FAbilityTriggerData* Trigger =
@@ -318,20 +318,20 @@ bool BuildPayload(
         const FString Source = TriggerSourceName(Trigger->TriggerSource);
         const FString Key = Tag + TEXT("|") + Source;
         const int32 Duplicate = DuplicateCounts.FindOrAdd(Key)++;
-        const TSharedRef<FJsonObject> Value = MakeShared<FJsonObject>();
+        const TSharedRef<FUnrealMCPRecord> Value = MakeShared<FUnrealMCPRecord>();
         Value->SetStringField(TEXT("trigger_id"), StableIdentity(Key + TEXT("|") + FString::FromInt(Duplicate)));
         Value->SetStringField(TEXT("tag"), Tag);
         Value->SetStringField(TEXT("source"), Source);
-        TriggerValues.Add(MakeShared<FJsonValueObject>(Value));
+        TriggerValues.Add(MakeShared<FUnrealMCPValueObject>(Value));
     }
     Triggers->SetArrayField(TEXT("triggers"), TriggerValues);
-    OutRecords.Add(MakeShared<FJsonValueObject>(Triggers));
+    OutRecords.Add(MakeShared<FUnrealMCPValueObject>(Triggers));
 
-    const TSharedRef<FJsonObject> Effects = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Effects = MakeShared<FUnrealMCPRecord>();
     Effects->SetStringField(TEXT("section"), TEXT("gameplay_ability_effects"));
     Effects->SetObjectField(TEXT("cost"), EncodeEffectReference(Ability, TEXT("CostGameplayEffectClass")));
     Effects->SetObjectField(TEXT("cooldown"), EncodeEffectReference(Ability, TEXT("CooldownGameplayEffectClass")));
-    OutRecords.Add(MakeShared<FJsonValueObject>(Effects));
+    OutRecords.Add(MakeShared<FUnrealMCPValueObject>(Effects));
 
     TArray<FString> Fingerprint;
     for (const TCHAR* PropertyName : {
@@ -375,7 +375,7 @@ public:
 
     bool ValidateArguments(
         const FString& Operation,
-        const TSharedPtr<FJsonObject>& Arguments,
+        const TSharedPtr<FUnrealMCPRecord>& Arguments,
         FUnrealMCPExtensionError& OutError) const override
     {
         FString Mode;
@@ -392,12 +392,12 @@ public:
     bool Inspect(
         const UObject& Target,
         const FString& Operation,
-        const TSharedPtr<FJsonObject>& Arguments,
-        TSharedPtr<FJsonObject>& OutResult,
+        const TSharedPtr<FUnrealMCPRecord>& Arguments,
+        TSharedPtr<FUnrealMCPRecord>& OutResult,
         FUnrealMCPExtensionError& OutError) override
     {
         const UGameplayAbility* Ability = Cast<UGameplayAbility>(&Target);
-        TArray<TSharedPtr<FJsonValue>> Records;
+        TArray<TSharedPtr<FUnrealMCPValue>> Records;
         FString Fingerprint;
         if (Ability == nullptr || !BuildPayload(*Ability, Records, Fingerprint, OutError))
         {
@@ -408,12 +408,12 @@ public:
             }
             return false;
         }
-        const TArray<TSharedPtr<FJsonValue>>* RequestedSections = nullptr;
+        const TArray<TSharedPtr<FUnrealMCPValue>>* RequestedSections = nullptr;
         if (Arguments->TryGetArrayField(TEXT("sections"), RequestedSections)
             && RequestedSections != nullptr)
         {
             const bool bGameplayAbilityRequested = RequestedSections->ContainsByPredicate(
-                [](const TSharedPtr<FJsonValue>& Value)
+                [](const TSharedPtr<FUnrealMCPValue>& Value)
                 {
                     FString Section;
                     return Value.IsValid() && Value->TryGetString(Section)
@@ -424,14 +424,14 @@ public:
                 Records.Reset();
             }
         }
-        const TSharedRef<FJsonObject> Capabilities = MakeShared<FJsonObject>();
+        const TSharedRef<FUnrealMCPRecord> Capabilities = MakeShared<FUnrealMCPRecord>();
         Capabilities->SetBoolField(TEXT("inspection"), true);
         Capabilities->SetBoolField(TEXT("mutation"), false);
         Capabilities->SetNumberField(TEXT("max_tags_per_container"), UnrealMCPGAS::MaxTagsPerContainer);
         Capabilities->SetNumberField(TEXT("max_triggers"), UnrealMCPGAS::MaxAbilityTriggers);
         Capabilities->SetNumberField(TEXT("max_tag_scan"), UnrealMCPGAS::MaxTagScan);
         Capabilities->SetNumberField(TEXT("max_trigger_scan"), UnrealMCPGAS::MaxTriggerScan);
-        OutResult = MakeShared<FJsonObject>();
+        OutResult = MakeShared<FUnrealMCPRecord>();
         OutResult->SetArrayField(TEXT("records"), Records);
         OutResult->SetObjectField(TEXT("family_capabilities"), Capabilities);
         return true;
@@ -444,13 +444,13 @@ public:
         FUnrealMCPExtensionError& OutError) const override
     {
         const UGameplayAbility* Ability = Cast<UGameplayAbility>(&Target);
-        TArray<TSharedPtr<FJsonValue>> Records;
+        TArray<TSharedPtr<FUnrealMCPValue>> Records;
         return Ability != nullptr && BuildPayload(*Ability, Records, OutFingerprint, OutError);
     }
 
     bool ApplyMutation(
-        UObject&, const FString&, const TSharedPtr<FJsonObject>&,
-        TSharedPtr<FJsonObject>&, FUnrealMCPExtensionError& OutError) override
+        UObject&, const FString&, const TSharedPtr<FUnrealMCPRecord>&,
+        TSharedPtr<FUnrealMCPRecord>&, FUnrealMCPExtensionError& OutError) override
     {
         SetError(OutError, TEXT("extension_unavailable"),
             TEXT("The GAS companion is inspection-only"));
@@ -458,8 +458,8 @@ public:
     }
 
     bool ReadBack(
-        const UObject&, const FString&, const TSharedPtr<FJsonObject>&,
-        TSharedPtr<FJsonObject>&, FUnrealMCPExtensionError& OutError) const override
+        const UObject&, const FString&, const TSharedPtr<FUnrealMCPRecord>&,
+        TSharedPtr<FUnrealMCPRecord>&, FUnrealMCPExtensionError& OutError) const override
     {
         SetError(OutError, TEXT("extension_unavailable"),
             TEXT("The GAS companion exposes no mutation read-back"));
@@ -512,12 +512,12 @@ bool FUnrealMCPGASAbilityInspectionTest::RunTest(const FString& Parameters)
         Trigger->TriggerSource = EGameplayAbilityTriggerSource::OwnedTagAdded;
     }
     const bool bDirtyBefore = Package->IsDirty();
-    TArray<TSharedPtr<FJsonValue>> FirstRecords;
+    TArray<TSharedPtr<FUnrealMCPValue>> FirstRecords;
     FString FirstFingerprint;
     FUnrealMCPExtensionError Error;
     TestTrue(TEXT("Typed Gameplay Ability payload builds"),
         BuildPayload(*Defaults, FirstRecords, FirstFingerprint, Error));
-    TArray<TSharedPtr<FJsonValue>> SecondRecords;
+    TArray<TSharedPtr<FUnrealMCPValue>> SecondRecords;
     FString SecondFingerprint;
     TestTrue(TEXT("Repeated typed inspection succeeds"),
         BuildPayload(*Defaults, SecondRecords, SecondFingerprint, Error));

@@ -2,7 +2,7 @@
 
 ## Ownership and boundaries
 
-`plugin/UnrealMCPCommonUI/` owns every direct `CommonUI`, `CommonInput`, `UMG`, and `UMGEditor` dependency. Its editor module registers one read-only companion API v1 contribution for `UCommonUserWidget` class defaults. The base `UnrealMCP` plugin remains independent of CommonUI headers, modules, plugin enablement, content, and transitive dependencies.
+`plugin/UnrealMCPCommonUI/` owns every direct `CommonUI`, `CommonInput`, `UMG`, and `UMGEditor` dependency. Its editor module registers one read-only JSON-neutral companion API v2 contribution for `UCommonUserWidget` class defaults. The base `UnrealMCP` plugin remains independent of CommonUI headers, modules, plugin enablement, content, and transitive dependencies.
 
 The initial frozen allowlist contains only Blueprint assets generated from `UCommonUserWidget` descendants. `UCommonActivatableWidget` descendants receive the activation and reference records in addition to the common widget record. CommonUI Data Assets, style Blueprints, settings, arbitrary referenced assets, runtime widgets, input simulation, and activation/navigation execution are excluded.
 

@@ -16,7 +16,7 @@ released_in: null
 
 - [`umg-authoring`](../completed/umg-authoring.md)
 - [`asset-inspect-umg`](asset-inspect-umg.md)
-- [`companion-api-v2`](companion-api-v2.md)
+- [`companion-api-v2`](../completed/companion-api-v2.md)
 
 ### Companion and version contract
 

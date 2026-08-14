@@ -16,7 +16,7 @@ released_in: null
 
 - [`pcg-graph-inspect`](pcg-graph-inspect.md)
 - [`asset-authoring-kernel`](../completed/asset-authoring-kernel.md)
-- [`companion-api-v2`](companion-api-v2.md)
+- [`companion-api-v2`](../completed/companion-api-v2.md)
 
 **Planning note:** Review and update this detailed contract against the current executable tool catalog, companion foundation, and supported Unreal public PCG APIs immediately before implementation. Only authoring of PCG Graph assets is stable functional scope for this feature. The tool mapping, operation shapes, identities, snapshots, validation, lifecycle, persistence, limits, and verification details below are provisional and are not implementation authority until that review is complete.
 

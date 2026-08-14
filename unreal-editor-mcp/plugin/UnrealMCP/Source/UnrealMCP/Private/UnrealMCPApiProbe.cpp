@@ -157,6 +157,7 @@ void RequirePublicTypes()
     (void)static_cast<FCleanupAfterDelete>(&ObjectTools::CleanupAfterSuccessfulDelete);
     static_assert(sizeof(FThreadSafeObjectIterator) > 0);
     static_assert(sizeof(FUnrealMCPCompanionRegistration) > 0);
+    static_assert(sizeof(FUnrealMCPCompanionAssetFamily) > 0);
     static_assert(sizeof(FUnrealMCPAssetFamilyDescriptor) > 0);
     static_assert(sizeof(FUnrealMCPAssetFamilyInspectionContext) > 0);
     static_assert(sizeof(FUnrealMCPAssetFamilyCreationContext) > 0);

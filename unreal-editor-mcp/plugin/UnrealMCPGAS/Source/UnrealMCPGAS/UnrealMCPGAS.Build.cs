@@ -7,11 +7,11 @@ public class UnrealMCPGAS : ModuleRules
         PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
         PublicDependencyModuleNames.AddRange(new[]
         {
-            "Core", "CoreUObject", "Engine", "UnrealMCP"
+            "Core", "CoreUObject", "Engine", "UnrealMCP", "UnrealMCPAssetCore"
         });
         PrivateDependencyModuleNames.AddRange(new[]
         {
-            "GameplayAbilities", "GameplayTags", "GameplayTasks", "Json",
+            "GameplayAbilities", "GameplayTags", "GameplayTasks",
             "Kismet", "UnrealEd"
         });
     }

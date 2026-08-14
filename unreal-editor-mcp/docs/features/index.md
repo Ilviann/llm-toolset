@@ -72,7 +72,7 @@ Keep the authoritative checklist in [`ROADMAP.md`](../../ROADMAP.md) synchronize
 - [`native-domain-modules` — Native domain module boundaries](completed/native-domain-modules.md) — Isolate host, asset-core, Blueprint, UMG, and content ownership behind fixed registries.
   - Depends on:
     - `asset-family-conformance`
-- [`companion-api-v2` — Typed asset-family companion API](planned/companion-api-v2.md) — Add typed inspection, creation, editing, read-back, persistence, and capability seams.
+- [`companion-api-v2` — Typed asset-family companion API](completed/companion-api-v2.md) — Add typed inspection, creation, editing, read-back, persistence, and capability seams.
   - Depends on:
     - `companion-plugins`
     - `native-domain-modules`

@@ -105,6 +105,7 @@ def _companion_capabilities(
                 entry.schema_revision if schema_revision is None else schema_revision
             ),
             "ready": ready,
+            "asset_families": [],
             "contributions": [
                 {
                     "tool_family": contribution.tool_name,

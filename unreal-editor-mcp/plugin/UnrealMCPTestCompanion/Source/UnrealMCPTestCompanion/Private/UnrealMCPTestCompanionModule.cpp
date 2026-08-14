@@ -3,7 +3,7 @@
 #include "UnrealMCPTestTypes.h"
 #include "UnrealMCPTestCompanionVersion.h"
 
-#include "Dom/JsonObject.h"
+#include "UnrealMCPWireTypes.h"
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "Engine/Blueprint.h"
 #include "Engine/SCS_Node.h"
@@ -41,7 +41,7 @@ public:
 
     virtual bool ValidateArguments(
         const FString& Operation,
-        const TSharedPtr<FJsonObject>& Arguments,
+        const TSharedPtr<FUnrealMCPRecord>& Arguments,
         FUnrealMCPExtensionError& OutError) const override
     {
         if (!Arguments.IsValid())
@@ -66,8 +66,8 @@ public:
     virtual bool Inspect(
         const UObject& Object,
         const FString& Operation,
-        const TSharedPtr<FJsonObject>& Arguments,
-        TSharedPtr<FJsonObject>& OutResult,
+        const TSharedPtr<FUnrealMCPRecord>& Arguments,
+        TSharedPtr<FUnrealMCPRecord>& OutResult,
         FUnrealMCPExtensionError& OutError) override
     {
         return ReadValue(Object, OutResult, OutError);
@@ -92,8 +92,8 @@ public:
     virtual bool ApplyMutation(
         UObject& Object,
         const FString& Operation,
-        const TSharedPtr<FJsonObject>& Arguments,
-        TSharedPtr<FJsonObject>& OutChange,
+        const TSharedPtr<FUnrealMCPRecord>& Arguments,
+        TSharedPtr<FUnrealMCPRecord>& OutChange,
         FUnrealMCPExtensionError& OutError) override
     {
         double Number = 0.0;
@@ -108,7 +108,7 @@ public:
             OutError = {TEXT("invalid_asset"), TEXT("The fixture target cannot be mutated")};
             return false;
         }
-        OutChange = MakeShared<FJsonObject>();
+        OutChange = MakeShared<FUnrealMCPRecord>();
         OutChange->SetNumberField(TEXT("value"), Value);
         return true;
     }
@@ -116,8 +116,8 @@ public:
     virtual bool ReadBack(
         const UObject& Object,
         const FString& Operation,
-        const TSharedPtr<FJsonObject>& Arguments,
-        TSharedPtr<FJsonObject>& OutResult,
+        const TSharedPtr<FUnrealMCPRecord>& Arguments,
+        TSharedPtr<FUnrealMCPRecord>& OutResult,
         FUnrealMCPExtensionError& OutError) const override
     {
         return ReadValue(Object, OutResult, OutError);
@@ -194,7 +194,7 @@ private:
 
     bool ReadValue(
         const UObject& Object,
-        TSharedPtr<FJsonObject>& OutResult,
+        TSharedPtr<FUnrealMCPRecord>& OutResult,
         FUnrealMCPExtensionError& OutError) const
     {
         int32 Value = 0;
@@ -203,7 +203,7 @@ private:
             OutError = {TEXT("invalid_asset"), TEXT("The fixture target is unavailable")};
             return false;
         }
-        OutResult = MakeShared<FJsonObject>();
+        OutResult = MakeShared<FUnrealMCPRecord>();
         OutResult->SetStringField(TEXT("asset_path"), Object.GetPathName());
         OutResult->SetNumberField(TEXT("value"), Value);
         return true;

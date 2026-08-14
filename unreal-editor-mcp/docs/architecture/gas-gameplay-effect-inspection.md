@@ -2,7 +2,7 @@
 
 ## Ownership and boundaries
 
-`plugin/UnrealMCPGAS/` owns the read-only `gameplay_effect` Blueprint asset-family contribution and every direct dependency on the Engine Gameplay Ability System modules. It registers through companion API v1 beside the existing `gameplay_ability` contribution. The base plugin remains GAS-free and continues to own discovery, authentication, Game-thread dispatch, Blueprint inspection, pagination, snapshots, limits, and capability composition.
+`plugin/UnrealMCPGAS/` owns the read-only `gameplay_effect` Blueprint asset-family contribution and every direct dependency on the Engine Gameplay Ability System modules. It registers through JSON-neutral companion API v2 beside the existing `gameplay_ability` contribution. The base plugin remains GAS-free and continues to own discovery, authentication, Game-thread dispatch, Blueprint inspection, pagination, snapshots, limits, and capability composition.
 
 The companion reads only verified `UGameplayEffect` class default objects. It uses public Unreal Engine 5.8 members plus exact reflected names for documented public fields whose containers need typed access. It never accepts caller-supplied property paths, walks project-defined object layouts, creates tags, evaluates magnitudes, builds specs, or mutates an Ability System Component.
 
@@ -16,7 +16,7 @@ Magnitudes are decoded only as scalable float, attribute based, custom calculati
 
 The family appears only when the exact companion/API/schema/dependency registration and Python catalog entry are ready. `features.gas_gameplay_effects_inspection` reports read support and `features.gas_gameplay_effects_mutation` remains false. The family matrix enables discovery and inspection only; component, member, graph, action-catalog, create, compile, save, and default-edit operations reject through existing base policy.
 
-`UnrealMCPGAS` is independently versioned at 0.2.1. Global companion API v1 and schema revision 1 are unchanged; 0.2.1 changes only startup ordering and descriptor preservation.
+`UnrealMCPGAS` is independently versioned at 0.2.2. Global companion API v2 and schema revision 2 are exact; 0.2.2 changes only API compatibility and record transport, not Gameplay Effect behavior.
 
 ## Verification
 

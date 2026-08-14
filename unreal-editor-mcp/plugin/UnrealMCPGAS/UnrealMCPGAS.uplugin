@@ -1,8 +1,8 @@
 {
   "FileVersion": 3,
-  "Version": 20001,
-  "VersionName": "0.2.1",
-  "companion_api_version": 1,
+  "Version": 20002,
+  "VersionName": "0.2.2",
+  "companion_api_version": 2,
   "FriendlyName": "Unreal MCP Gameplay Ability System",
   "Description": "Optional read-only Gameplay Ability and Gameplay Effect Blueprint inspection companion for Unreal MCP.",
   "Category": "Editor",
@@ -14,7 +14,7 @@
   "Installed": false,
   "unreal_mcp_companion": {
     "extension_id": "unreal-mcp-gas",
-    "schema_revision": 1,
+    "schema_revision": 2,
     "owning_module": "UnrealMCPGAS",
     "required_engine_plugins": ["GameplayAbilities"]
   },

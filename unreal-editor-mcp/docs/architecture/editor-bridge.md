@@ -6,7 +6,7 @@
 
 ## Dependency direction
 
-The host loads built-in domains, freezes their asset families and command contributions, and then starts the bridge listener. The protocol decodes HTTP JSON into neutral records before queueing, domain handlers consume and return only neutral records, and the protocol encodes the final envelope after dispatch. The companion registry is the sole temporary base-domain adapter to companion API v1 JSON. The bridge calls the catalog, protocol, ledger, and discovery helpers but none of those helpers knows about host module lifetime. Unreal object/editor state is read only after `AsyncTask` reaches the Game thread. The HTTP handler performs authentication, body bounds, shape validation, fixed-catalog lookup, ledger/queue admission, and dispatch.
+The host loads built-in domains, freezes their asset families and command contributions, and then starts the bridge listener. The protocol decodes HTTP JSON into neutral records before queueing, domain and companion handlers consume and return only neutral records, and the protocol encodes the final envelope after dispatch. Companion API v2 exposes no JSON types. The bridge calls the catalog, protocol, ledger, and discovery helpers but none of those helpers knows about host module lifetime. Unreal object/editor state is read only after `AsyncTask` reaches the Game thread. The HTTP handler performs authentication, body bounds, shape validation, fixed-catalog lookup, ledger/queue admission, and dispatch.
 
 ## Security and lifecycle invariants
 

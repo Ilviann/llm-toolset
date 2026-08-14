@@ -29,6 +29,7 @@ def capabilities(*, ready=True, schema=EXTENSION_SCHEMA_REVISION, api=COMPANION_
             "companion_api_version": api,
             "schema_revision": schema,
             "ready": ready,
+            "asset_families": [],
             "contributions": contributions,
         }],
     }
@@ -42,6 +43,7 @@ def gas_capabilities(*, ready=True, schema=EXTENSION_SCHEMA_REVISION, api=COMPAN
             "companion_api_version": api,
             "schema_revision": schema,
             "ready": ready,
+            "asset_families": [],
             "contributions": [{
                 "tool_family": "blueprint_inspect",
                 "operation": "inspect_gameplay_ability",
@@ -65,6 +67,7 @@ def commonui_capabilities(
             "companion_api_version": api,
             "schema_revision": schema,
             "ready": ready,
+            "asset_families": [],
             "contributions": [{
                 "tool_family": "blueprint_inspect",
                 "operation": "inspect_commonui_widget",
@@ -95,7 +98,7 @@ class ExtensionCatalogTests(unittest.TestCase):
         tool = self.tool(True, "blueprint_default_edit")
         valid = {
             "extension_id": "unreal-mcp-test",
-            "extension_schema_revision": 1,
+            "extension_schema_revision": EXTENSION_SCHEMA_REVISION,
             "operation": "set_test_asset_value",
             "operation_id": "a" * 32,
             "asset_path": "/Game/Test.Asset",
@@ -113,9 +116,9 @@ class ExtensionCatalogTests(unittest.TestCase):
                 validate_tool_arguments(forged, tool["inputSchema"])
 
     def test_absent_rejected_or_mismatched_native_extension_adds_no_schema(self):
-        cases = ({}, capabilities(ready=False), capabilities(schema=2), capabilities(api=2))
+        cases = ({}, capabilities(ready=False), capabilities(schema=1), capabilities(api=1))
         request = {
-            "extension_id": "unreal-mcp-test", "extension_schema_revision": 1,
+            "extension_id": "unreal-mcp-test", "extension_schema_revision": EXTENSION_SCHEMA_REVISION,
             "operation": "set_test_asset_value", "operation_id": "a" * 32,
             "asset_path": "/Game/Test.Asset", "expected_snapshot": "b" * 40, "value": 7,
         }
@@ -126,7 +129,7 @@ class ExtensionCatalogTests(unittest.TestCase):
                     validate_tool_arguments(request, tool["inputSchema"])
 
     def test_gas_companion_inspection_contributions_are_not_published(self):
-        for native in (gas_capabilities(), gas_capabilities(ready=False), gas_capabilities(schema=2)):
+        for native in (gas_capabilities(), gas_capabilities(ready=False), gas_capabilities(schema=1)):
             tools = compose_extension_tools(
                 tools_for_configuration(writable=False, lifecycle_enabled=False), native, writable=False,
             )
@@ -176,7 +179,7 @@ class ExtensionCatalogTests(unittest.TestCase):
         server = MCPServer(bridge, writable=True)
         server.handle({"jsonrpc": "2.0", "id": 1, "method": "tools/list"})
         valid = {
-            "extension_id": "unreal-mcp-test", "extension_schema_revision": 1,
+            "extension_id": "unreal-mcp-test", "extension_schema_revision": EXTENSION_SCHEMA_REVISION,
             "operation": "set_test_asset_value", "operation_id": "a" * 32,
             "asset_path": "/Game/Test.Asset", "expected_snapshot": "b" * 40, "value": 7,
         }

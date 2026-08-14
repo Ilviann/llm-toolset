@@ -264,7 +264,7 @@ void FUnrealMCPCommandCatalog::Build(
     Capabilities->Limits = {
         FixedLimit(TEXT("request_bytes"), UnrealMCP::MaxRequestBytes),
         FixedLimit(TEXT("companion_descriptors"), UnrealMCP::MaxDiscoveredCompanions), FixedLimit(TEXT("companions"), UnrealMCP::MaxAcceptedCompanions),
-        FixedLimit(TEXT("companion_contributions"), UnrealMCP::MaxCompanionContributions), FixedLimit(TEXT("companion_capability_records"), UnrealMCP::MaxCompanionCapabilityRecords),
+        FixedLimit(TEXT("companion_asset_families"), UnrealMCP::MaxCompanionAssetFamilies), FixedLimit(TEXT("companion_contributions"), UnrealMCP::MaxCompanionContributions), FixedLimit(TEXT("companion_capability_records"), UnrealMCP::MaxCompanionCapabilityRecords),
         FixedLimit(TEXT("companion_diagnostics"), UnrealMCP::MaxCompanionDiagnostics), FixedLimit(TEXT("extension_id_chars"), UnrealMCP::MaxExtensionIdChars),
         FixedLimit(TEXT("response_bytes"), UnrealMCP::MaxResponseBytes), FixedLimit(TEXT("queued_requests"), UnrealMCP::MaxQueuedRequests),
         FixedLimit(TEXT("json_depth"), UnrealMCP::MaxJsonDepth), FixedLimit(TEXT("string_chars"), UnrealMCP::MaxStringLength),

@@ -1,8 +1,8 @@
 {
   "FileVersion": 3,
-  "Version": 10000,
-  "VersionName": "0.1.0",
-  "companion_api_version": 1,
+  "Version": 10001,
+  "VersionName": "0.1.1",
+  "companion_api_version": 2,
   "FriendlyName": "Unreal MCP CommonUI",
   "Description": "Optional read-only CommonUI Widget Blueprint inspection companion for Unreal MCP.",
   "Category": "Editor",
@@ -14,7 +14,7 @@
   "Installed": false,
   "unreal_mcp_companion": {
     "extension_id": "unreal-mcp-commonui",
-    "schema_revision": 1,
+    "schema_revision": 2,
     "owning_module": "UnrealMCPCommonUI",
     "required_engine_plugins": ["CommonUI"]
   },

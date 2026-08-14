@@ -25,8 +25,17 @@ BRIDGE_HANDLER: Final = "bridge"
 CAPABILITIES_HANDLER: Final = "capabilities"
 LIFECYCLE_HANDLER: Final = "lifecycle"
 
-COMPANION_API_VERSION: Final = 1
-EXTENSION_SCHEMA_REVISION: Final = 1
+COMPANION_API_VERSION: Final = 2
+EXTENSION_SCHEMA_REVISION: Final = 2
+
+_NATIVE_ASSET_FAMILY_FIELDS: Final = frozenset({
+    "family_id", "native_class", "class_policy", "priority", "operations",
+    "creation_persistence", "editing_persistence", "limits", "selector_routes",
+    "stable_nested_identity_kinds",
+})
+_PERSISTENCE_POLICIES: Final = {
+    "none", "package_save", "blueprint_compile_and_save",
+}
 
 _PATH: Final = {
     "type": "string", "minLength": 3, "maxLength": 512,
@@ -373,6 +382,53 @@ CATALOG_ENTRIES: Final = (
 ASSET_FAMILY_CATALOG: Final = StaticAssetFamilyCatalog(CATALOG_ENTRIES)
 
 
+def _valid_native_asset_families(value: object) -> bool:
+    def stable_id(item: object) -> bool:
+        return (
+            isinstance(item, str) and 0 < len(item) <= 64
+            and all(character in "abcdefghijklmnopqrstuvwxyz0123456789-_"
+                    for character in item)
+        )
+
+    def unique_stable_ids(items: object, limit: int) -> bool:
+        return (
+            isinstance(items, list) and len(items) <= limit
+            and all(stable_id(item) for item in items)
+            and len(set(items)) == len(items)
+        )
+
+    if not isinstance(value, list) or len(value) > 16:
+        return False
+    for family in value:
+        if not isinstance(family, dict) or set(family) != _NATIVE_ASSET_FAMILY_FIELDS:
+            return False
+        operations = family.get("operations")
+        limits = family.get("limits")
+        selectors = family.get("selector_routes")
+        identities = family.get("stable_nested_identity_kinds")
+        if (
+            not stable_id(family.get("family_id"))
+            or not isinstance(family.get("native_class"), str)
+            or not 0 < len(family["native_class"]) <= 512
+            or not family["native_class"].startswith("/")
+            or family.get("class_policy") not in {"exact", "exact_and_derived"}
+            or type(family.get("priority")) is not int
+            or abs(family["priority"]) > 1000
+            or not isinstance(operations, dict)
+            or set(operations) != {"inspect", "create", "edit"}
+            or any(type(operations[name]) is not bool for name in operations)
+            or family.get("creation_persistence") not in _PERSISTENCE_POLICIES
+            or family.get("editing_persistence") not in _PERSISTENCE_POLICIES
+            or not isinstance(limits, dict) or len(limits) > 32
+            or any(not stable_id(name) or type(limit) is not int or limit < 1
+                   for name, limit in limits.items())
+            or not unique_stable_ids(selectors, 64)
+            or not unique_stable_ids(identities, 32)
+        ):
+            return False
+    return True
+
+
 def _compose_companion_branches(
     companions_catalog: Mapping[str, AssetFamilyPublication],
     tools: list[dict[str, object]],
@@ -398,6 +454,7 @@ def _compose_companion_branches(
             known is None
             or companion.get("companion_api_version") != COMPANION_API_VERSION
             or companion.get("schema_revision") != known.schema_revision
+            or not _valid_native_asset_families(companion.get("asset_families"))
         ):
             continue
         native_contributions = companion.get("contributions")
@@ -511,6 +568,7 @@ def compose_companion_capabilities(native_capabilities: dict[str, object]) -> No
             and host_api_match
             and companion.get("schema_revision") == known.schema_revision
             and companion.get("companion_api_version") == COMPANION_API_VERSION
+            and _valid_native_asset_families(companion.get("asset_families"))
         )
         native_ready = companion.get("ready") is True
         companion["python_known"] = python_known

@@ -15,7 +15,7 @@ released_in: null
 
 **Depends on:**
 
-- [`companion-api-v2`](companion-api-v2.md)
+- [`companion-api-v2`](../completed/companion-api-v2.md)
 - [`commonui-assets-inspect`](../completed/commonui-assets-inspect.md)
 - [`gas-ability-blueprints-inspect`](../completed/gas-ability-blueprints-inspect.md)
 - [`gas-gameplay-effects-inspect`](../completed/gas-gameplay-effects-inspect.md)

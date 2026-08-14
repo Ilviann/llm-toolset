@@ -16,7 +16,7 @@ released_in: null
 
 - [`umg-mvvm-inspect`](umg-mvvm-inspect.md)
 - [`asset-authoring-kernel`](../completed/asset-authoring-kernel.md)
-- [`companion-api-v2`](companion-api-v2.md)
+- [`companion-api-v2`](../completed/companion-api-v2.md)
 
 ### ViewModel Blueprint authoring
 

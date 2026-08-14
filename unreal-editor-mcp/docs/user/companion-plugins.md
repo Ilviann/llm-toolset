@@ -4,13 +4,13 @@ Companion plugins are optional trusted native editor plugins that extend existin
 
 ## Install and enable
 
-Install the base plugin and companion as separate plugin directories, then enable both for the project. The companion descriptor must depend on `UnrealMCP`, declare exact `companion_api_version: 1`, identify its extension under `unreal_mcp_companion`, and set its module `LoadingPhase` to `None` so only the initialized base registry loads it. Restart Unreal Editor after any enablement or binary change; live enablement and hot replacement are intentionally unsupported.
+Install the base plugin and companion as separate plugin directories, then enable both for the project. The companion descriptor must depend on `UnrealMCP`, declare exact `companion_api_version: 2` and schema revision `2`, identify its extension under `unreal_mcp_companion`, and set its module `LoadingPhase` to `None` so only the initialized base registry loads it. Restart Unreal Editor after any enablement or binary change; live enablement and hot replacement are intentionally unsupported.
 
 Base and companion semantic versions are independent. Compatibility depends on exact agreement among the base descriptor/compiled API version and the companion descriptor/compiled API version, plus the supported extension-schema revision. Required Engine plugins and modules must already be installed, enabled, and loaded.
 
 ## Detect availability
 
-Call `capabilities` and inspect `companions`. `ready: true` means native registration succeeded. `effective_ready: true` additionally means the exact Python package knows that extension/schema. Unknown native extensions deliberately expose no model-facing operation schema.
+Call `capabilities` and inspect `companions`. `ready: true` means native registration succeeded. `asset_families` lists bounded API-v2 family identities, class policies, inspection/creation/editing support, selector routes, stable nested-identity kinds, persistence, and limits; an empty list is valid while a released companion remains on its existing typed contribution path. `effective_ready: true` additionally means the exact Python package knows that extension/schema and accepts the bounded family record shape. Unknown or malformed native extensions deliberately expose no model-facing operation schema.
 
 Readonly mode exposes admitted read contributions only. Start the Python server with explicit `--writable` access before mutation branches can appear in `tools/list` or dispatch. After lifecycle or capability changes the server emits `notifications/tools/list_changed`; clients should retrieve `tools/list` again.
 
@@ -22,7 +22,7 @@ With `UE58` set to the Unreal Engine 5.8 installation root, authors can package 
 python scripts/package_plugin.py --target-platforms Win64 --companion-fixture
 ```
 
-Package the released `UnrealMCPGAS` 0.2.1 Gameplay Ability and Gameplay Effect inspection companion with `--gas-companion`; it requires a compatible base package. Package the released `UnrealMCPCommonUI` 0.1.0 Widget Blueprint inspection companion with `--commonui-companion`. On Windows, the graphical deployment helper provides independent GAS and CommonUI companion checkboxes and installs every selected plugin with the compatible base package in one transaction.
+Package the released `UnrealMCPGAS` 0.2.2 Gameplay Ability and Gameplay Effect inspection companion with `--gas-companion`; it requires an API-v2-compatible base package. Package the released `UnrealMCPCommonUI` 0.1.1 Widget Blueprint inspection companion with `--commonui-companion`. On Windows, the graphical deployment helper provides independent GAS and CommonUI companion checkboxes and installs every selected plugin with the compatible base package in one transaction.
 
 Released companions use the same UAT `BuildPlugin` contract with their own descriptor, and install their compatible base package separately. The packaging wrapper restores and verifies source-owned descriptor fields that UAT may omit. If a companion is unavailable, check enablement and restart state, exact descriptor/compiled API/schema values, owning module identity and load phase, and required Engine plugin/module state. A companion must not expose runtime schemas, arbitrary property paths, listener settings, or credentials.
 

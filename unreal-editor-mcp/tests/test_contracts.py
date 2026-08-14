@@ -78,7 +78,7 @@ class ReleaseContractTests(unittest.TestCase):
         native = re.search(r'Version\[\].*TEXT\("([^"]+)"\)', header)
         self.assertIsNotNone(native)
         versions = {project["project"]["version"], plugin["VersionName"], native.group(1), unreal_editor_mcp.__version__}
-        self.assertEqual(versions, {"0.43.0"})
+        self.assertEqual(versions, {"0.44.0"})
 
     def test_companion_api_and_companion_versions_are_internally_consistent(self):
         base = json.loads((ROOT / "plugin/UnrealMCP/UnrealMCP.uplugin").read_text(encoding="utf-8"))
@@ -106,7 +106,7 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertEqual({base["companion_api_version"], fixture["companion_api_version"],
                           gas["companion_api_version"], commonui["companion_api_version"],
                           int(base_api.group(1)), int(fixture_api.group(1)),
-                          int(gas_api.group(1)), int(commonui_api.group(1))}, {1})
+                     int(gas_api.group(1)), int(commonui_api.group(1))}, {2})
         self.assertEqual(fixture["VersionName"], fixture_version.group(1))
         self.assertEqual(gas["VersionName"], gas_version.group(1))
         self.assertEqual(commonui["VersionName"], commonui_version.group(1))
@@ -117,9 +117,9 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertEqual(fixture["Modules"][0]["LoadingPhase"], "None")
         self.assertEqual(gas["Modules"][0]["LoadingPhase"], "None")
         self.assertEqual(commonui["Modules"][0]["LoadingPhase"], "None")
-        self.assertEqual(fixture["unreal_mcp_companion"]["schema_revision"], 1)
-        self.assertEqual(gas["unreal_mcp_companion"]["schema_revision"], 1)
-        self.assertEqual(commonui["unreal_mcp_companion"]["schema_revision"], 1)
+        self.assertEqual(fixture["unreal_mcp_companion"]["schema_revision"], 2)
+        self.assertEqual(gas["unreal_mcp_companion"]["schema_revision"], 2)
+        self.assertEqual(commonui["unreal_mcp_companion"]["schema_revision"], 2)
 
         registry = (
             ROOT
@@ -182,6 +182,9 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertIn("commonui_widget_blueprints_mutation", bridge)
 
     def test_public_companion_api_does_not_expose_bridge_or_credentials(self):
+        api = (
+            ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Public/UnrealMCPCompanionApi.h"
+        ).read_text(encoding="utf-8")
         public = "\n".join(
             path.read_text(encoding="utf-8")
             for path in [
@@ -193,6 +196,23 @@ class ReleaseContractTests(unittest.TestCase):
             self.assertNotIn(forbidden, public)
         for required in ["RegisterCompanion", "UnregisterCompanion", "GetCompanionApiVersion"]:
             self.assertIn(required, public)
+        self.assertNotIn("FJsonObject", api)
+        for required in [
+            "FUnrealMCPRecord", "FUnrealMCPCompanionAssetFamily",
+            "FUnrealMCPAssetFamilySelectorRoute", "StableNestedIdentityKinds",
+            "CreationPersistence", "EditingPersistence", "InspectionAdapter",
+            "CreationAdapter", "EditingAdapter", "SnapshotBuilder",
+        ]:
+            self.assertIn(required, api)
+        for companion in ["UnrealMCPGAS", "UnrealMCPCommonUI", "UnrealMCPTestCompanion"]:
+            root = ROOT / "plugin" / companion / "Source" / companion
+            source = "\n".join(
+                path.read_text(encoding="utf-8") for path in sorted(root.rglob("*.cpp"))
+            )
+            build = (root / f"{companion}.Build.cs").read_text(encoding="utf-8")
+            self.assertNotIn("FJsonObject", source)
+            self.assertNotIn('"Json"', build)
+            self.assertIn('"UnrealMCPAssetCore"', build)
 
     def test_only_released_commands_are_registered(self):
         names = [tool["name"] for tool in TOOLS]

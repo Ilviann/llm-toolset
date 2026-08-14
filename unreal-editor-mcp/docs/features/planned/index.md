@@ -1,6 +1,5 @@
 # Planned features
 
-- [`companion-api-v2` — Typed asset-family companion API](companion-api-v2.md).
 - [`companion-asset-adapters` — Unified companion asset integration](companion-asset-adapters.md).
 - [`asset-inspect-data` — Data Asset and Data Table inspection](asset-inspect-data.md).
 - [`asset-inspect-umg` — Base UMG Widget Blueprint inspection](asset-inspect-umg.md).

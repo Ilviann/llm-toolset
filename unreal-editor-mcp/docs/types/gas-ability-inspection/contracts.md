@@ -17,6 +17,6 @@ The companion hashes all bounded effective typed state into the base Blueprint s
 
 ## Capabilities and exclusions
 
-The family is published only when `UnrealMCPGAS`, Engine `GameplayAbilities`, all three required GAS modules, companion API v1, schema revision 1, and the matching Python catalog are ready. Native companion records publish semantic version, API/schema values, dependency state, stable limits, read support true, and mutation support false.
+The family is published only when `UnrealMCPGAS`, Engine `GameplayAbilities`, all three required GAS modules, companion API v2, schema revision 2, and the matching Python catalog are ready. Native companion records publish semantic version, API/schema values, dependency state, stable limits, read support true, and mutation support false.
 
 Only discovery and inspection are supported. Creation, compilation, saving, default/member/graph mutation, action catalog additions, runtime granting or activation, PIE execution, Attribute Set authoring, Gameplay Cue authoring, and arbitrary Ability Task or C++ generation are excluded.

@@ -7,11 +7,12 @@ namespace UnrealMCP
 inline constexpr int32 MaxAssetInspectPageSize = 100;
 inline constexpr int32 MaxAssetInspectSelectorBytes = 1024;
 inline constexpr int32 MaxAssetInspectCompleteGraphBytes = 64 * 1024;
-inline constexpr TCHAR Version[] = TEXT("0.43.0");
-inline constexpr int32 CompanionApiVersion = 1;
-inline constexpr int32 ExtensionSchemaRevision = 1;
+inline constexpr TCHAR Version[] = TEXT("0.44.0");
+inline constexpr int32 CompanionApiVersion = 2;
+inline constexpr int32 ExtensionSchemaRevision = 2;
 inline constexpr int32 MaxDiscoveredCompanions = 64;
 inline constexpr int32 MaxAcceptedCompanions = 16;
+inline constexpr int32 MaxCompanionAssetFamilies = 16;
 inline constexpr int32 MaxCompanionContributions = 32;
 inline constexpr int32 MaxCompanionCapabilityRecords = 128;
 inline constexpr int32 MaxCompanionDiagnostics = 64;

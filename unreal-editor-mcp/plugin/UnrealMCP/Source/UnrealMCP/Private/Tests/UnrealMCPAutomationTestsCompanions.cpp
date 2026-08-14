@@ -8,6 +8,7 @@
 #include "Kismet2/KismetEditorUtilities.h"
 #include "UnrealMCPBlueprintInspector.h"
 #include "UnrealMCPExtensionRegistry.h"
+#include "UnrealMCPVersion.h"
 
 namespace
 {
@@ -22,17 +23,17 @@ public:
         return true;
     }
     virtual bool SupportsTarget(const UObject& Target) const override { return true; }
-    virtual bool ValidateArguments(const FString&, const TSharedPtr<FJsonObject>&,
+    virtual bool ValidateArguments(const FString&, const TSharedPtr<FUnrealMCPRecord>&,
         FUnrealMCPExtensionError&) const override { return true; }
-    virtual bool Inspect(const UObject&, const FString&, const TSharedPtr<FJsonObject>&,
-        TSharedPtr<FJsonObject>& OutResult, FUnrealMCPExtensionError&) override
+    virtual bool Inspect(const UObject&, const FString&, const TSharedPtr<FUnrealMCPRecord>&,
+        TSharedPtr<FUnrealMCPRecord>& OutResult, FUnrealMCPExtensionError&) override
     {
-        OutResult = MakeShared<FJsonObject>();
-        const TSharedRef<FJsonObject> Record = MakeShared<FJsonObject>();
+        OutResult = MakeShared<FUnrealMCPRecord>();
+        const TSharedRef<FUnrealMCPRecord> Record = MakeShared<FUnrealMCPRecord>();
         Record->SetStringField(TEXT("section"), TEXT("synthetic_family"));
         OutResult->SetArrayField(TEXT("records"), {
-            MakeShared<FJsonValueObject>(Record)});
-        const TSharedRef<FJsonObject> Capabilities = MakeShared<FJsonObject>();
+            MakeShared<FUnrealMCPValueObject>(Record)});
+        const TSharedRef<FUnrealMCPRecord> Capabilities = MakeShared<FUnrealMCPRecord>();
         Capabilities->SetBoolField(TEXT("inspection"), true);
         Capabilities->SetBoolField(TEXT("mutation"), false);
         OutResult->SetObjectField(TEXT("family_capabilities"), Capabilities);
@@ -44,15 +45,87 @@ public:
         OutFingerprint = TEXT("synthetic");
         return true;
     }
-    virtual bool ApplyMutation(UObject&, const FString&, const TSharedPtr<FJsonObject>&,
-        TSharedPtr<FJsonObject>&, FUnrealMCPExtensionError&) override { return true; }
-    virtual bool ReadBack(const UObject&, const FString&, const TSharedPtr<FJsonObject>&,
-        TSharedPtr<FJsonObject>& OutResult, FUnrealMCPExtensionError&) const override
+    virtual bool ApplyMutation(UObject&, const FString&, const TSharedPtr<FUnrealMCPRecord>&,
+        TSharedPtr<FUnrealMCPRecord>&, FUnrealMCPExtensionError&) override { return true; }
+    virtual bool ReadBack(const UObject&, const FString&, const TSharedPtr<FUnrealMCPRecord>&,
+        TSharedPtr<FUnrealMCPRecord>& OutResult, FUnrealMCPExtensionError&) const override
     {
-        OutResult = MakeShared<FJsonObject>();
+        OutResult = MakeShared<FUnrealMCPRecord>();
         return true;
     }
 };
+
+class FSyntheticInspectionAdapter final : public IUnrealMCPAssetFamilyInspectionAdapter
+{
+public:
+    bool Inspect(
+        const FUnrealMCPAssetFamilyInspectionContext&,
+        FUnrealMCPAssetFamilyDocumentBuilder& Document,
+        FUnrealMCPAssetFamilySelectorRouter& Selectors,
+        FUnrealMCPAssetFamilySnapshotBuilder& Snapshot,
+        FUnrealMCPError& OutError) override
+    {
+        return Selectors.Register({TEXT("summary"), {TEXT("summary")}, false, false}, OutError)
+            && Document.Add({TEXT("summary.kind"), TEXT("string"),
+                MakeShared<FUnrealMCPValueString>(TEXT("synthetic"))}, OutError)
+            && Snapshot.Add(TEXT("summary"), TEXT("synthetic"), OutError);
+    }
+};
+
+class FSyntheticCreationAdapter final : public IUnrealMCPAssetFamilyCreationAdapter
+{
+public:
+    bool Create(
+        const FUnrealMCPAssetFamilyCreationContext&,
+        UObject*& OutAsset,
+        FUnrealMCPAssetFamilyDocumentBuilder&,
+        FUnrealMCPAssetFamilySnapshotBuilder&,
+        FUnrealMCPError&) override
+    {
+        OutAsset = nullptr;
+        return true;
+    }
+};
+
+class FSyntheticEditingAdapter final : public IUnrealMCPAssetFamilyEditingAdapter
+{
+public:
+    bool Edit(
+        const FUnrealMCPAssetFamilyEditContext&,
+        FUnrealMCPAssetFamilyDocumentBuilder&,
+        FUnrealMCPAssetFamilySnapshotBuilder&,
+        FUnrealMCPError&) override
+    {
+        return true;
+    }
+};
+
+class FSyntheticWrongOwner final : public IModuleInterface
+{
+};
+
+FUnrealMCPCompanionAssetFamily SyntheticAssetFamily()
+{
+    FUnrealMCPCompanionAssetFamily Family;
+    Family.FamilyId = TEXT("synthetic_v2");
+    Family.NativeClassPath = TEXT("/Script/CoreUObject.Object");
+    Family.ClassPolicy = EUnrealMCPAssetFamilyClassPolicy::ExactAndDerived;
+    Family.Priority = 25;
+    Family.Limits = {{TEXT("records"), 4}};
+    Family.Capabilities = {true, true, true};
+    Family.SelectorRoutes = {{TEXT("summary"), {TEXT("summary")}, false, false}};
+    Family.StableNestedIdentityKinds = {TEXT("entry")};
+    Family.CreationPersistence = EUnrealMCPExtensionPersistence::PackageSave;
+    Family.EditingPersistence = EUnrealMCPExtensionPersistence::PackageSave;
+    Family.InspectionAdapter = MakeShared<FSyntheticInspectionAdapter>();
+    Family.CreationAdapter = MakeShared<FSyntheticCreationAdapter>();
+    Family.EditingAdapter = MakeShared<FSyntheticEditingAdapter>();
+    Family.SnapshotBuilder = [](UObject* Asset)
+    {
+        return Asset != nullptr ? Asset->GetPathName() : FString();
+    };
+    return Family;
+}
 
 FUnrealMCPCompanionRegistration SyntheticRegistration(
     const FString& ExtensionId,
@@ -74,8 +147,8 @@ FUnrealMCPCompanionRegistration SyntheticRegistration(
     Registration.ExtensionId = ExtensionId;
     Registration.OwningModule = TEXT("UnrealMCP");
     Registration.SemanticVersion = TEXT("7.4.2");
-    Registration.CompanionApiVersion = 1;
-    Registration.ExtensionSchemaRevision = 1;
+    Registration.CompanionApiVersion = UnrealMCP::CompanionApiVersion;
+    Registration.ExtensionSchemaRevision = UnrealMCP::ExtensionSchemaRevision;
     Registration.Contributions = {Contribution};
     return Registration;
 }
@@ -104,8 +177,8 @@ FString RequestJson(const FString& Command, const FString& Operation, const FStr
     const bool bMutation = !Snapshot.IsEmpty();
     return FString::Printf(
         TEXT("{\"command\":\"%s\",\"arguments\":{\"extension_id\":\"unreal-mcp-test\","
-             "\"extension_schema_revision\":1,\"operation\":\"%s\",\"asset_path\":\"%s\"%s}}"),
-        *Command, *Operation, *AssetPath,
+             "\"extension_schema_revision\":%d,\"operation\":\"%s\",\"asset_path\":\"%s\"%s}}"),
+        *Command, UnrealMCP::ExtensionSchemaRevision, *Operation, *AssetPath,
         bMutation
             ? *FString::Printf(TEXT(",\"operation_id\":\"%s\",\"expected_snapshot\":\"%s\",\"value\":%d"),
                 *FGuid::NewGuid().ToString(EGuidFormats::Digits).ToLower(), *Snapshot, Value)
@@ -197,7 +270,8 @@ private:
         if (State->Step == 0)
         {
             Test.TestEqual(TEXT("native companion API version"),
-                static_cast<int32>((*Object)->GetNumberField(TEXT("companion_api_version"))), 1);
+                static_cast<int32>((*Object)->GetNumberField(TEXT("companion_api_version"))),
+                UnrealMCP::CompanionApiVersion);
             const TArray<TSharedPtr<FJsonValue>>* Companions = nullptr;
             Test.TestTrue(TEXT("capabilities publish the test companion"),
                 (*Object)->TryGetArrayField(TEXT("companions"), Companions)
@@ -281,9 +355,76 @@ bool FUnrealMCPCompanionAdmissionTest::RunTest(const FString& Parameters)
     {
         FUnrealMCPExtensionRegistry Registry;
         FUnrealMCPCompanionRegistration Registration = SyntheticRegistration(
+            TEXT("synthetic_v2_family"), TEXT("inspect_synthetic_v2_family"));
+        Registration.AssetFamilies = {SyntheticAssetFamily()};
+        Registry.AddDescriptorForTesting(Registration);
+        const FUnrealMCPRegistrationResult RegistrationResult =
+            Registry.Register(Registration, Owner);
+        TestTrue(TEXT("complete typed API-v2 family contract registers"),
+            RegistrationResult.bAccepted);
+        FUnrealMCPCompanionRegistration Collision = SyntheticRegistration(
+            TEXT("synthetic_v2_family_collision"),
+            TEXT("inspect_synthetic_v2_family_collision"),
+            TEXT("synthetic_v2_family_collision_target"));
+        Collision.AssetFamilies = {SyntheticAssetFamily()};
+        Registry.AddDescriptorForTesting(Collision);
+        TestEqual(TEXT("typed family collision fails closed"),
+            Registry.Register(Collision, Owner).Reason,
+            FString(TEXT("asset_family_collision")));
+        Registry.Freeze();
+        const TSharedPtr<FUnrealMCPRecord> Capabilities = Registry.BuildCapabilities();
+        const TSharedPtr<FUnrealMCPRecord> Companion =
+            Capabilities->GetArrayField(TEXT("companions"))[0]->AsObject();
+        TestEqual(TEXT("typed family capability is published"),
+            Companion->GetArrayField(TEXT("asset_families")).Num(), 1);
+        const TSharedPtr<FUnrealMCPRecord> Family =
+            Companion->GetArrayField(TEXT("asset_families"))[0]->AsObject();
+        TestEqual(TEXT("typed family identity is stable"),
+            Family->GetStringField(TEXT("family_id")), FString(TEXT("synthetic_v2")));
+        const TSharedPtr<FUnrealMCPRecord> Operations = Family->GetObjectField(TEXT("operations"));
+        TestTrue(TEXT("typed inspection seam is published"), Operations->GetBoolField(TEXT("inspect")));
+        TestTrue(TEXT("target-free creation seam is published"), Operations->GetBoolField(TEXT("create")));
+        TestTrue(TEXT("existing-target edit seam is published"), Operations->GetBoolField(TEXT("edit")));
+        TestEqual(TEXT("stable nested identities are bounded and published"),
+            Family->GetArrayField(TEXT("stable_nested_identity_kinds")).Num(), 1);
+        Registry.BeginShutdown();
+        FSyntheticWrongOwner WrongOwner;
+        Registry.Unregister(RegistrationResult.Handle, WrongOwner);
+        TestEqual(TEXT("wrong owner cannot unregister during shutdown"),
+            Registry.AcceptedCountForTesting(), 1);
+        Registry.Unregister(RegistrationResult.Handle, Owner);
+        TestEqual(TEXT("owning module can unregister during shutdown"),
+            Registry.AcceptedCountForTesting(), 0);
+    }
+    {
+        FUnrealMCPExtensionRegistry Registry;
+        FUnrealMCPCompanionRegistration Registration = SyntheticRegistration(
+            TEXT("synthetic_invalid_family"), TEXT("inspect_synthetic_invalid_family"));
+        FUnrealMCPCompanionAssetFamily Family = SyntheticAssetFamily();
+        Family.CreationAdapter.Reset();
+        Registration.AssetFamilies = {MoveTemp(Family)};
+        Registry.AddDescriptorForTesting(Registration);
+        TestEqual(TEXT("capability and adapter mismatch fails closed"),
+            Registry.Register(Registration, Owner).Reason, FString(TEXT("invalid_asset_family")));
+    }
+    {
+        FUnrealMCPExtensionRegistry Registry;
+        FUnrealMCPCompanionRegistration Registration = SyntheticRegistration(
+            TEXT("synthetic_invalid_policy"), TEXT("inspect_synthetic_invalid_policy"));
+        FUnrealMCPCompanionAssetFamily Family = SyntheticAssetFamily();
+        Family.ClassPolicy = static_cast<EUnrealMCPAssetFamilyClassPolicy>(255);
+        Registration.AssetFamilies = {MoveTemp(Family)};
+        Registry.AddDescriptorForTesting(Registration);
+        TestEqual(TEXT("unknown class policy fails closed"),
+            Registry.Register(Registration, Owner).Reason, FString(TEXT("invalid_asset_family")));
+    }
+
+    {
+        FUnrealMCPExtensionRegistry Registry;
+        FUnrealMCPCompanionRegistration Registration = SyntheticRegistration(
             TEXT("synthetic_api"), TEXT("inspect_synthetic_api"));
         Registry.AddDescriptorForTesting(Registration);
-        Registration.CompanionApiVersion = 2;
+        Registration.CompanionApiVersion = 1;
         TestEqual(TEXT("compiled API mismatch fails closed"),
             Registry.Register(Registration, Owner).Reason, FString(TEXT("compiled_api_mismatch")));
         TestEqual(TEXT("rejected API mismatch has no partial admission"),
@@ -294,7 +435,7 @@ bool FUnrealMCPCompanionAdmissionTest::RunTest(const FString& Parameters)
         FUnrealMCPCompanionRegistration Registration = SyntheticRegistration(
             TEXT("synthetic_schema"), TEXT("inspect_synthetic_schema"));
         Registry.AddDescriptorForTesting(Registration);
-        Registration.ExtensionSchemaRevision = 2;
+        Registration.ExtensionSchemaRevision = 1;
         TestEqual(TEXT("compiled schema mismatch fails closed"),
             Registry.Register(Registration, Owner).Reason,
             FString(TEXT("unsupported_schema_revision")));

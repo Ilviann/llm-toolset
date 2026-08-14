@@ -193,7 +193,7 @@ class WindowsDeploymentScriptTests(unittest.TestCase):
                     encoding="utf-8"
                 )
             )
-            self.assertEqual(descriptor["companion_api_version"], 1)
+            self.assertEqual(descriptor["companion_api_version"], 2)
             self.assertEqual(
                 descriptor["unreal_mcp_companion"]["owning_module"], "UnrealMCPGAS"
             )

@@ -1,8 +1,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "UnrealMCPAssetFamilyRegistry.h"
+#include "UnrealMCPWireTypes.h"
 
-class FJsonObject;
 class UObject;
 
 enum class EUnrealMCPExtensionCategory : uint8
@@ -29,10 +30,15 @@ struct FUnrealMCPExtensionError
 {
     FString Code;
     FString Message;
-    TSharedPtr<FJsonObject> Details;
+    TSharedPtr<FUnrealMCPRecord> Details = MakeShared<FUnrealMCPRecord>();
     bool bRetryable = false;
 };
 
+/**
+ * Typed operation seam retained for shipped companion behavior while companion
+ * asset families are moved onto the common adapters. JSON and transport
+ * encoding remain exclusively owned by the base plugin.
+ */
 class UNREALMCP_API IUnrealMCPExtensionHandler
 {
 public:
@@ -42,13 +48,13 @@ public:
     virtual bool SupportsTarget(const UObject& Target) const = 0;
     virtual bool ValidateArguments(
         const FString& Operation,
-        const TSharedPtr<FJsonObject>& Arguments,
+        const TSharedPtr<FUnrealMCPRecord>& Arguments,
         FUnrealMCPExtensionError& OutError) const = 0;
     virtual bool Inspect(
         const UObject& Target,
         const FString& Operation,
-        const TSharedPtr<FJsonObject>& Arguments,
-        TSharedPtr<FJsonObject>& OutResult,
+        const TSharedPtr<FUnrealMCPRecord>& Arguments,
+        TSharedPtr<FUnrealMCPRecord>& OutResult,
         FUnrealMCPExtensionError& OutError) = 0;
     virtual bool AppendFingerprint(
         const UObject& Target,
@@ -58,15 +64,41 @@ public:
     virtual bool ApplyMutation(
         UObject& Target,
         const FString& Operation,
-        const TSharedPtr<FJsonObject>& Arguments,
-        TSharedPtr<FJsonObject>& OutChange,
+        const TSharedPtr<FUnrealMCPRecord>& Arguments,
+        TSharedPtr<FUnrealMCPRecord>& OutChange,
         FUnrealMCPExtensionError& OutError) = 0;
     virtual bool ReadBack(
         const UObject& Target,
         const FString& Operation,
-        const TSharedPtr<FJsonObject>& Arguments,
-        TSharedPtr<FJsonObject>& OutResult,
+        const TSharedPtr<FUnrealMCPRecord>& Arguments,
+        TSharedPtr<FUnrealMCPRecord>& OutResult,
         FUnrealMCPExtensionError& OutError) const = 0;
+};
+
+/**
+ * Complete API-v2 family contract. The base validates and freezes these
+ * records, then owns exact target resolution, selector dispatch, transactions,
+ * persistence, postcondition read-back, capability composition, and encoding.
+ * Companions own only domain semantics behind the typed common adapters.
+ */
+struct FUnrealMCPCompanionAssetFamily
+{
+    FString FamilyId;
+    FString NativeClassPath;
+    EUnrealMCPAssetFamilyClassPolicy ClassPolicy = EUnrealMCPAssetFamilyClassPolicy::Exact;
+    int32 Priority = 0;
+    TArray<FName> RequiredModules;
+    FUnrealMCPAssetFamilyLimits Bounds;
+    TArray<FUnrealMCPAssetFamilyLimit> Limits;
+    FUnrealMCPAssetFamilyCapabilities Capabilities;
+    TArray<FUnrealMCPAssetFamilySelectorRoute> SelectorRoutes;
+    TArray<FString> StableNestedIdentityKinds;
+    EUnrealMCPExtensionPersistence CreationPersistence = EUnrealMCPExtensionPersistence::None;
+    EUnrealMCPExtensionPersistence EditingPersistence = EUnrealMCPExtensionPersistence::None;
+    TSharedPtr<IUnrealMCPAssetFamilyInspectionAdapter> InspectionAdapter;
+    TSharedPtr<IUnrealMCPAssetFamilyCreationAdapter> CreationAdapter;
+    TSharedPtr<IUnrealMCPAssetFamilyEditingAdapter> EditingAdapter;
+    TFunction<FString(UObject*)> SnapshotBuilder;
 };
 
 struct FUnrealMCPExtensionContribution
@@ -96,6 +128,7 @@ struct FUnrealMCPCompanionRegistration
     int32 ExtensionSchemaRevision = 0;
     TArray<FString> RequiredEnginePlugins;
     TArray<FString> RequiredEngineModules;
+    TArray<FUnrealMCPCompanionAssetFamily> AssetFamilies;
     TArray<FUnrealMCPExtensionContribution> Contributions;
 };
 

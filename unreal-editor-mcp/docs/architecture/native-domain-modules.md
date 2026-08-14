@@ -5,7 +5,7 @@
 The base plugin is one external plugin with five editor modules:
 
 - `UnrealMCP` is the host and composition root. It owns transport,
-  authentication, lifecycle, companion API v1, extension discovery, and final
+  authentication, lifecycle, companion API v2, extension discovery, and final
   command-catalog freeze.
 - `UnrealMCPAssetCore` owns neutral wire records, JSON codecs, the asset-family
   registry, the authoring kernel, the operation ledger, and neutral asset
@@ -42,7 +42,7 @@ for its companion compatibility boundary, and dynamic UMG/Content dependencies.
   cannot register modules, native commands, or model-facing schemas.
 - Adding a leaf-domain service or test does not require host or unrelated-domain
   source changes. A new domain module is added only with its first real adapter.
-- The external plugin name, companion API v1, Python tool catalog, and installed
+- The external plugin name, companion API v2, Python tool catalog, and installed
   base-plugin directory remain unchanged.
 
 ## Verification

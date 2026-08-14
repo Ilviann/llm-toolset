@@ -7,11 +7,11 @@ public class UnrealMCPCommonUI : ModuleRules
         PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
         PublicDependencyModuleNames.AddRange(new[]
         {
-            "Core", "CoreUObject", "Engine", "UnrealMCP"
+            "Core", "CoreUObject", "Engine", "UnrealMCP", "UnrealMCPAssetCore"
         });
         PrivateDependencyModuleNames.AddRange(new[]
         {
-            "CommonInput", "CommonUI", "Json", "Kismet", "UMG", "UMGEditor", "UnrealEd"
+            "CommonInput", "CommonUI", "Kismet", "UMG", "UMGEditor", "UnrealEd"
         });
     }
 }

@@ -4,7 +4,7 @@
 
 #include "CommonActivatableWidget.h"
 #include "CommonUserWidget.h"
-#include "Dom/JsonObject.h"
+#include "UnrealMCPWireTypes.h"
 #include "Misc/SecureHash.h"
 #include "Modules/ModuleManager.h"
 #include "UObject/UnrealType.h"
@@ -32,7 +32,7 @@ void SetError(FUnrealMCPExtensionError& OutError, const TCHAR* Code, const TCHAR
 {
     OutError.Code = Code;
     OutError.Message = Message;
-    OutError.Details = MakeShared<FJsonObject>();
+    OutError.Details = MakeShared<FUnrealMCPRecord>();
 }
 
 FString StableIdentity(const FString& Seed)
@@ -60,25 +60,25 @@ FString PropertySource(const UCommonUserWidget& Widget, const FProperty* Propert
         ? TEXT("inherited") : TEXT("local");
 }
 
-TSharedRef<FJsonObject> Boolean(bool Value, const FString& Source)
+TSharedRef<FUnrealMCPRecord> Boolean(bool Value, const FString& Source)
 {
-    const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Result = MakeShared<FUnrealMCPRecord>();
     Result->SetBoolField(TEXT("value"), Value);
     Result->SetStringField(TEXT("source"), Source);
     return Result;
 }
 
-TSharedRef<FJsonObject> Scalar(const FString& Value, const FString& Source)
+TSharedRef<FUnrealMCPRecord> Scalar(const FString& Value, const FString& Source)
 {
-    const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Result = MakeShared<FUnrealMCPRecord>();
     Result->SetStringField(TEXT("value"), Value);
     Result->SetStringField(TEXT("source"), Source);
     return Result;
 }
 
-TSharedRef<FJsonObject> Integer(int32 Value, const FString& Source)
+TSharedRef<FUnrealMCPRecord> Integer(int32 Value, const FString& Source)
 {
-    const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Result = MakeShared<FUnrealMCPRecord>();
     Result->SetNumberField(TEXT("value"), Value);
     Result->SetStringField(TEXT("source"), Source);
     return Result;
@@ -87,7 +87,7 @@ TSharedRef<FJsonObject> Integer(int32 Value, const FString& Source)
 bool ExactBoolean(
     const UCommonUserWidget& Widget,
     const TCHAR* Name,
-    TSharedRef<FJsonObject>& OutValue)
+    TSharedRef<FUnrealMCPRecord>& OutValue)
 {
     const FBoolProperty* Property = FindFProperty<FBoolProperty>(Widget.GetClass(), Name);
     if (Property == nullptr)
@@ -102,7 +102,7 @@ bool ExactBoolean(
 bool ExactInteger(
     const UCommonUserWidget& Widget,
     const TCHAR* Name,
-    TSharedRef<FJsonObject>& OutValue)
+    TSharedRef<FUnrealMCPRecord>& OutValue)
 {
     const FIntProperty* Property = FindFProperty<FIntProperty>(Widget.GetClass(), Name);
     if (Property == nullptr)
@@ -117,7 +117,7 @@ bool ExactInteger(
 bool ExactText(
     const UCommonUserWidget& Widget,
     const TCHAR* Name,
-    TSharedRef<FJsonObject>& OutValue)
+    TSharedRef<FUnrealMCPRecord>& OutValue)
 {
     const FTextProperty* Property = FindFProperty<FTextProperty>(Widget.GetClass(), Name);
     if (Property == nullptr)
@@ -132,7 +132,7 @@ bool ExactText(
 bool ExactExported(
     const UCommonUserWidget& Widget,
     const TCHAR* Name,
-    TSharedRef<FJsonObject>& OutValue)
+    TSharedRef<FUnrealMCPRecord>& OutValue)
 {
     const FProperty* Property = ExactProperty(Widget, Name);
     if (Property == nullptr)
@@ -146,12 +146,12 @@ bool ExactExported(
     return true;
 }
 
-TSharedRef<FJsonObject> EmptyReference(
+TSharedRef<FUnrealMCPRecord> EmptyReference(
     const UCommonUserWidget& Widget,
     const FProperty* Property,
     const TCHAR* PropertyName)
 {
-    const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Result = MakeShared<FUnrealMCPRecord>();
     Result->SetStringField(TEXT("reference_id"), StableIdentity(FString(PropertyName) + TEXT("|")));
     Result->SetStringField(TEXT("object_path"), FString());
     Result->SetStringField(TEXT("class_path"), FString());
@@ -163,7 +163,7 @@ TSharedRef<FJsonObject> EmptyReference(
 bool HardReference(
     const UCommonUserWidget& Widget,
     const TCHAR* Name,
-    TSharedRef<FJsonObject>& OutValue)
+    TSharedRef<FUnrealMCPRecord>& OutValue)
 {
     const FObjectPropertyBase* Property = FindFProperty<FObjectPropertyBase>(Widget.GetClass(), Name);
     if (Property == nullptr)
@@ -186,7 +186,7 @@ bool HardReference(
 bool SoftReference(
     const UCommonUserWidget& Widget,
     const TCHAR* Name,
-    TSharedRef<FJsonObject>& OutValue)
+    TSharedRef<FUnrealMCPRecord>& OutValue)
 {
     const FSoftObjectProperty* Property = FindFProperty<FSoftObjectProperty>(Widget.GetClass(), Name);
     if (Property == nullptr)
@@ -206,12 +206,12 @@ bool SoftReference(
 
 bool AddBoolean(
     const UCommonUserWidget& Widget,
-    const TSharedRef<FJsonObject>& Record,
+    const TSharedRef<FUnrealMCPRecord>& Record,
     const TCHAR* Field,
     const TCHAR* Property,
     FUnrealMCPExtensionError& OutError)
 {
-    TSharedRef<FJsonObject> Value = MakeShared<FJsonObject>();
+    TSharedRef<FUnrealMCPRecord> Value = MakeShared<FUnrealMCPRecord>();
     if (!ExactBoolean(Widget, Property, Value))
     {
         SetError(OutError, TEXT("extension_contract_violation"),
@@ -224,11 +224,11 @@ bool AddBoolean(
 
 bool BuildPayload(
     const UCommonUserWidget& Widget,
-    TArray<TSharedPtr<FJsonValue>>& OutRecords,
+    TArray<TSharedPtr<FUnrealMCPValue>>& OutRecords,
     FString& OutFingerprint,
     FUnrealMCPExtensionError& OutError)
 {
-    const TSharedRef<FJsonObject> WidgetRecord = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> WidgetRecord = MakeShared<FUnrealMCPRecord>();
     WidgetRecord->SetStringField(TEXT("section"), WidgetSection);
     if (!AddBoolean(Widget, WidgetRecord, TEXT("display_in_action_bar"),
             TEXT("bDisplayInActionBar"), OutError)
@@ -237,13 +237,13 @@ bool BuildPayload(
     {
         return false;
     }
-    OutRecords.Add(MakeShared<FJsonValueObject>(WidgetRecord));
+    OutRecords.Add(MakeShared<FUnrealMCPValueObject>(WidgetRecord));
 
     const UCommonActivatableWidget* Activatable = Cast<UCommonActivatableWidget>(&Widget);
-    const TSharedRef<FJsonObject> Activation = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> Activation = MakeShared<FUnrealMCPRecord>();
     Activation->SetStringField(TEXT("section"), ActivationSection);
     Activation->SetBoolField(TEXT("supported"), Activatable != nullptr);
-    const TSharedRef<FJsonObject> References = MakeShared<FJsonObject>();
+    const TSharedRef<FUnrealMCPRecord> References = MakeShared<FUnrealMCPRecord>();
     References->SetStringField(TEXT("section"), ReferenceSection);
     References->SetBoolField(TEXT("supported"), Activatable != nullptr);
     if (Activatable == nullptr)
@@ -269,7 +269,7 @@ bool BuildPayload(
                 return false;
             }
         }
-        TSharedRef<FJsonObject> Value = MakeShared<FJsonObject>();
+        TSharedRef<FUnrealMCPRecord> Value = MakeShared<FUnrealMCPRecord>();
         if (!ExactText(Widget, TEXT("OverrideBackActionDisplayName"), Value))
         {
             SetError(OutError, TEXT("extension_contract_violation"),
@@ -314,8 +314,8 @@ bool BuildPayload(
         }
         References->SetObjectField(TEXT("action_domain_override"), Value);
     }
-    OutRecords.Add(MakeShared<FJsonValueObject>(Activation));
-    OutRecords.Add(MakeShared<FJsonValueObject>(References));
+    OutRecords.Add(MakeShared<FUnrealMCPValueObject>(Activation));
+    OutRecords.Add(MakeShared<FUnrealMCPValueObject>(References));
 
     TArray<FString> Fingerprint;
     for (const TCHAR* PropertyName : {
@@ -349,16 +349,16 @@ bool BuildPayload(
 }
 
 bool SectionRequested(
-    const TSharedPtr<FJsonObject>& Arguments,
+    const TSharedPtr<FUnrealMCPRecord>& Arguments,
     const FString& Section)
 {
-    const TArray<TSharedPtr<FJsonValue>>* Sections = nullptr;
+    const TArray<TSharedPtr<FUnrealMCPValue>>* Sections = nullptr;
     if (!Arguments.IsValid() || !Arguments->TryGetArrayField(TEXT("sections"), Sections)
         || Sections == nullptr)
     {
         return true;
     }
-    return Sections->ContainsByPredicate([&Section](const TSharedPtr<FJsonValue>& Value)
+    return Sections->ContainsByPredicate([&Section](const TSharedPtr<FUnrealMCPValue>& Value)
     {
         FString Requested;
         return Value.IsValid() && Value->TryGetString(Requested) && Requested == Section;
@@ -382,7 +382,7 @@ public:
 
     bool ValidateArguments(
         const FString& Operation,
-        const TSharedPtr<FJsonObject>& Arguments,
+        const TSharedPtr<FUnrealMCPRecord>& Arguments,
         FUnrealMCPExtensionError& OutError) const override
     {
         FString Mode;
@@ -399,12 +399,12 @@ public:
     bool Inspect(
         const UObject& Target,
         const FString& Operation,
-        const TSharedPtr<FJsonObject>& Arguments,
-        TSharedPtr<FJsonObject>& OutResult,
+        const TSharedPtr<FUnrealMCPRecord>& Arguments,
+        TSharedPtr<FUnrealMCPRecord>& OutResult,
         FUnrealMCPExtensionError& OutError) override
     {
         const UCommonUserWidget* Widget = Cast<UCommonUserWidget>(&Target);
-        TArray<TSharedPtr<FJsonValue>> Records;
+        TArray<TSharedPtr<FUnrealMCPValue>> Records;
         FString Fingerprint;
         if (Widget == nullptr || !BuildPayload(*Widget, Records, Fingerprint, OutError))
         {
@@ -415,16 +415,16 @@ public:
             }
             return false;
         }
-        Records.RemoveAll([&Arguments](const TSharedPtr<FJsonValue>& Value)
+        Records.RemoveAll([&Arguments](const TSharedPtr<FUnrealMCPValue>& Value)
         {
-            const TSharedPtr<FJsonObject>* Object = nullptr;
+            const TSharedPtr<FUnrealMCPRecord>* Object = nullptr;
             FString Section;
             return !Value.IsValid() || !Value->TryGetObject(Object) || Object == nullptr
                 || !Object->IsValid() || !(*Object)->TryGetStringField(TEXT("section"), Section)
                 || !SectionRequested(Arguments, Section);
         });
 
-        const TSharedRef<FJsonObject> Capabilities = MakeShared<FJsonObject>();
+        const TSharedRef<FUnrealMCPRecord> Capabilities = MakeShared<FUnrealMCPRecord>();
         Capabilities->SetBoolField(TEXT("inspection"), true);
         Capabilities->SetBoolField(TEXT("mutation"), false);
         Capabilities->SetNumberField(
@@ -432,10 +432,10 @@ public:
         Capabilities->SetNumberField(
             TEXT("max_properties"), UnrealMCPCommonUI::MaxInspectedProperties);
         Capabilities->SetArrayField(TEXT("typed_sections"), {
-            MakeShared<FJsonValueString>(WidgetSection),
-            MakeShared<FJsonValueString>(ActivationSection),
-            MakeShared<FJsonValueString>(ReferenceSection)});
-        OutResult = MakeShared<FJsonObject>();
+            MakeShared<FUnrealMCPValueString>(WidgetSection),
+            MakeShared<FUnrealMCPValueString>(ActivationSection),
+            MakeShared<FUnrealMCPValueString>(ReferenceSection)});
+        OutResult = MakeShared<FUnrealMCPRecord>();
         OutResult->SetArrayField(TEXT("records"), Records);
         OutResult->SetObjectField(TEXT("family_capabilities"), Capabilities);
         return true;
@@ -448,13 +448,13 @@ public:
         FUnrealMCPExtensionError& OutError) const override
     {
         const UCommonUserWidget* Widget = Cast<UCommonUserWidget>(&Target);
-        TArray<TSharedPtr<FJsonValue>> Records;
+        TArray<TSharedPtr<FUnrealMCPValue>> Records;
         return Widget != nullptr && BuildPayload(*Widget, Records, OutFingerprint, OutError);
     }
 
     bool ApplyMutation(
-        UObject&, const FString&, const TSharedPtr<FJsonObject>&,
-        TSharedPtr<FJsonObject>&, FUnrealMCPExtensionError& OutError) override
+        UObject&, const FString&, const TSharedPtr<FUnrealMCPRecord>&,
+        TSharedPtr<FUnrealMCPRecord>&, FUnrealMCPExtensionError& OutError) override
     {
         SetError(OutError, TEXT("extension_unavailable"),
             TEXT("The CommonUI companion is inspection-only"));
@@ -462,8 +462,8 @@ public:
     }
 
     bool ReadBack(
-        const UObject&, const FString&, const TSharedPtr<FJsonObject>&,
-        TSharedPtr<FJsonObject>&, FUnrealMCPExtensionError& OutError) const override
+        const UObject&, const FString&, const TSharedPtr<FUnrealMCPRecord>&,
+        TSharedPtr<FUnrealMCPRecord>&, FUnrealMCPExtensionError& OutError) const override
     {
         SetError(OutError, TEXT("extension_unavailable"),
             TEXT("The CommonUI companion exposes no mutation read-back"));
@@ -513,12 +513,12 @@ bool FUnrealMCPCommonUIWidgetInspectionTest::RunTest(const FString& Parameters)
     }
 
     const bool bDirtyBefore = Package->IsDirty();
-    TArray<TSharedPtr<FJsonValue>> FirstRecords;
+    TArray<TSharedPtr<FUnrealMCPValue>> FirstRecords;
     FString FirstFingerprint;
     FUnrealMCPExtensionError Error;
     TestTrue(TEXT("Typed CommonUI payload builds"),
         BuildPayload(*Defaults, FirstRecords, FirstFingerprint, Error));
-    TArray<TSharedPtr<FJsonValue>> SecondRecords;
+    TArray<TSharedPtr<FUnrealMCPValue>> SecondRecords;
     FString SecondFingerprint;
     TestTrue(TEXT("Repeated CommonUI inspection succeeds"),
         BuildPayload(*Defaults, SecondRecords, SecondFingerprint, Error));
@@ -535,14 +535,14 @@ bool FUnrealMCPCommonUIWidgetInspectionTest::RunTest(const FString& Parameters)
     TestNotNull(TEXT("non-activatable CommonUI Widget defaults resolve"), BaseDefaults);
     if (BaseDefaults != nullptr)
     {
-        TArray<TSharedPtr<FJsonValue>> BaseRecords;
+        TArray<TSharedPtr<FUnrealMCPValue>> BaseRecords;
         FString BaseFingerprint;
         TestTrue(TEXT("non-activatable CommonUI payload builds"),
             BuildPayload(*BaseDefaults, BaseRecords, BaseFingerprint, Error));
-        const TSharedPtr<FJsonObject>* ActivationRecord = nullptr;
-        for (const TSharedPtr<FJsonValue>& Record : BaseRecords)
+        const TSharedPtr<FUnrealMCPRecord>* ActivationRecord = nullptr;
+        for (const TSharedPtr<FUnrealMCPValue>& Record : BaseRecords)
         {
-            const TSharedPtr<FJsonObject>* Object = nullptr;
+            const TSharedPtr<FUnrealMCPRecord>* Object = nullptr;
             FString Section;
             if (Record.IsValid() && Record->TryGetObject(Object) && Object != nullptr
                 && (*Object)->TryGetStringField(TEXT("section"), Section)

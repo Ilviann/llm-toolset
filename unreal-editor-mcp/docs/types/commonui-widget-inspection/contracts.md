@@ -14,7 +14,7 @@ Every exposed scalar reports `value` and `source`. For non-activatable descendan
 
 ## Capabilities, bounds, and exclusions
 
-The contribution is ready only when `UnrealMCPCommonUI`, Engine `CommonUI`, loaded `CommonUI` and `CommonInput` modules, companion API v1, schema revision 1, and the matching Python catalog agree. Native capabilities publish semantic version 0.1.0, `commonui_widget_blueprints_inspection: true`, `commonui_widget_blueprints_mutation: false`, three maximum records, and 17 exact inspected properties.
+The contribution is ready only when `UnrealMCPCommonUI`, Engine `CommonUI`, loaded `CommonUI` and `CommonInput` modules, companion API v2, schema revision 2, and the matching Python catalog agree. Native capabilities publish semantic version 0.1.1, `commonui_widget_blueprints_inspection: true`, `commonui_widget_blueprints_mutation: false`, three maximum records, and 17 exact inspected properties.
 
 The base inspector still enforces its 4,096-record structural ceiling, 100-record page ceiling, 32 retained cursors, 30-second cursor lifetime, five-second command deadline, and 256-KiB response ceiling. The companion adds no discovery scan or retained state and traverses no dependency graph.
 

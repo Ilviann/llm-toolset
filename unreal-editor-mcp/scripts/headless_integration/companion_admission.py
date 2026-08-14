@@ -5,12 +5,14 @@ from __future__ import annotations
 import uuid
 
 from unreal_editor_mcp.bridge import UnrealBridge
+from unreal_editor_mcp.asset_family_catalog import COMPANION_API_VERSION
 from unreal_editor_mcp.errors import BridgeError, ErrorCode
 
 
 def verify_companion_admission(capabilities: dict[str, object]) -> None:
     companions = capabilities.get("companions")
-    if capabilities.get("companion_api_version") != 1 or not isinstance(companions, list):
+    if capabilities.get("companion_api_version") != COMPANION_API_VERSION \
+            or not isinstance(companions, list):
         raise AssertionError(f"companion capabilities are missing: {capabilities!r}")
     fixture = next(
         (item for item in companions if isinstance(item, dict)
@@ -90,4 +92,3 @@ def verify_companion_admission(capabilities: dict[str, object]) -> None:
                 "action_catalog", "graph_edit",
             )):
         raise AssertionError(f"Gameplay Effect family is not inspection-only: {effect_family!r}")
-

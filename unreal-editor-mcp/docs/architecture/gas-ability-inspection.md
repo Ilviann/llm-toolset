@@ -2,7 +2,7 @@
 
 ## Ownership and boundaries
 
-`plugin/UnrealMCPGAS/` owns every direct dependency on the Engine Gameplay Ability System plugin and the `GameplayAbilities`, `GameplayTags`, and `GameplayTasks` modules. Its editor module registers one read-only `gameplay_ability` Blueprint asset-family contribution through companion API v1. The base `UnrealMCP` plugin remains GAS-free and owns discovery, authentication, Game-thread dispatch, Blueprint structure collection, pagination, snapshots, limits, and capability composition.
+`plugin/UnrealMCPGAS/` owns every direct dependency on the Engine Gameplay Ability System plugin and the `GameplayAbilities`, `GameplayTags`, and `GameplayTasks` modules. Its editor module registers one read-only `gameplay_ability` Blueprint asset-family contribution through JSON-neutral companion API v2. The base `UnrealMCP` plugin remains GAS-free and owns discovery, authentication, Game-thread dispatch, Blueprint structure collection, pagination, snapshots, limits, and capability composition.
 
 The companion reads only `UGameplayAbility` class default objects reached from verified Gameplay Ability Blueprints. It uses public policy getters plus an exact allowlist of typed GAS properties; it does not accept property paths or unrestricted reflection. In 0.36.0 the handler is registered but has no model-facing read route and is not part of `asset-inspect-core`.
 
@@ -18,7 +18,7 @@ The companion fingerprint covers its full bounded typed state even when paged ou
 
 The companion retains direct build dependencies on `GameplayAbilities`, `GameplayTags`, and `GameplayTasks`. Native admission uses the enabled Gameplay Abilities plugin plus its owning `GameplayAbilities` module as the live dependency gate because Unreal does not consistently register the linked tag and task runtime modules as independently loaded.
 
-The companion is independently versioned at 0.2.1, requires global `companion_api_version: 1`, and can be packaged separately with `scripts/package_plugin.py --gas-companion`. Its 0.2.0 feature line added the inspection-only `gameplay_effect` family; 0.2.1 changes only startup ordering and descriptor preservation. The Windows deployment helper can build and install this companion with a compatible base package.
+The companion is independently versioned at 0.2.2, requires global `companion_api_version: 2` and schema revision 2, and can be packaged separately with `scripts/package_plugin.py --gas-companion`. Version 0.2.2 is the API-v2 compatibility migration; it adds no GAS authoring capability. The Windows deployment helper can build and install this companion with a compatible base package.
 
 ## Verification
 

@@ -51,7 +51,7 @@ def manage_disposable_level(
             "asset_references", {"asset_path": stale_path, "page_size": 100})
         if stale_references.get("records"):
             raise AssertionError(f"stale disposable map is referenced: {stale_references!r}")
-        for _ in range(20):
+        for _ in range(300):
             try:
                 call_when_ready("asset_delete", {
                     "operation_id": uuid.uuid4().hex,
@@ -60,11 +60,14 @@ def manage_disposable_level(
                 })
                 break
             except BridgeError as error:
-                if error.code is not ErrorCode.BUSY:
+                if error.code not in {
+                    ErrorCode.BUSY,
+                    ErrorCode.REFERENCE_PREFLIGHT_INCOMPLETE,
+                }:
                     raise
                 time.sleep(0.1)
         else:
-            raise AssertionError("stale disposable map deletion remained busy")
+            raise AssertionError("stale disposable map deletion did not become ready")
     operation_id = uuid.uuid4().hex
     create_arguments = {
         "operation_id": operation_id,
@@ -116,7 +119,7 @@ def manage_disposable_level(
     references = call_when_ready("asset_references", {"asset_path": map_path, "page_size": 100})
     if references.get("records"):
         raise AssertionError(f"disposable map unexpectedly has external references: {references!r}")
-    for _ in range(20):
+    for _ in range(300):
         try:
             deleted = bridge.call("asset_delete", {
                 "operation_id": uuid.uuid4().hex,
@@ -125,11 +128,15 @@ def manage_disposable_level(
             })
             break
         except BridgeError as error:
-            if error.code not in {ErrorCode.BUSY, ErrorCode.EDITOR_UNAVAILABLE}:
+            if error.code not in {
+                ErrorCode.BUSY,
+                ErrorCode.EDITOR_UNAVAILABLE,
+                ErrorCode.REFERENCE_PREFLIGHT_INCOMPLETE,
+            }:
                 raise
             time.sleep(0.1)
     else:
-        raise AssertionError("map deletion remained busy after bounded retry")
+        raise AssertionError("map deletion did not become ready after bounded retry")
     if deleted.get("deleted") is not True or deleted.get("map_deletion") is not True \
             or deleted.get("package_closure_complete") is not True:
         raise AssertionError(f"map closure deletion was not verified: {deleted!r}")
