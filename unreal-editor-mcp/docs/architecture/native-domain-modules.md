@@ -12,7 +12,7 @@ The base plugin is one external plugin with five editor modules:
   inspection.
 - `UnrealMCPBlueprint` owns Blueprint inspection, policy, graph authoring,
   mutation, gameplay-framework assignment, and shared reflected value codecs.
-- `UnrealMCPUMG` owns Widget tree, layout, style, and binding authoring.
+- `UnrealMCPUMG` owns Widget tree, layout, style, and binding authoring plus the base-UMG `asset_inspect` semantic overlay.
 - `UnrealMCPContent` owns asset references/deletion, Levels, user-defined
   structs, and Data Tables.
 

@@ -60,7 +60,8 @@ def author_widget_scenario(bridge: UnrealBridge) -> dict[str, str]:
     })
     if saved.get("saved") is not True:
         raise AssertionError(f"Widget Blueprint save failed: {saved!r}")
-    return {"asset_path": ASSET_PATH, "snapshot_id": saved["snapshot_id"]}
+    inspected = bridge.call("asset_inspect", {"asset_path": ASSET_PATH})
+    return {"asset_path": ASSET_PATH, "snapshot_id": inspected["snapshot_id"]}
 
 
 def verify_restarted_widgets(bridge: UnrealBridge, scenario: dict[str, str]) -> None:
@@ -72,7 +73,8 @@ def verify_restarted_widgets(bridge: UnrealBridge, scenario: dict[str, str]) -> 
             arguments={"asset_path": scenario["asset_path"]},
             expected_fields=(
                 (("asset", "path"), scenario["asset_path"]),
-                (("asset", "type"), "unsupported_blueprint"),
+                (("asset", "type"), "widget_blueprint"),
+                (("widget_tree", "widget_count"), 2),
             ),
         ),
         scenario["snapshot_id"],

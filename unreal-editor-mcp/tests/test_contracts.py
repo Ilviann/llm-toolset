@@ -78,7 +78,7 @@ class ReleaseContractTests(unittest.TestCase):
         native = re.search(r'Version\[\].*TEXT\("([^"]+)"\)', header)
         self.assertIsNotNone(native)
         versions = {project["project"]["version"], plugin["VersionName"], native.group(1), unreal_editor_mcp.__version__}
-        self.assertEqual(versions, {"0.47.0"})
+        self.assertEqual(versions, {"0.48.0"})
 
     def test_companion_api_and_companion_versions_are_internally_consistent(self):
         base = json.loads((ROOT / "plugin/UnrealMCP/UnrealMCP.uplugin").read_text(encoding="utf-8"))
@@ -385,6 +385,36 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertIn("GameDataValueCodec::Encode", structured)
         self.assertIn("primary_data_asset_blueprint", blueprint)
         self.assertIn("UnrealMCP.AssetInspect.DataAssetsTablesSelectorsAndSnapshots", native_test)
+
+    def test_asset_inspect_umg_composes_core_logic_with_bounded_umg_semantics(self):
+        module = (UMG_PRIVATE / "UnrealMCPUMGModule.cpp").read_text(encoding="utf-8")
+        adapter = (UMG_PRIVATE / "UnrealMCPUMGInspectionAdapter.cpp").read_text(encoding="utf-8")
+        model = (UMG_PRIVATE / "UnrealMCPUMGInspectionModel.cpp").read_text(encoding="utf-8")
+        structured = (BLUEPRINT_PRIVATE / "UnrealMCPStructuredDataInspection.cpp").read_text(encoding="utf-8")
+        blueprint = (BLUEPRINT_PRIVATE / "UnrealMCPAssetInspectionAdapters.cpp").read_text(encoding="utf-8")
+        native_test = (
+            UMG_PRIVATE / "Tests/UnrealMCPAutomationTestsAssetInspectUMG.cpp"
+        ).read_text(encoding="utf-8")
+        self.assertIn("UMGInspection::RegisterAdapter", module)
+        self.assertIn('TEXT("asset_inspect_umg")', module)
+        for contract in [
+            'TEXT("umg_widget")', 'TEXT("widget_tree")', 'TEXT("widgets")',
+            'TEXT("named_slots")', 'TEXT("bindings")', 'TEXT("properties")',
+            "bComposableInspectionOverlay", "UUserWidget::StaticClass()",
+        ]:
+            self.assertIn(contract, adapter)
+        for limit in [
+            "MaxWidgetTreeWidgets", "MaxWidgetTreeDepth",
+            "MaxWidgetNamedSlots", "MaxWidgetBindings",
+        ]:
+            self.assertIn(limit, adapter + model)
+        self.assertIn("BuildSelectedPropertyPage", structured)
+        self.assertIn('Result.Type = TEXT("widget_blueprint")', blueprint)
+        self.assertNotIn("CommonUI", adapter + model)
+        self.assertNotIn("MovieScene", adapter + model)
+        self.assertIn(
+            "UnrealMCP.AssetInspect.UMGHierarchyLayoutBindingsAndExclusions", native_test
+        )
 
     def test_asset_references_is_published_bounded_and_covered(self):
         bridge = native_host_source()

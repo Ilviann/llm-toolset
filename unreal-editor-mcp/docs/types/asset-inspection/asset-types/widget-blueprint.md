@@ -25,7 +25,7 @@ widget:
   cursor: default
   render_transform: {translation: {x: 0.0, y: 0.0}, scale: {x: 1.0, y: 1.0}, shear: {x: 0.0, y: 0.0}, angle: 0.0}
   render_transform_pivot: {x: 0.5, y: 0.5}
-  navigation: {up: escape, down: escape, left: escape, right: escape, next: escape, previous: escape}
+  navigation: {up: {rule: escape}, down: {rule: escape}, left: {rule: escape}, right: {rule: escape}, next: {rule: escape}, previous: {rule: escape}}
 user_widget:
   color_and_opacity: {r: 1.0, g: 1.0, b: 1.0, a: 1.0}
   foreground_color: inherited

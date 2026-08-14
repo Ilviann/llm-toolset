@@ -74,6 +74,33 @@ TArray<FProperty*> Properties(const FUnrealMCPStructuredDataSource& Source, FUnr
     return Result;
 }
 
+TArray<FProperty*> SelectedProperties(
+    const FUnrealMCPStructuredDataSource& Source,
+    const TArray<FString>& PropertyNames,
+    FUnrealMCPError& OutError)
+{
+    const TArray<FProperty*> Candidates = Properties(Source, OutError);
+    if (!OutError.Code.IsEmpty()) return {};
+    TSet<FString> Requested;
+    for (const FString& Name : PropertyNames) Requested.Add(Name);
+    TArray<FProperty*> Result;
+    for (FProperty* Property : Candidates)
+    {
+        if (Requested.Contains(Property->GetName())
+            || Requested.Contains(AuthoredName(Source.Type, Property)))
+        {
+            Result.Add(Property);
+        }
+    }
+    Result.Sort([&Source](const FProperty& Left, const FProperty& Right)
+    {
+        const FString LeftKey = DeclaredBy(&Left) + TEXT("|") + AuthoredName(Source.Type, &Left);
+        const FString RightKey = DeclaredBy(&Right) + TEXT("|") + AuthoredName(Source.Type, &Right);
+        return LeftKey < RightKey;
+    });
+    return Result;
+}
+
 TSharedRef<FUnrealMCPRecord> Limitation(const FProperty* Property, const FUnrealMCPError& Error)
 {
     const TSharedRef<FUnrealMCPRecord> Result = MakeShared<FUnrealMCPRecord>();
@@ -489,6 +516,36 @@ bool UnrealMCP::StructuredDataInspection::BuildPropertyPage(
     return true;
 }
 
+bool UnrealMCP::StructuredDataInspection::BuildSelectedPropertyPage(
+    const FUnrealMCPStructuredDataSource& Source,
+    const FString& SelectorPrefix,
+    const TArray<FString>& PropertyNames,
+    int32 PageIndex,
+    int32 PageSize,
+    const FString& SnapshotId,
+    TSharedPtr<FUnrealMCPRecord>& OutProperties,
+    FUnrealMCPError& OutError)
+{
+    const TArray<FProperty*> Values = Private::SelectedProperties(Source, PropertyNames, OutError);
+    if (!OutError.Code.IsEmpty()) return false;
+    const int64 Start64 = static_cast<int64>(PageIndex) * PageSize;
+    const int32 Start = static_cast<int32>(FMath::Min<int64>(Start64, Values.Num()));
+    const int32 End = FMath::Min(Start + PageSize, Values.Num());
+    TArray<TSharedPtr<FUnrealMCPValue>> Items;
+    for (int32 Index = Start; Index < End; ++Index)
+    {
+        Items.Add(MakeShared<FUnrealMCPValueObject>(
+            Private::PropertyRecord(Source, Values[Index], SelectorPrefix)));
+    }
+    const TSharedRef<FUnrealMCPRecord> Result = MakeShared<FUnrealMCPRecord>();
+    Result->SetNumberField(TEXT("count"), Values.Num());
+    Result->SetArrayField(TEXT("items"), Items);
+    Result->SetObjectField(TEXT("page"),
+        Private::PageRecord(PageIndex, PageSize, Values.Num(), Items.Num(), SnapshotId));
+    OutProperties = Result;
+    return true;
+}
+
 bool UnrealMCP::StructuredDataInspection::BuildFieldValues(
     const FUnrealMCPStructuredDataSource& Source,
     const FString& SelectorPrefix,
@@ -559,6 +616,28 @@ FString UnrealMCP::StructuredDataInspection::BuildSnapshot(
         const void* Address = Property->ContainerPtrToValuePtr<void>(Source.Data);
         Lines.Add(Private::DeclaredBy(Property) + TEXT("|") + Private::AuthoredName(Source.Type, Property)
             + TEXT("|") + Property->GetClass()->GetName() + TEXT("|") + Private::Sha1(Private::Canonical(Property, Address)));
+    }
+    Lines.Sort();
+    return Private::Sha1(FString::Join(Lines, TEXT("\n")));
+}
+
+FString UnrealMCP::StructuredDataInspection::BuildSelectedSnapshot(
+    const FUnrealMCPStructuredDataSource& Source,
+    const FString& Identity,
+    const TArray<FString>& PropertyNames)
+{
+    FUnrealMCPError Error;
+    const TArray<FProperty*> Values = Private::SelectedProperties(Source, PropertyNames, Error);
+    if (!Error.Code.IsEmpty()) return FString();
+    TArray<FString> Lines;
+    Lines.Add(TEXT("identity|") + Identity);
+    Lines.Add(TEXT("type|") + (Source.Type != nullptr ? Source.Type->GetPathName() : FString()));
+    for (FProperty* Property : Values)
+    {
+        const void* Address = Property->ContainerPtrToValuePtr<void>(Source.Data);
+        Lines.Add(Private::DeclaredBy(Property) + TEXT("|") + Private::AuthoredName(Source.Type, Property)
+            + TEXT("|") + Property->GetClass()->GetName() + TEXT("|")
+            + Private::Sha1(Private::Canonical(Property, Address)));
     }
     Lines.Sort();
     return Private::Sha1(FString::Join(Lines, TEXT("\n")));

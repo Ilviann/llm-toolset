@@ -8,7 +8,7 @@
 
 The module creates the shared registry, registers built-in families, admits companion families through the extension registry, and then freezes both registries before constructing the bridge. The command catalog retains the frozen family registry and refuses startup composition with a mutable registry. Family adapters depend inward on typed contexts, semantic value records, and bounded builders; they do not depend on the bridge, JSON codecs, Python schemas, access policy, target resolution, transactions, persistence, or response encoding.
 
-`asset_inspect` selects one frozen primary `core_blueprint` or `neutral_asset` descriptor and every admitted inspection overlay matching the asset's semantic class. The primary owns base identity and fallback behavior; overlays may add only their declared blocks, selectors, and snapshot material. Registry-backed inspection changes no MCP command or request schema and uses unchanged companion API v2.
+`asset_inspect` selects one frozen primary `core_blueprint` or `neutral_asset` descriptor and every built-in or admitted companion inspection overlay matching the asset's semantic class. The primary owns base identity and fallback behavior; overlays may add only their declared blocks, selectors, and snapshot material. Base UMG uses this seam for `UUserWidget`; optional CommonUI composes independently over the same represented class. Registry-backed inspection changes no MCP command or request schema and uses unchanged companion API v2.
 
 ## Invariants
 

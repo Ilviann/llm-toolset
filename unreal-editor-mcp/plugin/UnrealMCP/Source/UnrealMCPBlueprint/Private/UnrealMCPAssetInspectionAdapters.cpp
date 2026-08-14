@@ -2,6 +2,7 @@
 
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "AssetRegistry/IAssetRegistry.h"
+#include "Blueprint/UserWidget.h"
 #include "Components/ActorComponent.h"
 #include "Components/SceneComponent.h"
 #include "UnrealMCPWireTypes.h"
@@ -294,6 +295,10 @@ FClassification Classify(UObject* AssetObject, UBlueprint* Blueprint)
     else if (Represented != nullptr && Represented->IsChildOf(UActorComponent::StaticClass()))
     {
         Result.Type = TEXT("actor_component_blueprint"); Result.bDeepBlueprint = true;
+    }
+    else if (Represented != nullptr && Represented->IsChildOf(UUserWidget::StaticClass()))
+    {
+        Result.Type = TEXT("widget_blueprint"); Result.bDeepBlueprint = true;
     }
     else if (Represented != nullptr && Represented->IsChildOf(AActor::StaticClass()))
     {

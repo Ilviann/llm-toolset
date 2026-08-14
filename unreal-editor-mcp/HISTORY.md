@@ -7,6 +7,12 @@
 - Added an independent CommonUI companion checkbox to the Windows deployment helper, including fixed base-dependent packaging, project/Engine installation, and transactional multi-plugin handling without changing runtime or plugin versions.
 - Decomposed Python packaging, Windows deployment, and headless integration support tools behind stable entrypoints, with shared Unreal-local primitives, typed deployment and Blueprint scenario state, focused domain modules, and unchanged runtime/plugin versions.
 
+## 0.48.0 — 2026-08-14
+
+- Added built-in base UMG Widget Blueprint inspection through the common `asset_inspect` facade, composing core Blueprint members and graphs with effective inherited/local hierarchy, class defaults, panel-slot layout, presentation, named slots, legacy property bindings, and Designer event bindings.
+- Added deterministic zero-based pages and exact nested collection selectors, flattened navigation, typed binding metadata, bounded cumulative snapshots, duplicate-name and hierarchy limits, and explicit Widget Animation/CommonUI/MVVM exclusions without changing the MCP schema or companion API v2.
+- Added focused native, Python-contract, headless restart, and packaging coverage. Companion plugin versions remain independently unchanged; macOS verification remains preferred follow-up work.
+
 ## 0.47.0 — 2026-08-14
 
 - Added bounded semantic `FGameplayTag` and `FGameplayTagContainer` values to existing Blueprint class-default/component-default, Game Data, and structured `asset_inspect` workflows, with exact strings, sorted explicit-tag arrays, empty values, recursive Data Table fields, and legacy-invalid inspection.

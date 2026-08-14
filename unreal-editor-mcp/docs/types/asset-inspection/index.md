@@ -6,7 +6,7 @@ This component contract defines the accepted design for bounded semantic inspect
 
 1. [`asset-inspect-core`](../../features/completed/asset-inspect-core.md) owns the tool, shared contracts, neutral classification, gameplay-framework Blueprints, Actor Components, and Blueprint Interfaces.
 2. [`asset-inspect-data`](../../features/completed/asset-inspect-data.md) adds Data Assets and Data Tables.
-3. [`asset-inspect-umg`](../../features/planned/asset-inspect-umg.md) adds base UMG Widget Blueprint inspection.
+3. [`asset-inspect-umg`](../../features/completed/asset-inspect-umg.md) adds base UMG Widget Blueprint inspection.
 4. [`asset-inspect-animation`](../../features/planned/asset-inspect-animation.md) adds Animation Blueprint inspection.
 
 The numbered list is the preferred delivery order. The three extension features depend directly only on `asset-inspect-core`, so their technical implementation may be reordered without inventing unrelated prerequisites.
@@ -29,7 +29,7 @@ The numbered list is the preferred delivery order. The three extension features 
 - Require one exact project-content asset path as an `asset_inspect` parameter. The tool does not discover or search by folder, name, class, or family.
 - Accept either exact Unreal package form such as `/Game/Folder/Asset` or object form such as `/Game/Folder/Asset.Asset`, and normalize both to the canonical object path before loading, inspection, response generation, snapshot calculation, and page selection.
 - Reuse safe codecs and structural fingerprinting where their semantics match. `game_data_inspect` remains published; the reconstruction-oriented Blueprint facade was removed when `asset_inspect` covered its core analysis role.
-- Add base UMG Widget Blueprint logic and layout through `asset-inspect-umg`. CommonUI companion records compose separately through API-v2 adapters; MVVM remains separate.
+- Base UMG Widget Blueprint logic, hierarchy, layout, presentation, named slots, and bindings are available through `asset-inspect-umg`. CommonUI companion records compose separately through API-v2 adapters; MVVM remains separate.
 - Exclude Widget Animation timeline inspection from `asset-inspect-umg`. Animation variables and calls may still appear as ordinary references or call nodes in Widget Blueprint logic graphs, but the tool does not inspect animation bindings, MovieScene tracks, sections, or keyframes.
 - Keep core inspection independent of GAS. When the optional API-v2 GAS companion is admitted, its Gameplay Ability and Gameplay Effect overlays compose without making the companion a base requirement.
 - Optimize output for semantic analysis of the asset's behavior, algorithms, structure, relationships, and meaningful data. One-to-one asset reconstruction from the result is explicitly out of scope.
@@ -80,7 +80,7 @@ Add or expand `asset_inspect` coverage for:
 - Actor-owned components are already records within supported Actor-family Blueprint inspection. `asset-inspect-core` also includes standalone Actor Component Blueprint assets, which are not a published Blueprint family and therefore need a new classification and collector path.
 - Blueprint Interfaces are declarations-only core families. Data Asset and Primary Data Asset instances plus their Blueprint class variants are deeply inspected; Animation Blueprints remain separately planned.
 - Data Tables reuse the separate game-data schema/value collectors and snapshots behind `asset_inspect`; `game_data_inspect` remains published for its cursor-oriented contract.
-- Ordinary Widget Blueprint logic and tree inspection is already in the base and will be reused by `asset-inspect-umg`. CommonUI inspection composes as an optional companion overlay; MVVM inspection remains a separate planned feature.
+- Ordinary Widget Blueprint logic and tree inspection is implemented by the base `asset-inspect-umg` overlay. CommonUI inspection composes as an optional companion overlay; MVVM inspection remains a separate planned feature.
 - GAS Ability and GAS Effect collectors compose through optional inspection overlays. Their absence or rejection changes no base family, schema, or response contract.
 
 ## Current repository evidence

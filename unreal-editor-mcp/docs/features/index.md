@@ -87,7 +87,7 @@ Keep the authoritative checklist in [`ROADMAP.md`](../../ROADMAP.md) synchronize
   - Depends on:
     - `asset-inspect-core`
     - `native-domain-modules`
-- [`asset-inspect-umg` — Base UMG Widget Blueprint inspection](planned/asset-inspect-umg.md) — Extend the facade to base UMG logic, hierarchy, layout and bindings.
+- [`asset-inspect-umg` — Base UMG Widget Blueprint inspection](completed/asset-inspect-umg.md) — Extend the facade to base UMG logic, hierarchy, layout and bindings.
   - Depends on:
     - `asset-inspect-core`
     - `native-domain-modules`

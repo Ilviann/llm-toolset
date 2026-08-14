@@ -5,6 +5,7 @@
 #include "UnrealMCPAssetInspectionAdapters.h"
 
 #include "Components/ActorComponent.h"
+#include "Blueprint/UserWidget.h"
 #include "Engine/DataAsset.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/PlayerState.h"
@@ -153,6 +154,7 @@ bool FUnrealMCPAssetInspectionCoreTest::RunTest(const FString& Parameters)
         {APlayerController::StaticClass(), TEXT("player_controller_blueprint")},
         {APlayerState::StaticClass(), TEXT("player_state_blueprint")},
         {UActorComponent::StaticClass(), TEXT("actor_component_blueprint")},
+        {UUserWidget::StaticClass(), TEXT("widget_blueprint")},
     };
     int32 FamilyIndex = 0;
     for (const FFamily& Family : Families)

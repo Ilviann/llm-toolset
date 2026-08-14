@@ -39,7 +39,7 @@ Feature identifiers are stable names, not execution indexes. Unfinished features
   - Depends on:
     - `asset-inspect-core`
     - `native-domain-modules`
-- [ ] [`asset-inspect-umg` — Base UMG Widget Blueprint inspection](docs/features/planned/asset-inspect-umg.md) — Extend the facade to base UMG logic, hierarchy, layout and bindings.
+- [x] [`asset-inspect-umg` — Base UMG Widget Blueprint inspection](docs/features/completed/asset-inspect-umg.md) — Extend the facade to base UMG logic, hierarchy, layout and bindings.
   - Depends on:
     - `asset-inspect-core`
     - `native-domain-modules`

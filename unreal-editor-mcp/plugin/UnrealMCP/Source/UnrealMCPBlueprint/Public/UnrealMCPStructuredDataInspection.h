@@ -29,6 +29,16 @@ UNREALMCPBLUEPRINT_API bool BuildPropertyPage(
     TSharedPtr<FUnrealMCPRecord>& OutProperties,
     FUnrealMCPError& OutError);
 
+UNREALMCPBLUEPRINT_API bool BuildSelectedPropertyPage(
+    const FUnrealMCPStructuredDataSource& Source,
+    const FString& SelectorPrefix,
+    const TArray<FString>& PropertyNames,
+    int32 PageIndex,
+    int32 PageSize,
+    const FString& SnapshotId,
+    TSharedPtr<FUnrealMCPRecord>& OutProperties,
+    FUnrealMCPError& OutError);
+
 UNREALMCPBLUEPRINT_API bool BuildFieldValues(
     const FUnrealMCPStructuredDataSource& Source,
     const FString& SelectorPrefix,
@@ -50,4 +60,9 @@ UNREALMCPBLUEPRINT_API bool InspectField(
 UNREALMCPBLUEPRINT_API FString BuildSnapshot(
     const FUnrealMCPStructuredDataSource& Source,
     const FString& Identity);
+
+UNREALMCPBLUEPRINT_API FString BuildSelectedSnapshot(
+    const FUnrealMCPStructuredDataSource& Source,
+    const FString& Identity,
+    const TArray<FString>& PropertyNames);
 }

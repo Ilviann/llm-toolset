@@ -2,6 +2,7 @@
 
 #include "UnrealMCPBlueprintInspector.h"
 #include "UnrealMCPDomainModule.h"
+#include "UnrealMCPUMGInspectionAdapter.h"
 #include "UnrealMCPVersion.h"
 #include "UnrealMCPWidgetTreeService.h"
 
@@ -37,7 +38,10 @@ class FUnrealMCPUMGModule final : public IUnrealMCPBuiltInDomainModule
 {
 public:
     FName GetDomainName() const override { return TEXT("umg"); }
-    bool RegisterAssetFamilies(FUnrealMCPAssetFamilyRegistry&, FUnrealMCPError&) override { return true; }
+    bool RegisterAssetFamilies(FUnrealMCPAssetFamilyRegistry& Registry, FUnrealMCPError& OutError) override
+    {
+        return UnrealMCP::UMGInspection::RegisterAdapter(Registry, OutError);
+    }
 
     bool RegisterCommands(
         const FUnrealMCPDomainRegistrar& Registrar,
@@ -55,6 +59,7 @@ public:
         Descriptor.Handler = [State](const auto& A, auto& R, auto& E) { return State->Execute(A, R, E); };
         if (!Registrar.RegisterCommand(MoveTemp(Descriptor), OutError)) return false;
         for (const TCHAR* Feature : {
+            TEXT("asset_inspect_umg"),
             TEXT("widget_tree_authoring"), TEXT("umg_layout_authoring"), TEXT("umg_style_authoring"),
             TEXT("umg_property_bindings"), TEXT("umg_designer_events")})
         {

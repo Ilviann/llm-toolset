@@ -1,6 +1,5 @@
 # Planned features
 
-- [`asset-inspect-umg` — Base UMG Widget Blueprint inspection](asset-inspect-umg.md).
 - [`asset-inspect-animation` — Animation Blueprint semantic inspection](asset-inspect-animation.md).
 - [`umg-mvvm-inspect` — UMG ViewModel and View Binding inspection](umg-mvvm-inspect.md).
 - [`umg-mvvm` — UMG ViewModel and View Binding authoring](umg-mvvm.md).

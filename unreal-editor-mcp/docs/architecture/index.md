@@ -19,6 +19,7 @@ Each file in this directory documents one implemented cohesive component: what i
 - [`asset-inspection-service.md`](asset-inspection-service.md) — exact `/Game` resolution, frozen family dispatch, focused core adapters, selectors, paging, graph traversal, limits, and snapshots.
 - [`structured-data-inspection.md`](structured-data-inspection.md) — shared safe reflected properties, semantic values, collection descriptors, nested selector routing, and deterministic pages.
 - [`data-asset-table-inspection.md`](data-asset-table-inspection.md) — built-in Data Asset/Data Table families, Primary Asset bundles, schema/row/column views, and game-data snapshot reuse.
+- [`umg-asset-inspection.md`](umg-asset-inspection.md) — built-in base-UMG Widget Blueprint hierarchy, layout, presentation, named slots, bindings, and snapshot overlay.
 - [`blueprint-action-catalog.md`](blueprint-action-catalog.md) — bounded live graph-action discovery, filters, opaque identities, caching, and invalidation.
 - [`blueprint-graph-editor.md`](blueprint-graph-editor.md) — request decoding, focused node/pin operation handlers, transactional graph editing, identity completion, and result read-back.
 - [`blueprint-block-replacement.md`](blueprint-block-replacement.md) — complete logic-unit boundaries, scratch compilation, semantic parity, transactional apply, and rollback.

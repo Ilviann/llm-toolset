@@ -62,6 +62,7 @@ def run_automation(executable: Path, project: Path, environment: dict[str, str],
         "AdapterIsolation",
         "CoreFamiliesSelectorsPagingAndLimits",
         "DataAssetsTablesSelectorsAndSnapshots",
+        "UMGHierarchyLayoutBindingsAndExclusions",
         "PreflightTransactionPreservation",
         "LogicUnitsAndExternalLinks",
         "DeterministicChangedNodes",
@@ -116,6 +117,7 @@ def run_automation(executable: Path, project: Path, environment: dict[str, str],
         expected = tuple(name for name in all_expected if name in {
             "AdapterIsolation", "CoreFamiliesSelectorsPagingAndLimits",
             "DataAssetsTablesSelectorsAndSnapshots",
+            "UMGHierarchyLayoutBindingsAndExclusions",
         })
     elif test_filter == "UnrealMCP.LevelManagement":
         expected = tuple(name for name in all_expected if name == "CreateConfigurePersistAndDelete")
