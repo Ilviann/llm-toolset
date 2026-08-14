@@ -434,6 +434,8 @@ FUnrealMCPRegistrationResult FUnrealMCPExtensionRegistry::Register(
         FamilyDescriptor.Bounds = Family.Bounds;
         FamilyDescriptor.Limits = Family.Limits;
         FamilyDescriptor.Capabilities = Family.Capabilities;
+        FamilyDescriptor.SelectorRoutes = Family.SelectorRoutes;
+        FamilyDescriptor.bComposableInspectionOverlay = Family.Capabilities.bInspection;
         FamilyDescriptor.InspectionAdapter = Family.InspectionAdapter;
         FamilyDescriptor.CreationAdapter = Family.CreationAdapter;
         FamilyDescriptor.EditingAdapter = Family.EditingAdapter;
@@ -470,6 +472,7 @@ FUnrealMCPRegistrationResult FUnrealMCPExtensionRegistry::Register(
             && (Family.Capabilities.bEditing
                 || Family.EditingPersistence == EUnrealMCPExtensionPersistence::None);
         if (!bHasCapability || Family.NativeClassPath.IsEmpty() || Family.NativeClassPath.Len() > 512
+            || (Family.Capabilities.bInspection && !Family.SnapshotBuilder)
             || static_cast<uint8>(Family.ClassPolicy)
                 > static_cast<uint8>(EUnrealMCPAssetFamilyClassPolicy::ExactAndDerived)
             || !Validator.Register(MoveTemp(FamilyDescriptor), FamilyError)
@@ -577,6 +580,51 @@ FUnrealMCPRegistrationResult FUnrealMCPExtensionRegistry::Register(
             || !FModuleManager::Get().IsModuleLoaded(FName(*RequiredModule)))
         {
             return Reject(TEXT("engine_module_unloaded"));
+        }
+    }
+
+    if (AssetFamilyRegistry.IsValid())
+    {
+        if (AssetFamilyRegistry->IsFrozen())
+        {
+            return Reject(TEXT("registration_closed"));
+        }
+        for (const FUnrealMCPCompanionAssetFamily& Family : Registration.AssetFamilies)
+        {
+            UClass* NativeClass = LoadObject<UClass>(nullptr, *Family.NativeClassPath);
+            for (const FUnrealMCPAssetFamilyDescriptor& Existing : AssetFamilyRegistry->GetDescriptors())
+            {
+                if (Existing.FamilyId == Family.FamilyId
+                    || (Existing.NativeClass == NativeClass
+                        && Existing.ClassPolicy == Family.ClassPolicy
+                        && Existing.Priority == Family.Priority))
+                {
+                    return Reject(TEXT("asset_family_collision"));
+                }
+            }
+        }
+        for (const FUnrealMCPCompanionAssetFamily& Family : Registration.AssetFamilies)
+        {
+            FUnrealMCPAssetFamilyDescriptor DescriptorToRegister;
+            DescriptorToRegister.FamilyId = Family.FamilyId;
+            DescriptorToRegister.NativeClass = LoadObject<UClass>(nullptr, *Family.NativeClassPath);
+            DescriptorToRegister.ClassPolicy = Family.ClassPolicy;
+            DescriptorToRegister.Priority = Family.Priority;
+            DescriptorToRegister.RequiredModules = Family.RequiredModules;
+            DescriptorToRegister.Bounds = Family.Bounds;
+            DescriptorToRegister.Limits = Family.Limits;
+            DescriptorToRegister.Capabilities = Family.Capabilities;
+            DescriptorToRegister.SelectorRoutes = Family.SelectorRoutes;
+            DescriptorToRegister.bComposableInspectionOverlay = Family.Capabilities.bInspection;
+            DescriptorToRegister.InspectionAdapter = Family.InspectionAdapter;
+            DescriptorToRegister.CreationAdapter = Family.CreationAdapter;
+            DescriptorToRegister.EditingAdapter = Family.EditingAdapter;
+            DescriptorToRegister.SnapshotBuilder = Family.SnapshotBuilder;
+            FUnrealMCPError IntegrationError;
+            if (!AssetFamilyRegistry->Register(MoveTemp(DescriptorToRegister), IntegrationError))
+            {
+                return Reject(TEXT("asset_family_integration_failed"));
+            }
         }
     }
 

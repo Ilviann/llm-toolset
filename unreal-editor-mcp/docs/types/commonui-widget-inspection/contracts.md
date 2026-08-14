@@ -2,7 +2,7 @@
 
 ## Family, records, and references
 
-An admitted `unreal-mcp-commonui` schema-revision-1 contribution augments ordinary inspection for Blueprint-generated `UCommonUserWidget` descendants. Discovery and the top-level result retain the base `widget` family so existing Widget-tree, default, binding, graph, member, and class records do not change.
+An admitted `unreal-mcp-commonui` schema-revision-2 companion publishes inspection-only family `commonui_widget` for Blueprint-generated `UCommonUserWidget` descendants. The common result retains neutral Widget Blueprint identity while the companion adds its exact blocks and selectors.
 
 The typed request sections add at most three records:
 
@@ -14,7 +14,7 @@ Every exposed scalar reports `value` and `source`. For non-activatable descendan
 
 ## Capabilities, bounds, and exclusions
 
-The contribution is ready only when `UnrealMCPCommonUI`, Engine `CommonUI`, loaded `CommonUI` and `CommonInput` modules, companion API v2, schema revision 2, and the matching Python catalog agree. Native capabilities publish semantic version 0.1.1, `commonui_widget_blueprints_inspection: true`, `commonui_widget_blueprints_mutation: false`, three maximum records, and 17 exact inspected properties.
+The family is ready only when `UnrealMCPCommonUI`, Engine `CommonUI`, loaded `CommonUI` and `CommonInput` modules, companion API v2, schema revision 2, and the matching Python catalog agree. Native capabilities publish semantic version 0.2.0, inspection true, creation/editing false, three selector routes, three maximum records, and 17 exact inspected properties.
 
 The base inspector still enforces its 4,096-record structural ceiling, 100-record page ceiling, 32 retained cursors, 30-second cursor lifetime, five-second command deadline, and 256-KiB response ceiling. The companion adds no discovery scan or retained state and traverses no dependency graph.
 

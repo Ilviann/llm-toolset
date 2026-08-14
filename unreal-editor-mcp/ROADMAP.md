@@ -82,7 +82,7 @@ Feature identifiers are stable names, not execution indexes. Unfinished features
 - [x] [`gas-gameplay-effects-inspect` — Gameplay Effect inspection](docs/features/completed/gas-gameplay-effects-inspect.md) — Add bounded typed inspection of existing data-only Gameplay Effect Blueprint assets through the GAS companion.
   - Depends on:
     - `gas-ability-blueprints-inspect`
-- [ ] [`companion-asset-adapters` — Unified companion asset integration](docs/features/planned/companion-asset-adapters.md) — Route approved GAS and CommonUI families through common asset infrastructure.
+- [x] [`companion-asset-adapters` — Unified companion asset integration](docs/features/completed/companion-asset-adapters.md) — Route approved GAS and CommonUI families through common asset infrastructure.
   - Depends on:
     - `companion-api-v2`
     - `commonui-assets-inspect`
@@ -187,5 +187,6 @@ Feature checkboxes record implementation completion after mandatory Windows veri
   - `asset-family-conformance`
   - `native-domain-modules`
   - `companion-api-v2`
+  - `companion-asset-adapters`
 - Windows:
   - None

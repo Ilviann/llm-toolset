@@ -12,7 +12,7 @@ released_in: "0.30.0"
 
 **Implementation status:** Completed in 0.30.0 with `UnrealMCPGAS` 0.1.0 on companion API v1. Windows passed Python/static contracts, adaptive and forced-unity editor builds, the full native Automation suite, full headless production-socket integration, and separate base/GAS packaging. The supported UAT package compiled the GAS implementation outside unity; macOS verification remains preferred follow-up work and Linux is out of scope.
 
-The native companion and API v1 registration remain installed, but 0.36.0 removed the shared model-facing Blueprint inspection route. GAS records are dormant until a redesigned companion read contract is approved and are not routed into `asset-inspect-core`.
+Version 0.36.0 removed the former shared Blueprint inspection route. The later [`companion-asset-adapters`](companion-asset-adapters.md) release migrated these collectors to API v2 and now routes them through `asset_inspect` without changing this feature's original collector scope.
 
 **Depends on:**
 

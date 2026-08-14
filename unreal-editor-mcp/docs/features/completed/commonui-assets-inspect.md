@@ -13,7 +13,7 @@ released_in: "0.35.0"
 
 **Implementation status:** Completed in 0.35.0 with `UnrealMCPCommonUI` 0.1.0 on unchanged companion API v1 and schema revision 1. The frozen initial allowlist is `UCommonUserWidget`-derived Widget Blueprints, including typed `UCommonActivatableWidget` defaults. Mandatory Windows verification covers Python/static contracts, adaptive/forced-unity/non-unity builds, native Automation, production-socket headless integration, and separate base/CommonUI packaging. macOS remains preferred non-blocking follow-up work; Linux is out of scope.
 
-The native companion and API v1 registration remain installed, but 0.36.0 removed the shared model-facing Blueprint inspection route. CommonUI records are dormant until a redesigned companion read contract is approved and are not routed into `asset-inspect-core`.
+Version 0.36.0 removed the former shared Blueprint inspection route. The later [`companion-asset-adapters`](companion-asset-adapters.md) release migrated these collectors to API v2 and now routes them through `asset_inspect` without changing this feature's original collector scope.
 
 **Depends on:**
 

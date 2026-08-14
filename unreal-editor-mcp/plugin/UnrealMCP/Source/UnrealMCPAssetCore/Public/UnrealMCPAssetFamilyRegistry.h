@@ -203,6 +203,8 @@ struct FUnrealMCPAssetFamilyDescriptor
     FUnrealMCPAssetFamilyLimits Bounds;
     TArray<FUnrealMCPAssetFamilyLimit> Limits;
     FUnrealMCPAssetFamilyCapabilities Capabilities;
+    TArray<FUnrealMCPAssetFamilySelectorRoute> SelectorRoutes;
+    bool bComposableInspectionOverlay = false;
     TSharedPtr<IUnrealMCPAssetFamilyInspectionAdapter> InspectionAdapter;
     TSharedPtr<IUnrealMCPAssetFamilyCreationAdapter> CreationAdapter;
     TSharedPtr<IUnrealMCPAssetFamilyEditingAdapter> EditingAdapter;
@@ -230,6 +232,15 @@ public:
         EUnrealMCPAssetFamilyCapability Capability,
         FUnrealMCPAssetFamilySelection& OutSelection,
         FUnrealMCPError& OutError) const;
+    bool SelectPrimary(
+        const UClass* AssetClass,
+        EUnrealMCPAssetFamilyCapability Capability,
+        FUnrealMCPAssetFamilySelection& OutSelection,
+        FUnrealMCPError& OutError) const;
+    bool SelectInspectionOverlays(
+        const UClass* SemanticClass,
+        TArray<const FUnrealMCPAssetFamilyDescriptor*>& OutDescriptors,
+        FUnrealMCPError& OutError) const;
 
     bool IsFrozen() const { return bFrozen; }
     const TArray<FUnrealMCPAssetFamilyDescriptor>& GetDescriptors() const { return Descriptors; }
@@ -240,6 +251,12 @@ private:
     bool SupportsCapability(
         const FUnrealMCPAssetFamilyDescriptor& Descriptor,
         EUnrealMCPAssetFamilyCapability Capability) const;
+    bool SelectSingle(
+        const UClass* AssetClass,
+        EUnrealMCPAssetFamilyCapability Capability,
+        bool bPrimaryOnly,
+        FUnrealMCPAssetFamilySelection& OutSelection,
+        FUnrealMCPError& OutError) const;
 
     FUnrealMCPAssetFamilyModuleResolver ModuleResolver;
     TArray<FUnrealMCPAssetFamilyDescriptor> Descriptors;

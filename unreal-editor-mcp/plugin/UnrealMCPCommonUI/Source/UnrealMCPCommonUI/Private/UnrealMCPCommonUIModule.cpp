@@ -471,6 +471,191 @@ public:
     }
 };
 
+UCommonUserWidget* ResolveCommonUIWidgetDefaults(UObject* Asset)
+{
+    UBlueprint* Blueprint = Cast<UBlueprint>(Asset);
+    UClass* GeneratedClass = Blueprint != nullptr
+        ? (Blueprint->GeneratedClass != nullptr ? Blueprint->GeneratedClass : Blueprint->ParentClass)
+        : nullptr;
+    return GeneratedClass != nullptr
+        ? Cast<UCommonUserWidget>(GeneratedClass->GetDefaultObject(false)) : nullptr;
+}
+
+void ConvertCommonUIInspectionError(
+    const FUnrealMCPExtensionError& Input,
+    FUnrealMCPError& Output)
+{
+    Output.Code = Input.Code;
+    Output.Message = Input.Message;
+    Output.Details = Input.Details;
+    Output.bRetryable = Input.bRetryable;
+}
+
+class FCommonUIWidgetAssetInspectionAdapter final
+    : public IUnrealMCPAssetFamilyInspectionAdapter
+{
+public:
+    bool Inspect(
+        const FUnrealMCPAssetFamilyInspectionContext& Context,
+        FUnrealMCPAssetFamilyDocumentBuilder& Document,
+        FUnrealMCPAssetFamilySelectorRouter& Selectors,
+        FUnrealMCPAssetFamilySnapshotBuilder& Snapshot,
+        FUnrealMCPError& OutError) override
+    {
+        if (Context.bHasPaging || Context.bHasPartialGraphFlag)
+        {
+            OutError = {TEXT("invalid_argument"),
+                TEXT("CommonUI selectors do not support paging or graph flags")};
+            return false;
+        }
+        const TArray<FString> Sections = {
+            WidgetSection, ActivationSection, ReferenceSection};
+        for (const FString& Section : Sections)
+        {
+            if (!Selectors.Register({Section, {Section}, false, false}, OutError))
+            {
+                return false;
+            }
+        }
+        if (!Selectors.Freeze(OutError))
+        {
+            return false;
+        }
+        const FUnrealMCPAssetFamilySelectorRoute* SelectedRoute = nullptr;
+        if (!Context.Selector.IsRoot())
+        {
+            SelectedRoute = Selectors.Resolve(Context.Selector, OutError);
+            if (SelectedRoute == nullptr)
+            {
+                return false;
+            }
+        }
+        UCommonUserWidget* Widget = ResolveCommonUIWidgetDefaults(Context.Asset);
+        if (Widget == nullptr)
+        {
+            OutError = {TEXT("invalid_asset"),
+                TEXT("The asset does not represent a CommonUI Widget class")};
+            return false;
+        }
+        const TSharedRef<FUnrealMCPRecord> Arguments = MakeShared<FUnrealMCPRecord>();
+        Arguments->SetStringField(TEXT("mode"), TEXT("inspect"));
+        TArray<TSharedPtr<FUnrealMCPValue>> Requested;
+        if (SelectedRoute != nullptr)
+        {
+            Requested.Add(MakeShared<FUnrealMCPValueString>(SelectedRoute->Identity));
+        }
+        else
+        {
+            for (const FString& Section : Sections)
+            {
+                Requested.Add(MakeShared<FUnrealMCPValueString>(Section));
+            }
+        }
+        Arguments->SetArrayField(TEXT("sections"), MoveTemp(Requested));
+        TSharedPtr<FUnrealMCPRecord> Result;
+        FUnrealMCPExtensionError ExtensionError;
+        if (!Handler.Inspect(*Widget, OperationName, Arguments, Result, ExtensionError))
+        {
+            ConvertCommonUIInspectionError(ExtensionError, OutError);
+            return false;
+        }
+        const TArray<TSharedPtr<FUnrealMCPValue>>* Records = nullptr;
+        if (!Result.IsValid() || !Result->TryGetArrayField(TEXT("records"), Records)
+            || Records == nullptr)
+        {
+            OutError = {TEXT("extension_contract_violation"),
+                TEXT("The CommonUI adapter returned invalid semantic blocks")};
+            return false;
+        }
+        for (const TSharedPtr<FUnrealMCPValue>& Value : *Records)
+        {
+            const TSharedPtr<FUnrealMCPRecord>* Block = nullptr;
+            FString Section;
+            if (!Value.IsValid() || !Value->TryGetObject(Block)
+                || Block == nullptr || !Block->IsValid()
+                || !(*Block)->TryGetStringField(TEXT("section"), Section)
+                || !Sections.Contains(Section))
+            {
+                OutError = {TEXT("extension_contract_violation"),
+                    TEXT("The CommonUI adapter returned invalid semantic blocks")};
+                return false;
+            }
+            (*Block)->RemoveField(TEXT("section"));
+            if (!Document.Add({Section, TEXT("record"),
+                MakeShared<FUnrealMCPValueObject>(*Block)}, OutError))
+            {
+                return false;
+            }
+        }
+        if (Context.Selector.IsRoot())
+        {
+            TArray<TSharedPtr<FUnrealMCPValue>> Values;
+            for (const FString& Section : Sections)
+            {
+                Values.Add(MakeShared<FUnrealMCPValueString>(Section));
+            }
+            if (!Document.Add({TEXT("selectors"), TEXT("array"),
+                MakeShared<FUnrealMCPValueArray>(MoveTemp(Values))}, OutError))
+            {
+                return false;
+            }
+        }
+        else
+        {
+            const TSharedRef<FUnrealMCPRecord> Selection = MakeShared<FUnrealMCPRecord>();
+            Selection->SetStringField(TEXT("selector"), SelectedRoute->Identity);
+            Selection->SetStringField(TEXT("kind"), TEXT("record"));
+            if (!Document.Add({TEXT("selection"), TEXT("record"),
+                MakeShared<FUnrealMCPValueObject>(Selection)}, OutError))
+            {
+                return false;
+            }
+        }
+        FString Fingerprint;
+        if (!Handler.AppendFingerprint(*Widget, OperationName, Fingerprint, ExtensionError))
+        {
+            ConvertCommonUIInspectionError(ExtensionError, OutError);
+            return false;
+        }
+        return Snapshot.Add(TEXT("commonui_widget"), Fingerprint, OutError);
+    }
+
+private:
+    FCommonUIWidgetInspectionHandler Handler;
+};
+
+FUnrealMCPCompanionAssetFamily CommonUIWidgetFamily()
+{
+    FUnrealMCPCompanionAssetFamily Family;
+    Family.FamilyId = TEXT("commonui_widget");
+    Family.NativeClassPath = UCommonUserWidget::StaticClass()->GetPathName();
+    Family.ClassPolicy = EUnrealMCPAssetFamilyClassPolicy::ExactAndDerived;
+    Family.Priority = 200;
+    Family.RequiredModules = {TEXT("CommonUI")};
+    Family.Bounds.MaxDocumentBytes = 4 * 1024 * 1024;
+    Family.Bounds.MaxValueNodes = 65536;
+    Family.Limits = {
+        {TEXT("records"), UnrealMCPCommonUI::MaxInspectionRecords},
+        {TEXT("properties"), UnrealMCPCommonUI::MaxInspectedProperties}};
+    Family.Capabilities.bInspection = true;
+    Family.SelectorRoutes = {
+        {WidgetSection, {WidgetSection}, false, false},
+        {ActivationSection, {ActivationSection}, false, false},
+        {ReferenceSection, {ReferenceSection}, false, false}};
+    Family.InspectionAdapter = MakeShared<FCommonUIWidgetAssetInspectionAdapter>();
+    Family.SnapshotBuilder = [](UObject* Asset)
+    {
+        UCommonUserWidget* Widget = ResolveCommonUIWidgetDefaults(Asset);
+        if (Widget == nullptr) return FString();
+        FCommonUIWidgetInspectionHandler Handler;
+        FUnrealMCPExtensionError Error;
+        FString Fingerprint;
+        return Handler.AppendFingerprint(
+            *Widget, OperationName, Fingerprint, Error) ? Fingerprint : FString();
+    };
+    return Family;
+}
+
 #if WITH_DEV_AUTOMATION_TESTS
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FUnrealMCPCommonUIWidgetInspectionTest,
@@ -529,6 +714,25 @@ bool FUnrealMCPCommonUIWidgetInspectionTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("CommonUI inspection preserves package dirtiness"),
         Package->IsDirty(), bDirtyBefore);
     TestTrue(TEXT("CommonUI fingerprint includes typed state"), !FirstFingerprint.IsEmpty());
+
+    FCommonUIWidgetAssetInspectionAdapter Adapter;
+    FUnrealMCPAssetFamilyInspectionContext Context;
+    Context.Asset = Blueprint;
+    Context.Identity = {Blueprint->GetPathName(), TEXT("fixture_snapshot")};
+    FUnrealMCPAssetFamilyDocumentBuilder Document{FUnrealMCPAssetFamilyLimits()};
+    FUnrealMCPAssetFamilySelectorRouter Selectors{FUnrealMCPAssetFamilyLimits()};
+    FUnrealMCPAssetFamilySnapshotBuilder Snapshot{FUnrealMCPAssetFamilyLimits()};
+    FUnrealMCPError AdapterError;
+    TestTrue(TEXT("CommonUI common asset adapter returns its semantic blocks"),
+        Adapter.Inspect(Context, Document, Selectors, Snapshot, AdapterError));
+    for (const FString& Section : {
+        FString(WidgetSection), FString(ActivationSection), FString(ReferenceSection)})
+    {
+        TestTrue(FString::Printf(TEXT("CommonUI adapter publishes %s"), *Section),
+            Document.GetRecords().ContainsByPredicate(
+                [&Section](const FUnrealMCPAssetFamilyValueRecord& Value)
+                { return Value.Path == Section; }));
+    }
 
     const UCommonUserWidget* BaseDefaults = Cast<UCommonUserWidget>(
         UCommonUserWidget::StaticClass()->GetDefaultObject(false));
@@ -635,27 +839,6 @@ class FUnrealMCPCommonUIModule final : public IModuleInterface
 public:
     void StartupModule() override
     {
-        FUnrealMCPExtensionContribution Contribution;
-        Contribution.ContributionId = TEXT("commonui_widget_inspection");
-        Contribution.Category = EUnrealMCPExtensionCategory::AssetFamily;
-        Contribution.Access = EUnrealMCPExtensionAccess::Read;
-        Contribution.Persistence = EUnrealMCPExtensionPersistence::None;
-        Contribution.ToolFamily = TEXT("blueprint_inspect");
-        Contribution.Operation = OperationName;
-        Contribution.TargetFamily = TEXT("commonui_widget");
-        Contribution.TargetClassPath = UCommonUserWidget::StaticClass()->GetPathName();
-        Contribution.bAllowDerivedTargetClasses = true;
-        Contribution.RequiredLiveCapability = TEXT("commonui_widget_blueprints_inspection");
-        Contribution.AllowedArgumentFields = {
-            TEXT("mode"), TEXT("sections"), TEXT("graph_id"), TEXT("component_id"),
-            TEXT("member_id"), TEXT("function_id"), TEXT("local_id"), TEXT("macro_id"),
-            TEXT("custom_event_id"), TEXT("widget_id"), TEXT("property_names"),
-            TEXT("include_inherited"), TEXT("page_size")};
-        Contribution.StableLimits = {
-            {TEXT("records"), UnrealMCPCommonUI::MaxInspectionRecords},
-            {TEXT("properties"), UnrealMCPCommonUI::MaxInspectedProperties}};
-        Contribution.Handler = MakeShared<FCommonUIWidgetInspectionHandler>();
-
         FUnrealMCPCompanionRegistration Registration;
         Registration.PluginName = TEXT("UnrealMCPCommonUI");
         Registration.ExtensionId = TEXT("unreal-mcp-commonui");
@@ -665,7 +848,7 @@ public:
         Registration.ExtensionSchemaRevision = UnrealMCPCommonUI::ExtensionSchemaRevision;
         Registration.RequiredEnginePlugins = {TEXT("CommonUI")};
         Registration.RequiredEngineModules = {TEXT("CommonInput"), TEXT("CommonUI")};
-        Registration.Contributions.Add(MoveTemp(Contribution));
+        Registration.AssetFamilies.Add(CommonUIWidgetFamily());
         RegistrationResult = IUnrealMCPModule::Get().RegisterCompanion(Registration, *this);
     }
 

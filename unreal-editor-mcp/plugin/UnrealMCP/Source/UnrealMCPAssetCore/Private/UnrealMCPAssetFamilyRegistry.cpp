@@ -362,7 +362,8 @@ bool FUnrealMCPAssetFamilyRegistry::ValidateDescriptor(
     }
     if (Descriptor.Capabilities.bInspection != Descriptor.InspectionAdapter.IsValid()
         || Descriptor.Capabilities.bCreation != Descriptor.CreationAdapter.IsValid()
-        || Descriptor.Capabilities.bEditing != Descriptor.EditingAdapter.IsValid())
+        || Descriptor.Capabilities.bEditing != Descriptor.EditingAdapter.IsValid()
+        || (Descriptor.bComposableInspectionOverlay && !Descriptor.Capabilities.bInspection))
     {
         SetError(OutError, TEXT("capability_mismatch"), TEXT("Asset-family capability declarations disagree with their adapters"));
         return false;
@@ -386,6 +387,18 @@ bool FUnrealMCPAssetFamilyRegistry::ValidateDescriptor(
             return false;
         }
         Limits.Add(Limit.Name);
+    }
+    FUnrealMCPAssetFamilySelectorRouter DeclaredRoutes(Descriptor.Bounds);
+    for (const FUnrealMCPAssetFamilySelectorRoute& Route : Descriptor.SelectorRoutes)
+    {
+        if (!DeclaredRoutes.Register(Route, OutError))
+        {
+            return false;
+        }
+    }
+    if (!DeclaredRoutes.Freeze(OutError))
+    {
+        return false;
     }
     return true;
 }
@@ -458,6 +471,12 @@ bool FUnrealMCPAssetFamilyRegistry::Freeze(FUnrealMCPError& OutError)
         {
             return Left.Name < Right.Name;
         });
+        Descriptor.SelectorRoutes.Sort([](
+            const FUnrealMCPAssetFamilySelectorRoute& Left,
+            const FUnrealMCPAssetFamilySelectorRoute& Right)
+        {
+            return Left.Identity < Right.Identity;
+        });
         TArray<FName> MissingModules;
         for (const FName Module : Descriptor.RequiredModules)
         {
@@ -469,7 +488,7 @@ bool FUnrealMCPAssetFamilyRegistry::Freeze(FUnrealMCPError& OutError)
         MissingModulesByFamily.Add(Descriptor.FamilyId, MoveTemp(MissingModules));
 
         Material += FString::Printf(
-            TEXT("%s|%s|%d|%d|%d%d%d|%d,%d,%d,%d,%d,%d,%d,%d|"),
+            TEXT("%s|%s|%d|%d|%d%d%d|%d|%d,%d,%d,%d,%d,%d,%d,%d|"),
             *Descriptor.FamilyId,
             *Descriptor.NativeClass->GetPathName(),
             static_cast<int32>(Descriptor.ClassPolicy),
@@ -477,6 +496,7 @@ bool FUnrealMCPAssetFamilyRegistry::Freeze(FUnrealMCPError& OutError)
             Descriptor.Capabilities.bInspection ? 1 : 0,
             Descriptor.Capabilities.bCreation ? 1 : 0,
             Descriptor.Capabilities.bEditing ? 1 : 0,
+            Descriptor.bComposableInspectionOverlay ? 1 : 0,
             Descriptor.Bounds.MaxDocumentRecords,
             Descriptor.Bounds.MaxDocumentBytes,
             Descriptor.Bounds.MaxValueNodes,
@@ -493,6 +513,11 @@ bool FUnrealMCPAssetFamilyRegistry::Freeze(FUnrealMCPError& OutError)
         for (const FUnrealMCPAssetFamilyLimit& Limit : Descriptor.Limits)
         {
             Material += Limit.Name + TEXT("=") + LexToString(Limit.Value) + TEXT(",");
+        }
+        Material += TEXT("|");
+        for (const FUnrealMCPAssetFamilySelectorRoute& Route : Descriptor.SelectorRoutes)
+        {
+            Material += Route.Identity + TEXT("=") + FString::Join(Route.Prefix, TEXT("/")) + TEXT(",");
         }
         Material += TEXT(";");
     }
@@ -523,6 +548,25 @@ bool FUnrealMCPAssetFamilyRegistry::Select(
     FUnrealMCPAssetFamilySelection& OutSelection,
     FUnrealMCPError& OutError) const
 {
+    return SelectSingle(AssetClass, Capability, false, OutSelection, OutError);
+}
+
+bool FUnrealMCPAssetFamilyRegistry::SelectPrimary(
+    const UClass* AssetClass,
+    EUnrealMCPAssetFamilyCapability Capability,
+    FUnrealMCPAssetFamilySelection& OutSelection,
+    FUnrealMCPError& OutError) const
+{
+    return SelectSingle(AssetClass, Capability, true, OutSelection, OutError);
+}
+
+bool FUnrealMCPAssetFamilyRegistry::SelectSingle(
+    const UClass* AssetClass,
+    EUnrealMCPAssetFamilyCapability Capability,
+    bool bPrimaryOnly,
+    FUnrealMCPAssetFamilySelection& OutSelection,
+    FUnrealMCPError& OutError) const
+{
     OutSelection = {};
     if (!bFrozen)
     {
@@ -539,6 +583,10 @@ bool FUnrealMCPAssetFamilyRegistry::Select(
     TArray<const FUnrealMCPAssetFamilyDescriptor*> Best;
     for (const FUnrealMCPAssetFamilyDescriptor& Descriptor : Descriptors)
     {
+        if (bPrimaryOnly && Descriptor.bComposableInspectionOverlay)
+        {
+            continue;
+        }
         const bool bMatches = Descriptor.ClassPolicy == EUnrealMCPAssetFamilyClassPolicy::Exact
             ? AssetClass == Descriptor.NativeClass
             : AssetClass->IsChildOf(Descriptor.NativeClass);
@@ -575,6 +623,47 @@ bool FUnrealMCPAssetFamilyRegistry::Select(
     {
         SetError(OutError, TEXT("unsupported_operation"), TEXT("The selected asset family does not declare the requested capability"));
         return false;
+    }
+    return true;
+}
+
+bool FUnrealMCPAssetFamilyRegistry::SelectInspectionOverlays(
+    const UClass* SemanticClass,
+    TArray<const FUnrealMCPAssetFamilyDescriptor*>& OutDescriptors,
+    FUnrealMCPError& OutError) const
+{
+    OutDescriptors.Reset();
+    if (!bFrozen)
+    {
+        SetError(OutError, TEXT("invalid_state"), TEXT("Asset-family registry is not frozen"));
+        return false;
+    }
+    if (SemanticClass == nullptr)
+    {
+        return true;
+    }
+    for (const FUnrealMCPAssetFamilyDescriptor& Descriptor : Descriptors)
+    {
+        if (!Descriptor.bComposableInspectionOverlay
+            || !SupportsCapability(Descriptor, EUnrealMCPAssetFamilyCapability::Inspection))
+        {
+            continue;
+        }
+        const bool bMatches = Descriptor.ClassPolicy == EUnrealMCPAssetFamilyClassPolicy::Exact
+            ? SemanticClass == Descriptor.NativeClass
+            : SemanticClass->IsChildOf(Descriptor.NativeClass);
+        if (!bMatches)
+        {
+            continue;
+        }
+        if (!MissingModulesByFamily.FindRef(Descriptor.FamilyId).IsEmpty())
+        {
+            SetError(OutError, TEXT("dependency_unavailable"),
+                TEXT("A matching companion asset family has unavailable required modules"));
+            OutDescriptors.Reset();
+            return false;
+        }
+        OutDescriptors.Add(&Descriptor);
     }
     return true;
 }

@@ -1,6 +1,5 @@
 # Planned features
 
-- [`companion-asset-adapters` — Unified companion asset integration](companion-asset-adapters.md).
 - [`asset-inspect-data` — Data Asset and Data Table inspection](asset-inspect-data.md).
 - [`asset-inspect-umg` — Base UMG Widget Blueprint inspection](asset-inspect-umg.md).
 - [`asset-inspect-animation` — Animation Blueprint semantic inspection](asset-inspect-animation.md).

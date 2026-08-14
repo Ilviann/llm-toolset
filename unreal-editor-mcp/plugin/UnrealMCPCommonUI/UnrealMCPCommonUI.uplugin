@@ -1,7 +1,7 @@
 {
   "FileVersion": 3,
-  "Version": 10001,
-  "VersionName": "0.1.1",
+  "Version": 20000,
+  "VersionName": "0.2.0",
   "companion_api_version": 2,
   "FriendlyName": "Unreal MCP CommonUI",
   "Description": "Optional read-only CommonUI Widget Blueprint inspection companion for Unreal MCP.",

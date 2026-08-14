@@ -29,9 +29,9 @@ The numbered list is the preferred delivery order. The three extension features 
 - Require one exact project-content asset path as an `asset_inspect` parameter. The tool does not discover or search by folder, name, class, or family.
 - Accept either exact Unreal package form such as `/Game/Folder/Asset` or object form such as `/Game/Folder/Asset.Asset`, and normalize both to the canonical object path before loading, inspection, response generation, snapshot calculation, and page selection.
 - Reuse safe codecs and structural fingerprinting where their semantics match. `game_data_inspect` remains published; the reconstruction-oriented Blueprint facade was removed when `asset_inspect` covered its core analysis role.
-- Add base UMG Widget Blueprint logic and layout through `asset-inspect-umg`. Exclude CommonUI companion records and MVVM-specific features.
+- Add base UMG Widget Blueprint logic and layout through `asset-inspect-umg`. CommonUI companion records compose separately through API-v2 adapters; MVVM remains separate.
 - Exclude Widget Animation timeline inspection from `asset-inspect-umg`. Animation variables and calls may still appear as ordinary references or call nodes in Widget Blueprint logic graphs, but the tool does not inspect animation bindings, MovieScene tracks, sections, or keyframes.
-- Exclude GAS Gameplay Ability and Gameplay Effect integration from this planned feature set so `asset_inspect` does not require a GAS companion or change the companion API.
+- Keep core inspection independent of GAS. When the optional API-v2 GAS companion is admitted, its Gameplay Ability and Gameplay Effect overlays compose without making the companion a base requirement.
 - Optimize output for semantic analysis of the asset's behavior, algorithms, structure, relationships, and meaningful data. One-to-one asset reconstruction from the result is explicitly out of scope.
 - Use hierarchical inspection rather than automatically emitting every semantic detail. A default request returns a compact asset-specific index; a targeted request returns the selected logical child in depth.
 - When an important non-graph property group can become large, keep its small semantic summary and child count in the root response and advertise an exact selector for bounded, pageable detail. Do not omit the property group merely to reduce the root footprint. Graphs are an explicit atomic exception and are never paged.
@@ -80,8 +80,8 @@ Add or expand `asset_inspect` coverage for:
 - Actor-owned components are already records within supported Actor-family Blueprint inspection. `asset-inspect-core` also includes standalone Actor Component Blueprint assets, which are not a published Blueprint family and therefore need a new classification and collector path.
 - Blueprint Interfaces are declarations-only core families. Animation Blueprints and Data Assets are not deeply inspected and require their separately planned family work.
 - Data Tables and user-defined structs already have the separate game-data inspector; Data Assets do not use that contract.
-- Ordinary Widget Blueprint logic and tree inspection is already in the base and will be reused by `asset-inspect-umg`. CommonUI inspection is an optional companion contribution and is explicitly outside this feature set; MVVM inspection remains a separate planned feature.
-- GAS Ability and GAS Effect collectors already exist as optional companion contributions, but this feature set deliberately does not route or expose them through `asset_inspect`. This keeps the staged work independent of the GAS companion and avoids a companion API change.
+- Ordinary Widget Blueprint logic and tree inspection is already in the base and will be reused by `asset-inspect-umg`. CommonUI inspection composes as an optional companion overlay; MVVM inspection remains a separate planned feature.
+- GAS Ability and GAS Effect collectors compose through optional inspection overlays. Their absence or rejection changes no base family, schema, or response contract.
 
 ## Current repository evidence
 
@@ -146,7 +146,7 @@ Selector paths use `/` between segments. Encode every name-derived segment as UT
 
 Only admitted live contributions appear in root output or selector routing. Each contribution declares stable limits and fingerprint material; companion records participate in the same asset snapshot and pagination bounds. Missing, disabled, incompatible, or unready companions leave the neutral base response intact and expose none of their blocks or selectors.
 
-The current companion structure already supports an exact `TargetClassPath` and `bAllowDerivedTargetClasses`, but it does not define `asset_inspect` root-block or hierarchical-selector contribution contracts. Adding those contracts in a later stage is a companion API change and therefore requires an impact report, API increment, migration of every companion and fixture, independent semantic-version bumps, packaging, and full regression verification at implementation time.
+Companion API v2 asset families declare exact class policy, bounded root blocks, selector routes, and snapshot builders. Admitted inspection-only families compose over the base storage family in deterministic family-ID order. Block, selector, or snapshot collisions fail closed; absence or rejection leaves the neutral base response intact. GAS and CommonUI use this contract without changing the API-v2 or schema-revision values.
 
 ### Capability shape
 
@@ -184,7 +184,7 @@ Prefer records that explain control flow, data flow, ordering, conditions, depen
 
 Media payloads are outside this goal even when technically readable. Do not emit texture pixels, audio or video content, mesh geometry buffers, thumbnails, source-art bytes, encoded media, or filesystem paths intended to retrieve those payloads.
 
-Internal specialized collectors remain authoritative where authoring preconditions or family codecs depend on them. `asset_inspect` owns the model-facing semantic contract; `game_data_inspect` remains published, while the former reconstruction-oriented Blueprint tool was removed in 0.36.0. Companion inspection registrations remain dormant until a redesigned read contract is approved.
+Internal specialized collectors remain authoritative where authoring preconditions or family codecs depend on them. `asset_inspect` owns the model-facing semantic contract; `game_data_inspect` remains published, while the former reconstruction-oriented Blueprint tool was removed in 0.36.0. Admitted API-v2 companion inspection families contribute only through the common facade.
 
 ### Output implementation
 

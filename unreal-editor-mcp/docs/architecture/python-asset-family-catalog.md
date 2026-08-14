@@ -12,7 +12,7 @@ Tool-family schema modules do not depend on the catalog or server. The static ca
 
 - Family IDs, public tool names, companion identities, contribution keys, and native command mappings are unique. Access classes, handlers, result policies, schema revisions, and native requirements are exact and validated before serving.
 - Readonly and lifecycle filtering preserves catalog order. When native `capabilities.commands` is present, a tool is published only when all of its required commands are listed; missing or malformed command lists fail closed without changing unrelated schemas. An absent command field retains offline startup publication so the server can report editor unavailability through normal calls.
-- Built-in schemas and all approved companion branches are Python-owned constants. Exact native companion API/schema identity, readiness, contribution keys, startup access, and known Python entries must intersect before a branch is published.
+- Built-in schemas and all approved companion branches are Python-owned constants. Exact native companion API/schema identity, readiness, expected asset-family IDs, inspection-only operation shape, startup access, and known Python entries must intersect before a companion becomes effectively ready.
 - Server dispatch uses the catalog's operation mapping. Only catalog-declared local handlers bypass the bridge, and only catalog-declared result policies transform success output. `asset_inspect` remains the sole safe-YAML result; every other released tool retains JSON text.
 - Composition deep-copies schemas. Capability transitions and companion additions cannot mutate the static catalog or leak branches into a later composition.
 

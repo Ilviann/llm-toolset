@@ -99,6 +99,7 @@ class AssetFamilyPublication:
     schema_revision: int | None = None
     contributions: tuple[CompanionContribution, ...] = ()
     integrated_sections: tuple[IntegratedSections, ...] = ()
+    native_family_ids: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -137,13 +138,21 @@ class StaticAssetFamilyCatalog:
                 raise RuntimeError(f"Duplicate or empty Python asset family: {entry.family_id!r}")
             family_ids.add(entry.family_id)
             if entry.extension_id is None:
-                if entry.schema_revision is not None or entry.contributions or entry.integrated_sections:
+                if (entry.schema_revision is not None or entry.contributions
+                        or entry.integrated_sections or entry.native_family_ids):
                     raise RuntimeError(f"Built-in family {entry.family_id!r} has companion metadata")
             else:
                 if entry.extension_id in extension_ids:
                     raise RuntimeError(f"Duplicate Python companion family: {entry.extension_id!r}")
                 if type(entry.schema_revision) is not int or entry.schema_revision <= 0:
                     raise RuntimeError(f"Companion family {entry.family_id!r} has invalid schema revision")
+                if (
+                    len(entry.native_family_ids) != len(set(entry.native_family_ids))
+                    or any(not family_id for family_id in entry.native_family_ids)
+                ):
+                    raise RuntimeError(
+                        f"Companion family {entry.family_id!r} has invalid native family identities"
+                    )
                 extension_ids.add(entry.extension_id)
             for publication in entry.tools:
                 definition = publication.definition
@@ -355,27 +364,13 @@ CATALOG_ENTRIES: Final = (
         "gas-companion",
         extension_id="unreal-mcp-gas",
         schema_revision=EXTENSION_SCHEMA_REVISION,
-        integrated_sections=(
-            IntegratedSections(
-                "blueprint_inspect", "inspect_gameplay_ability", READ_ACCESS,
-                ("gameplay_ability",),
-            ),
-            IntegratedSections(
-                "blueprint_inspect", "inspect_gameplay_effect", READ_ACCESS,
-                ("gameplay_effect",),
-            ),
-        ),
+        native_family_ids=("gameplay_ability", "gameplay_effect"),
     ),
     AssetFamilyPublication(
         "commonui-companion",
         extension_id="unreal-mcp-commonui",
         schema_revision=EXTENSION_SCHEMA_REVISION,
-        integrated_sections=(
-            IntegratedSections(
-                "blueprint_inspect", "inspect_commonui_widget", READ_ACCESS,
-                ("commonui_widget", "commonui_activation", "commonui_references"),
-            ),
-        ),
+        native_family_ids=("commonui_widget",),
     ),
 )
 
@@ -429,6 +424,26 @@ def _valid_native_asset_families(value: object) -> bool:
     return True
 
 
+def _matches_known_asset_families(
+    known: AssetFamilyPublication,
+    value: object,
+) -> bool:
+    if not _valid_native_asset_families(value) or not isinstance(value, list):
+        return False
+    if not known.native_family_ids:
+        return True
+    by_id = {
+        family.get("family_id"): family
+        for family in value if isinstance(family, dict)
+    }
+    if set(by_id) != set(known.native_family_ids):
+        return False
+    return all(
+        family.get("operations") == {"inspect": True, "create": False, "edit": False}
+        for family in by_id.values()
+    )
+
+
 def _compose_companion_branches(
     companions_catalog: Mapping[str, AssetFamilyPublication],
     tools: list[dict[str, object]],
@@ -454,7 +469,9 @@ def _compose_companion_branches(
             known is None
             or companion.get("companion_api_version") != COMPANION_API_VERSION
             or companion.get("schema_revision") != known.schema_revision
-            or not _valid_native_asset_families(companion.get("asset_families"))
+            or not _matches_known_asset_families(
+                known, companion.get("asset_families")
+            )
         ):
             continue
         native_contributions = companion.get("contributions")
@@ -568,7 +585,9 @@ def compose_companion_capabilities(native_capabilities: dict[str, object]) -> No
             and host_api_match
             and companion.get("schema_revision") == known.schema_revision
             and companion.get("companion_api_version") == COMPANION_API_VERSION
-            and _valid_native_asset_families(companion.get("asset_families"))
+            and _matches_known_asset_families(
+                known, companion.get("asset_families")
+            )
         )
         native_ready = companion.get("ready") is True
         companion["python_known"] = python_known

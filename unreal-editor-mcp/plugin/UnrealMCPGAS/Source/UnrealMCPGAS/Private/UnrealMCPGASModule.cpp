@@ -14,7 +14,7 @@
 
 namespace UnrealMCPGAS
 {
-FUnrealMCPExtensionContribution MakeGameplayEffectInspectionContribution();
+FUnrealMCPCompanionAssetFamily MakeGameplayEffectInspectionFamily();
 }
 
 #if WITH_DEV_AUTOMATION_TESTS
@@ -467,6 +467,186 @@ public:
     }
 };
 
+UGameplayAbility* ResolveAbilityDefaults(UObject* Asset)
+{
+    UBlueprint* Blueprint = Cast<UBlueprint>(Asset);
+    UClass* GeneratedClass = Blueprint != nullptr
+        ? (Blueprint->GeneratedClass != nullptr ? Blueprint->GeneratedClass : Blueprint->ParentClass)
+        : nullptr;
+    return GeneratedClass != nullptr
+        ? Cast<UGameplayAbility>(GeneratedClass->GetDefaultObject(false)) : nullptr;
+}
+
+void ConvertInspectionError(
+    const FUnrealMCPExtensionError& Input,
+    FUnrealMCPError& Output)
+{
+    Output.Code = Input.Code;
+    Output.Message = Input.Message;
+    Output.Details = Input.Details;
+    Output.bRetryable = Input.bRetryable;
+}
+
+bool AddInspectionBlock(
+    const TSharedPtr<FUnrealMCPRecord>& Result,
+    const FString& Section,
+    FUnrealMCPAssetFamilyDocumentBuilder& Document,
+    FUnrealMCPError& OutError)
+{
+    const TArray<TSharedPtr<FUnrealMCPValue>>* Records = nullptr;
+    if (!Result.IsValid() || !Result->TryGetArrayField(TEXT("records"), Records)
+        || Records == nullptr || Records->IsEmpty()
+        || Records->Num() > UnrealMCPGAS::MaxInspectionRecords)
+    {
+        OutError = {TEXT("extension_contract_violation"),
+            TEXT("The GAS adapter returned an invalid semantic block")};
+        return false;
+    }
+    const TSharedRef<FUnrealMCPRecord> Block = MakeShared<FUnrealMCPRecord>();
+    TSet<FString> Names;
+    for (const TSharedPtr<FUnrealMCPValue>& Value : *Records)
+    {
+        const TSharedPtr<FUnrealMCPRecord>* Record = nullptr;
+        FString RecordSection;
+        const FString Prefix = Section + TEXT("_");
+        if (!Value.IsValid() || !Value->TryGetObject(Record)
+            || Record == nullptr || !Record->IsValid()
+            || !(*Record)->TryGetStringField(TEXT("section"), RecordSection)
+            || !RecordSection.StartsWith(Prefix))
+        {
+            OutError = {TEXT("extension_contract_violation"),
+                TEXT("The GAS adapter returned an invalid semantic block")};
+            return false;
+        }
+        const FString Name = RecordSection.RightChop(Prefix.Len());
+        if (Name.IsEmpty() || Names.Contains(Name))
+        {
+            OutError = {TEXT("extension_contract_violation"),
+                TEXT("The GAS adapter returned colliding semantic subrecords")};
+            return false;
+        }
+        Names.Add(Name);
+        (*Record)->RemoveField(TEXT("section"));
+        Block->SetObjectField(Name, *Record);
+    }
+    return Document.Add({Section, TEXT("record"),
+        MakeShared<FUnrealMCPValueObject>(Block)}, OutError);
+}
+
+class FGameplayAbilityAssetInspectionAdapter final
+    : public IUnrealMCPAssetFamilyInspectionAdapter
+{
+public:
+    bool Inspect(
+        const FUnrealMCPAssetFamilyInspectionContext& Context,
+        FUnrealMCPAssetFamilyDocumentBuilder& Document,
+        FUnrealMCPAssetFamilySelectorRouter& Selectors,
+        FUnrealMCPAssetFamilySnapshotBuilder& Snapshot,
+        FUnrealMCPError& OutError) override
+    {
+        if (Context.bHasPaging || Context.bHasPartialGraphFlag)
+        {
+            OutError = {TEXT("invalid_argument"),
+                TEXT("Gameplay Ability selectors do not support paging or graph flags")};
+            return false;
+        }
+        if (!Selectors.Register(
+            {TEXT("gameplay_ability"), {TEXT("gameplay_ability")}, false, false}, OutError)
+            || !Selectors.Freeze(OutError))
+        {
+            return false;
+        }
+        if (!Context.Selector.IsRoot()
+            && Selectors.Resolve(Context.Selector, OutError) == nullptr)
+        {
+            return false;
+        }
+        UGameplayAbility* Ability = ResolveAbilityDefaults(Context.Asset);
+        if (Ability == nullptr)
+        {
+            OutError = {TEXT("invalid_asset"),
+                TEXT("The asset does not represent a Gameplay Ability class")};
+            return false;
+        }
+        const TSharedRef<FUnrealMCPRecord> Arguments = MakeShared<FUnrealMCPRecord>();
+        Arguments->SetStringField(TEXT("mode"), TEXT("inspect"));
+        Arguments->SetArrayField(TEXT("sections"), {
+            MakeShared<FUnrealMCPValueString>(TEXT("gameplay_ability"))});
+        TSharedPtr<FUnrealMCPRecord> Result;
+        FUnrealMCPExtensionError ExtensionError;
+        if (!Handler.Inspect(*Ability, OperationName, Arguments, Result, ExtensionError))
+        {
+            ConvertInspectionError(ExtensionError, OutError);
+            return false;
+        }
+        FString Fingerprint;
+        if (!Handler.AppendFingerprint(
+            *Ability, OperationName, Fingerprint, ExtensionError))
+        {
+            ConvertInspectionError(ExtensionError, OutError);
+            return false;
+        }
+        if (Context.Selector.IsRoot())
+        {
+            if (!Document.Add({TEXT("selectors"), TEXT("array"),
+                MakeShared<FUnrealMCPValueArray>(TArray<TSharedPtr<FUnrealMCPValue>>{
+                    MakeShared<FUnrealMCPValueString>(TEXT("gameplay_ability"))})}, OutError))
+            {
+                return false;
+            }
+        }
+        else
+        {
+            const TSharedRef<FUnrealMCPRecord> Selection = MakeShared<FUnrealMCPRecord>();
+            Selection->SetStringField(TEXT("selector"), TEXT("gameplay_ability"));
+            Selection->SetStringField(TEXT("kind"), TEXT("record"));
+            if (!Document.Add({TEXT("selection"), TEXT("record"),
+                MakeShared<FUnrealMCPValueObject>(Selection)}, OutError))
+            {
+                return false;
+            }
+        }
+        return AddInspectionBlock(Result, TEXT("gameplay_ability"), Document, OutError)
+            && Snapshot.Add(TEXT("gameplay_ability"), Fingerprint, OutError);
+    }
+
+private:
+    FGameplayAbilityInspectionHandler Handler;
+};
+
+FUnrealMCPCompanionAssetFamily GameplayAbilityFamily()
+{
+    FUnrealMCPCompanionAssetFamily Family;
+    Family.FamilyId = TEXT("gameplay_ability");
+    Family.NativeClassPath = UGameplayAbility::StaticClass()->GetPathName();
+    Family.ClassPolicy = EUnrealMCPAssetFamilyClassPolicy::ExactAndDerived;
+    Family.Priority = 200;
+    Family.RequiredModules = {TEXT("GameplayAbilities")};
+    Family.Bounds.MaxDocumentBytes = 4 * 1024 * 1024;
+    Family.Bounds.MaxValueNodes = 65536;
+    Family.Limits = {
+        {TEXT("records"), UnrealMCPGAS::MaxInspectionRecords},
+        {TEXT("tags_per_container"), UnrealMCPGAS::MaxTagsPerContainer},
+        {TEXT("triggers"), UnrealMCPGAS::MaxAbilityTriggers},
+        {TEXT("tag_scan"), UnrealMCPGAS::MaxTagScan},
+        {TEXT("trigger_scan"), UnrealMCPGAS::MaxTriggerScan}};
+    Family.Capabilities.bInspection = true;
+    Family.SelectorRoutes = {
+        {TEXT("gameplay_ability"), {TEXT("gameplay_ability")}, false, false}};
+    Family.InspectionAdapter = MakeShared<FGameplayAbilityAssetInspectionAdapter>();
+    Family.SnapshotBuilder = [](UObject* Asset)
+    {
+        UGameplayAbility* Ability = ResolveAbilityDefaults(Asset);
+        if (Ability == nullptr) return FString();
+        FGameplayAbilityInspectionHandler Handler;
+        FUnrealMCPExtensionError Error;
+        FString Fingerprint;
+        return Handler.AppendFingerprint(
+            *Ability, OperationName, Fingerprint, Error) ? Fingerprint : FString();
+    };
+    return Family;
+}
+
 #if WITH_DEV_AUTOMATION_TESTS
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FUnrealMCPGASAbilityInspectionTest,
@@ -528,6 +708,22 @@ bool FUnrealMCPGASAbilityInspectionTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Inspection preserves package dirtiness"),
         Package->IsDirty(), bDirtyBefore);
     TestTrue(TEXT("Fingerprint includes typed state"), !FirstFingerprint.IsEmpty());
+    FGameplayAbilityAssetInspectionAdapter Adapter;
+    FUnrealMCPAssetFamilyInspectionContext Context;
+    Context.Asset = Blueprint;
+    Context.Identity = {Blueprint->GetPathName(), TEXT("fixture_snapshot")};
+    FUnrealMCPAssetFamilyDocumentBuilder Document{FUnrealMCPAssetFamilyLimits()};
+    FUnrealMCPAssetFamilySelectorRouter Selectors{FUnrealMCPAssetFamilyLimits()};
+    FUnrealMCPAssetFamilySnapshotBuilder Snapshot{FUnrealMCPAssetFamilyLimits()};
+    FUnrealMCPError AdapterError;
+    TestTrue(TEXT("Gameplay Ability common asset adapter returns its semantic block"),
+        Adapter.Inspect(Context, Document, Selectors, Snapshot, AdapterError));
+    TestTrue(TEXT("Gameplay Ability adapter publishes its selector"),
+        Document.GetRecords().ContainsByPredicate([](const FUnrealMCPAssetFamilyValueRecord& Value)
+        { return Value.Path == TEXT("selectors"); }));
+    TestTrue(TEXT("Gameplay Ability adapter publishes its root block"),
+        Document.GetRecords().ContainsByPredicate([](const FUnrealMCPAssetFamilyValueRecord& Value)
+        { return Value.Path == TEXT("gameplay_ability"); }));
     return true;
 }
 #endif
@@ -537,30 +733,6 @@ class FUnrealMCPGASModule final : public IModuleInterface
 public:
     void StartupModule() override
     {
-        FUnrealMCPExtensionContribution AbilityContribution;
-        AbilityContribution.ContributionId = TEXT("gameplay_ability_inspection");
-        AbilityContribution.Category = EUnrealMCPExtensionCategory::AssetFamily;
-        AbilityContribution.Access = EUnrealMCPExtensionAccess::Read;
-        AbilityContribution.Persistence = EUnrealMCPExtensionPersistence::None;
-        AbilityContribution.ToolFamily = TEXT("blueprint_inspect");
-        AbilityContribution.Operation = OperationName;
-        AbilityContribution.TargetFamily = TEXT("gameplay_ability");
-        AbilityContribution.TargetClassPath = UGameplayAbility::StaticClass()->GetPathName();
-        AbilityContribution.bAllowDerivedTargetClasses = true;
-        AbilityContribution.RequiredLiveCapability = TEXT("gas_ability_blueprints_inspection");
-        AbilityContribution.AllowedArgumentFields = {
-            TEXT("mode"), TEXT("sections"), TEXT("graph_id"), TEXT("component_id"),
-            TEXT("member_id"), TEXT("function_id"), TEXT("local_id"), TEXT("macro_id"),
-            TEXT("custom_event_id"), TEXT("widget_id"), TEXT("property_names"),
-            TEXT("include_inherited"), TEXT("page_size")};
-        AbilityContribution.StableLimits = {
-            {TEXT("records"), UnrealMCPGAS::MaxInspectionRecords},
-            {TEXT("tags_per_container"), UnrealMCPGAS::MaxTagsPerContainer},
-            {TEXT("triggers"), UnrealMCPGAS::MaxAbilityTriggers},
-            {TEXT("tag_scan"), UnrealMCPGAS::MaxTagScan},
-            {TEXT("trigger_scan"), UnrealMCPGAS::MaxTriggerScan}};
-        AbilityContribution.Handler = MakeShared<FGameplayAbilityInspectionHandler>();
-
         FUnrealMCPCompanionRegistration Registration;
         Registration.PluginName = TEXT("UnrealMCPGAS");
         Registration.ExtensionId = TEXT("unreal-mcp-gas");
@@ -573,8 +745,8 @@ public:
         // necessarily register either transitive runtime module as explicitly loaded. The
         // owning GameplayAbilities module is the authoritative live-module admission gate.
         Registration.RequiredEngineModules = {TEXT("GameplayAbilities")};
-        Registration.Contributions.Add(MoveTemp(AbilityContribution));
-        Registration.Contributions.Add(UnrealMCPGAS::MakeGameplayEffectInspectionContribution());
+        Registration.AssetFamilies.Add(GameplayAbilityFamily());
+        Registration.AssetFamilies.Add(UnrealMCPGAS::MakeGameplayEffectInspectionFamily());
         RegistrationResult = IUnrealMCPModule::Get().RegisterCompanion(Registration, *this);
     }
 

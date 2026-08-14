@@ -1636,6 +1636,141 @@ public:
     }
 };
 
+UGameplayEffect* ResolveGameplayEffectDefaults(UObject* Asset)
+{
+    UBlueprint* Blueprint = Cast<UBlueprint>(Asset);
+    UClass* GeneratedClass = Blueprint != nullptr
+        ? (Blueprint->GeneratedClass != nullptr ? Blueprint->GeneratedClass : Blueprint->ParentClass)
+        : nullptr;
+    return GeneratedClass != nullptr
+        ? Cast<UGameplayEffect>(GeneratedClass->GetDefaultObject(false)) : nullptr;
+}
+
+void ConvertGameplayEffectInspectionError(
+    const FUnrealMCPExtensionError& Input,
+    FUnrealMCPError& Output)
+{
+    Output.Code = Input.Code;
+    Output.Message = Input.Message;
+    Output.Details = Input.Details;
+    Output.bRetryable = Input.bRetryable;
+}
+
+class FGameplayEffectAssetInspectionAdapter final
+    : public IUnrealMCPAssetFamilyInspectionAdapter
+{
+public:
+    bool Inspect(
+        const FUnrealMCPAssetFamilyInspectionContext& Context,
+        FUnrealMCPAssetFamilyDocumentBuilder& Document,
+        FUnrealMCPAssetFamilySelectorRouter& Selectors,
+        FUnrealMCPAssetFamilySnapshotBuilder& Snapshot,
+        FUnrealMCPError& OutError) override
+    {
+        if (Context.bHasPaging || Context.bHasPartialGraphFlag)
+        {
+            OutError = {TEXT("invalid_argument"),
+                TEXT("Gameplay Effect selectors do not support paging or graph flags")};
+            return false;
+        }
+        if (!Selectors.Register(
+            {TEXT("gameplay_effect"), {TEXT("gameplay_effect")}, false, false}, OutError)
+            || !Selectors.Freeze(OutError)
+            || (!Context.Selector.IsRoot()
+                && Selectors.Resolve(Context.Selector, OutError) == nullptr))
+        {
+            return false;
+        }
+        UGameplayEffect* Effect = ResolveGameplayEffectDefaults(Context.Asset);
+        if (Effect == nullptr)
+        {
+            OutError = {TEXT("invalid_asset"),
+                TEXT("The asset does not represent a Gameplay Effect class")};
+            return false;
+        }
+        const TSharedRef<FUnrealMCPRecord> Arguments = MakeShared<FUnrealMCPRecord>();
+        Arguments->SetStringField(TEXT("mode"), TEXT("inspect"));
+        Arguments->SetArrayField(TEXT("sections"), {
+            MakeShared<FUnrealMCPValueString>(TEXT("gameplay_effect"))});
+        TSharedPtr<FUnrealMCPRecord> Result;
+        FUnrealMCPExtensionError ExtensionError;
+        if (!Handler.Inspect(*Effect, GameplayEffectOperation, Arguments, Result, ExtensionError))
+        {
+            ConvertGameplayEffectInspectionError(ExtensionError, OutError);
+            return false;
+        }
+        const TArray<TSharedPtr<FUnrealMCPValue>>* Records = nullptr;
+        if (!Result.IsValid() || !Result->TryGetArrayField(TEXT("records"), Records)
+            || Records == nullptr
+            || Records->Num() != UnrealMCPGAS::MaxGameplayEffectInspectionRecords)
+        {
+            OutError = {TEXT("extension_contract_violation"),
+                TEXT("The GAS adapter returned an invalid Gameplay Effect block")};
+            return false;
+        }
+        const TSharedRef<FUnrealMCPRecord> Block = MakeShared<FUnrealMCPRecord>();
+        TSet<FString> Names;
+        for (const TSharedPtr<FUnrealMCPValue>& Value : *Records)
+        {
+            const TSharedPtr<FUnrealMCPRecord>* Record = nullptr;
+            FString Section;
+            constexpr int32 PrefixLength = 16;
+            if (!Value.IsValid() || !Value->TryGetObject(Record)
+                || Record == nullptr || !Record->IsValid()
+                || !(*Record)->TryGetStringField(TEXT("section"), Section)
+                || !Section.StartsWith(TEXT("gameplay_effect_")))
+            {
+                OutError = {TEXT("extension_contract_violation"),
+                    TEXT("The GAS adapter returned an invalid Gameplay Effect block")};
+                return false;
+            }
+            const FString Name = Section.RightChop(PrefixLength);
+            if (Name.IsEmpty() || Names.Contains(Name))
+            {
+                OutError = {TEXT("extension_contract_violation"),
+                    TEXT("The GAS adapter returned colliding Gameplay Effect subrecords")};
+                return false;
+            }
+            Names.Add(Name);
+            (*Record)->RemoveField(TEXT("section"));
+            Block->SetObjectField(Name, *Record);
+        }
+        FString Fingerprint;
+        if (!Handler.AppendFingerprint(
+            *Effect, GameplayEffectOperation, Fingerprint, ExtensionError))
+        {
+            ConvertGameplayEffectInspectionError(ExtensionError, OutError);
+            return false;
+        }
+        if (Context.Selector.IsRoot())
+        {
+            if (!Document.Add({TEXT("selectors"), TEXT("array"),
+                MakeShared<FUnrealMCPValueArray>(TArray<TSharedPtr<FUnrealMCPValue>>{
+                    MakeShared<FUnrealMCPValueString>(TEXT("gameplay_effect"))})}, OutError))
+            {
+                return false;
+            }
+        }
+        else
+        {
+            const TSharedRef<FUnrealMCPRecord> Selection = MakeShared<FUnrealMCPRecord>();
+            Selection->SetStringField(TEXT("selector"), TEXT("gameplay_effect"));
+            Selection->SetStringField(TEXT("kind"), TEXT("record"));
+            if (!Document.Add({TEXT("selection"), TEXT("record"),
+                MakeShared<FUnrealMCPValueObject>(Selection)}, OutError))
+            {
+                return false;
+            }
+        }
+        return Document.Add({TEXT("gameplay_effect"), TEXT("record"),
+                MakeShared<FUnrealMCPValueObject>(Block)}, OutError)
+            && Snapshot.Add(TEXT("gameplay_effect"), Fingerprint, OutError);
+    }
+
+private:
+    FGameplayEffectInspectionHandler Handler;
+};
+
 #if WITH_DEV_AUTOMATION_TESTS
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FUnrealMCPGASGameplayEffectInspectionTest,
@@ -1834,25 +1969,17 @@ bool FUnrealMCPGASGameplayEffectLiveFixtureTest::RunTest(const FString& Paramete
 
 namespace UnrealMCPGAS
 {
-FUnrealMCPExtensionContribution MakeGameplayEffectInspectionContribution()
+FUnrealMCPCompanionAssetFamily MakeGameplayEffectInspectionFamily()
 {
-    FUnrealMCPExtensionContribution Contribution;
-    Contribution.ContributionId = TEXT("gameplay_effect_inspection");
-    Contribution.Category = EUnrealMCPExtensionCategory::AssetFamily;
-    Contribution.Access = EUnrealMCPExtensionAccess::Read;
-    Contribution.Persistence = EUnrealMCPExtensionPersistence::None;
-    Contribution.ToolFamily = TEXT("blueprint_inspect");
-    Contribution.Operation = GameplayEffectOperation;
-    Contribution.TargetFamily = TEXT("gameplay_effect");
-    Contribution.TargetClassPath = UGameplayEffect::StaticClass()->GetPathName();
-    Contribution.bAllowDerivedTargetClasses = true;
-    Contribution.RequiredLiveCapability = TEXT("gas_gameplay_effects_inspection");
-    Contribution.AllowedArgumentFields = {
-        TEXT("mode"), TEXT("sections"), TEXT("graph_id"), TEXT("component_id"),
-        TEXT("member_id"), TEXT("function_id"), TEXT("local_id"), TEXT("macro_id"),
-        TEXT("custom_event_id"), TEXT("widget_id"), TEXT("property_names"),
-        TEXT("include_inherited"), TEXT("page_size")};
-    Contribution.StableLimits = {
+    FUnrealMCPCompanionAssetFamily Family;
+    Family.FamilyId = TEXT("gameplay_effect");
+    Family.NativeClassPath = UGameplayEffect::StaticClass()->GetPathName();
+    Family.ClassPolicy = EUnrealMCPAssetFamilyClassPolicy::ExactAndDerived;
+    Family.Priority = 200;
+    Family.RequiredModules = {TEXT("GameplayAbilities")};
+    Family.Bounds.MaxDocumentBytes = 4 * 1024 * 1024;
+    Family.Bounds.MaxValueNodes = 65536;
+    Family.Limits = {
         {TEXT("records"), MaxGameplayEffectInspectionRecords},
         {TEXT("modifiers"), MaxGameplayEffectModifiers},
         {TEXT("executions"), MaxGameplayEffectExecutions},
@@ -1865,7 +1992,20 @@ FUnrealMCPExtensionContribution MakeGameplayEffectInspectionContribution()
         {TEXT("collection_scan"), MaxGameplayEffectCollectionScan},
         {TEXT("chain_depth"), MaxGameplayEffectChainDepth},
         {TEXT("chain_assets"), MaxGameplayEffectChainAssets}};
-    Contribution.Handler = MakeShared<FGameplayEffectInspectionHandler>();
-    return Contribution;
+    Family.Capabilities.bInspection = true;
+    Family.SelectorRoutes = {
+        {TEXT("gameplay_effect"), {TEXT("gameplay_effect")}, false, false}};
+    Family.InspectionAdapter = MakeShared<FGameplayEffectAssetInspectionAdapter>();
+    Family.SnapshotBuilder = [](UObject* Asset)
+    {
+        UGameplayEffect* Effect = ResolveGameplayEffectDefaults(Asset);
+        if (Effect == nullptr) return FString();
+        FGameplayEffectInspectionHandler Handler;
+        FUnrealMCPExtensionError Error;
+        FString Fingerprint;
+        return Handler.AppendFingerprint(
+            *Effect, GameplayEffectOperation, Fingerprint, Error) ? Fingerprint : FString();
+    };
+    return Family;
 }
 }

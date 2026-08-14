@@ -94,7 +94,7 @@ adding an optional Engine-plugin dependency to the base module.
    proven.
 9. [`companion-api-v2`](../features/completed/companion-api-v2.md) migrates every
    companion and fixture together to the complete typed family API.
-10. [`companion-asset-adapters`](../features/planned/companion-asset-adapters.md)
+10. [`companion-asset-adapters`](../features/completed/companion-asset-adapters.md)
     proves inspection and authoring for optional families without dependency
     leakage into the base.
 

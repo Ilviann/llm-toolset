@@ -57,6 +57,141 @@ bool EncodeDocument(
     return true;
 }
 
+UClass* SemanticClass(UObject* AssetObject)
+{
+    if (const UBlueprint* Blueprint = Cast<UBlueprint>(AssetObject))
+    {
+        return Blueprint->GeneratedClass != nullptr
+            ? Blueprint->GeneratedClass : Blueprint->ParentClass;
+    }
+    return AssetObject != nullptr ? AssetObject->GetClass() : nullptr;
+}
+
+bool SameRoute(
+    const FUnrealMCPAssetFamilySelectorRoute& Left,
+    const FUnrealMCPAssetFamilySelectorRoute& Right)
+{
+    return Left.Identity == Right.Identity
+        && Left.Prefix == Right.Prefix
+        && Left.bPageable == Right.bPageable
+        && Left.bGraph == Right.bGraph;
+}
+
+bool ValidateAdapterRoutes(
+    const FUnrealMCPAssetFamilyDescriptor& Descriptor,
+    FUnrealMCPAssetFamilySelectorRouter& Routes,
+    FUnrealMCPError& OutError)
+{
+    if (!Routes.IsFrozen() && !Routes.Freeze(OutError))
+    {
+        return false;
+    }
+    const TArray<FUnrealMCPAssetFamilySelectorRoute>& Actual = Routes.GetRoutes();
+    if (Actual.Num() != Descriptor.SelectorRoutes.Num())
+    {
+        OutError = {TEXT("extension_contract_violation"),
+            TEXT("A companion inspection adapter changed its declared selector routes")};
+        return false;
+    }
+    for (const FUnrealMCPAssetFamilySelectorRoute& Expected : Descriptor.SelectorRoutes)
+    {
+        if (!Actual.ContainsByPredicate([&Expected](const FUnrealMCPAssetFamilySelectorRoute& Value)
+            { return SameRoute(Expected, Value); }))
+        {
+            OutError = {TEXT("extension_contract_violation"),
+                TEXT("A companion inspection adapter changed its declared selector routes")};
+            return false;
+        }
+    }
+    return true;
+}
+
+bool BuildComposedSnapshot(
+    const FUnrealMCPAssetFamilyDescriptor& Primary,
+    const TArray<const FUnrealMCPAssetFamilyDescriptor*>& Overlays,
+    UObject* AssetObject,
+    FString& OutSnapshot,
+    FUnrealMCPError& OutError)
+{
+    const FString PrimarySnapshot = Primary.SnapshotBuilder
+        ? Primary.SnapshotBuilder(AssetObject) : BuildGenericSnapshot(AssetObject);
+    if (PrimarySnapshot.IsEmpty())
+    {
+        OutError = {TEXT("internal_error"), TEXT("The primary asset-family snapshot is unavailable")};
+        return false;
+    }
+    if (Overlays.IsEmpty())
+    {
+        OutSnapshot = PrimarySnapshot;
+        return true;
+    }
+    FUnrealMCPAssetFamilySnapshotBuilder Snapshot(Primary.Bounds);
+    if (!Snapshot.Add(TEXT("primary"), PrimarySnapshot, OutError))
+    {
+        return false;
+    }
+    for (const FUnrealMCPAssetFamilyDescriptor* Overlay : Overlays)
+    {
+        const FString Value = Overlay != nullptr && Overlay->SnapshotBuilder
+            ? Overlay->SnapshotBuilder(AssetObject) : FString();
+        if (Value.IsEmpty())
+        {
+            OutError = {TEXT("extension_contract_violation"),
+                TEXT("A companion inspection snapshot is unavailable")};
+            return false;
+        }
+        if (!Snapshot.Add(Overlay->FamilyId, Value, OutError))
+        {
+            return false;
+        }
+    }
+    OutSnapshot = Snapshot.BuildSnapshotId();
+    return true;
+}
+
+bool AppendDocument(
+    const FUnrealMCPAssetFamilyDocumentBuilder& Source,
+    bool bOmitUnsupportedLimitations,
+    FUnrealMCPAssetFamilyDocumentBuilder& Target,
+    TSet<FString>& InOutSelectors,
+    FUnrealMCPError& OutError)
+{
+    for (const FUnrealMCPAssetFamilyValueRecord& Record : Source.GetRecords())
+    {
+        if (bOmitUnsupportedLimitations && Record.Path == TEXT("limitations"))
+        {
+            continue;
+        }
+        if (Record.Path == TEXT("selectors"))
+        {
+            const TArray<TSharedPtr<FUnrealMCPValue>>* Values = nullptr;
+            if (!Record.Value.IsValid() || !Record.Value->TryGetArray(Values) || Values == nullptr)
+            {
+                OutError = {TEXT("extension_contract_violation"),
+                    TEXT("An asset-family adapter returned malformed selector metadata")};
+                return false;
+            }
+            for (const TSharedPtr<FUnrealMCPValue>& Value : *Values)
+            {
+                FString Selector;
+                if (!Value.IsValid() || !Value->TryGetString(Selector) || Selector.IsEmpty())
+                {
+                    OutError = {TEXT("extension_contract_violation"),
+                        TEXT("An asset-family adapter returned malformed selector metadata")};
+                    return false;
+                }
+                InOutSelectors.Add(MoveTemp(Selector));
+            }
+            continue;
+        }
+        if (!Target.Add(Record, OutError))
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
 struct FDecodedInspectionRequest
 {
     FString AssetPath;
@@ -277,25 +412,73 @@ bool FUnrealMCPAssetInspectionService::Execute(
     }
 
     FUnrealMCPAssetFamilySelection Family;
-    if (!AssetFamilyRegistry->Select(
+    if (!AssetFamilyRegistry->SelectPrimary(
         AssetObject->GetClass(), EUnrealMCPAssetFamilyCapability::Inspection, Family, OutError))
     {
         return false;
     }
     check(Family.Descriptor != nullptr && Family.Descriptor->InspectionAdapter.IsValid());
 
+    TArray<const FUnrealMCPAssetFamilyDescriptor*> Overlays;
+    if (!AssetFamilyRegistry->SelectInspectionOverlays(
+        SemanticClass(AssetObject), Overlays, OutError))
+    {
+        return false;
+    }
+
+    FUnrealMCPAssetFamilySelectorRouter OverlayRouteRegistry(Family.Descriptor->Bounds);
+    for (const FUnrealMCPAssetFamilyDescriptor* Overlay : Overlays)
+    {
+        for (const FUnrealMCPAssetFamilySelectorRoute& Route : Overlay->SelectorRoutes)
+        {
+            if (!OverlayRouteRegistry.Register(Route, OutError))
+            {
+                OutError.Code = TEXT("extension_contract_violation");
+                OutError.Message = TEXT("Matching companion asset families have colliding selector routes");
+                return false;
+            }
+        }
+    }
+    if (!OverlayRouteRegistry.Freeze(OutError))
+    {
+        return false;
+    }
+    const FUnrealMCPAssetFamilyDescriptor* SelectedOverlay = nullptr;
+    if (!Request.SelectorSegments.IsEmpty() && !Overlays.IsEmpty())
+    {
+        FUnrealMCPAssetFamilySelector RequestedSelector{Request.SelectorSegments};
+        FUnrealMCPError RouteError;
+        const FUnrealMCPAssetFamilySelectorRoute* SelectedRoute =
+            OverlayRouteRegistry.Resolve(RequestedSelector, RouteError);
+        if (SelectedRoute != nullptr)
+        {
+            for (const FUnrealMCPAssetFamilyDescriptor* Overlay : Overlays)
+            {
+                if (Overlay->SelectorRoutes.ContainsByPredicate(
+                    [SelectedRoute](const FUnrealMCPAssetFamilySelectorRoute& Route)
+                    { return SameRoute(Route, *SelectedRoute); }))
+                {
+                    SelectedOverlay = Overlay;
+                    break;
+                }
+            }
+        }
+    }
+
     UBlueprint* Blueprint = Cast<UBlueprint>(AssetObject);
     const UPackage* Package = AssetObject->GetOutermost();
     const bool bDirtyBefore = Package != nullptr && Package->IsDirty();
     const TEnumAsByte<EBlueprintStatus> StatusBefore = Blueprint != nullptr
         ? Blueprint->Status : TEnumAsByte<EBlueprintStatus>(BS_Unknown);
-    const auto BuildSnapshot = [&Family, AssetObject]()
+    const auto BuildSnapshot = [&Family, &Overlays, AssetObject, &OutError](FString& Out)
     {
-        return Family.Descriptor->SnapshotBuilder
-            ? Family.Descriptor->SnapshotBuilder(AssetObject)
-            : BuildGenericSnapshot(AssetObject);
+        return BuildComposedSnapshot(*Family.Descriptor, Overlays, AssetObject, Out, OutError);
     };
-    const FString Snapshot = BuildSnapshot();
+    FString Snapshot;
+    if (!BuildSnapshot(Snapshot))
+    {
+        return false;
+    }
 
     FUnrealMCPAssetFamilyInspectionContext Context;
     Context.Asset = AssetObject;
@@ -308,13 +491,71 @@ bool FUnrealMCPAssetInspectionService::Execute(
     Context.bHasPaging = Request.bHasPaging;
     Context.bHasPartialGraphFlag = Request.bHasPartialGraphFlag;
 
-    FUnrealMCPAssetFamilyDocumentBuilder Document(Family.Descriptor->Bounds);
-    FUnrealMCPAssetFamilySelectorRouter Selectors(Family.Descriptor->Bounds);
-    FUnrealMCPAssetFamilySnapshotBuilder AdapterSnapshot(Family.Descriptor->Bounds);
+    const bool bCompanionRoute = Request.SelectorSegments.IsEmpty()
+        ? !Overlays.IsEmpty() : SelectedOverlay != nullptr;
+    FUnrealMCPAssetFamilyInspectionContext PrimaryContext = Context;
+    if (bCompanionRoute)
+    {
+        PrimaryContext.Selector.Segments.Reset();
+        PrimaryContext.bHasPaging = false;
+        PrimaryContext.bHasPartialGraphFlag = false;
+    }
+    FUnrealMCPAssetFamilyDocumentBuilder PrimaryDocument(Family.Descriptor->Bounds);
+    FUnrealMCPAssetFamilySelectorRouter PrimarySelectors(Family.Descriptor->Bounds);
+    FUnrealMCPAssetFamilySnapshotBuilder PrimaryAdapterSnapshot(Family.Descriptor->Bounds);
     if (!Family.Descriptor->InspectionAdapter->Inspect(
-        Context, Document, Selectors, AdapterSnapshot, OutError)
-        || !EncodeDocument(
-            Document, Request.AssetPath, Snapshot, OutResult, OutError))
+        PrimaryContext, PrimaryDocument, PrimarySelectors, PrimaryAdapterSnapshot, OutError))
+    {
+        return false;
+    }
+
+    FUnrealMCPAssetFamilyDocumentBuilder Document(Family.Descriptor->Bounds);
+    TSet<FString> SelectorNames;
+    if (!AppendDocument(PrimaryDocument, bCompanionRoute, Document, SelectorNames, OutError))
+    {
+        return false;
+    }
+    if (bCompanionRoute)
+    {
+        TArray<const FUnrealMCPAssetFamilyDescriptor*> ActiveOverlays;
+        if (SelectedOverlay != nullptr)
+        {
+            ActiveOverlays.Add(SelectedOverlay);
+        }
+        else
+        {
+            ActiveOverlays = Overlays;
+        }
+        for (const FUnrealMCPAssetFamilyDescriptor* Overlay : ActiveOverlays)
+        {
+            FUnrealMCPAssetFamilyDocumentBuilder OverlayDocument(Overlay->Bounds);
+            FUnrealMCPAssetFamilySelectorRouter OverlaySelectors(Overlay->Bounds);
+            FUnrealMCPAssetFamilySnapshotBuilder OverlaySnapshot(Overlay->Bounds);
+            if (!Overlay->InspectionAdapter->Inspect(
+                Context, OverlayDocument, OverlaySelectors, OverlaySnapshot, OutError)
+                || !ValidateAdapterRoutes(*Overlay, OverlaySelectors, OutError)
+                || !AppendDocument(OverlayDocument, false, Document, SelectorNames, OutError))
+            {
+                return false;
+            }
+        }
+    }
+    if (!SelectorNames.IsEmpty())
+    {
+        TArray<FString> SortedSelectors = SelectorNames.Array();
+        SortedSelectors.Sort();
+        TArray<TSharedPtr<FUnrealMCPValue>> Values;
+        for (const FString& Selector : SortedSelectors)
+        {
+            Values.Add(MakeShared<FUnrealMCPValueString>(Selector));
+        }
+        if (!Document.Add({TEXT("selectors"), TEXT("array"),
+            MakeShared<FUnrealMCPValueArray>(MoveTemp(Values))}, OutError))
+        {
+            return false;
+        }
+    }
+    if (!EncodeDocument(Document, Request.AssetPath, Snapshot, OutResult, OutError))
     {
         return false;
     }
@@ -326,7 +567,13 @@ bool FUnrealMCPAssetInspectionService::Execute(
         OutResult.Reset();
         return false;
     }
-    if (BuildSnapshot() != Snapshot)
+    FString SnapshotAfter;
+    if (!BuildSnapshot(SnapshotAfter))
+    {
+        OutResult.Reset();
+        return false;
+    }
+    if (SnapshotAfter != Snapshot)
     {
         OutError = {TEXT("stale_precondition"), TEXT("The asset changed during inspection"), MakeShared<FUnrealMCPRecord>(), true};
         OutResult.Reset();

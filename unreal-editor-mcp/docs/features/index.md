@@ -77,7 +77,7 @@ Keep the authoritative checklist in [`ROADMAP.md`](../../ROADMAP.md) synchronize
     - `companion-plugins`
     - `native-domain-modules`
     - `python-asset-family-catalog`
-- [`companion-asset-adapters` — Unified companion asset integration](planned/companion-asset-adapters.md) — Route approved GAS and CommonUI families through common asset infrastructure.
+- [`companion-asset-adapters` — Unified companion asset integration](completed/companion-asset-adapters.md) — Route approved GAS and CommonUI families through common asset infrastructure.
   - Depends on:
     - `companion-api-v2`
     - `commonui-assets-inspect`

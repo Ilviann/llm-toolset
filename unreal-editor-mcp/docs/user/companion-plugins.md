@@ -10,7 +10,7 @@ Base and companion semantic versions are independent. Compatibility depends on e
 
 ## Detect availability
 
-Call `capabilities` and inspect `companions`. `ready: true` means native registration succeeded. `asset_families` lists bounded API-v2 family identities, class policies, inspection/creation/editing support, selector routes, stable nested-identity kinds, persistence, and limits; an empty list is valid while a released companion remains on its existing typed contribution path. `effective_ready: true` additionally means the exact Python package knows that extension/schema and accepts the bounded family record shape. Unknown or malformed native extensions deliberately expose no model-facing operation schema.
+Call `capabilities` and inspect `companions`. `ready: true` means native registration succeeded. `asset_families` lists bounded API-v2 family identities, class policies, inspection/creation/editing support, selector routes, stable nested-identity kinds, persistence, and limits. `effective_ready: true` additionally means the exact Python package knows that extension/schema and accepts the expected family identities and operation shape. Unknown, incomplete, or malformed native extensions deliberately expose no model-facing operation schema or companion inspection block.
 
 Readonly mode exposes admitted read contributions only. Start the Python server with explicit `--writable` access before mutation branches can appear in `tools/list` or dispatch. After lifecycle or capability changes the server emits `notifications/tools/list_changed`; clients should retrieve `tools/list` again.
 
@@ -22,7 +22,7 @@ With `UE58` set to the Unreal Engine 5.8 installation root, authors can package 
 python scripts/package_plugin.py --target-platforms Win64 --companion-fixture
 ```
 
-Package the released `UnrealMCPGAS` 0.2.2 Gameplay Ability and Gameplay Effect inspection companion with `--gas-companion`; it requires an API-v2-compatible base package. Package the released `UnrealMCPCommonUI` 0.1.1 Widget Blueprint inspection companion with `--commonui-companion`. On Windows, the graphical deployment helper provides independent GAS and CommonUI companion checkboxes and installs every selected plugin with the compatible base package in one transaction.
+Package the released `UnrealMCPGAS` 0.3.0 Gameplay Ability and Gameplay Effect inspection companion with `--gas-companion`; it requires an API-v2-compatible base package. Package the released `UnrealMCPCommonUI` 0.2.0 Widget Blueprint inspection companion with `--commonui-companion`. On Windows, the graphical deployment helper provides independent GAS and CommonUI companion checkboxes and installs every selected plugin with the compatible base package in one transaction.
 
 Released companions use the same UAT `BuildPlugin` contract with their own descriptor, and install their compatible base package separately. The packaging wrapper restores and verifies source-owned descriptor fields that UAT may omit. If a companion is unavailable, check enablement and restart state, exact descriptor/compiled API/schema values, owning module identity and load phase, and required Engine plugin/module state. A companion must not expose runtime schemas, arbitrary property paths, listener settings, or credentials.
 

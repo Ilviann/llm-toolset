@@ -2,13 +2,13 @@
 
 `asset_inspect` reads one exact `/Game` asset. Both `/Game/Actors/BP_Door` and `/Game/Actors/BP_Door.BP_Door` resolve to the canonical object path; discovery, `/Engine`, plugin mounts, filesystem paths, traversal, and media retrieval are unavailable.
 
-Omit `selector` for a compact root containing asset identity, one stable snapshot, semantic family blocks, and exact child selectors. Core deep families are Actor and gameplay-framework Blueprints, standalone Actor Component Blueprints, and Blueprint Interfaces. Data Assets/Tables, UMG, Animation Blueprints, GAS, CommonUI, MVVM, Materials, and Niagara do not receive deep core records.
+Omit `selector` for a compact root containing asset identity, one stable snapshot, semantic family blocks, and exact child selectors. Core deep families are Actor and gameplay-framework Blueprints, standalone Actor Component Blueprints, and Blueprint Interfaces. Data Assets/Tables, base UMG, Animation Blueprints, MVVM, Materials, and Niagara do not receive deep core records. When admitted, the optional GAS and CommonUI companions add their own bounded blocks and selectors without replacing the base identity.
 
 ```json
 {"asset_path":"/Game/Actors/BP_Door"}
 ```
 
-Use selectors returned by the root, for example `event_graphs/EventGraph`, `events/EventGraph/BeginPlay`, `functions/ComputeValue`, `macros/ClampValue`, `components/Trigger`, or a pageable collection selector. Selector segments use uppercase UTF-8 percent encoding.
+Use selectors returned by the root, for example `event_graphs/EventGraph`, `events/EventGraph/BeginPlay`, `functions/ComputeValue`, `macros/ClampValue`, `components/Trigger`, `gameplay_ability`, `gameplay_effect`, `commonui_widget`, `commonui_activation`, `commonui_references`, or a pageable collection selector. Selector segments use uppercase UTF-8 percent encoding.
 
 ```json
 {

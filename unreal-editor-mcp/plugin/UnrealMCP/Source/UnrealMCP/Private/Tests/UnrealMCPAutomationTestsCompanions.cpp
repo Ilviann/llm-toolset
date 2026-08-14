@@ -353,7 +353,9 @@ bool FUnrealMCPCompanionAdmissionTest::RunTest(const FString& Parameters)
     IUnrealMCPModule& Owner = IUnrealMCPModule::Get();
 
     {
-        FUnrealMCPExtensionRegistry Registry;
+        const TSharedRef<FUnrealMCPAssetFamilyRegistry> IntegratedFamilies =
+            MakeShared<FUnrealMCPAssetFamilyRegistry>([](FName) { return true; });
+        FUnrealMCPExtensionRegistry Registry(IntegratedFamilies);
         FUnrealMCPCompanionRegistration Registration = SyntheticRegistration(
             TEXT("synthetic_v2_family"), TEXT("inspect_synthetic_v2_family"));
         Registration.AssetFamilies = {SyntheticAssetFamily()};
@@ -371,6 +373,19 @@ bool FUnrealMCPCompanionAdmissionTest::RunTest(const FString& Parameters)
         TestEqual(TEXT("typed family collision fails closed"),
             Registry.Register(Collision, Owner).Reason,
             FString(TEXT("asset_family_collision")));
+        FUnrealMCPError FamilyError;
+        TestTrue(TEXT("admitted companion families freeze in the common registry"),
+            IntegratedFamilies->Freeze(FamilyError));
+        TArray<const FUnrealMCPAssetFamilyDescriptor*> Overlays;
+        TestTrue(TEXT("common registry selects the admitted inspection overlay"),
+            IntegratedFamilies->SelectInspectionOverlays(
+                UObject::StaticClass(), Overlays, FamilyError));
+        TestEqual(TEXT("exactly one inspection overlay is integrated"), Overlays.Num(), 1);
+        if (Overlays.Num() == 1)
+        {
+            TestEqual(TEXT("integrated family identity is preserved"),
+                Overlays[0]->FamilyId, FString(TEXT("synthetic_v2")));
+        }
         Registry.Freeze();
         const TSharedPtr<FUnrealMCPRecord> Capabilities = Registry.BuildCapabilities();
         const TSharedPtr<FUnrealMCPRecord> Companion =

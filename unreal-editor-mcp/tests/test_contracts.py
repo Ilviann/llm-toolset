@@ -78,7 +78,7 @@ class ReleaseContractTests(unittest.TestCase):
         native = re.search(r'Version\[\].*TEXT\("([^"]+)"\)', header)
         self.assertIsNotNone(native)
         versions = {project["project"]["version"], plugin["VersionName"], native.group(1), unreal_editor_mcp.__version__}
-        self.assertEqual(versions, {"0.44.0"})
+        self.assertEqual(versions, {"0.45.0"})
 
     def test_companion_api_and_companion_versions_are_internally_consistent(self):
         base = json.loads((ROOT / "plugin/UnrealMCP/UnrealMCP.uplugin").read_text(encoding="utf-8"))
@@ -147,7 +147,8 @@ class ReleaseContractTests(unittest.TestCase):
             "gameplay_effect_tags", "gameplay_effect_granted_abilities",
             "gameplay_effect_additional_effects", "gameplay_effect_requirements",
             "gameplay_effect_components", "gameplay_effect_relationships",
-            "MaxTagsPerContainer", "MaxAbilityTriggers", "EUnrealMCPExtensionAccess::Read",
+            "MaxTagsPerContainer", "MaxAbilityTriggers",
+            "Capabilities.bInspection", "InspectionAdapter", "AssetFamilies",
         ]:
             self.assertIn(contract, gas_source)
         self.assertNotIn("EUnrealMCPExtensionAccess::Mutation", gas_source)
@@ -170,16 +171,14 @@ class ReleaseContractTests(unittest.TestCase):
             "commonui_widget", "commonui_activation", "commonui_references",
             "UCommonUserWidget", "UCommonActivatableWidget", "ActionDomainOverride",
             "MaxInspectionRecords", "MaxInspectedProperties",
-            "EUnrealMCPExtensionAccess::Read", "WBP_InspectionFixture",
+            "Capabilities.bInspection", "InspectionAdapter", "AssetFamilies",
+            "WBP_InspectionFixture",
         ]:
             self.assertIn(contract, commonui_source)
         self.assertNotIn("EUnrealMCPExtensionAccess::Mutation", commonui_source)
         for section in ["commonui_widget", "commonui_activation", "commonui_references"]:
             self.assertIn(f'TEXT("{section}")', inspection_query)
             self.assertIn(f'TEXT("{section}")', inspection_support)
-        bridge = native_host_source()
-        self.assertIn("commonui_widget_blueprints_inspection", bridge)
-        self.assertIn("commonui_widget_blueprints_mutation", bridge)
 
     def test_public_companion_api_does_not_expose_bridge_or_credentials(self):
         api = (

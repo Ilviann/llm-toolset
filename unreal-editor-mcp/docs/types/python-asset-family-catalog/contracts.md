@@ -2,7 +2,7 @@
 
 ## Entries and publications
 
-`AssetFamilyPublication` has one stable non-empty `family_id` and either built-in tool publications or one exact companion identity with a positive schema revision and shipped contributions. `ToolPublication` binds one exact three-field MCP tool definition to `read` or `mutation` access, an optional native command, one `bridge`, `capabilities`, or `lifecycle` handler, one `json` or `safe_yaml` result handler, and finite exact native-command requirements.
+`AssetFamilyPublication` has one stable non-empty `family_id` and either built-in tool publications or one exact companion identity with a positive schema revision, expected native family IDs, and optional shipped contributions. `ToolPublication` binds one exact three-field MCP tool definition to `read` or `mutation` access, an optional native command, one `bridge`, `capabilities`, or `lifecycle` handler, one `json` or `safe_yaml` result handler, and finite exact native-command requirements.
 
 `CompanionContribution` binds an exact tool, operation, access, and input-schema branch. `IntegratedSections` binds an exact native contribution to a non-empty unique semantic-section tuple. Companion entries define only Python-approved schemas and mappings; native records cannot add or replace them.
 
@@ -14,7 +14,7 @@
 
 `compose` receives exact Boolean writable and lifecycle configuration plus optional native capabilities. It walks entries in shipped order, excludes mutation publications in readonly mode, excludes the local lifecycle publication when disabled, and intersects required commands when native `commands` is present. A missing command field means native availability is not yet authoritative; a present malformed or overlarge list satisfies no native requirement.
 
-Composition deep-copies every published schema and returns an immutable name-to-publication mapping for server dispatch. Ready companion records are bounded to 64 records and 32 contributions each and require exact companion API, schema revision, identity, operation, access, and Python catalog matches. Companion mutation branches additionally require writable mode. Unknown tools or now-dormant integrated inspection routes add nothing.
+Composition deep-copies every published schema and returns an immutable name-to-publication mapping for server dispatch. Ready companion records are bounded to 64 records, 16 families, and 32 contributions each. GAS and CommonUI require their exact expected family-ID sets with `inspect: true`, `create: false`, and `edit: false`; incomplete, extra, or mutation-advertising sets are not effectively ready. Companion mutation branches additionally require writable mode. Unknown tools or integrated inspection routes add nothing.
 
 ## Dispatch and result handling
 

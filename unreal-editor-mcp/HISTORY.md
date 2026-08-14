@@ -7,6 +7,12 @@
 - Added an independent CommonUI companion checkbox to the Windows deployment helper, including fixed base-dependent packaging, project/Engine installation, and transactional multi-plugin handling without changing runtime or plugin versions.
 - Decomposed Python packaging, Windows deployment, and headless integration support tools behind stable entrypoints, with shared Unreal-local primitives, typed deployment and Blueprint scenario state, focused domain modules, and unchanged runtime/plugin versions.
 
+## 0.45.0 — 2026-08-14
+
+- Routed the released GAS Gameplay Ability, GAS Gameplay Effect, and CommonUI collectors through the common `asset_inspect` facade as deterministic API-v2 inspection overlays with bounded root blocks, selectors, and cumulative snapshots.
+- Added fail-closed companion-family admission to the frozen native registry, exact Python family-shape policy, collision checks, neutral fallback preservation, repeat/restart and non-mutation coverage, and full Windows native, production-socket, build, and packaging gates.
+- Advanced `UnrealMCPGAS` to 0.3.0 and `UnrealMCPCommonUI` to 0.2.0 independently of the 0.45.0 base release; companion API v2 and schema revision 2 remain unchanged and no companion mutation is published.
+
 ## 0.44.0 — 2026-08-14
 
 - Migrated the base, GAS, CommonUI, and test-fixture plugins atomically to exact companion API v2 and extension schema revision 2. Companion handlers now exchange bounded JSON-neutral records, every shipped companion dropped its JSON module dependency, and v1, stale, or mixed installations fail closed.

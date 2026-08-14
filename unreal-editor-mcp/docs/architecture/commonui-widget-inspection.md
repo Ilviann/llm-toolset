@@ -8,7 +8,7 @@ The initial frozen allowlist contains only Blueprint assets generated from `UCom
 
 ## Inspection flow
 
-The base companion registry admits the module only when the project effectively enables the Engine `CommonUI` plugin, the `CommonUI` and `CommonInput` modules are loaded, descriptor and compiled identity agree, and API/schema versions exactly match. In 0.36.0 Python still reports exact readiness but does not attach these v1 inspection sections to a model-facing tool; they remain dormant pending redesign.
+The base companion registry admits the module only when the project effectively enables the Engine `CommonUI` plugin, the `CommonUI` and `CommonInput` modules are loaded, descriptor and compiled identity agree, and API/schema versions exactly match. The inspection-only family `commonui_widget` routes its three typed sections through the common `asset_inspect` facade while the base retains identity, snapshots, limits, and read-only preservation.
 
 The base inspector retains the published `widget` family, Asset Registry discovery, ordinary Blueprint and Widget-tree records, pagination, Game-thread dispatch, dirtiness checks, and snapshot construction. It passes the verified generated-class default object to the companion, appends at most three typed records, and incorporates all 17 allowlisted properties into the same snapshot even when a typed section is not selected.
 

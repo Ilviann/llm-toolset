@@ -1,8 +1,8 @@
-# Built-in asset-family registry contracts
+# Asset-family registry contracts
 
 ## Descriptor and selection records
 
-- `FUnrealMCPAssetFamilyDescriptor` identifies one built-in family by stable ID, resolved native class, exact/derived policy, signed priority, required modules, common bounds, named limits, capability declarations, and optional typed adapters.
+- `FUnrealMCPAssetFamilyDescriptor` identifies one built-in or admitted companion family by stable ID, resolved native class, exact/derived policy, signed priority, required modules, common bounds, named limits, capability declarations, declared selector routes, optional typed adapters, and an inspection-overlay flag.
 - `FUnrealMCPAssetFamilyCapabilities` declares inspection, creation, and editing independently. Declaration and adapter presence must agree.
 - `FUnrealMCPAssetFamilySelection` returns the exact frozen descriptor and bounded missing-module evidence. Classification is evaluated before dependency and capability admission so failures remain diagnostic without retargeting.
 - `FUnrealMCPAssetFamilyLimits` bounds semantic records, recursively measured value nodes/depth/bytes, selector routes and depth, and snapshot contributions and bytes. `FUnrealMCPAssetFamilyLimit` carries family-specific positive named limits.
@@ -23,4 +23,4 @@
 
 ## Registry lifecycle
 
-`FUnrealMCPAssetFamilyRegistry::Register` accepts trusted compiled descriptors only before freeze. `Freeze` validates again, sorts deterministically, captures required-module availability, and computes one restart-stable fingerprint. `Select` requires the frozen state, resolves exactly one highest-priority family, then admits the requested independent capability. The base module freezes this registry before constructing the bridge, and the command catalog rejects a mutable registry.
+`FUnrealMCPAssetFamilyRegistry::Register` accepts trusted compiled descriptors only before freeze. `Freeze` validates again, sorts descriptors and routes deterministically, captures required-module availability, and computes one restart-stable fingerprint. `SelectPrimary` resolves exactly one highest-priority non-overlay family. `SelectInspectionOverlays` returns every matching enabled inspection overlay in family-ID order; overlays do not compete with the primary classification. The base module admits companions before freezing this registry and constructing the bridge, and the command catalog rejects a mutable registry.

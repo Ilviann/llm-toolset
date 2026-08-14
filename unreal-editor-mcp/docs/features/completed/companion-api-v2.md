@@ -24,7 +24,7 @@ released_in: "0.44.0"
 - Replaced every companion handler argument, result, change, read-back, and error-detail `FJsonObject` with bounded `FUnrealMCPRecord` and `FUnrealMCPValue` data. Removed Unreal's JSON module dependency from every shipped companion; only the base protocol and descriptor reader encode or decode JSON.
 - Added `FUnrealMCPCompanionAssetFamily` as the complete bounded family seam for exact/derived classification, root and selector inspection, target-free creation, existing-target editing, stable nested identities, common snapshots, postcondition read-back, creation/edit persistence, typed capabilities, named limits, required modules, and domain adapters.
 - Added atomic validation, deterministic sorting/signatures, collision checks, capability/adapter agreement, bounds, selector and nested-identity validation, and `asset_families` capability records. The Python catalog validates the bounded v2 record shape without accepting dynamic schemas.
-- Preserved current GAS and CommonUI inspection behavior and kept their families outside `asset_inspect` until [`companion-asset-adapters`](../planned/companion-asset-adapters.md). This release publishes no new companion mutation.
+- Preserved current GAS and CommonUI inspection behavior and kept their families outside `asset_inspect` until [`companion-asset-adapters`](companion-asset-adapters.md). This release publishes no new companion mutation.
 - Released the base/Python package as 0.44.0, GAS as 0.2.2, CommonUI as 0.1.1, and the disposable fixture as 0.1.2.
 
 ### Verification

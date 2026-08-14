@@ -1,5 +1,6 @@
 # Completed features
 
+- [`companion-asset-adapters` — Unified companion asset integration](companion-asset-adapters.md).
 - [`companion-api-v2` — Typed asset-family companion API](companion-api-v2.md).
 - [`native-domain-modules` — Native domain module boundaries](native-domain-modules.md).
 - [`native-wire-contracts` — Typed native request and result records](native-wire-contracts.md).

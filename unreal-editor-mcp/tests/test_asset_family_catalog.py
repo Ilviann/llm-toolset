@@ -151,19 +151,23 @@ class AssetFamilyCatalogTests(unittest.TestCase):
         )
 
     def test_companion_capability_annotation_validates_typed_v2_family_records(self):
-        family = {
-            "family_id": "fixture", "native_class": "/Script/CoreUObject.Object",
-            "class_policy": "exact_and_derived", "priority": 25,
-            "operations": {"inspect": True, "create": False, "edit": False},
-            "creation_persistence": "none", "editing_persistence": "none",
-            "limits": {"records": 4}, "selector_routes": ["summary"],
-            "stable_nested_identity_kinds": ["entry"],
-        }
+        def family(family_id, native_class):
+            return {
+                "family_id": family_id, "native_class": native_class,
+                "class_policy": "exact_and_derived", "priority": 200,
+                "operations": {"inspect": True, "create": False, "edit": False},
+                "creation_persistence": "none", "editing_persistence": "none",
+                "limits": {"records": 4}, "selector_routes": [family_id],
+                "stable_nested_identity_kinds": [],
+            }
+        ability = family("gameplay_ability", "/Script/GameplayAbilities.GameplayAbility")
+        effect = family("gameplay_effect", "/Script/GameplayAbilities.GameplayEffect")
         native = {
             "companion_api_version": 2,
             "companions": [{
                 "extension_id": "unreal-mcp-gas", "companion_api_version": 2,
-                "schema_revision": 2, "ready": True, "asset_families": [family],
+                "schema_revision": 2, "ready": True,
+                "asset_families": [ability, effect],
                 "contributions": [],
             }],
         }
@@ -176,8 +180,8 @@ class AssetFamilyCatalogTests(unittest.TestCase):
             native["companions"][0]["effective_unavailable_reason"],
             "python_schema_mismatch",
         )
-        family["operations"]["create"] = False
-        native["companions"][0]["asset_families"][0] = family | {"dynamic": True}
+        ability["operations"]["create"] = False
+        native["companions"][0]["asset_families"][0] = ability | {"dynamic": True}
         compose_companion_capabilities(native)
         self.assertFalse(native["companions"][0]["effective_ready"])
 

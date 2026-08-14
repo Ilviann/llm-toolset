@@ -35,6 +35,21 @@ def capabilities(*, ready=True, schema=EXTENSION_SCHEMA_REVISION, api=COMPANION_
     }
 
 
+def inspection_family(family_id, native_class):
+    return {
+        "family_id": family_id,
+        "native_class": native_class,
+        "class_policy": "exact_and_derived",
+        "priority": 200,
+        "operations": {"inspect": True, "create": False, "edit": False},
+        "creation_persistence": "none",
+        "editing_persistence": "none",
+        "limits": {"records": 32},
+        "selector_routes": [family_id],
+        "stable_nested_identity_kinds": [],
+    }
+
+
 def gas_capabilities(*, ready=True, schema=EXTENSION_SCHEMA_REVISION, api=COMPANION_API_VERSION):
     return {
         "companion_api_version": api,
@@ -43,16 +58,15 @@ def gas_capabilities(*, ready=True, schema=EXTENSION_SCHEMA_REVISION, api=COMPAN
             "companion_api_version": api,
             "schema_revision": schema,
             "ready": ready,
-            "asset_families": [],
-            "contributions": [{
-                "tool_family": "blueprint_inspect",
-                "operation": "inspect_gameplay_ability",
-                "access": "read",
-            }, {
-                "tool_family": "blueprint_inspect",
-                "operation": "inspect_gameplay_effect",
-                "access": "read",
-            }],
+            "asset_families": [
+                inspection_family(
+                    "gameplay_ability", "/Script/GameplayAbilities.GameplayAbility",
+                ),
+                inspection_family(
+                    "gameplay_effect", "/Script/GameplayAbilities.GameplayEffect",
+                ),
+            ],
+            "contributions": [],
         }],
     }
 
@@ -67,12 +81,10 @@ def commonui_capabilities(
             "companion_api_version": api,
             "schema_revision": schema,
             "ready": ready,
-            "asset_families": [],
-            "contributions": [{
-                "tool_family": "blueprint_inspect",
-                "operation": "inspect_commonui_widget",
-                "access": "read",
-            }],
+            "asset_families": [inspection_family(
+                "commonui_widget", "/Script/CommonUI.CommonUserWidget",
+            )],
+            "contributions": [],
         }],
     }
 
@@ -145,11 +157,11 @@ class ExtensionCatalogTests(unittest.TestCase):
         default_edit = next(tool for tool in tools if tool["name"] == "blueprint_default_edit")
         self.assertNotIn("unreal-mcp-gas", json.dumps(default_edit))
 
-    def test_gas_gameplay_effect_inspection_is_outside_asset_inspect_core(self):
+    def test_gas_adapter_keeps_the_shared_asset_inspect_schema_stable(self):
         tool = self.tool(False, "asset_inspect", gas_capabilities())
         self.assertNotIn("gameplay_effect", json.dumps(tool))
 
-    def test_commonui_companion_inspection_is_outside_asset_inspect_core(self):
+    def test_commonui_adapter_keeps_the_shared_asset_inspect_schema_stable(self):
         tool = self.tool(False, "asset_inspect", commonui_capabilities())
         self.assertNotIn("commonui_widget", json.dumps(tool))
 

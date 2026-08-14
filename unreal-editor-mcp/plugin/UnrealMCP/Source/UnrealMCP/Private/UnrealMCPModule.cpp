@@ -122,14 +122,17 @@ public:
                 return;
             }
         }
+        ExtensionRegistry = MakeShared<FUnrealMCPExtensionRegistry>(AssetFamilyRegistry);
+        ExtensionRegistry->DiscoverAndLoad();
         if (!AssetFamilyRegistry->Freeze(RegistryError))
         {
             UE_LOG(LogUnrealMCP, Error, TEXT("Unreal MCP disabled: %s"), *RegistryError.Message);
+            ExtensionRegistry->BeginShutdown();
+            ExtensionRegistry.Reset();
             AssetFamilyRegistry.Reset();
+            BuiltInDomainModules.Reset();
             return;
         }
-        ExtensionRegistry = MakeShared<FUnrealMCPExtensionRegistry>();
-        ExtensionRegistry->DiscoverAndLoad();
         ExtensionRegistry->Freeze();
         Bridge = MakeShared<FUnrealMCPBridge>(
             MoveTemp(Token), StateDirectory, ProjectHash(), Port,

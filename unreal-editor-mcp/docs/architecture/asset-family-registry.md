@@ -2,22 +2,23 @@
 
 ## Ownership
 
-`FUnrealMCPAssetFamilyRegistry` owns trusted base-plugin family descriptors, deterministic class selection, required-module readiness, independent inspection/creation/editing capability admission, stable ordering, registry fingerprints, and freeze state. `FUnrealMCPAssetFamilyDocumentBuilder`, `FUnrealMCPAssetFamilySelectorRouter`, and `FUnrealMCPAssetFamilySnapshotBuilder` own adapter-local bounds, collision checks, deterministic selector routing, and ordered snapshot contributions.
+`FUnrealMCPAssetFamilyRegistry` owns trusted base-plugin and admitted companion family descriptors, deterministic primary-family selection, composable inspection-overlay selection, required-module readiness, independent inspection/creation/editing capability admission, stable ordering, registry fingerprints, and freeze state. `FUnrealMCPAssetFamilyDocumentBuilder`, `FUnrealMCPAssetFamilySelectorRouter`, and `FUnrealMCPAssetFamilySnapshotBuilder` own adapter-local bounds, collision checks, deterministic selector routing, and ordered snapshot contributions.
 
 ## Dependency direction
 
-The module creates and freezes the built-in registry before constructing the bridge. The command catalog retains the frozen registry for later domain composition and refuses startup composition with a mutable registry. Family adapters depend inward on typed contexts, semantic value records, and bounded builders; they do not depend on the bridge, JSON codecs, Python schemas, access policy, target resolution, transactions, persistence, or response encoding.
+The module creates the shared registry, registers built-in families, admits companion families through the extension registry, and then freezes both registries before constructing the bridge. The command catalog retains the frozen family registry and refuses startup composition with a mutable registry. Family adapters depend inward on typed contexts, semantic value records, and bounded builders; they do not depend on the bridge, JSON codecs, Python schemas, access policy, target resolution, transactions, persistence, or response encoding.
 
-`asset_inspect` now selects the frozen `core_blueprint` or `neutral_asset` descriptor and invokes its inspection adapter. Existing authoring services retain their released paths until the authoring-kernel feature migrates them. Registry-backed inspection changes no MCP command, schema, capability envelope, or companion API.
+`asset_inspect` selects one frozen primary `core_blueprint` or `neutral_asset` descriptor and every admitted inspection overlay matching the asset's semantic class. The primary owns base identity and fallback behavior; overlays may add only their declared blocks, selectors, and snapshot material. Registry-backed inspection changes no MCP command or request schema and uses unchanged companion API v2.
 
 ## Invariants
 
 - Family IDs and limit IDs are bounded stable lowercase identities; native classes are resolved `UClass` values with exact or exact-and-derived matching.
 - Higher priority wins. Multiple matching descriptors at the same highest priority fail with `ambiguous_classification`; registration rejects an identical class-policy-priority claim early.
+- Inspection overlays never compete with the primary family. `SelectPrimary` ignores overlays, while `SelectInspectionOverlays` returns every matching enabled overlay in frozen family-ID order.
 - Required module names are captured at freeze. Missing dependencies leave the descriptor visible to trusted native composition but reject selection with `dependency_unavailable`.
 - Inspection, creation, and editing are independent declarations. Each Boolean must agree exactly with the presence of its typed adapter.
 - Registration order cannot affect frozen ordering or the registry fingerprint. Descriptor bounds, limits, modules, class policy, priority, and capability shape all participate in the fingerprint.
-- Semantic paths and types, selector routes, snapshot identities, record/value counts and depth, computed value bytes, route depth, and contribution counts are bounded. Duplicate semantic paths, selector claims, and snapshot identities fail closed.
+- Semantic paths and types, declared selector routes, snapshot identities, record/value counts and depth, computed value bytes, route depth, and contribution counts are bounded. Duplicate primary/overlay semantic paths, selector claims, and snapshot identities fail closed.
 - Target resolution, writable-mount/access policy, request schemas, mutation replay, transactions, persistence and rollback authority, wire codecs, and final response limits remain outside adapters.
 
 ## Verification

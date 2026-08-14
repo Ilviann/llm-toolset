@@ -1,10 +1,12 @@
 # Gameplay Effect inspection
 
-> Released in 0.31.0, this companion inspector is not model-facing in 0.36.0 after removal of its former shared Blueprint read route. Native registration remains available for a future redesigned read contract; `asset_inspect-core` intentionally does not expose GAS semantics.
+> `UnrealMCPGAS` 0.3.0 exposes Gameplay Effect inspection through `asset_inspect`; it does not publish GAS authoring.
 
-Install and enable the base `UnrealMCP` plugin, optional `UnrealMCPGAS` 0.2.2 companion, and Engine Gameplay Ability System plugin, then restart Unreal Editor. The base and companion versions are independent; companion API v2 and schema revision 2 must match the base and Python catalog exactly.
+Install and enable the base `UnrealMCP` plugin, optional `UnrealMCPGAS` 0.3.0 companion, and Engine Gameplay Ability System plugin, then restart Unreal Editor. The base and companion versions are independent; companion API v2 and schema revision 2 must match the base and Python catalog exactly.
 
-`capabilities` may still report the admitted `unreal-mcp-gas` companion and its native Gameplay Effect inspection feature flag. That flag describes its migrated JSON-neutral API-v2 registration, not a callable model-facing read tool. `asset_inspect` returns only its bounded neutral core identity and limitations for Gameplay Effect assets. Do not use the dormant typed sections or snapshots as authoring preconditions until `companion-asset-adapters` supplies the unified read facade.
+An admitted `unreal-mcp-gas` companion publishes the exact inspection-only family `gameplay_effect`. A root `asset_inspect` call preserves base identity and adds selector and block `gameplay_effect`. The block groups the eleven bounded typed collectors under `duration`, `modifiers`, `executions`, `stacking`, `cues`, `tags`, `components`, `granted_abilities`, `additional_effects`, `requirements`, and `relationships`. The companion fingerprint participates in the common snapshot.
+
+Missing, disabled, mismatched, or unready GAS installations expose no Gameplay Effect block, selector, or mutation capability and leave the neutral base result available.
 
 This release cannot create, edit, compile, or save Gameplay Effects. It also does not create tags, author Attribute Sets or Gameplay Cues, evaluate custom calculations, construct runtime specs, or touch Ability System Components. Those operations reject without modifying the package.
 

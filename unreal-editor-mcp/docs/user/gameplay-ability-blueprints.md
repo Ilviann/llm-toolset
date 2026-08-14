@@ -1,10 +1,12 @@
 # Gameplay Ability Blueprint inspection
 
-> Released in 0.30.0, this companion inspector is not model-facing in 0.36.0 after removal of its former shared Blueprint read route. Native registration remains available for a future redesigned read contract; `asset_inspect-core` intentionally does not expose GAS semantics.
+> `UnrealMCPGAS` 0.3.0 exposes Gameplay Ability inspection through `asset_inspect`; it does not publish GAS authoring.
 
-Install `UnrealMCP` and the optional `UnrealMCPGAS` 0.2.2 directory as separate project or Engine plugins, enable both plus the Engine Gameplay Ability System plugin, and restart Unreal Editor. The base and companion semantic versions are independent; both descriptors and binaries must agree on `companion_api_version: 2`, and the Python package must know schema revision 2.
+Install `UnrealMCP` and the optional `UnrealMCPGAS` 0.3.0 directory as separate project or Engine plugins, enable both plus the Engine Gameplay Ability System plugin, and restart Unreal Editor. The base and companion semantic versions are independent; both descriptors and binaries must agree on `companion_api_version: 2`, and the Python package must know schema revision 2.
 
-`capabilities` may still report the admitted `unreal-mcp-gas` companion and its native inspection feature flags. Those flags describe its migrated JSON-neutral API-v2 registration, not a callable model-facing read tool. `asset_inspect` returns only its bounded neutral core identity and limitations for Gameplay Ability assets. Do not rely on the dormant record, selector, or snapshot contracts for authoring until `companion-asset-adapters` supplies the unified read facade.
+An admitted `unreal-mcp-gas` companion publishes the exact inspection-only family `gameplay_ability`. A root `asset_inspect` call preserves the base asset identity and adds selector `gameplay_ability` plus one `gameplay_ability` block containing bounded `policies`, `tags`, `triggers`, and `effects` records. Calling the returned selector yields only that semantic selection. The companion contributes its typed fingerprint to the common snapshot, so repeat and selector calls can be compared safely.
+
+Missing, disabled, mismatched, or unready GAS installations leave the neutral base response intact and expose no GAS block, selector, or mutation capability. This release cannot create, edit, compile, or save Gameplay Ability Blueprints through the companion family.
 
 With `UE58` set to the Unreal Engine 5.8 installation root, package the companion offline from the same release state as the base:
 

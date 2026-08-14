@@ -4,7 +4,7 @@ The base `UnrealMCP` editor module owns companion discovery, admission, registry
 
 ## Startup and ownership
 
-During base-module startup the registry scans at most 64 `.uplugin` descriptors through Unreal's plugin manager. It ignores ordinary plugins, records disabled companions without loading them, validates exact descriptor API/schema identity and dependencies, and loads only an enabled declared owning module. Companion modules use `LoadingPhase: None`, making the initialized base registry their sole startup loader. The loaded module makes one aggregate `RegisterCompanion` call. The registry validates compiled identity, handler and adapter shape, limits, loaded module ownership, family/contribution collisions, selector routes, stable nested-identity kinds, and persistence declarations before sorting and freezing admitted records.
+During base-module startup the registry scans at most 64 `.uplugin` descriptors through Unreal's plugin manager. It ignores ordinary plugins, records disabled companions without loading them, validates exact descriptor API/schema identity and dependencies, and loads only an enabled declared owning module. Companion modules use `LoadingPhase: None`, making the initialized base registry their sole startup loader. The loaded module makes one aggregate `RegisterCompanion` call. The registry validates compiled identity, handler and adapter shape, limits, loaded module ownership, family/contribution collisions, selector routes, stable nested-identity kinds, and persistence declarations, then atomically registers admitted companion families into the shared asset-family registry before both registries freeze.
 
 The current global `companion_api_version` and extension schema revision are both `2`. Descriptor, companion binary, base binary, and Python catalog values must agree exactly; missing, v1, stale, ranged, or mixed installations fail closed. Enablement changes, hot reload, replacement, and late registration require an editor restart. Shutdown closes admission before the bridge stops and permits only owner-matched unregister calls.
 
@@ -18,7 +18,7 @@ The base validates and freezes those contracts. It retains exact target resoluti
 
 The Python server owns the exact-version allowlist in `unreal_editor_mcp/asset_family_catalog.py`; `extension_catalog.py` retains compatibility exports only. The catalog validates bounded API-v2 family capability records and intersects shipped schemas with ready native contributions and immutable startup access mode. Unknown, malformed, stale, or forged records publish no operation branch.
 
-The released GAS and CommonUI collectors retain their current capability-visible Blueprint inspection behavior after migrating to typed v2 records. Their records remain outside `asset_inspect` until [`companion-asset-adapters`](../features/planned/companion-asset-adapters.md) routes approved families through the common facade. No new GAS or CommonUI mutation is published by this migration.
+The released GAS and CommonUI collectors are API-v2 inspection-only asset families. Their adapters compose bounded semantic blocks, selector routes, and snapshot contributions through `asset_inspect`; they advertise no creation or editing adapter. The shared service retains base identity, request validation, limit enforcement, non-mutation checks, and final encoding. Exact expected family identities in the Python catalog prevent partial or forged companion family sets from becoming effectively ready.
 
 ## Implementation and verification
 

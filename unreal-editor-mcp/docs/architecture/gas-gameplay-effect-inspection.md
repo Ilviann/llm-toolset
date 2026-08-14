@@ -8,7 +8,7 @@ The companion reads only verified `UGameplayEffect` class default objects. It us
 
 ## Inspection flow
 
-The frozen extension registry classifies usable native and Blueprint-generated `UGameplayEffect` descendants as `gameplay_effect` and retains eleven typed record collectors. In 0.36.0 their former shared model-facing route is removed; the collectors remain dormant pending a redesigned companion read contract.
+The frozen extension registry classifies usable native and Blueprint-generated `UGameplayEffect` descendants through inspection-only family `gameplay_effect`. Its adapter composes the eleven typed collectors into one `gameplay_effect` block and selector through `asset_inspect` while the common service owns base identity, snapshots, limits, and read-only preservation.
 
 Magnitudes are decoded only as scalable float, attribute based, custom calculation class, or set by caller. Components are accepted through an explicit public-class allowlist; unknown classes become typed unsupported records. Class, attribute, tag, curve, and asset references report resolution and compatibility without loading unrelated assets. Local/inherited ownership, stable nested identities, sorted values, duplicate detection, scan/output bounds, and bounded chained-effect traversal feed the same snapshot fingerprint even when output is paged or omitted.
 
@@ -16,7 +16,7 @@ Magnitudes are decoded only as scalable float, attribute based, custom calculati
 
 The family appears only when the exact companion/API/schema/dependency registration and Python catalog entry are ready. `features.gas_gameplay_effects_inspection` reports read support and `features.gas_gameplay_effects_mutation` remains false. The family matrix enables discovery and inspection only; component, member, graph, action-catalog, create, compile, save, and default-edit operations reject through existing base policy.
 
-`UnrealMCPGAS` is independently versioned at 0.2.2. Global companion API v2 and schema revision 2 are exact; 0.2.2 changes only API compatibility and record transport, not Gameplay Effect behavior.
+`UnrealMCPGAS` is independently versioned at 0.3.0. Global companion API v2 and schema revision 2 remain exact; 0.3.0 publishes the existing typed Gameplay Effect behavior through the unified facade without adding mutation.
 
 ## Verification
 

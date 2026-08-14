@@ -18,7 +18,7 @@ released_in: null
 - [`phase-13`](../completed/phase-13.md)
 - [`gas-ability-blueprints-inspect`](../completed/gas-ability-blueprints-inspect.md)
 - [`asset-authoring-kernel`](../completed/asset-authoring-kernel.md)
-- [`companion-asset-adapters`](companion-asset-adapters.md)
+- [`companion-asset-adapters`](../completed/companion-asset-adapters.md)
 
 ### Creation and update implementation
 

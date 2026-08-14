@@ -14,6 +14,10 @@ struct FUnrealMCPError;
 class FUnrealMCPExtensionRegistry final : public IUnrealMCPBlueprintExtensionProvider
 {
 public:
+    explicit FUnrealMCPExtensionRegistry(
+        TSharedPtr<FUnrealMCPAssetFamilyRegistry> InAssetFamilyRegistry = nullptr)
+        : AssetFamilyRegistry(MoveTemp(InAssetFamilyRegistry)) {}
+
     void DiscoverAndLoad();
     void Freeze();
     void BeginShutdown();
@@ -104,6 +108,7 @@ private:
     TArray<FDescriptorRecord> Descriptors;
     TArray<FAcceptedRecord> Accepted;
     TArray<FString> Diagnostics;
+    TSharedPtr<FUnrealMCPAssetFamilyRegistry> AssetFamilyRegistry;
     uint64 NextHandle = 1;
     bool bFrozen = false;
     bool bShuttingDown = false;
