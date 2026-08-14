@@ -15,7 +15,7 @@ released_in: null
 **Depends on:**
 
 - [`companion-plugins`](../completed/companion-plugins.md)
-- [`native-domain-modules`](native-domain-modules.md)
+- [`native-domain-modules`](../completed/native-domain-modules.md)
 - [`python-asset-family-catalog`](../completed/python-asset-family-catalog.md)
 
 ### API contract

@@ -5,7 +5,12 @@ public class UnrealMCP : ModuleRules
     public UnrealMCP(ReadOnlyTargetRules Target) : base(Target)
     {
         PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
-        PublicDependencyModuleNames.AddRange(new[] { "Core" });
+        PublicDependencyModuleNames.AddRange(new[] { "Core", "UnrealMCPAssetCore" });
+        DynamicallyLoadedModuleNames.AddRange(new[]
+        {
+            "UnrealMCPUMG",
+            "UnrealMCPContent"
+        });
         PrivateDependencyModuleNames.AddRange(new[]
         {
             "AssetRegistry",
@@ -23,6 +28,7 @@ public class UnrealMCP : ModuleRules
             "SubobjectDataInterface",
             "UMG",
             "UMGEditor",
+            "UnrealMCPBlueprint",
             "UnrealEd"
         });
     }

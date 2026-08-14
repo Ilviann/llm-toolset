@@ -2,7 +2,7 @@
 
 ## Descriptor
 
-`FUnrealMCPCommandDescriptor` binds one exact identity to `ReadOnly`, `Writable`, or `Internal` access; `RequestThread` or `GameThread` dispatch; `None` or `Retained` operation policy; one typed neutral-record handler; optional live Boolean native features; and finite numeric native limits. `bAllowsExtensionRequests` is fixed and true only for the existing `asset_inspect` companion seam.
+`FUnrealMCPCommandDescriptor` binds one exact identity and explicit numeric order to `ReadOnly`, `Writable`, or `Internal` access; `RequestThread` or `GameThread` dispatch; `None` or `Retained` operation policy; one typed neutral-record handler; optional live Boolean native features; and finite numeric native limits. `bAllowsExtensionRequests` is fixed and true only for the existing `asset_inspect` companion seam.
 
 ## Registration and freeze
 
@@ -10,7 +10,7 @@
 
 ## Composition
 
-Descriptors retain insertion order. That order supplies `capabilities.commands`; descriptor feature and limit contributions supply `capabilities.features` and `capabilities.limits`. The host appends exact companion records and Blueprint-family records but companions cannot register native commands or schemas. Python independently retains the shipped model-facing schemas and verifies exact access parity.
+Freeze sorts descriptors by their unique explicit order and rebuilds lookup indexes. That order supplies `capabilities.commands`; descriptor feature and limit contributions supply `capabilities.features` and `capabilities.limits`. The host appends exact companion records and Blueprint-family records but companions cannot register native commands or schemas. Python independently retains the shipped model-facing schemas and verifies exact access parity.
 
 ## Errors
 

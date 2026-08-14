@@ -1,6 +1,6 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
-#include "UnrealMCPAutomationTestSupport.h"
+#include "UnrealMCPHostAutomationTestSupport.h"
 
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(

@@ -53,7 +53,8 @@ FUnrealMCPBridge::FUnrealMCPBridge(
     FString InProjectHash,
     uint32 InPort,
     TSharedRef<FUnrealMCPAssetFamilyRegistry> InAssetFamilyRegistry,
-    TSharedRef<FUnrealMCPExtensionRegistry> InExtensionRegistry)
+    TSharedRef<FUnrealMCPExtensionRegistry> InExtensionRegistry,
+    TArray<IUnrealMCPBuiltInDomainModule*> InDomainModules)
     : Token(MoveTemp(InToken)), StateDirectory(MoveTemp(InStateDirectory)),
       ProjectHash(MoveTemp(InProjectHash)), Port(InPort),
       AssetFamilyRegistry(MoveTemp(InAssetFamilyRegistry)), ExtensionRegistry(MoveTemp(InExtensionRegistry))
@@ -65,7 +66,8 @@ FUnrealMCPBridge::FUnrealMCPBridge(
     HostHandlers.EditorState = [this](const auto&, auto& Result, auto&) { Result = EditorState(); return true; };
     HostHandlers.EditorShutdown = [this](const auto&, auto& Result, auto& Error) { return EditorShutdown(Result, Error); };
     CommandCatalog = MakeUnique<FUnrealMCPCommandCatalog>(
-        ProjectHash, BridgeInstanceId, *OperationLedger, AssetFamilyRegistry, ExtensionRegistry, MoveTemp(HostHandlers));
+        ProjectHash, BridgeInstanceId, *OperationLedger, AssetFamilyRegistry, ExtensionRegistry,
+        MoveTemp(InDomainModules), MoveTemp(HostHandlers));
 }
 
 FUnrealMCPBridge::~FUnrealMCPBridge()

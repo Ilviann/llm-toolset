@@ -1,7 +1,7 @@
 {
   "FileVersion": 3,
-  "Version": 420000,
-  "VersionName": "0.42.0",
+  "Version": 430000,
+  "VersionName": "0.43.0",
   "companion_api_version": 1,
   "FriendlyName": "Unreal Editor MCP",
   "Description": "Authenticated localhost bridge for offline-first Unreal Editor MCP workflows.",
@@ -17,6 +17,26 @@
       "Name": "UnrealMCP",
       "Type": "Editor",
       "LoadingPhase": "PostEngineInit"
+    },
+    {
+      "Name": "UnrealMCPAssetCore",
+      "Type": "Editor",
+      "LoadingPhase": "None"
+    },
+    {
+      "Name": "UnrealMCPBlueprint",
+      "Type": "Editor",
+      "LoadingPhase": "None"
+    },
+    {
+      "Name": "UnrealMCPUMG",
+      "Type": "Editor",
+      "LoadingPhase": "None"
+    },
+    {
+      "Name": "UnrealMCPContent",
+      "Type": "Editor",
+      "LoadingPhase": "None"
     }
   ]
 }

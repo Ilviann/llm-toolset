@@ -7,6 +7,11 @@
 - Added an independent CommonUI companion checkbox to the Windows deployment helper, including fixed base-dependent packaging, project/Engine installation, and transactional multi-plugin handling without changing runtime or plugin versions.
 - Decomposed Python packaging, Windows deployment, and headless integration support tools behind stable entrypoints, with shared Unreal-local primitives, typed deployment and Blueprint scenario state, focused domain modules, and unchanged runtime/plugin versions.
 
+## 0.43.0 — 2026-08-14
+
+- Split the base native plugin into stable host, Asset Core, Blueprint, UMG, and Content editor modules with explicit deterministic loading, typed command/family contribution, one frozen released command order, and domain-owned services and Automation Tests.
+- Preserved the external plugin identity, Python schemas and catalog, companion API v1, capability and limit values, lifecycle behavior, and installed package layout while requiring all five base-module binaries in packaging verification.
+
 ## 0.42.0 — 2026-08-13
 
 - Added one immutable Python asset-family publication catalog for exact schemas, readonly/writable gates, native command requirements, bridge/local operation mappings, result rendering, and companion schema intersection while preserving all public tool names, ordering, schemas, and MCP initialization/list/call behavior.

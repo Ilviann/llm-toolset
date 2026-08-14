@@ -14,6 +14,7 @@ class FUnrealMCPCommandCatalog;
 class FUnrealMCPAssetFamilyRegistry;
 class FUnrealMCPOperationLedger;
 class FUnrealMCPExtensionRegistry;
+class IUnrealMCPBuiltInDomainModule;
 class IHttpRouter;
 
 class FUnrealMCPBridge : public TSharedFromThis<FUnrealMCPBridge>
@@ -25,7 +26,8 @@ public:
         FString InProjectHash,
         uint32 InPort,
         TSharedRef<FUnrealMCPAssetFamilyRegistry> InAssetFamilyRegistry,
-        TSharedRef<FUnrealMCPExtensionRegistry> InExtensionRegistry);
+        TSharedRef<FUnrealMCPExtensionRegistry> InExtensionRegistry,
+        TArray<IUnrealMCPBuiltInDomainModule*> InDomainModules);
     ~FUnrealMCPBridge();
 
     bool Start(FString& OutError);

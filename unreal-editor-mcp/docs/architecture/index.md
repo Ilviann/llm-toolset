@@ -6,6 +6,7 @@ Each file in this directory documents one implemented cohesive component: what i
 - [`python-asset-family-catalog.md`](python-asset-family-catalog.md) — immutable schema, access, command, result, capability, and companion publication descriptors.
 - [`editor-bridge.md`](editor-bridge.md) — plugin composition, credentials, listener/route ownership, dispatch, commands, limits, and heartbeat.
 - [`native-command-catalog.md`](native-command-catalog.md) — fixed typed command descriptors, domain handler composition, capabilities, limits, freeze, and collision policy.
+- [`native-domain-modules.md`](native-domain-modules.md) — host, Asset Core, Blueprint, UMG, and Content module ownership, loading, dependencies, and package boundaries.
 - [`asset-family-registry.md`](asset-family-registry.md) — deterministic built-in family descriptors, independent typed adapters, bounded semantic builders, classification, dependencies, and startup freeze.
 - [`asset-authoring-kernel.md`](asset-authoring-kernel.md) — shared exact-target admission, creation cleanup, transactions, persistence, read-back, and verified rollback.
 - [`companion-extension-registry.md`](companion-extension-registry.md) — companion discovery, admission, lifecycle, capability intersection, and base-owned dispatch policy.

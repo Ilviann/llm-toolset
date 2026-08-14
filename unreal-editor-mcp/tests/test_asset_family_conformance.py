@@ -66,7 +66,10 @@ CATALOG_FIXTURES = (
 )
 
 PACKAGE_FIXTURES = (
-    PackageFamilyFixture("built-in", BASE_PLUGIN, ("UnrealMCP",)),
+    PackageFamilyFixture("built-in", BASE_PLUGIN, (
+        "UnrealMCP", "UnrealMCPAssetCore", "UnrealMCPBlueprint",
+        "UnrealMCPUMG", "UnrealMCPContent",
+    )),
     PackageFamilyFixture(
         "test-companion", FIXTURE_PLUGIN, ("UnrealMCPTestCompanion",),
     ),

@@ -2,7 +2,7 @@
 
 This page is the navigation entry point for every released tool family. For installation, first connection, and the concise contract overview, start with the [project README](../../README.md).
 
-Unreal Editor MCP 0.42.0 is an offline-first MCP bridge for Unreal Engine 5.8+. It pairs a dependency-free Python 3.10+ stdio server with an editor-only C++ plugin. Readonly mode is the default and exposes these nine tools in deterministic order:
+Unreal Editor MCP 0.43.0 is an offline-first MCP bridge for Unreal Engine 5.8+. It pairs a dependency-free Python 3.10+ stdio server with an editor-only C++ plugin. Readonly mode is the default and exposes these nine tools in deterministic order:
 
 - `capabilities` always reports the configured project name/hash and Python surface. With an active bridge it also reports exact plugin/Unreal versions, commands, features, listener state, effective limits, and the Blueprint-family matrix; otherwise `native_capabilities_available` and `bridge_ready` are false and native-only fields are absent.
 - `editor_state` reports project identity, bridge readiness, play/simulate/save/GC state, and concise queued-operation state.

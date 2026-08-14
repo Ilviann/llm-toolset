@@ -27,7 +27,7 @@ Feature identifiers are stable names, not execution indexes. Unfinished features
 - [x] [`python-asset-family-catalog` — Static Python asset-family catalog](docs/features/completed/python-asset-family-catalog.md) — Compose approved schemas, access gates, mappings, and capabilities from one shipped catalog.
   - Depends on:
     - `asset-family-foundation`
-- [ ] [`native-domain-modules` — Native domain module boundaries](docs/features/planned/native-domain-modules.md) — Isolate host, asset-core, Blueprint, UMG, and content ownership behind fixed registries.
+- [x] [`native-domain-modules` — Native domain module boundaries](docs/features/completed/native-domain-modules.md) — Isolate host, asset-core, Blueprint, UMG, and content ownership behind fixed registries.
   - Depends on:
     - `asset-family-conformance`
 - [ ] [`companion-api-v2` — Typed asset-family companion API](docs/features/planned/companion-api-v2.md) — Add typed inspection, creation, editing, read-back, persistence, and capability seams.
@@ -185,5 +185,6 @@ Feature checkboxes record implementation completion after mandatory Windows veri
   - `asset-authoring-kernel`
   - `python-asset-family-catalog`
   - `asset-family-conformance`
+  - `native-domain-modules`
 - Windows:
   - None

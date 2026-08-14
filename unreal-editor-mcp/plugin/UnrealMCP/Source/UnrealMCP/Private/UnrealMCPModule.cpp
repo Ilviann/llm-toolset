@@ -8,9 +8,9 @@
 #include "Misc/Paths.h"
 #include "Misc/SecureHash.h"
 #include "UnrealMCPAssetFamilyRegistry.h"
-#include "UnrealMCPAssetInspectionAdapters.h"
 #include "UnrealMCPBridge.h"
 #include "UnrealMCPCompatibility.h"
+#include "UnrealMCPDomainModule.h"
 #include "UnrealMCPExtensionRegistry.h"
 #include "UnrealMCPTokenStore.h"
 #include "UnrealMCPVersion.h"
@@ -90,10 +90,39 @@ public:
             return;
         }
         ConfigureLoopbackListener(Port);
+        static const FName BuiltInModuleOrder[] = {
+            TEXT("UnrealMCPAssetCore"),
+            TEXT("UnrealMCPBlueprint"),
+            TEXT("UnrealMCPUMG"),
+            TEXT("UnrealMCPContent")};
+        BuiltInDomainModules.Reset();
+        for (const FName ModuleName : BuiltInModuleOrder)
+        {
+            EModuleLoadResult LoadResult = EModuleLoadResult::Success;
+            IModuleInterface* Loaded = FModuleManager::Get().LoadModuleWithFailureReason(ModuleName, LoadResult);
+            if (Loaded == nullptr)
+            {
+                UE_LOG(LogUnrealMCP, Error, TEXT("Unreal MCP disabled: built-in module %s failed to load (%d)"),
+                    *ModuleName.ToString(), static_cast<int32>(LoadResult));
+                BuiltInDomainModules.Reset();
+                return;
+            }
+            BuiltInDomainModules.Add(static_cast<IUnrealMCPBuiltInDomainModule*>(Loaded));
+        }
         AssetFamilyRegistry = MakeShared<FUnrealMCPAssetFamilyRegistry>();
         FUnrealMCPError RegistryError;
-        if (!UnrealMCP::AssetInspection::RegisterBuiltInAdapters(*AssetFamilyRegistry, RegistryError)
-            || !AssetFamilyRegistry->Freeze(RegistryError))
+        for (IUnrealMCPBuiltInDomainModule* DomainModule : BuiltInDomainModules)
+        {
+            if (!DomainModule->RegisterAssetFamilies(*AssetFamilyRegistry, RegistryError))
+            {
+                UE_LOG(LogUnrealMCP, Error, TEXT("Unreal MCP disabled: built-in domain %s failed family registration: %s"),
+                    *DomainModule->GetDomainName().ToString(), *RegistryError.Message);
+                AssetFamilyRegistry.Reset();
+                BuiltInDomainModules.Reset();
+                return;
+            }
+        }
+        if (!AssetFamilyRegistry->Freeze(RegistryError))
         {
             UE_LOG(LogUnrealMCP, Error, TEXT("Unreal MCP disabled: %s"), *RegistryError.Message);
             AssetFamilyRegistry.Reset();
@@ -104,7 +133,7 @@ public:
         ExtensionRegistry->Freeze();
         Bridge = MakeShared<FUnrealMCPBridge>(
             MoveTemp(Token), StateDirectory, ProjectHash(), Port,
-            AssetFamilyRegistry.ToSharedRef(), ExtensionRegistry.ToSharedRef());
+            AssetFamilyRegistry.ToSharedRef(), ExtensionRegistry.ToSharedRef(), BuiltInDomainModules);
         if (!Bridge->Start(Error))
         {
             UE_LOG(LogUnrealMCP, Error, TEXT("Unreal MCP disabled: %s"), *Error);
@@ -127,6 +156,7 @@ public:
         }
         ExtensionRegistry.Reset();
         AssetFamilyRegistry.Reset();
+        BuiltInDomainModules.Reset();
     }
 
     virtual int32 GetCompanionApiVersion() const override
@@ -157,6 +187,7 @@ private:
     TSharedPtr<FUnrealMCPBridge> Bridge;
     TSharedPtr<FUnrealMCPAssetFamilyRegistry> AssetFamilyRegistry;
     TSharedPtr<FUnrealMCPExtensionRegistry> ExtensionRegistry;
+    TArray<IUnrealMCPBuiltInDomainModule*> BuiltInDomainModules;
 };
 
 IMPLEMENT_MODULE(FUnrealMCPModule, UnrealMCP)

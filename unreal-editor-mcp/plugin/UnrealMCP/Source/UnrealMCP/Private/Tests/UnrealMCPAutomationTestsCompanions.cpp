@@ -1,4 +1,5 @@
 #include "UnrealMCPAutomationTestSupport.h"
+#include "UnrealMCPHostAutomationTestSupport.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 

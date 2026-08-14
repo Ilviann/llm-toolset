@@ -89,7 +89,7 @@ adding an optional Engine-plugin dependency to the base module.
 7. [`asset-family-conformance`](../features/completed/asset-family-conformance.md)
    supplies reusable inspection, authoring, persistence, and unavailable-state
    verification.
-8. [`native-domain-modules`](../features/planned/native-domain-modules.md)
+8. [`native-domain-modules`](../features/completed/native-domain-modules.md)
    moves established domains behind narrow module boundaries after the seams are
    proven.
 9. [`companion-api-v2`](../features/planned/companion-api-v2.md) migrates every

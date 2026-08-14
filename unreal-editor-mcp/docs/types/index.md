@@ -6,6 +6,7 @@ References in this directory are grouped by the component that owns the contract
 - [`python-asset-family-catalog/`](python-asset-family-catalog/index.md) — immutable family, tool, companion, composition, dispatch, and result-publication contracts.
 - [`editor-bridge/`](editor-bridge/index.md) — native request, error, capability, state, discovery, and limit contracts.
 - [`native-command-catalog/`](native-command-catalog/index.md) — fixed command identities, access, dispatch, retained-operation policies, handlers, capabilities, limits, and registration lifecycle.
+- [`native-domain-modules/`](native-domain-modules/index.md) — built-in module interface, registrar, context, ownership, ordering, and failure contracts.
 - [`asset-family-registry/`](asset-family-registry/index.md) — built-in family descriptors, typed adapter contexts, independent capabilities, semantic builders, selection, bounds, and freeze lifecycle.
 - [`asset-authoring-kernel/`](asset-authoring-kernel/index.md) — exact creation/edit requests, lifecycle collaborators, results, persistence policy, and recovery errors.
 - [`companion-extension-registry/`](companion-extension-registry/index.md) — public native registration, contribution handlers, descriptor metadata, capability records, bounds, and errors.

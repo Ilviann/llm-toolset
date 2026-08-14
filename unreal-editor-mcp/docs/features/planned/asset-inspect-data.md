@@ -14,7 +14,7 @@ released_in: null
 **Depends on:**
 
 - [`asset-inspect-core`](../completed/asset-inspect-core.md)
-- [`native-domain-modules`](native-domain-modules.md)
+- [`native-domain-modules`](../completed/native-domain-modules.md)
 
 ### Family scope
 

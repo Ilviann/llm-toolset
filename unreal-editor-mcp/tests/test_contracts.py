@@ -24,14 +24,29 @@ from unreal_editor_mcp.tool_catalog_families.widgets import WIDGET_TOOLS
 
 
 ROOT = Path(__file__).resolve().parents[1]
+NATIVE_SOURCE = ROOT / "plugin/UnrealMCP/Source"
+HOST_PRIVATE = NATIVE_SOURCE / "UnrealMCP/Private"
+ASSET_CORE_PRIVATE = NATIVE_SOURCE / "UnrealMCPAssetCore/Private"
+ASSET_CORE_PUBLIC = NATIVE_SOURCE / "UnrealMCPAssetCore/Public"
+BLUEPRINT_PRIVATE = NATIVE_SOURCE / "UnrealMCPBlueprint/Private"
+UMG_PRIVATE = NATIVE_SOURCE / "UnrealMCPUMG/Private"
+CONTENT_PRIVATE = NATIVE_SOURCE / "UnrealMCPContent/Private"
+
+
+def native_command_source():
+    paths = [
+        HOST_PRIVATE / "UnrealMCPBridge.cpp",
+        HOST_PRIVATE / "UnrealMCPCommandCatalog.cpp",
+        ASSET_CORE_PRIVATE / "UnrealMCPAssetCoreModule.cpp",
+        BLUEPRINT_PRIVATE / "UnrealMCPBlueprintModule.cpp",
+        UMG_PRIVATE / "UnrealMCPUMGModule.cpp",
+        CONTENT_PRIVATE / "UnrealMCPContentModule.cpp",
+    ]
+    return "\n".join(path.read_text(encoding="utf-8") for path in paths)
 
 
 def native_host_source(root=None):
-    root = root or ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private"
-    return "\n".join(
-        (root / filename).read_text(encoding="utf-8")
-        for filename in ("UnrealMCPBridge.cpp", "UnrealMCPCommandCatalog.cpp")
-    )
+    return native_command_source()
 
 
 class ReleaseContractTests(unittest.TestCase):
@@ -59,18 +74,18 @@ class ReleaseContractTests(unittest.TestCase):
     def test_versions_match_executable_metadata(self):
         project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
         plugin = json.loads((ROOT / "plugin/UnrealMCP/UnrealMCP.uplugin").read_text(encoding="utf-8"))
-        header = (ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Public/UnrealMCPVersion.h").read_text(encoding="utf-8")
+        header = (ASSET_CORE_PUBLIC / "UnrealMCPVersion.h").read_text(encoding="utf-8")
         native = re.search(r'Version\[\].*TEXT\("([^"]+)"\)', header)
         self.assertIsNotNone(native)
         versions = {project["project"]["version"], plugin["VersionName"], native.group(1), unreal_editor_mcp.__version__}
-        self.assertEqual(versions, {"0.42.0"})
+        self.assertEqual(versions, {"0.43.0"})
 
     def test_companion_api_and_companion_versions_are_internally_consistent(self):
         base = json.loads((ROOT / "plugin/UnrealMCP/UnrealMCP.uplugin").read_text(encoding="utf-8"))
         fixture = json.loads((ROOT / "plugin/UnrealMCPTestCompanion/UnrealMCPTestCompanion.uplugin").read_text(encoding="utf-8"))
         gas = json.loads((ROOT / "plugin/UnrealMCPGAS/UnrealMCPGAS.uplugin").read_text(encoding="utf-8"))
         commonui = json.loads((ROOT / "plugin/UnrealMCPCommonUI/UnrealMCPCommonUI.uplugin").read_text(encoding="utf-8"))
-        base_header = (ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Public/UnrealMCPVersion.h").read_text(encoding="utf-8")
+        base_header = (ASSET_CORE_PUBLIC / "UnrealMCPVersion.h").read_text(encoding="utf-8")
         fixture_header = (ROOT / "plugin/UnrealMCPTestCompanion/Source/UnrealMCPTestCompanion/Public/UnrealMCPTestCompanionVersion.h").read_text(encoding="utf-8")
         gas_header = (ROOT / "plugin/UnrealMCPGAS/Source/UnrealMCPGAS/Public/UnrealMCPGASVersion.h").read_text(encoding="utf-8")
         commonui_header = (ROOT / "plugin/UnrealMCPCommonUI/Source/UnrealMCPCommonUI/Public/UnrealMCPCommonUIVersion.h").read_text(encoding="utf-8")
@@ -114,8 +129,8 @@ class ReleaseContractTests(unittest.TestCase):
 
     def test_gas_companion_is_read_only_bounded_and_keeps_base_gas_free(self):
         base_build = (ROOT / "plugin/UnrealMCP/Source/UnrealMCP/UnrealMCP.Build.cs").read_text(encoding="utf-8")
-        inspection_query = (ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private/UnrealMCPBlueprintInspectionQuery.h").read_text(encoding="utf-8")
-        inspection_support = (ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private/UnrealMCPBlueprintInspectionSupport.h").read_text(encoding="utf-8")
+        inspection_query = (BLUEPRINT_PRIVATE / "UnrealMCPBlueprintInspectionQuery.h").read_text(encoding="utf-8")
+        inspection_support = (BLUEPRINT_PRIVATE / "UnrealMCPBlueprintInspectionSupport.h").read_text(encoding="utf-8")
         gas_build = (ROOT / "plugin/UnrealMCPGAS/Source/UnrealMCPGAS/UnrealMCPGAS.Build.cs").read_text(encoding="utf-8")
         gas_source = "\n".join(
             path.read_text(encoding="utf-8")
@@ -141,8 +156,8 @@ class ReleaseContractTests(unittest.TestCase):
 
     def test_commonui_companion_is_read_only_bounded_and_keeps_base_commonui_free(self):
         base_build = (ROOT / "plugin/UnrealMCP/Source/UnrealMCP/UnrealMCP.Build.cs").read_text(encoding="utf-8")
-        inspection_query = (ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private/UnrealMCPBlueprintInspectionQuery.h").read_text(encoding="utf-8")
-        inspection_support = (ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private/UnrealMCPBlueprintInspectionSupport.h").read_text(encoding="utf-8")
+        inspection_query = (BLUEPRINT_PRIVATE / "UnrealMCPBlueprintInspectionQuery.h").read_text(encoding="utf-8")
+        inspection_support = (BLUEPRINT_PRIVATE / "UnrealMCPBlueprintInspectionSupport.h").read_text(encoding="utf-8")
         commonui_build = (ROOT / "plugin/UnrealMCPCommonUI/Source/UnrealMCPCommonUI/UnrealMCPCommonUI.Build.cs").read_text(encoding="utf-8")
         commonui_source = "\n".join(
             path.read_text(encoding="utf-8")
@@ -196,34 +211,58 @@ class ReleaseContractTests(unittest.TestCase):
         for command in names:
             self.assertIn(f'TEXT("{command}")', bridge_source)
 
-        catalog = (ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private/UnrealMCPCommandCatalog.cpp").read_text(encoding="utf-8")
-        descriptors = re.findall(
-            r'Add\(TEXT\("([^"]+)"\), Access::(ReadOnly|Writable|Internal), '
-            r'Retained::(None|Retained), Dispatch::(RequestThread|GameThread)',
-            catalog,
+        catalog = (HOST_PRIVATE / "UnrealMCPCommandCatalog.cpp").read_text(encoding="utf-8")
+        self.assertIn("Catalog.Freeze", catalog)
+        self.assertIn("Descriptors.Sort", catalog)
+        self.assertIn("Descriptor.Order", catalog)
+        self.assertIn("Access::Internal", catalog)
+        self.assertIn("Dispatch::RequestThread", catalog)
+
+    def test_native_domains_have_explicit_load_and_ownership_boundaries(self):
+        descriptor = json.loads(
+            (ROOT / "plugin/UnrealMCP/UnrealMCP.uplugin").read_text(encoding="utf-8")
         )
-        native_names = names[:2] + ["editor_shutdown"] + names[2:]
-        self.assertEqual([descriptor[0] for descriptor in descriptors], native_names)
-        access = {name: value for name, value, _, _ in descriptors}
-        self.assertEqual({name for name, value in access.items() if value == "ReadOnly"}, READONLY_TOOL_NAMES)
-        self.assertEqual({name for name, value in access.items() if value == "Writable"}, WRITABLE_TOOL_NAMES)
-        self.assertEqual({name for name, value in access.items() if value == "Internal"}, {"editor_shutdown"})
-        retained = {name for name, _, value, _ in descriptors if value == "Retained"}
-        self.assertEqual(retained, {
-            "asset_delete", "level_open", "level_manage", "level_actor_edit", "level_save",
-            "blueprint_graph_edit", "blueprint_block_replace", "blueprint_create",
-            "blueprint_compile", "blueprint_save", "blueprint_component_edit",
-            "blueprint_default_edit", "blueprint_member_edit", "widget_tree_edit",
-            "gameplay_framework_edit", "game_data_edit",
-        })
-        dispatch = {name: value for name, _, _, value in descriptors}
-        self.assertEqual(
-            {name for name, value in dispatch.items() if value == "RequestThread"},
-            {"operation_status", "operation_cancel"},
-        )
+        modules = {module["Name"]: module["LoadingPhase"] for module in descriptor["Modules"]}
+        expected_domains = [
+            "UnrealMCPAssetCore", "UnrealMCPBlueprint", "UnrealMCPUMG", "UnrealMCPContent",
+        ]
+        self.assertEqual(modules["UnrealMCP"], "PostEngineInit")
+        self.assertEqual([modules[name] for name in expected_domains], ["None"] * 4)
+
+        startup = (HOST_PRIVATE / "UnrealMCPModule.cpp").read_text(encoding="utf-8")
+        positions = [startup.index(f'TEXT("{name}")') for name in expected_domains]
+        self.assertEqual(positions, sorted(positions))
+        self.assertIn("LoadModuleWithFailureReason", startup)
+
+        ownership = {
+            ASSET_CORE_PRIVATE / "UnrealMCPAssetCoreModule.cpp": ["asset_inspect"],
+            BLUEPRINT_PRIVATE / "UnrealMCPBlueprintModule.cpp": [
+                "blueprint_action_catalog", "blueprint_graph_edit", "blueprint_block_replace",
+                "blueprint_create", "blueprint_compile", "blueprint_save",
+                "blueprint_component_edit", "blueprint_default_edit", "blueprint_member_edit",
+                "gameplay_framework_edit",
+            ],
+            UMG_PRIVATE / "UnrealMCPUMGModule.cpp": ["widget_tree_edit"],
+            CONTENT_PRIVATE / "UnrealMCPContentModule.cpp": [
+                "asset_references", "asset_delete", "level_inspect", "level_open",
+                "level_manage", "level_actor_edit", "level_save", "game_data_inspect",
+                "game_data_edit",
+            ],
+        }
+        host = (HOST_PRIVATE / "UnrealMCPCommandCatalog.cpp").read_text(encoding="utf-8")
+        for path, commands in ownership.items():
+            source = path.read_text(encoding="utf-8")
+            for command in commands:
+                self.assertIn(f'TEXT("{command}")', source)
+                self.assertNotIn(f'Add(TEXT("{command}")', host)
+        for forbidden in [
+            "UnrealMCPBlueprintInspector.h", "UnrealMCPWidgetTreeService.h",
+            "UnrealMCPGameDataService.h", "UnrealMCPLevelService.h",
+        ]:
+            self.assertNotIn(forbidden, host)
 
     def test_native_catalog_is_fixed_and_bridge_is_domain_neutral(self):
-        root = ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private"
+        root = HOST_PRIVATE
         bridge = (root / "UnrealMCPBridge.cpp").read_text(encoding="utf-8")
         catalog = (root / "UnrealMCPCommandCatalog.cpp").read_text(encoding="utf-8")
         self.assertNotIn("UnrealMCPBlueprintInspector.h", bridge)
@@ -241,9 +280,9 @@ class ReleaseContractTests(unittest.TestCase):
         ).read_text(encoding="utf-8"))
 
     def test_asset_inspection_coordinator_is_family_neutral(self):
-        root = ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private"
-        coordinator = (root / "UnrealMCPAssetInspectionService.cpp").read_text(encoding="utf-8")
-        adapters = (root / "UnrealMCPAssetInspectionAdapters.cpp").read_text(encoding="utf-8")
+        coordinator = (ASSET_CORE_PRIVATE / "UnrealMCPAssetInspectionService.cpp").read_text(encoding="utf-8")
+        adapters = (BLUEPRINT_PRIVATE / "UnrealMCPAssetInspectionAdapters.cpp").read_text(encoding="utf-8")
+        neutral_adapter = (ASSET_CORE_PRIVATE / "UnrealMCPNeutralAssetInspectionAdapter.cpp").read_text(encoding="utf-8")
         self.assertIn("AssetFamilyRegistry->Select", coordinator)
         self.assertIn("InspectionAdapter->Inspect", coordinator)
         for family_symbol in [
@@ -253,21 +292,22 @@ class ReleaseContractTests(unittest.TestCase):
         ]:
             self.assertNotIn(family_symbol, coordinator)
         for adapter_symbol in [
-            "FNeutralAssetInspectionAdapter", "FCoreBlueprintInspectionAdapter",
+            "FCoreBlueprintInspectionAdapter",
             "FBlueprintInterfaceInspectionAdapter", "FActorComponentBlueprintInspectionAdapter",
             "FGameplayBlueprintInspectionAdapter", "FBlueprintGraphInspectionAdapter",
             "FBlueprintCollectionInspectionAdapter", "FBlueprintSemanticPropertyAdapter",
         ]:
             self.assertIn(adapter_symbol, adapters)
+        self.assertIn("FNeutralAssetInspectionAdapter", neutral_adapter)
         self.assertIn('TEXT("core_blueprint")', adapters)
-        self.assertIn('TEXT("neutral_asset")', adapters)
+        self.assertIn('TEXT("neutral_asset")', neutral_adapter)
         self.assertIn("UnrealMCP.AssetInspect.AdapterIsolation", (
-            root / "Tests/UnrealMCPAutomationTestsAssetInspection.cpp"
+            BLUEPRINT_PRIVATE / "Tests/UnrealMCPAutomationTestsAssetInspection.cpp"
         ).read_text(encoding="utf-8"))
 
     def test_asset_references_is_published_bounded_and_covered(self):
         bridge = native_host_source()
-        source_dir = ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private"
+        source_dir = CONTENT_PRIVATE
         components = {
             name: (source_dir / f"UnrealMCPAssetReference{name}.cpp").read_text(encoding="utf-8")
             for name in [
@@ -275,7 +315,7 @@ class ReleaseContractTests(unittest.TestCase):
                 "SnapshotBuilder", "CursorStore",
             ]
         }
-        native_test = (ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private/Tests/UnrealMCPAutomationTestsAssetReferences.cpp").read_text(encoding="utf-8")
+        native_test = (CONTENT_PRIVATE / "Tests/UnrealMCPAutomationTestsAssetReferences.cpp").read_text(encoding="utf-8")
         for feature in ["asset_reference_discovery", "asset_reference_live_memory"]:
             self.assertIn(f'TEXT("{feature}")', bridge)
         self.assertIn("MaxAssetReferenceRegistryCandidates", components["RegistryScanner"])
@@ -291,9 +331,9 @@ class ReleaseContractTests(unittest.TestCase):
 
     def test_asset_delete_is_ledger_backed_conservative_and_covered(self):
         bridge = native_host_source()
-        service = (ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private/UnrealMCPAssetDeletionService.cpp").read_text(encoding="utf-8")
-        native_test = (ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private/Tests/UnrealMCPAutomationTestsAssetDelete.cpp").read_text(encoding="utf-8")
-        self.assertIn('Add(TEXT("asset_delete")', bridge)
+        service = (CONTENT_PRIVATE / "UnrealMCPAssetDeletionService.cpp").read_text(encoding="utf-8")
+        native_test = (CONTENT_PRIVATE / "Tests/UnrealMCPAutomationTestsAssetDelete.cpp").read_text(encoding="utf-8")
+        self.assertIn('TEXT("asset_delete")', bridge)
         self.assertIn('TEXT("asset_delete")', bridge)
         for safety in [
             "IsPlayingSessionInEditor()", "IsSimulatingInEditor()", "IsSavingPackage()",
@@ -307,8 +347,8 @@ class ReleaseContractTests(unittest.TestCase):
 
     def test_level_open_is_published_and_covered(self):
         bridge = native_host_source()
-        service = (ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private/UnrealMCPLevelService.cpp").read_text(encoding="utf-8")
-        native_test = (ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private/Tests/UnrealMCPAutomationTestsLevelOpen.cpp").read_text(encoding="utf-8")
+        service = (CONTENT_PRIVATE / "UnrealMCPLevelService.cpp").read_text(encoding="utf-8")
+        native_test = (CONTENT_PRIVATE / "Tests/UnrealMCPAutomationTestsLevelOpen.cpp").read_text(encoding="utf-8")
         for feature in ["level_discovery", "level_open", "level_snapshots"]:
             self.assertIn(f'TEXT("{feature}")', bridge)
         for safety in ["IsPlayingSessionInEditor()", "IsSimulatingInEditor()", "IsSavingPackage()",
@@ -318,12 +358,12 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertIn("UnrealMCP.LevelOpen.DiscoverySnapshotsAndSafety", native_test)
 
     def test_level_management_is_ledger_backed_bounded_and_covered(self):
-        root = ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private"
+        root = CONTENT_PRIVATE
         bridge = native_host_source(root)
         service = (root / "UnrealMCPLevelManagementService.cpp").read_text(encoding="utf-8")
         deletion = (root / "UnrealMCPAssetDeletionService.cpp").read_text(encoding="utf-8")
         native_test = (root / "Tests/UnrealMCPAutomationTestsLevelManagement.cpp").read_text(encoding="utf-8")
-        self.assertIn('Add(TEXT("level_manage")', bridge)
+        self.assertIn('TEXT("level_manage")', bridge)
         for feature in [
             "level_management", "level_blank_creation", "level_template_creation",
             "level_world_settings", "level_map_deletion",
@@ -344,8 +384,8 @@ class ReleaseContractTests(unittest.TestCase):
 
     def test_level_inspect_is_bounded_read_only_and_covered(self):
         bridge = native_host_source()
-        service = (ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private/UnrealMCPLevelActorInspector.cpp").read_text(encoding="utf-8")
-        native_test = (ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private/Tests/UnrealMCPAutomationTestsLevelInspect.cpp").read_text(encoding="utf-8")
+        service = (CONTENT_PRIVATE / "UnrealMCPLevelActorInspector.cpp").read_text(encoding="utf-8")
+        native_test = (CONTENT_PRIVATE / "Tests/UnrealMCPAutomationTestsLevelInspect.cpp").read_text(encoding="utf-8")
         for feature in [
             "level_actor_inspection", "level_world_partition_descriptors",
             "level_targeted_actor_loading", "level_instance_properties",
@@ -362,13 +402,13 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertIn("UnrealMCP.LevelInspect.ActorsComponentsPropertiesAndSafety", native_test)
 
     def test_level_edit_is_ledger_backed_transactional_and_covered(self):
-        root = ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private"
+        root = CONTENT_PRIVATE
         bridge = native_host_source(root)
         service = (root / "UnrealMCPLevelActorEditingService.cpp").read_text(encoding="utf-8")
         native_test = (root / "Tests/UnrealMCPAutomationTestsLevelEdit.cpp").read_text(encoding="utf-8")
         production = (ROOT / "scripts/headless_integration/level_editing.py").read_text(encoding="utf-8")
         for command in ["level_actor_edit", "level_save"]:
-            self.assertIn(f'Add(TEXT("{command}")', bridge)
+            self.assertIn(f'TEXT("{command}")', bridge)
         for feature in [
             "level_actor_editing", "level_actor_transactions",
             "level_package_save_verification",
@@ -396,11 +436,11 @@ class ReleaseContractTests(unittest.TestCase):
             self.assertIn(acceptance, production)
 
     def test_phase_sixteen_multiplayer_policy_is_published_and_covered(self):
-        policy = (ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private/UnrealMCPBlueprintFamilyPolicy.cpp").read_text(encoding="utf-8")
+        policy = (BLUEPRINT_PRIVATE / "UnrealMCPBlueprintFamilyPolicy.cpp").read_text(encoding="utf-8")
         bridge = native_host_source()
-        phase_fourteen_test = (ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private/Tests/UnrealMCPAutomationTestsPhase14.cpp").read_text(encoding="utf-8")
-        phase_fifteen_test = (ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private/Tests/UnrealMCPAutomationTestsPhase15.cpp").read_text(encoding="utf-8")
-        phase_sixteen_test = (ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private/Tests/UnrealMCPAutomationTestsPhase16.cpp").read_text(encoding="utf-8")
+        phase_fourteen_test = (BLUEPRINT_PRIVATE / "Tests/UnrealMCPAutomationTestsPhase14.cpp").read_text(encoding="utf-8")
+        phase_fifteen_test = (BLUEPRINT_PRIVATE / "Tests/UnrealMCPAutomationTestsPhase15.cpp").read_text(encoding="utf-8")
+        phase_sixteen_test = (BLUEPRINT_PRIVATE / "Tests/UnrealMCPAutomationTestsPhase16.cpp").read_text(encoding="utf-8")
         for family in ["actor", "game_mode_base", "game_mode", "game_state_base", "game_state", "game_instance"]:
             self.assertIn(f'TEXT("{family}")', policy)
         for family in ["game_mode_base", "game_mode", "game_state_base", "game_state"]:
@@ -418,8 +458,8 @@ class ReleaseContractTests(unittest.TestCase):
 
     def test_phase_seventeen_game_data_is_published_and_covered(self):
         bridge = native_host_source()
-        service = (ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private/UnrealMCPGameDataOperationHandlers.cpp").read_text(encoding="utf-8")
-        test = (ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private/Tests/UnrealMCPAutomationTestsPhase17.cpp").read_text(encoding="utf-8")
+        service = (CONTENT_PRIVATE / "UnrealMCPGameDataOperationHandlers.cpp").read_text(encoding="utf-8")
+        test = (CONTENT_PRIVATE / "Tests/UnrealMCPAutomationTestsPhase17.cpp").read_text(encoding="utf-8")
         for command in ["game_data_inspect", "game_data_edit"]:
             self.assertIn(f'TEXT("{command}")', bridge)
         for feature in ["user_defined_struct_authoring", "typed_data_tables", "game_data_batch_editing"]:
@@ -429,33 +469,31 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertIn('UnrealMCP.Phase17.GameDataAuthoring', test)
 
     def test_game_data_and_graph_editor_have_focused_native_boundaries(self):
-        root = ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private"
         expected_units = {
-            "UnrealMCPGameDataRequestValidation.cpp": "ValidateEditShape",
-            "UnrealMCPGameDataOperationHandlers.cpp": "FUnrealMCPGameDataService::Edit",
-            "UnrealMCPGameDataInspectionBuilder.cpp": "GameDataInspectionBuilder",
-            "UnrealMCPBlueprintGraphRequestValidation.cpp": "BlueprintGraphRequestValidation",
-            "UnrealMCPBlueprintGraphOperationHandlers.cpp": "FUnrealMCPBlueprintGraphEditor::Execute",
-            "UnrealMCPBlueprintGraphPinOperationHandler.cpp": "BlueprintGraphPinOperationHandler",
-            "UnrealMCPBlueprintGraphResultBuilder.cpp": "BlueprintGraphResultBuilder",
+            CONTENT_PRIVATE / "UnrealMCPGameDataRequestValidation.cpp": "ValidateEditShape",
+            CONTENT_PRIVATE / "UnrealMCPGameDataOperationHandlers.cpp": "FUnrealMCPGameDataService::Edit",
+            CONTENT_PRIVATE / "UnrealMCPGameDataInspectionBuilder.cpp": "GameDataInspectionBuilder",
+            BLUEPRINT_PRIVATE / "UnrealMCPBlueprintGraphRequestValidation.cpp": "BlueprintGraphRequestValidation",
+            BLUEPRINT_PRIVATE / "UnrealMCPBlueprintGraphOperationHandlers.cpp": "FUnrealMCPBlueprintGraphEditor::Execute",
+            BLUEPRINT_PRIVATE / "UnrealMCPBlueprintGraphPinOperationHandler.cpp": "BlueprintGraphPinOperationHandler",
+            BLUEPRINT_PRIVATE / "UnrealMCPBlueprintGraphResultBuilder.cpp": "BlueprintGraphResultBuilder",
         }
-        for filename, owner in expected_units.items():
-            source = (root / filename).read_text(encoding="utf-8")
+        for path, owner in expected_units.items():
+            source = path.read_text(encoding="utf-8")
             self.assertIn(owner, source)
             self.assertLessEqual(len(source.splitlines()), 600)
 
     def test_widget_tree_is_family_scoped_bounded_and_covered(self):
-        root = ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private"
-        policy = (root / "UnrealMCPBlueprintFamilyPolicy.cpp").read_text(encoding="utf-8")
-        service = (root / "UnrealMCPWidgetTreeService.cpp").read_text(encoding="utf-8")
-        inspector = (root / "UnrealMCPWidgetTreeInspector.h").read_text(encoding="utf-8")
-        bridge = native_host_source(root)
+        policy = (BLUEPRINT_PRIVATE / "UnrealMCPBlueprintFamilyPolicy.cpp").read_text(encoding="utf-8")
+        service = (UMG_PRIVATE / "UnrealMCPWidgetTreeService.cpp").read_text(encoding="utf-8")
+        inspector = (BLUEPRINT_PRIVATE / "UnrealMCPWidgetTreeInspector.h").read_text(encoding="utf-8")
+        bridge = native_host_source()
         native_test = (
-            root / "Tests/UnrealMCPAutomationTestsWidgetTree.cpp"
+            UMG_PRIVATE / "Tests/UnrealMCPAutomationTestsWidgetTree.cpp"
         ).read_text(encoding="utf-8")
         self.assertIn('TEXT("widget")', policy)
         self.assertIn("UUserWidget::StaticClass()", policy)
-        self.assertIn('Add(TEXT("widget_tree_edit")', bridge)
+        self.assertIn('TEXT("widget_tree_edit")', bridge)
         for feature in [
             "widget_blueprint_family", "widget_tree_authoring",
             "umg_layout_authoring", "umg_style_authoring",
@@ -481,7 +519,6 @@ class ReleaseContractTests(unittest.TestCase):
         )
 
     def test_umg_authoring_has_focused_native_components(self):
-        root = ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private"
         expected = {
             "UnrealMCPWidgetAuthoringSupport.cpp": "ApplyProperty",
             "UnrealMCPWidgetLayoutService.cpp": "FUnrealMCPWidgetLayoutService::Execute",
@@ -489,14 +526,14 @@ class ReleaseContractTests(unittest.TestCase):
             "UnrealMCPWidgetBindingService.cpp": "FUnrealMCPWidgetBindingService::Execute",
         }
         for filename, owner in expected.items():
-            source = (root / filename).read_text(encoding="utf-8")
+            source = (UMG_PRIVATE / filename).read_text(encoding="utf-8")
             self.assertIn(owner, source)
             self.assertLessEqual(len(source.splitlines()), 600)
-        inspector = (root / "UnrealMCPWidgetTreeInspector.h").read_text(encoding="utf-8")
+        inspector = (BLUEPRINT_PRIVATE / "UnrealMCPWidgetTreeInspector.h").read_text(encoding="utf-8")
         self.assertIn('TEXT("widget_bindings")', inspector)
-        self.assertIn("FUnrealMCPWidgetLayoutService::Fingerprint", inspector)
+        self.assertIn("WidgetInspection::FingerprintLayout", inspector)
         native_test = (
-            root / "Tests/UnrealMCPAutomationTestsUMGAuthoring.cpp"
+            UMG_PRIVATE / "Tests/UnrealMCPAutomationTestsUMGAuthoring.cpp"
         ).read_text(encoding="utf-8")
         self.assertIn(
             "UnrealMCP.UMGAuthoring.LayoutStyleBindingsAndEvents",

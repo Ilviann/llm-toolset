@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "UnrealMCPCompanionApi.h"
+#include "UnrealMCPDomainModule.h"
 
 class FUnrealMCPRecord;
 class FUnrealMCPValue;
@@ -10,7 +11,7 @@ class UBlueprint;
 class UClass;
 struct FUnrealMCPError;
 
-class FUnrealMCPExtensionRegistry
+class FUnrealMCPExtensionRegistry final : public IUnrealMCPBlueprintExtensionProvider
 {
 public:
     void DiscoverAndLoad();
@@ -33,14 +34,14 @@ public:
     bool ClassifyBlueprintClass(
         const UClass* Class,
         FString& OutFamily,
-        FString& OutNativeBaseClass) const;
+        FString& OutNativeBaseClass) const override;
     bool AppendBlueprintInspection(
         const UBlueprint& Blueprint,
         const TSharedPtr<FUnrealMCPRecord>& Arguments,
         TArray<TSharedPtr<FUnrealMCPValue>>& OutRecords,
         TArray<FString>& OutFingerprint,
         TSharedPtr<FUnrealMCPRecord>& InOutFamilyCapabilities,
-        FUnrealMCPError& OutError) const;
+        FUnrealMCPError& OutError) const override;
     TArray<TSharedPtr<FUnrealMCPValue>> BuildBlueprintFamilyCapabilities() const;
     bool HasReadyFamilyCapability(
         const FString& TargetFamily,
