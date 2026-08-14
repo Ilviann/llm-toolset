@@ -1,6 +1,7 @@
 #include "Modules/ModuleManager.h"
 
 #include "UnrealMCPAssetDeletionService.h"
+#include "UnrealMCPDataInspectionAdapters.h"
 #include "UnrealMCPAssetReferenceService.h"
 #include "UnrealMCPDomainModule.h"
 #include "UnrealMCPGameDataService.h"
@@ -119,7 +120,10 @@ class FUnrealMCPContentModule final : public IUnrealMCPBuiltInDomainModule
 {
 public:
     FName GetDomainName() const override { return TEXT("content"); }
-    bool RegisterAssetFamilies(FUnrealMCPAssetFamilyRegistry&, FUnrealMCPError&) override { return true; }
+    bool RegisterAssetFamilies(FUnrealMCPAssetFamilyRegistry& Registry, FUnrealMCPError& OutError) override
+    {
+        return UnrealMCP::DataInspection::RegisterAdapters(Registry, OutError);
+    }
 
     bool RegisterCommands(
         const FUnrealMCPDomainRegistrar& Registrar,
@@ -155,6 +159,7 @@ public:
             if (!Registrar.RegisterCommand(MoveTemp(Descriptor), OutError)) return false;
         }
         for (const TCHAR* Feature : {
+            TEXT("asset_inspect_data"),
             TEXT("user_defined_struct_authoring"), TEXT("typed_data_tables"),
             TEXT("game_data_batch_editing"), TEXT("asset_reference_discovery"), TEXT("asset_reference_live_memory"),
             TEXT("asset_delete"), TEXT("level_discovery"), TEXT("level_open"), TEXT("level_snapshots"),

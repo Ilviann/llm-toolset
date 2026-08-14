@@ -150,11 +150,11 @@ An instance whose class happens to be Blueprint-generated remains `data_asset` o
 
 ## Implementation implications
 
-- Data Assets are not currently a published inspection family and cannot reuse the Data Table row contract directly.
+- Data Assets are a published built-in inspection family and use the shared reflected-value codec without adopting the Data Table row contract.
 - Implement exact DataAsset/PrimaryDataAsset classification, safe instance-property traversal, Primary Asset ID and bundle extraction, cumulative declaring-type provenance, shared property encoding, deterministic collection ordering, zero-based indexed pages, snapshotting, and exact nested selector routing.
 - Blueprint class variants can reuse common Blueprint graph/member collectors but require a new non-Actor Blueprint-family classifier and DataAsset class-default adapter.
 - No domain companion is required for the base framework. Companions may later replace generic safe properties with richer namespaced semantics for exact domain subclasses while preserving the same collection paging contract.
 
 ## Open questions
 
-- None at the current requirements layer. DataAsset and PrimaryDataAsset Blueprint class assets, including Data-Only Blueprint variants, are included in `asset-inspect-data` alongside instance assets.
+- None. DataAsset and PrimaryDataAsset Blueprint class assets, including Data-Only Blueprint variants, are included alongside instance assets.

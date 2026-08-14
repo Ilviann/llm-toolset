@@ -41,6 +41,8 @@ TSharedRef<FUnrealMCPRecord> SchemaRecord(const UScriptStruct* Struct, const FPr
     const TSharedRef<FUnrealMCPRecord> Result = MakeShared<FUnrealMCPRecord>();
     Result->SetStringField(TEXT("name"), Struct->GetAuthoredNameForField(Property));
     Result->SetStringField(TEXT("property_name"), Property->GetName());
+    const UStruct* DeclaringType = Property->GetOwnerStruct();
+    Result->SetStringField(TEXT("declared_by"), DeclaringType != nullptr ? DeclaringType->GetPathName() : FString());
     Result->SetObjectField(TEXT("type"), UnrealMCP::GameDataValueCodec::EncodeType(Property));
     return Result;
 }

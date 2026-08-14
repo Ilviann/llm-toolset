@@ -35,7 +35,7 @@ Feature identifiers are stable names, not execution indexes. Unfinished features
     - `companion-plugins`
     - `native-domain-modules`
     - `python-asset-family-catalog`
-- [ ] [`asset-inspect-data` — Data Asset and Data Table inspection](docs/features/planned/asset-inspect-data.md) — Extend the facade to structured Data Assets and Data Tables.
+- [x] [`asset-inspect-data` — Data Asset and Data Table inspection](docs/features/completed/asset-inspect-data.md) — Extend the facade to structured Data Assets and Data Tables.
   - Depends on:
     - `asset-inspect-core`
     - `native-domain-modules`
@@ -188,5 +188,6 @@ Feature checkboxes record implementation completion after mandatory Windows veri
   - `native-domain-modules`
   - `companion-api-v2`
   - `companion-asset-adapters`
+  - `asset-inspect-data`
 - Windows:
   - None

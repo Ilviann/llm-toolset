@@ -137,6 +137,10 @@ class HeadlessIntegrationScriptTests(unittest.TestCase):
                 if command == "capabilities":
                     return {"bridge_version": __version__, "bridge_instance_id": "b" * 32}
                 if command == "asset_inspect":
+                    if arguments and arguments.get("asset_path") == "/Game/DT_Fixture.DT_Fixture":
+                        if arguments.get("selector") == "columns/Damage":
+                            return {"name": "Damage", "values": []}
+                        return {"type": "data_table", "schema": {"field_count": 2}}
                     return {
                         "snapshot_id": "c" * 40,
                         "graph": {"debug": {"graph_guid": "d" * 32}},
@@ -182,6 +186,10 @@ class HeadlessIntegrationScriptTests(unittest.TestCase):
                 if command == "capabilities":
                     return {"bridge_version": __version__, "bridge_instance_id": "b" * 32}
                 if command == "asset_inspect":
+                    if arguments and arguments.get("asset_path") == "/Game/DT_Fixture.DT_Fixture":
+                        if arguments.get("selector") == "columns/Damage":
+                            return {"name": "Damage", "values": []}
+                        return {"type": "data_table", "schema": {"field_count": 2}}
                     return {
                         "snapshot_id": "c" * 40,
                         "graph": {"debug": {"graph_guid": "d" * 32}},

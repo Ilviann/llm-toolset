@@ -33,6 +33,40 @@ def collect_game_data(bridge: UnrealBridge, arguments: dict[str, object]) -> dic
     return merged
 
 
+def verify_asset_inspect_data_table(
+    bridge: UnrealBridge,
+    table_path: str,
+    expected_snapshot: str,
+) -> None:
+    """Verify the common facade's Data Table root, row, and column views."""
+    root = bridge.call("asset_inspect", {"asset_path": table_path, "page_size": 1})
+    asset = root.get("asset", {})
+    rows = root.get("rows", {})
+    if asset.get("type") != "data_table" \
+            or root.get("snapshot_id") != expected_snapshot \
+            or root.get("data_table", {}).get("row_count") != 1 \
+            or root.get("schema", {}).get("field_count") != 2 \
+            or [item.get("name") for item in rows.get("index", [])] != ["Rifle"]:
+        raise AssertionError(f"asset_inspect Data Table root mismatch: {root!r}")
+    row = bridge.call("asset_inspect", {
+        "asset_path": table_path,
+        "selector": "rows/Rifle",
+    })
+    if row.get("snapshot_id") != expected_snapshot \
+            or row.get("row", {}).get("values", {}).get("Damage") != 45:
+        raise AssertionError(f"asset_inspect exact Data Table row mismatch: {row!r}")
+    column = bridge.call("asset_inspect", {
+        "asset_path": table_path,
+        "selector": "columns/Damage",
+        "page_size": 1,
+        "page_index": 0,
+    })
+    values = column.get("values", [])
+    if column.get("snapshot_id") != expected_snapshot or len(values) != 1 \
+            or values[0].get("row") != "Rifle" or values[0].get("value") != 45:
+        raise AssertionError(f"asset_inspect Data Table column mismatch: {column!r}")
+
+
 def author_phase_seventeen_game_data(
     bridge: UnrealBridge,
     layout: ProjectLayout,
@@ -144,6 +178,7 @@ def author_phase_seventeen_game_data(
             or rows[0].get("values", {}).get("AmmoType") != "Rifle" \
             or final_table.get("snapshot_id") != batch.get("snapshot_id"):
         raise AssertionError(f"Phase 17 batch read-back mismatch: {final_table!r}")
+    verify_asset_inspect_data_table(bridge, table_path, final_table["snapshot_id"])
     return {
         "struct_path": struct_path,
         "struct_snapshot": dependent_struct["snapshot_id"],
@@ -225,4 +260,4 @@ def verify_restarted_game_data_and_level(
             or rows[0].get("values", {}).get("Damage") != 45 \
             or rows[0].get("values", {}).get("AmmoType") != "Rifle":
         raise AssertionError(f"Phase 17 typed rows changed after restart: {reloaded_table!r}")
-
+    verify_asset_inspect_data_table(bridge, game_data["table_path"], game_data["table_snapshot"])

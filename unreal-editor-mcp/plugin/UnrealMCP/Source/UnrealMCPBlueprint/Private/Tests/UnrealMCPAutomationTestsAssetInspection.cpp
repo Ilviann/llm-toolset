@@ -5,6 +5,7 @@
 #include "UnrealMCPAssetInspectionAdapters.h"
 
 #include "Components/ActorComponent.h"
+#include "Engine/DataAsset.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/PlayerState.h"
 #include "UObject/Interface.h"
@@ -148,6 +149,7 @@ bool FUnrealMCPAssetInspectionCoreTest::RunTest(const FString& Parameters)
         {AGameStateBase::StaticClass(), TEXT("game_state_base_blueprint")},
         {AGameState::StaticClass(), TEXT("game_state_blueprint")},
         {UGameInstance::StaticClass(), TEXT("game_instance_blueprint")},
+        {UPrimaryDataAsset::StaticClass(), TEXT("primary_data_asset_blueprint")},
         {APlayerController::StaticClass(), TEXT("player_controller_blueprint")},
         {APlayerState::StaticClass(), TEXT("player_state_blueprint")},
         {UActorComponent::StaticClass(), TEXT("actor_component_blueprint")},

@@ -7,6 +7,12 @@
 - Added an independent CommonUI companion checkbox to the Windows deployment helper, including fixed base-dependent packaging, project/Engine installation, and transactional multi-plugin handling without changing runtime or plugin versions.
 - Decomposed Python packaging, Windows deployment, and headless integration support tools behind stable entrypoints, with shared Unreal-local primitives, typed deployment and Blueprint scenario state, focused domain modules, and unchanged runtime/plugin versions.
 
+## 0.46.0 — 2026-08-14
+
+- Added built-in `asset_inspect` families for Data Asset/Primary Data Asset instances and Data Tables, plus Data Asset and Data-Only Blueprint class classification with existing graph/member inspection.
+- Added cumulative safe reflected properties, Primary Asset IDs and Asset Bundles, sorted Data Table schema/row/column views, exact nested collection selectors, deterministic pages, explicit unsupported-value limitations, and query-independent snapshots while retaining `game_data_inspect` compatibility and the unchanged one-tool schema.
+- Added the `asset_inspect_data` native capability, focused Windows Automation and production-socket coverage, adaptive/forced-unity/non-unity builds, Win64 packaging, and complete architecture/type/user documentation. Companion API v2 and all companion plugin versions remain unchanged; macOS verification is preferred follow-up work.
+
 ## 0.45.0 — 2026-08-14
 
 - Routed the released GAS Gameplay Ability, GAS Gameplay Effect, and CommonUI collectors through the common `asset_inspect` facade as deterministic API-v2 inspection overlays with bounded root blocks, selectors, and cumulative snapshots.

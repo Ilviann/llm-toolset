@@ -83,7 +83,7 @@ Keep the authoritative checklist in [`ROADMAP.md`](../../ROADMAP.md) synchronize
     - `commonui-assets-inspect`
     - `gas-ability-blueprints-inspect`
     - `gas-gameplay-effects-inspect`
-- [`asset-inspect-data` — Data Asset and Data Table inspection](planned/asset-inspect-data.md) — Extend the facade to structured Data Assets and Data Tables.
+- [`asset-inspect-data` — Data Asset and Data Table inspection](completed/asset-inspect-data.md) — Extend the facade to structured Data Assets and Data Tables.
   - Depends on:
     - `asset-inspect-core`
     - `native-domain-modules`

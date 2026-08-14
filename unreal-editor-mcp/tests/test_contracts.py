@@ -78,7 +78,7 @@ class ReleaseContractTests(unittest.TestCase):
         native = re.search(r'Version\[\].*TEXT\("([^"]+)"\)', header)
         self.assertIsNotNone(native)
         versions = {project["project"]["version"], plugin["VersionName"], native.group(1), unreal_editor_mcp.__version__}
-        self.assertEqual(versions, {"0.45.0"})
+        self.assertEqual(versions, {"0.46.0"})
 
     def test_companion_api_and_companion_versions_are_internally_consistent(self):
         base = json.loads((ROOT / "plugin/UnrealMCP/UnrealMCP.uplugin").read_text(encoding="utf-8"))
@@ -323,6 +323,24 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertIn("UnrealMCP.AssetInspect.AdapterIsolation", (
             BLUEPRINT_PRIVATE / "Tests/UnrealMCPAutomationTestsAssetInspection.cpp"
         ).read_text(encoding="utf-8"))
+
+    def test_asset_inspect_data_reuses_family_and_reflected_value_boundaries(self):
+        content_module = (CONTENT_PRIVATE / "UnrealMCPContentModule.cpp").read_text(encoding="utf-8")
+        adapters = (CONTENT_PRIVATE / "UnrealMCPDataInspectionAdapters.cpp").read_text(encoding="utf-8")
+        structured = (BLUEPRINT_PRIVATE / "UnrealMCPStructuredDataInspection.cpp").read_text(encoding="utf-8")
+        blueprint = (BLUEPRINT_PRIVATE / "UnrealMCPAssetInspectionAdapters.cpp").read_text(encoding="utf-8")
+        native_test = (CONTENT_PRIVATE / "Tests/UnrealMCPAutomationTestsAssetInspectData.cpp").read_text(encoding="utf-8")
+        self.assertIn("DataInspection::RegisterAdapters", content_module)
+        self.assertIn('TEXT("asset_inspect_data")', content_module)
+        for contract in [
+            'TEXT("data_asset")', 'TEXT("data_table")', 'TEXT("properties")',
+            'TEXT("asset_bundles")', 'TEXT("rows")', 'TEXT("columns")',
+            "GameDataInspectionBuilder::Build", "StructuredDataInspection::InspectField",
+        ]:
+            self.assertIn(contract, adapters)
+        self.assertIn("GameDataValueCodec::Encode", structured)
+        self.assertIn("primary_data_asset_blueprint", blueprint)
+        self.assertIn("UnrealMCP.AssetInspect.DataAssetsTablesSelectorsAndSnapshots", native_test)
 
     def test_asset_references_is_published_bounded_and_covered(self):
         bridge = native_host_source()

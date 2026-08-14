@@ -59,6 +59,7 @@ def run_automation(executable: Path, project: Path, environment: dict[str, str],
         "LayoutStyleBindingsAndEvents",
         "AdapterIsolation",
         "CoreFamiliesSelectorsPagingAndLimits",
+        "DataAssetsTablesSelectorsAndSnapshots",
         "PreflightTransactionPreservation",
         "LogicUnitsAndExternalLinks",
         "DeterministicChangedNodes",
@@ -108,6 +109,7 @@ def run_automation(executable: Path, project: Path, environment: dict[str, str],
     elif test_filter == "UnrealMCP.AssetInspect":
         expected = tuple(name for name in all_expected if name in {
             "AdapterIsolation", "CoreFamiliesSelectorsPagingAndLimits",
+            "DataAssetsTablesSelectorsAndSnapshots",
         })
     elif test_filter == "UnrealMCP.LevelManagement":
         expected = tuple(name for name in all_expected if name == "CreateConfigurePersistAndDelete")

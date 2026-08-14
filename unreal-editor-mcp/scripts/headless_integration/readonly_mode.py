@@ -297,6 +297,20 @@ def verify_readonly_mode(
         "page_size": 1,
     })
     _continue_once(server, "game_data_inspect", game_data)
+    table_yaml = _call_text(server, "asset_inspect", {
+        "asset_path": game_data_path,
+        "page_size": 1,
+    })
+    column_yaml = _call_text(server, "asset_inspect", {
+        "asset_path": game_data_path,
+        "selector": "columns/Damage",
+        "page_size": 1,
+        "page_index": 0,
+    })
+    if '"type": "data_table"' not in table_yaml \
+            or '"field_count": 2' not in table_yaml \
+            or '"name": "Damage"' not in column_yaml:
+        raise AssertionError("asset-inspect-data safe-YAML correspondence failed")
 
     after = _project_fingerprint(layout.root)
     if after != before:

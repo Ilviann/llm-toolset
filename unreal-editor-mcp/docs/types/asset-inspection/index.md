@@ -5,7 +5,7 @@ This component contract defines the accepted design for bounded semantic inspect
 ## Owning features
 
 1. [`asset-inspect-core`](../../features/completed/asset-inspect-core.md) owns the tool, shared contracts, neutral classification, gameplay-framework Blueprints, Actor Components, and Blueprint Interfaces.
-2. [`asset-inspect-data`](../../features/planned/asset-inspect-data.md) adds Data Assets and Data Tables.
+2. [`asset-inspect-data`](../../features/completed/asset-inspect-data.md) adds Data Assets and Data Tables.
 3. [`asset-inspect-umg`](../../features/planned/asset-inspect-umg.md) adds base UMG Widget Blueprint inspection.
 4. [`asset-inspect-animation`](../../features/planned/asset-inspect-animation.md) adds Animation Blueprint inspection.
 
@@ -56,7 +56,7 @@ The numbered list is the preferred delivery order. The three extension features 
 
 ## Delivery stages
 
-### Planned delivery order
+### Delivery order
 
 1. `asset-inspect-core`: common API and contracts, neutral/media classification, Actor Blueprints, Actor-owned components, standalone Actor Component Blueprints, GameInstance, GameMode, GameState, PlayerController, PlayerState, and Blueprint Interfaces.
 2. `asset-inspect-data`: Data Assets, Primary Data Assets, Blueprint/Data-Only Blueprint class variants, and Data Tables.
@@ -78,8 +78,8 @@ Add or expand `asset_inspect` coverage for:
 
 - The released Blueprint family policy already deeply inspects Actor, GameMode/GameModeBase, GameState/GameStateBase, and GameInstance Blueprints. PlayerController and PlayerState descendants currently travel through the general Actor family.
 - Actor-owned components are already records within supported Actor-family Blueprint inspection. `asset-inspect-core` also includes standalone Actor Component Blueprint assets, which are not a published Blueprint family and therefore need a new classification and collector path.
-- Blueprint Interfaces are declarations-only core families. Animation Blueprints and Data Assets are not deeply inspected and require their separately planned family work.
-- Data Tables and user-defined structs already have the separate game-data inspector; Data Assets do not use that contract.
+- Blueprint Interfaces are declarations-only core families. Data Asset and Primary Data Asset instances plus their Blueprint class variants are deeply inspected; Animation Blueprints remain separately planned.
+- Data Tables reuse the separate game-data schema/value collectors and snapshots behind `asset_inspect`; `game_data_inspect` remains published for its cursor-oriented contract.
 - Ordinary Widget Blueprint logic and tree inspection is already in the base and will be reused by `asset-inspect-umg`. CommonUI inspection composes as an optional companion overlay; MVVM inspection remains a separate planned feature.
 - GAS Ability and GAS Effect collectors compose through optional inspection overlays. Their absence or rejection changes no base family, schema, or response contract.
 

@@ -10,6 +10,7 @@
 #include "EdGraph/EdGraphPin.h"
 #include "EdGraphSchema_K2.h"
 #include "Engine/Blueprint.h"
+#include "Engine/DataAsset.h"
 #include "Engine/GameInstance.h"
 #include "Engine/SCS_Node.h"
 #include "Engine/SimpleConstructionScript.h"
@@ -43,6 +44,7 @@
 #include "UnrealMCPBlueprintInspector.h"
 #include "UnrealMCPK2TypeCodec.h"
 #include "UnrealMCPPropertyCodec.h"
+#include "UnrealMCPStructuredDataInspection.h"
 #include "UnrealMCPVersion.h"
 #include "UObject/Package.h"
 #include "UObject/SoftObjectPath.h"
@@ -76,6 +78,8 @@ struct FClassification
     FString RepresentedClass;
     bool bDeepBlueprint = false;
     bool bInterface = false;
+    bool bDataAsset = false;
+    bool bPrimaryDataAsset = false;
     bool bMedia = false;
 };
 
@@ -273,6 +277,19 @@ FClassification Classify(UObject* AssetObject, UBlueprint* Blueprint)
     else if (Represented != nullptr && Represented->IsChildOf(UGameInstance::StaticClass()))
     {
         Result.Type = TEXT("game_instance_blueprint"); Result.bDeepBlueprint = true;
+    }
+    else if (Represented != nullptr && Represented->IsChildOf(UPrimaryDataAsset::StaticClass()))
+    {
+        Result.Type = TEXT("primary_data_asset_blueprint");
+        Result.bDeepBlueprint = true;
+        Result.bDataAsset = true;
+        Result.bPrimaryDataAsset = true;
+    }
+    else if (Represented != nullptr && Represented->IsChildOf(UDataAsset::StaticClass()))
+    {
+        Result.Type = TEXT("data_asset_blueprint");
+        Result.bDeepBlueprint = true;
+        Result.bDataAsset = true;
     }
     else if (Represented != nullptr && Represented->IsChildOf(UActorComponent::StaticClass()))
     {
@@ -1626,6 +1643,49 @@ public:
         TSharedPtr<FUnrealMCPRecord>& OutResult,
         FUnrealMCPError& OutError)
     {
+        if (Classification.bDataAsset && !Request.Segments.IsEmpty()
+            && Request.Segments[0] == TEXT("properties"))
+        {
+            if (Request.bHasPartialFlag)
+            {
+                OutError = {TEXT("invalid_argument"), TEXT("allow_partial_graph applies only to graph selectors")};
+                return false;
+            }
+            UObject* Defaults = Blueprint != nullptr && Blueprint->GeneratedClass != nullptr
+                ? Blueprint->GeneratedClass->GetDefaultObject(false) : nullptr;
+            if (Defaults == nullptr)
+            {
+                OutError = {TEXT("busy"), TEXT("The Data Asset Blueprint class defaults are unavailable"),
+                    MakeShared<FUnrealMCPRecord>(), true};
+                return false;
+            }
+            FUnrealMCPStructuredDataSource Source{Defaults->GetClass(), Defaults, Defaults, true};
+            const TSharedRef<FUnrealMCPRecord> DataResult = BaseResult(
+                Request.AssetPath, Snapshot, Classification);
+            const TSharedRef<FUnrealMCPRecord> Selection = MakeShared<FUnrealMCPRecord>();
+            Selection->SetStringField(TEXT("selector"), Request.Selector);
+            DataResult->SetObjectField(TEXT("selection"), Selection);
+            if (Request.Segments.Num() == 1)
+            {
+                TSharedPtr<FUnrealMCPRecord> Properties;
+                if (!UnrealMCP::StructuredDataInspection::BuildPropertyPage(Source, TEXT("properties"),
+                    Request.PageIndex, Request.PageSize, Snapshot, Properties, OutError)) return false;
+                DataResult->SetObjectField(TEXT("properties"), Properties.ToSharedRef());
+            }
+            else
+            {
+                TArray<FString> Segments = Request.Segments;
+                Segments.RemoveAt(0);
+                TSharedPtr<FUnrealMCPRecord> Inspection;
+                if (!UnrealMCP::StructuredDataInspection::InspectField(Source, TEXT("properties"), Segments,
+                    Request.Selector, Request.PageIndex, Request.PageSize, Request.bHasPaging,
+                    Snapshot, Inspection, OutError)) return false;
+                for (const TPair<FString, TSharedPtr<FUnrealMCPValue>>& Field : Inspection->Values)
+                    DataResult->SetField(Field.Key, Field.Value);
+            }
+            OutResult = DataResult;
+            return true;
+        }
         if (Request.Segments[0] == TEXT("components")
             && (Request.Segments.Num() == 1 || Request.Segments.Num() == 2))
         {
@@ -1709,6 +1769,46 @@ bool InspectClassifiedBlueprint(
         {
             Result = FBlueprintSemanticPropertyAdapter::InspectRoot(
                 Blueprint, Classification, Request, Context.Identity.SnapshotId);
+            if (Classification.bDataAsset)
+            {
+                UObject* Defaults = Blueprint->GeneratedClass != nullptr
+                    ? Blueprint->GeneratedClass->GetDefaultObject(false) : nullptr;
+                if (Defaults == nullptr)
+                {
+                    OutError = {TEXT("busy"), TEXT("The Data Asset Blueprint class defaults are unavailable"),
+                        MakeShared<FUnrealMCPRecord>(), true};
+                    return false;
+                }
+                const TSharedRef<FUnrealMCPRecord> Block = MakeShared<FUnrealMCPRecord>();
+                Block->SetStringField(TEXT("value_source"), TEXT("class_defaults"));
+                Block->SetStringField(TEXT("load_behavior"), TEXT("lazy_on_demand"));
+                Result->SetObjectField(TEXT("data_asset"), Block);
+                if (Classification.bPrimaryDataAsset)
+                {
+                    const FPrimaryAssetId Id = Defaults->GetPrimaryAssetId();
+                    const TSharedRef<FUnrealMCPRecord> Primary = MakeShared<FUnrealMCPRecord>();
+                    const TSharedRef<FUnrealMCPRecord> Identity = MakeShared<FUnrealMCPRecord>();
+                    Identity->SetBoolField(TEXT("valid"), Id.IsValid());
+                    if (Id.IsValid())
+                    {
+                        Identity->SetStringField(TEXT("type"), Id.PrimaryAssetType.ToString());
+                        Identity->SetStringField(TEXT("name"), Id.PrimaryAssetName.ToString());
+                    }
+                    Primary->SetObjectField(TEXT("primary_asset_id"), Identity);
+                    Result->SetObjectField(TEXT("primary_data_asset"), Primary);
+                }
+                FUnrealMCPStructuredDataSource Source{Defaults->GetClass(), Defaults, Defaults, true};
+                TSharedPtr<FUnrealMCPRecord> Properties;
+                if (!UnrealMCP::StructuredDataInspection::BuildPropertyPage(Source, TEXT("properties"),
+                    0, DefaultPageSize, Context.Identity.SnapshotId, Properties, OutError)) return false;
+                Result->SetObjectField(TEXT("properties"), Properties.ToSharedRef());
+                const TArray<TSharedPtr<FUnrealMCPValue>>* Existing = nullptr;
+                TArray<TSharedPtr<FUnrealMCPValue>> SelectorValues;
+                if (Result->TryGetArrayField(TEXT("selectors"), Existing) && Existing != nullptr)
+                    SelectorValues = *Existing;
+                AddSelector(SelectorValues, TEXT("properties"));
+                Result->SetArrayField(TEXT("selectors"), SelectorValues);
+            }
         }
     }
     else

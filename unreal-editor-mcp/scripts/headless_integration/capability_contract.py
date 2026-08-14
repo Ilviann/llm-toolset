@@ -23,6 +23,8 @@ def verify_capability_contract(capabilities: dict[str, object], state: dict[str,
         raise AssertionError("graceful editor shutdown capability is unavailable")
     if capabilities.get("features", {}).get("asset_inspection_core") is not True:
         raise AssertionError("asset inspection core capability is unavailable")
+    if capabilities.get("features", {}).get("asset_inspect_data") is not True:
+        raise AssertionError("asset-inspect-data capability is unavailable")
     expected_asset_inspect_limits = {
         "asset_inspect_page_size": 100,
         "asset_inspect_selector_bytes": 1024,
