@@ -26,11 +26,19 @@ Feature identifiers are stable names, not execution indexes. Unfinished features
   - Depends on:
     - `asset-inspect-core`
     - `native-domain-modules`
-- [ ] [`umg-mvvm-inspect` — UMG ViewModel and View Binding inspection](docs/features/planned/umg-mvvm-inspect.md) — Add bounded typed inspection of existing MVVM ViewModel Blueprints and Widget View Bindings through an optional API-compatible companion plugin.
+- [ ] [`ai-assets-inspect` — Unreal AI asset inspection](docs/features/planned/ai-assets-inspect.md) — Inspect Behavior Trees, Blackboards, Environment Queries, and supported custom AI Blueprint node classes through `asset_inspect`.
+  - Depends on:
+    - `asset-inspect-core`
+    - `companion-asset-adapters`
+- [ ] [`enhanced-input-assets-inspect` — Enhanced Input asset inspection](docs/features/planned/enhanced-input-assets-inspect.md) — Inspect Input Actions, Mapping Contexts, and supported trigger/modifier types through `asset_inspect`.
+  - Depends on:
+    - `asset-inspect-core`
+    - `companion-asset-adapters`
+- [ ] [`umg-mvvm-inspect` — UMG ViewModel and View Binding inspection](docs/features/planned/umg-mvvm-inspect.md) — Inspect MVVM ViewModel Blueprints and Widget View Bindings through `asset_inspect` and an optional companion plugin.
   - Depends on:
     - `umg-authoring`
     - `asset-inspect-umg`
-    - `companion-api-v2`
+    - `companion-asset-adapters`
 - [ ] [`umg-mvvm` — UMG ViewModel and View Binding authoring](docs/features/planned/umg-mvvm.md) — Add typed MVVM ViewModel creation and Widget View Binding authoring through the MVVM companion.
   - Depends on:
     - `umg-mvvm-inspect`
@@ -40,6 +48,11 @@ Feature identifiers are stable names, not execution indexes. Unfinished features
   - Depends on:
     - `umg-authoring`
     - `companion-plugins`
+- [ ] [`commonui-umg-types-inspect` — CommonUI types in UMG inspection](docs/features/planned/commonui-umg-types-inspect.md) — Expand `asset_inspect` from CommonUI root Widget Blueprints to supported CommonUI widget and value types throughout UMG trees.
+  - Depends on:
+    - `asset-inspect-umg`
+    - `commonui-assets-inspect`
+    - `companion-asset-adapters`
 - [ ] [`commonui-assets-authoring` — Create/update assets with CommonUI plugin dependencies](docs/features/planned/commonui-assets-authoring.md) — Add stale-safe creation and updating of supported CommonUI-dependent assets through the CommonUI companion.
   - Depends on:
     - `commonui-assets-inspect`
@@ -63,6 +76,11 @@ Feature identifiers are stable names, not execution indexes. Unfinished features
     - `commonui-assets-inspect`
     - `gas-ability-blueprints-inspect`
     - `gas-gameplay-effects-inspect`
+- [ ] [`gas-supporting-assets-inspect` — Supporting Gameplay Ability System asset inspection](docs/features/planned/gas-supporting-assets-inspect.md) — Inspect Gameplay Cue Notify, Attribute Set, magnitude-calculation, and execution-calculation Blueprint assets through `asset_inspect`.
+  - Depends on:
+    - `gas-ability-blueprints-inspect`
+    - `gas-gameplay-effects-inspect`
+    - `companion-asset-adapters`
 - [ ] [`gas-gameplay-effects` — Gameplay Effect creation and updating](docs/features/planned/gas-gameplay-effects.md) — Add typed creation and data-only updating of Gameplay Effect Blueprint assets through the GAS companion.
   - Depends on:
     - `gas-gameplay-effects-inspect`

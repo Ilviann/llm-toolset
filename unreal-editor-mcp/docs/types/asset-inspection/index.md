@@ -4,12 +4,19 @@ This component contract defines the accepted design for bounded semantic inspect
 
 ## Owning features
 
-1. [`asset-inspect-core`](../../features/completed/asset-inspect-core.md) owns the tool, shared contracts, neutral classification, gameplay-framework Blueprints, Actor Components, and Blueprint Interfaces.
-2. [`asset-inspect-data`](../../features/completed/asset-inspect-data.md) adds Data Assets and Data Tables.
-3. [`asset-inspect-umg`](../../features/completed/asset-inspect-umg.md) adds base UMG Widget Blueprint inspection.
-4. [`asset-inspect-animation`](../../features/planned/asset-inspect-animation.md) adds Animation Blueprint inspection.
+- [`asset-inspect-core`](../../features/completed/asset-inspect-core.md) owns the tool, shared contracts, neutral classification, gameplay-framework Blueprints, Actor Components, and Blueprint Interfaces.
+- [`asset-inspect-data`](../../features/completed/asset-inspect-data.md) adds Data Assets and Data Tables.
+- [`asset-inspect-umg`](../../features/completed/asset-inspect-umg.md) adds base UMG Widget Blueprint inspection.
+- [`commonui-assets-inspect`](../../features/completed/commonui-assets-inspect.md) adds the released CommonUI root-widget overlay.
+- [`gas-ability-blueprints-inspect`](../../features/completed/gas-ability-blueprints-inspect.md) and [`gas-gameplay-effects-inspect`](../../features/completed/gas-gameplay-effects-inspect.md) add the released GAS overlays.
+- [`asset-inspect-animation`](../../features/planned/asset-inspect-animation.md) adds Animation Blueprint inspection.
+- [`commonui-umg-types-inspect`](../../features/planned/commonui-umg-types-inspect.md) expands CommonUI coverage to widgets and values throughout supported UMG assets.
+- [`umg-mvvm-inspect`](../../features/planned/umg-mvvm-inspect.md) adds ViewModel Blueprint and Widget MVVM inspection.
+- [`ai-assets-inspect`](../../features/planned/ai-assets-inspect.md) adds Behavior Tree, Blackboard, EQS, and custom AI Blueprint families.
+- [`enhanced-input-assets-inspect`](../../features/planned/enhanced-input-assets-inspect.md) adds Enhanced Input asset and nested trigger/modifier families.
+- [`gas-supporting-assets-inspect`](../../features/planned/gas-supporting-assets-inspect.md) expands GAS coverage to supporting Blueprint asset families.
 
-The numbered list is the preferred delivery order. The three extension features depend directly only on `asset-inspect-core`, so their technical implementation may be reordered without inventing unrelated prerequisites.
+Feature front matter and the roadmap are authoritative for direct prerequisites and implementation order.
 
 ## Asset-family contracts
 
@@ -65,14 +72,16 @@ The numbered list is the preferred delivery order. The three extension features 
 
 ### Later stages
 
-Add or expand `asset_inspect` coverage for:
+Add or expand `asset_inspect` coverage through the linked planned features for:
 
-- GAS Gameplay Abilities
-- GAS Gameplay Effects
-- Optional CommonUI-specific Widget inspection
-- MVVM-specific Widget inspection
-- Materials and Material Functions
-- Niagara Systems and Emitters
+- [Animation Blueprints](../../features/planned/asset-inspect-animation.md)
+- [CommonUI types throughout supported UMG assets](../../features/planned/commonui-umg-types-inspect.md)
+- [MVVM ViewModels and Widget bindings](../../features/planned/umg-mvvm-inspect.md)
+- [Behavior Trees, Blackboards, EQS, and custom AI Blueprints](../../features/planned/ai-assets-inspect.md)
+- [Enhanced Input assets and nested types](../../features/planned/enhanced-input-assets-inspect.md)
+- [Supporting GAS Cue Notify, Attribute Set, and calculation Blueprints](../../features/planned/gas-supporting-assets-inspect.md)
+
+Materials, Material Functions, Niagara Systems, and Niagara Emitters remain uncommitted candidates without roadmap features.
 
 ### Current implementation fit
 
@@ -80,8 +89,9 @@ Add or expand `asset_inspect` coverage for:
 - Actor-owned components are already records within supported Actor-family Blueprint inspection. `asset-inspect-core` also includes standalone Actor Component Blueprint assets, which are not a published Blueprint family and therefore need a new classification and collector path.
 - Blueprint Interfaces are declarations-only core families. Data Asset and Primary Data Asset instances plus their Blueprint class variants are deeply inspected; Animation Blueprints remain separately planned.
 - Data Tables reuse the separate game-data schema/value collectors and snapshots behind `asset_inspect`; `game_data_inspect` remains published for its cursor-oriented contract.
-- Ordinary Widget Blueprint logic and tree inspection is implemented by the base `asset-inspect-umg` overlay. CommonUI inspection composes as an optional companion overlay; MVVM inspection remains a separate planned feature.
-- GAS Ability and GAS Effect collectors compose through optional inspection overlays. Their absence or rejection changes no base family, schema, or response contract.
+- Ordinary Widget Blueprint logic and tree inspection is implemented by the base `asset-inspect-umg` overlay. Released CommonUI inspection covers `UCommonUserWidget`-derived roots; broader CommonUI tree/value inspection and MVVM inspection remain separate planned features.
+- GAS Ability and GAS Effect collectors compose through optional inspection overlays. Supporting GAS Blueprint families remain planned. Their absence or rejection changes no base family, schema, or response contract.
+- AI and Enhanced Input inspection remain planned as independent companion-contributed families so the base plugin retains no direct dependency on those systems.
 
 ## Current repository evidence
 

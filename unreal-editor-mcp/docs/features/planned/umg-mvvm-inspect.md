@@ -4,25 +4,25 @@ status: planned
 depends_on:
   - umg-authoring
   - asset-inspect-umg
-  - companion-api-v2
+  - companion-asset-adapters
 released_in: null
 ---
 
 # `umg-mvvm-inspect` — UMG ViewModel and View Binding inspection
 
-**Outcome:** Agents can discover and inspect existing Blueprint ViewModels, Widget Blueprint ViewModel contexts, and UMG View Bindings through an optional editor-only companion plugin without changing an asset or making Unreal's UMG Viewmodel plugin a dependency of the base Unreal MCP plugin.
+**Outcome:** `asset_inspect` can discover and inspect existing Blueprint ViewModels, Widget Blueprint ViewModel contexts, and UMG View Bindings through an optional editor-only companion plugin without changing an asset or making Unreal's UMG Viewmodel plugin a dependency of the base Unreal MCP plugin.
 
 **Depends on:**
 
 - [`umg-authoring`](../completed/umg-authoring.md)
 - [`asset-inspect-umg`](../completed/asset-inspect-umg.md)
-- [`companion-api-v2`](../completed/companion-api-v2.md)
+- [`companion-asset-adapters`](../completed/companion-asset-adapters.md)
 
 ### Companion and version contract
 
 - Add a separate editor-only `UnrealMCPMVVM` companion plugin that owns all direct dependencies on the Engine's `ModelViewViewModel` plugin and the public `ModelViewViewModel`, `ModelViewViewModelBlueprint`, and `ModelViewViewModelEditor` modules actually required by compiled probes and native behavior. Do not depend on `ModelViewViewModelDebugger` in production code.
 - Keep `UnrealMCP` independent of UMG Viewmodel headers, modules, plugin enablement, and transitive Engine-plugin dependencies. The base plugin must build, package, load, and retain Widget Blueprint creation, UMG authoring, legacy property bindings, and Designer events when `UnrealMCPMVVM` or the Engine plugin is absent.
-- Reuse the typed asset-family registry and companion lifecycle established by `companion-api-v2` rather than adding another listener or credential. The companion may register only its ViewModel family policy, FieldNotify and inspection adapters, Widget MVVM selectors, and bounded capability data; it must reuse base authentication, dispatch, errors, snapshots, limits, and shutdown.
+- Reuse the typed asset-family registry, companion lifecycle, and composed `asset_inspect` adapter seam established by `companion-asset-adapters` rather than adding another listener, credential, or model-facing tool. The companion may register only its ViewModel family policy, FieldNotify and inspection adapters, Widget MVVM selectors, and bounded capability data; it must reuse base authentication, dispatch, safe-YAML rendering, errors, snapshots, limits, and shutdown.
 - Version `UnrealMCPMVVM` independently from `UnrealMCP` under the shared semantic-version policy. Require both descriptors to declare the same global `companion_api_version` and require the compiled base and companion constants to match each other and their descriptors before registration; do not pin the companion's required `UnrealMCP` plugin reference to the base semantic version.
 - Reference the Engine plugin by descriptor name `ModelViewViewModel` without an `UnrealMCP`-defined `RequestedVersion`; establish compatibility by building and testing against the exact supported Unreal Engine distribution. Never download, install, or enable it at runtime.
 - Extend release-contract tests to validate Python/base version pairing, each plugin's internal semantic-version sources, descriptor and compiled companion API values, and extension-schema compatibility. Publish companion semantic version, `companion_api_version`, readiness, Engine-plugin state, inspection support, supported initialization and binding modes, conversion policy, and effective limits through `capabilities`; fail closed and expose no MVVM family when any required component or compatibility value is absent or mismatched.
@@ -55,6 +55,6 @@ released_in: null
 
 - Document companion installation and enablement, independent semantic versioning, strict `companion_api_version` equality, capability detection, supported ViewModel and View Binding inspection records, initialization and binding modes, inheritance, stable paths and identities, pagination, limits, exclusions, and focused read-only examples.
 - Document that UMG Viewmodel is an optional Beta Engine plugin whose compatibility must be verified per supported Unreal build, while legacy bindings remain available through base Unreal MCP. Document offline source and binary packaging from one release state; never download or enable dependencies at runtime.
-- Complete the feature only when absent or mismatched companions cannot expose or execute MVVM inspection, the base Widget and UMG workflow remains fully usable without the Engine plugin, representative existing ViewModels and Widget View Bindings can be read after restart without any asset or package mutation, and the complete base and inspection suites pass on both native platforms.
+- Complete the feature only when absent or mismatched companions cannot expose or execute MVVM inspection, the base Widget and UMG workflow remains fully usable without the Engine plugin, representative existing ViewModels and Widget View Bindings can be read after restart without any asset or package mutation, and the complete Windows base and inspection gates pass. Record remaining applicable macOS verification in the roadmap backlog.
 
 [Back to roadmap](../../../ROADMAP.md) · [Shared roadmap contracts](../index.md)

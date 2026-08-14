@@ -95,11 +95,19 @@ Keep the authoritative checklist in [`ROADMAP.md`](../../ROADMAP.md) synchronize
   - Depends on:
     - `asset-inspect-core`
     - `native-domain-modules`
-- [`umg-mvvm-inspect` — UMG ViewModel and View Binding inspection](planned/umg-mvvm-inspect.md) — Add bounded typed inspection of existing MVVM ViewModel Blueprints and Widget View Bindings through an optional API-compatible companion plugin.
+- [`ai-assets-inspect` — Unreal AI asset inspection](planned/ai-assets-inspect.md) — Inspect Behavior Trees, Blackboards, Environment Queries, and supported custom AI Blueprint node classes through `asset_inspect`.
+  - Depends on:
+    - `asset-inspect-core`
+    - `companion-asset-adapters`
+- [`enhanced-input-assets-inspect` — Enhanced Input asset inspection](planned/enhanced-input-assets-inspect.md) — Inspect Input Actions, Mapping Contexts, and supported trigger/modifier types through `asset_inspect`.
+  - Depends on:
+    - `asset-inspect-core`
+    - `companion-asset-adapters`
+- [`umg-mvvm-inspect` — UMG ViewModel and View Binding inspection](planned/umg-mvvm-inspect.md) — Inspect MVVM ViewModel Blueprints and Widget View Bindings through `asset_inspect` and an optional companion plugin.
   - Depends on:
     - `umg-authoring`
     - `asset-inspect-umg`
-    - `companion-api-v2`
+    - `companion-asset-adapters`
 - [`umg-mvvm` — UMG ViewModel and View Binding authoring](planned/umg-mvvm.md) — Add typed MVVM ViewModel creation and Widget View Binding authoring through the MVVM companion.
   - Depends on:
     - `umg-mvvm-inspect`
@@ -109,6 +117,11 @@ Keep the authoritative checklist in [`ROADMAP.md`](../../ROADMAP.md) synchronize
   - Depends on:
     - `umg-authoring`
     - `companion-plugins`
+- [`commonui-umg-types-inspect` — CommonUI types in UMG inspection](planned/commonui-umg-types-inspect.md) — Expand `asset_inspect` from CommonUI root Widget Blueprints to supported CommonUI widget and value types throughout UMG trees.
+  - Depends on:
+    - `asset-inspect-umg`
+    - `commonui-assets-inspect`
+    - `companion-asset-adapters`
 - [`commonui-assets-authoring` — Create/update assets with CommonUI plugin dependencies](planned/commonui-assets-authoring.md) — Add stale-safe creation and updating of supported CommonUI-dependent assets through the CommonUI companion.
   - Depends on:
     - `commonui-assets-inspect`
@@ -143,6 +156,11 @@ Keep the authoritative checklist in [`ROADMAP.md`](../../ROADMAP.md) synchronize
 - [`gas-gameplay-effects-inspect` — Gameplay Effect inspection](completed/gas-gameplay-effects-inspect.md) — Add bounded typed inspection of existing data-only Gameplay Effect Blueprint assets through the GAS companion.
   - Depends on:
     - `gas-ability-blueprints-inspect`
+- [`gas-supporting-assets-inspect` — Supporting Gameplay Ability System asset inspection](planned/gas-supporting-assets-inspect.md) — Inspect Gameplay Cue Notify, Attribute Set, magnitude-calculation, and execution-calculation Blueprint assets through `asset_inspect`.
+  - Depends on:
+    - `gas-ability-blueprints-inspect`
+    - `gas-gameplay-effects-inspect`
+    - `companion-asset-adapters`
 - [`gas-gameplay-effects` — Gameplay Effect creation and updating](planned/gas-gameplay-effects.md) — Add typed creation and data-only updating of Gameplay Effect Blueprint assets through the GAS companion.
   - Depends on:
     - `gas-gameplay-effects-inspect`
@@ -226,11 +244,13 @@ The default installation remains an exact-version pair:
 
 `companion-plugins` adds the base-owned extension registry and discovery contract used by every optional editor companion. Companions extend existing bounded tool families through exact allowlisted extension IDs; they do not add listeners, credentials, HTTP routes, arbitrary MCP tools, runtime-provided schemas, or unrestricted reflection. The Python package and base plugin remain authoritative for model-facing schemas, access classification, authentication, dispatch, limits, errors, capability composition, and extension admission.
 
-`gas-ability-blueprints-inspect` and `gas-gameplay-effects-inspect` use one optional editor-only `UnrealMCPGAS` companion plugin. It owns every direct Gameplay Ability System module dependency, reuses the base plugin's listener, credential, dispatch, ledger, and capability contracts, and has an independent semantic version while requiring the same `companion_api_version` as `UnrealMCP`. The base plugin must continue to build, package, load, and expose its complete non-GAS contract when the companion or Gameplay Ability System plugin is absent.
+`gas-ability-blueprints-inspect`, `gas-gameplay-effects-inspect`, and `gas-supporting-assets-inspect` use one optional editor-only `UnrealMCPGAS` companion plugin. It owns every direct Gameplay Ability System module dependency, reuses the base plugin's listener, credential, dispatch, ledger, and capability contracts, and has an independent semantic version while requiring the same `companion_api_version` as `UnrealMCP`. The base plugin must continue to build, package, load, and expose its complete non-GAS contract when the companion or Gameplay Ability System plugin is absent.
 
 `umg-mvvm-inspect` adds an independent optional editor-only `UnrealMCPMVVM` companion plugin. It owns every direct `ModelViewViewModel` plugin and module dependency, reuses the same base extension and bridge contracts, and has an independent semantic version while requiring the same `companion_api_version` as `UnrealMCP`. The base plugin must retain its complete Widget Blueprint, legacy property-binding, and Designer-event contract when the companion or Engine UMG Viewmodel plugin is absent.
 
-`commonui-assets-inspect` adds an independent optional editor-only `UnrealMCPCommonUI` companion plugin. It owns every direct `CommonUI` plugin and module dependency, reuses the same base extension and bridge contracts, and has an independent semantic version while requiring the same `companion_api_version` as `UnrealMCP`. CommonUI capabilities remain unavailable unless Unreal reports the `CommonUI` plugin effectively enabled for the configured project and its required modules loaded. The base plugin must retain its complete non-CommonUI contract when the companion is absent or CommonUI is missing, disabled, or unloaded.
+`commonui-assets-inspect` and `commonui-umg-types-inspect` use the independent optional editor-only `UnrealMCPCommonUI` companion plugin. It owns every direct `CommonUI` plugin and module dependency, reuses the same base extension and bridge contracts, and has an independent semantic version while requiring the same `companion_api_version` as `UnrealMCP`. CommonUI capabilities remain unavailable unless Unreal reports the `CommonUI` plugin effectively enabled for the configured project and its required modules loaded. The base plugin must retain its complete non-CommonUI contract when the companion is absent or CommonUI is missing, disabled, or unloaded.
+
+`ai-assets-inspect` and `enhanced-input-assets-inspect` add independent optional editor-only `UnrealMCPAI` and `UnrealMCPEnhancedInput` companions. Each owns its direct Engine module or plugin dependencies, contributes only fixed `asset_inspect` families and selectors through the released companion adapter seam, and leaves the base plugin's complete contract available when absent or unready.
 
 `pcg-graph-inspect` adds an independent optional editor-only `UnrealMCPPCG` companion plugin. It owns every direct PCG plugin and module dependency, reuses the same base extension and bridge contracts, and has an independent semantic version while requiring the same `companion_api_version` as `UnrealMCP`. PCG capabilities remain unavailable unless Unreal reports its `PCG` plugin effectively enabled for the configured project and the editor loads it successfully; an Engine-default enablement is valid, while an explicit project disablement wins. The base plugin must retain its complete non-PCG contract when the companion is absent or the Engine plugin is missing, disabled, or unloaded.
 
@@ -274,11 +294,13 @@ Keep the public surface compact. Add typed operations to these remaining tool fa
 
 Lifecycle and future build tools remain absent unless independently configured. Readonly access is the default; complete Blueprint authoring requires the explicit `--writable` startup trust decision. Measure the Blueprint schemas and use nested operation discriminators if context cost becomes excessive.
 
-The GAS features extend the existing Blueprint tools when the companion capability is live and do not add a separate model-facing GAS tool. `gas-ability-blueprints-inspect` adds bounded typed inspection for its graph-capable family; `gas-ability-blueprints` then adds creation, default/member editing, action cataloging, graph editing, compilation, and saving. `gas-gameplay-effects-inspect` adds bounded typed inspection for its data-only family while explicitly rejecting graph and member surfaces; `gas-gameplay-effects` then adds creation, default editing, compilation, and saving. Capabilities distinguish read support from mutation support so an inspection-only release cannot advertise or execute create/update operations.
+The GAS features extend `asset_inspect` and existing Blueprint tools when the companion capability is live and do not add a separate model-facing GAS tool. `gas-ability-blueprints-inspect` and `gas-gameplay-effects-inspect` provide the released Ability and Effect families. `gas-supporting-assets-inspect` adds Cue Notify, Attribute Set, magnitude-calculation, and execution-calculation Blueprint families without treating Ability Tasks as standalone assets. The authoring features add only their explicitly named mutation surfaces. Capabilities distinguish read support from mutation support so an inspection-only release cannot advertise or execute create/update operations.
 
-The MVVM features extend existing Blueprint and Widget tools rather than adding a separate model-facing MVVM tool. `umg-mvvm-inspect` adds bounded typed inspection for ViewModel Blueprints, Widget Blueprint ViewModel contexts, and View Bindings while keeping those records distinct from legacy property bindings and Designer events. `umg-mvvm` then adds ViewModel Blueprint creation and editing plus typed `widget_tree_edit` mutations for contexts and bindings. Capabilities distinguish read support from mutation support so an inspection-only release cannot advertise or execute create/update operations.
+The MVVM features extend `asset_inspect` and existing Blueprint and Widget tools rather than adding a separate model-facing MVVM tool. `umg-mvvm-inspect` adds bounded typed inspection for ViewModel Blueprints, Widget Blueprint ViewModel contexts, and View Bindings while keeping those records distinct from legacy property bindings and Designer events. `umg-mvvm` then adds ViewModel Blueprint creation and editing plus typed `widget_tree_edit` mutations for contexts and bindings. Capabilities distinguish read support from mutation support so an inspection-only release cannot advertise or execute create/update operations.
 
-The CommonUI features extend existing asset, Blueprint, and Widget tools rather than adding a separate model-facing CommonUI tool. `commonui-assets-inspect` initially allowlists `UCommonUserWidget`-derived Widget Blueprints and adds bounded typed widget, activation, and reference records while retaining the ordinary `widget` family. `commonui-assets-authoring` can later add creation and updating only for inspected records that public editor APIs can mutate safely. Capabilities distinguish read support from mutation support so the inspection contribution advertises no CommonUI-specific create/update operation.
+The CommonUI features extend `asset_inspect` and existing Blueprint and Widget tools rather than adding a separate model-facing CommonUI tool. The released `commonui-assets-inspect` feature allowlists `UCommonUserWidget`-derived Widget Blueprints and adds bounded typed widget, activation, and reference records. `commonui-umg-types-inspect` expands semantic coverage to allowlisted CommonUI child widgets and stored CommonUI value types in any otherwise supported Widget Blueprint. `commonui-assets-authoring` can later add creation and updating only for inspected records that public editor APIs can mutate safely.
+
+The AI and Enhanced Input inspection features add only fixed `asset_inspect` families and nested semantic records. AI scope is bounded to Behavior Trees, Blackboards, EQS, and named custom Blueprint node bases; Enhanced Input scope is bounded to actions, mapping contexts, legacy player-mappable configs, and named trigger/modifier types. Runtime execution, simulation, debugger state, project settings, and unrestricted reflection remain excluded.
 
 Review and update every detailed PCG contract against the executable tool catalog, companion foundation, and supported Unreal public APIs before implementation. The only stable functional scope is inspection and authoring of PCG Graph assets plus inspection and authoring of PCG-related level actors, components, and other supported level objects. Current tool mappings, operation shapes, snapshots, validation, asynchronous lifecycle, persistence, limits, and verification details are provisional.
 
