@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Fixed Windows binary deployment for multi-module plugins by validating the bounded descriptor module list, stripping module-owned and UAT-generated implementation source, and retaining and configuring each module's precompiled Unreal Build Tool rules without changing runtime or plugin versions.
 - Added reusable native, Python-catalog, plugin-packaging, and production-bridge asset-family conformance fixtures covering independent capability states, unavailable dependencies and companions, deterministic inspection, bounded selectors/snapshots, authoring cleanup and recovery, retained lost-response results, persistence, restart read-back, and unrelated-state preservation without changing runtime or plugin versions.
 - Standardized Unreal Engine 5.8 development tooling on the `UE58` environment variable and moved the disposable integration project to `ue-test/ue58/`.
 - Added an independent CommonUI companion checkbox to the Windows deployment helper, including fixed base-dependent packaging, project/Engine installation, and transactional multi-plugin handling without changing runtime or plugin versions.

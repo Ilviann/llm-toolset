@@ -35,23 +35,35 @@ class WindowsDeploymentScriptTests(unittest.TestCase):
         )
         return deploy.locate_project(folder)
 
-    def write_package(self, folder: Path, plugin_name: str = "UnrealMCP") -> None:
+    def write_package(
+        self,
+        folder: Path,
+        plugin_name: str = "UnrealMCP",
+        module_names: tuple[str, ...] | None = None,
+    ) -> None:
+        modules = module_names if module_names is not None else (plugin_name,)
         (folder / f"{plugin_name}.uplugin").write_text(
-            json.dumps({"Installed": True}),
+            json.dumps(
+                {
+                    "Installed": True,
+                    "Modules": [{"Name": module_name} for module_name in modules],
+                }
+            ),
             encoding="utf-8",
         )
         binary = folder / "Binaries" / "Win64" / f"UnrealEditor-{plugin_name}.dll"
         binary.parent.mkdir(parents=True)
         binary.write_bytes(b"binary")
         binary.with_suffix(".pdb").write_bytes(b"symbols")
-        source = folder / "Source" / plugin_name / "Private" / "Module.cpp"
-        source.parent.mkdir(parents=True)
-        source.write_text("// source", encoding="utf-8")
-        (folder / "Source" / plugin_name / f"{plugin_name}.Build.cs").write_text(
-            f"public class {plugin_name}\n{{\n    public {plugin_name}()\n    {{\n"
-            "        PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;\n    }\n}\n",
-            encoding="utf-8",
-        )
+        for module_name in modules:
+            source = folder / "Source" / module_name / "Private" / "Module.cpp"
+            source.parent.mkdir(parents=True)
+            source.write_text("// source", encoding="utf-8")
+            (folder / "Source" / module_name / f"{module_name}.Build.cs").write_text(
+                f"public class {module_name}\n{{\n    public {module_name}()\n    {{\n"
+                "        PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;\n    }\n}\n",
+                encoding="utf-8",
+            )
         manifest = (
             folder
             / "Intermediate"
@@ -65,6 +77,23 @@ class WindowsDeploymentScriptTests(unittest.TestCase):
         manifest.parent.mkdir(parents=True)
         manifest.write_text("manifest", encoding="utf-8")
         manifest.with_name(f"UnrealEditor-{plugin_name}.lib").write_bytes(b"import library")
+        generated = (
+            folder
+            / "Intermediate"
+            / "Build"
+            / "Win64"
+            / "UnrealEditor"
+            / "Inc"
+            / plugin_name
+            / "UHT"
+            / "GeneratedTypes.gen.cpp"
+        )
+        generated.parent.mkdir(parents=True)
+        generated.write_text("// generated implementation", encoding="utf-8")
+        generated.with_suffix(".generated.h").write_text(
+            "// generated header",
+            encoding="utf-8",
+        )
 
     def write_engine(self, folder: Path, major: int = 5, minor: int = 8) -> None:
         launcher = folder / "Engine" / "Build" / "BatchFiles" / "RunUAT.bat"
@@ -259,6 +288,65 @@ class WindowsDeploymentScriptTests(unittest.TestCase):
             self.assertEqual(list(destination.rglob("*.cpp")), [])
             self.assertEqual(list(destination.rglob("*.pdb")), [])
             deploy.verify_binary_plugin(destination)
+
+    def test_install_filters_and_configures_every_declared_module(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            project_folder = root / "Game"
+            project_folder.mkdir()
+            project = self.write_project(project_folder)
+            package = root / "Package"
+            package.mkdir()
+            modules = ("UnrealMCP", "UnrealMCPUMG")
+            self.write_package(package, module_names=modules)
+            adapter = (
+                package
+                / "Source/UnrealMCPUMG/Private/UnrealMCPUMGInspectionAdapter.cpp"
+            )
+            adapter.write_text("// UMG adapter source", encoding="utf-8")
+
+            destination = deploy.install_binary_plugin(
+                package,
+                project,
+                replace_existing=False,
+            )
+
+            self.assertEqual(list(destination.rglob("*.cpp")), [])
+            for module_name in modules:
+                rules = (
+                    destination
+                    / "Source"
+                    / module_name
+                    / f"{module_name}.Build.cs"
+                )
+                self.assertTrue(rules.is_file())
+                self.assertIn(
+                    "bUsePrecompiled = true;",
+                    rules.read_text(encoding="utf-8"),
+                )
+            deploy.verify_binary_plugin(destination)
+
+    def test_module_descriptor_validation_is_bounded_and_path_safe(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            package = Path(temporary)
+            descriptor = package / "UnrealMCP.uplugin"
+            invalid_modules = (
+                [],
+                [{"Name": "../Escape"}],
+                [{"Name": "UnrealMCP"}, {"Name": "unrealmcp"}],
+                [
+                    {"Name": f"Module{index}"}
+                    for index in range(deploy.MAX_PLUGIN_MODULES + 1)
+                ],
+            )
+            for modules in invalid_modules:
+                with self.subTest(modules=modules[:2]):
+                    descriptor.write_text(
+                        json.dumps({"Installed": True, "Modules": modules}),
+                        encoding="utf-8",
+                    )
+                    with self.assertRaises(deploy.DeploymentError):
+                        deploy.read_plugin_module_names(package, "UnrealMCP")
 
     def test_install_can_keep_only_matching_win64_pdb_crash_symbols(self):
         with tempfile.TemporaryDirectory() as temporary:

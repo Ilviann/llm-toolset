@@ -152,6 +152,10 @@ Keep the authoritative checklist in [`ROADMAP.md`](../../ROADMAP.md) synchronize
 - [`python-tooling-decomposition` — Python support-tool responsibility decomposition](completed/python-tooling-decomposition.md) — Split Unreal-local packaging, deployment, and headless Python tools along narrow reusable responsibility boundaries without behavior changes.
   - Depends on:
     - `windows-deployment-validation-fixes`
+- [`windows-deployment-multimodule` — Multi-module binary deployment](completed/windows-deployment-multimodule.md) — Strip implementation source while retaining precompiled rules for every declared plugin module.
+  - Depends on:
+    - `native-domain-modules`
+    - `python-tooling-decomposition`
 - [`gas-ability-blueprints` — Gameplay Ability Blueprint creation and updating](planned/gas-ability-blueprints.md) — Add typed Gameplay Ability Blueprint creation and authoring through the GAS companion.
   - Depends on:
     - `phase-13`

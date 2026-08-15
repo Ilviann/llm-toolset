@@ -16,7 +16,12 @@ except ModuleNotFoundError:
 
 from .discovery import DeploymentError, MAX_PROJECT_DESCRIPTOR_BYTES, read_json_object
 from .models import BASE_PLUGIN, MAX_DEPLOYMENT_PLUGINS, PLUGIN_NAME, PluginBuild, ProjectInfo
-from .verification import configure_precompiled_module_rules, ignored_binary_items, verify_binary_plugin
+from .verification import (
+    configure_precompiled_module_rules,
+    ignored_binary_items,
+    read_plugin_module_names,
+    verify_binary_plugin,
+)
 
 
 MAX_PROJECT_PLUGIN_REFERENCES = 4096
@@ -168,7 +173,18 @@ def install_binary_plugins(
             staging = destination.parent / f".{plugin.name}.install-{nonce}"
             backup = destination.parent / f".{plugin.name}.backup-{nonce}"
             staged.append((plugin, staging, destination, backup))
-            shutil.copytree(package_root, staging, ignore=lambda directory, items, name=plugin.name: ignored_binary_items(directory, items, include_pdb=include_pdb, plugin_name=name))
+            module_names = read_plugin_module_names(package_root, plugin.name)
+            shutil.copytree(
+                package_root,
+                staging,
+                ignore=lambda directory, items, name=plugin.name, modules=module_names: ignored_binary_items(
+                    directory,
+                    items,
+                    include_pdb=include_pdb,
+                    plugin_name=name,
+                    module_names=modules,
+                ),
+            )
             configure_precompiled_module_rules(staging, plugin.name)
             configure_installed_descriptor(staging, plugin.name, enabled_by_default)
             verify_binary_plugin(staging, include_pdb=include_pdb, plugin_name=plugin.name, enabled_by_default=enabled_by_default)

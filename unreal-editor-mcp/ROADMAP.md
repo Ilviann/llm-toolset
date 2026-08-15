@@ -155,6 +155,10 @@ Support-tooling features change repository utilities without changing Unreal MCP
 - [x] [`python-tooling-decomposition` — Python support-tool responsibility decomposition](docs/features/completed/python-tooling-decomposition.md) — Split Unreal-local packaging, deployment, and headless Python tools along narrow reusable responsibility boundaries without behavior changes.
   - Depends on:
     - `windows-deployment-validation-fixes`
+- [x] [`windows-deployment-multimodule` — Multi-module binary deployment](docs/features/completed/windows-deployment-multimodule.md) — Strip implementation source while retaining precompiled rules for every declared plugin module.
+  - Depends on:
+    - `native-domain-modules`
+    - `python-tooling-decomposition`
 
 ## Native platform test backlog
 

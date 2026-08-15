@@ -26,6 +26,7 @@
 - [`windows-deployment-enhanced-input-preview` — Complete companion deployment and settings preview](windows-deployment-enhanced-input-preview.md).
 - [`windows-deployment-validation-fixes` — Deployment selection and Engine validation fixes](windows-deployment-validation-fixes.md).
 - [`python-tooling-decomposition` — Python support-tool responsibility decomposition](python-tooling-decomposition.md).
+- [`windows-deployment-multimodule` — Multi-module binary deployment](windows-deployment-multimodule.md).
 - [`asset-family-conformance` — Reusable asset-family verification](asset-family-conformance.md).
 - [`gas-supporting-assets-inspect` — Supporting Gameplay Ability System asset inspection](gas-supporting-assets-inspect.md).
 
