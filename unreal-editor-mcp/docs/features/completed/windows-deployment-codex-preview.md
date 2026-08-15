@@ -13,6 +13,8 @@ release_track: support-tooling
 
 **Implementation status:** Completed as unversioned support tooling without changing the MCP runtime, native bridge, companion API, installation transaction, or plugin version.
 
+The later [`windows-deployment-enhanced-input-preview`](windows-deployment-enhanced-input-preview.md) feature replaces the per-field Codex tab with a combined LM Studio `mcp.json` and ChatGPT Codex `config.toml` text preview.
+
 **Depends on:**
 
 - [`windows-deployment-install-modes`](windows-deployment-install-modes.md)

@@ -137,6 +137,11 @@ Keep the authoritative checklist in [`ROADMAP.md`](../../ROADMAP.md) synchronize
 - [`windows-deployment-codex-preview` — Codex deployment configuration preview](completed/windows-deployment-codex-preview.md) — Show one shared launch definition as LM Studio JSON and separately copyable ChatGPT Codex STDIO fields.
   - Depends on:
     - `windows-deployment-install-modes`
+- [`windows-deployment-enhanced-input-preview` — Complete companion deployment and settings preview](completed/windows-deployment-enhanced-input-preview.md) — Deploy every released production companion and preview sample LM Studio and ChatGPT Codex settings entries.
+  - Depends on:
+    - `windows-deployment-validation-fixes`
+    - `enhanced-input-assets-inspect`
+    - `windows-deployment-codex-preview`
 - [`windows-deployment-commonui` — CommonUI companion deployment option](completed/windows-deployment-commonui.md) — Add an independent checkbox that builds and installs `UnrealMCPCommonUI` with the compatible base plugin.
   - Depends on:
     - `windows-deployment-install-modes`

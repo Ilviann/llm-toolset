@@ -6,9 +6,16 @@ from unittest import mock
 
 from scripts import deploy_plugin_windows as deploy
 from scripts.windows_deployment import discovery, transaction, workflow
+from scripts.windows_deployment.view import OUTPUT_TAB_TITLES
 
 
 class WindowsDeploymentScriptTests(unittest.TestCase):
+    def test_window_has_only_requested_output_tabs(self):
+        self.assertEqual(
+            OUTPUT_TAB_TITLES,
+            ("Build log output", "MCP settings preview"),
+        )
+
     def test_entrypoint_reexports_decomposed_owners(self):
         from scripts import windows_deployment
         from scripts.windows_deployment.models import DeploymentPlan, DeploymentRequest, DeploymentResult
@@ -164,6 +171,15 @@ class WindowsDeploymentScriptTests(unittest.TestCase):
             self.write_engine(engine)
             command = deploy.build_command(engine, root / "Package", deploy.COMMONUI_PLUGIN)
             self.assertIn(f"-Plugin={deploy.package_plugin.COMMONUI_DESCRIPTOR}", command)
+            self.assertIn(f"-Dependencies={deploy.package_plugin.PLUGIN_DESCRIPTOR}", command)
+
+    def test_enhanced_input_build_command_uses_companion_descriptor_and_base_dependency(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            engine = root / "UE_5.8"
+            self.write_engine(engine)
+            command = deploy.build_command(engine, root / "Package", deploy.ENHANCED_INPUT_PLUGIN)
+            self.assertIn(f"-Plugin={deploy.package_plugin.ENHANCED_INPUT_DESCRIPTOR}", command)
             self.assertIn(f"-Dependencies={deploy.package_plugin.PLUGIN_DESCRIPTOR}", command)
 
     def test_run_packaging_restores_gas_descriptor_contract_before_verification(self):
@@ -388,14 +404,44 @@ class WindowsDeploymentScriptTests(unittest.TestCase):
                 ),
             )
 
-    def test_gas_and_commonui_companion_selections_are_independent_and_ordered(self):
+    def test_project_install_destinations_include_selected_enhanced_input_companion(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            project_folder = root / "Game"
+            project_folder.mkdir()
+            project = self.write_project(project_folder)
+            destinations = deploy.deployment_destinations(
+                project,
+                root / "UE_5.8",
+                deploy.INSTALL_IN_PROJECT,
+                include_gas=False,
+                include_enhanced_input=True,
+            )
+            self.assertEqual(
+                destinations,
+                (
+                    project_folder.resolve() / "Plugins" / "UnrealMCP",
+                    project_folder.resolve() / "Plugins" / "UnrealMCPEnhancedInput",
+                ),
+            )
+
+    def test_companion_selections_are_independent_and_ordered(self):
         self.assertEqual(
             deploy.selected_plugins(include_gas=False, include_commonui=False),
             (deploy.BASE_PLUGIN,),
         )
         self.assertEqual(
-            deploy.selected_plugins(include_gas=True, include_commonui=True),
-            (deploy.BASE_PLUGIN, deploy.GAS_PLUGIN, deploy.COMMONUI_PLUGIN),
+            deploy.selected_plugins(
+                include_gas=True,
+                include_commonui=True,
+                include_enhanced_input=True,
+            ),
+            (
+                deploy.BASE_PLUGIN,
+                deploy.GAS_PLUGIN,
+                deploy.COMMONUI_PLUGIN,
+                deploy.ENHANCED_INPUT_PLUGIN,
+            ),
         )
 
     def test_project_descriptor_enable_rejects_duplicate_owned_reference(self):
@@ -423,7 +469,12 @@ class WindowsDeploymentScriptTests(unittest.TestCase):
             root = Path(temporary)
             engine = root / "UE_5.8"
             self.write_engine(engine)
-            plugins = (deploy.BASE_PLUGIN, deploy.GAS_PLUGIN, deploy.COMMONUI_PLUGIN)
+            plugins = (
+                deploy.BASE_PLUGIN,
+                deploy.GAS_PLUGIN,
+                deploy.COMMONUI_PLUGIN,
+                deploy.ENHANCED_INPUT_PLUGIN,
+            )
             packages = []
             destinations = []
             for plugin in plugins:
@@ -447,12 +498,17 @@ class WindowsDeploymentScriptTests(unittest.TestCase):
                 )
                 self.assertIs(descriptor["EnabledByDefault"], True)
 
-    def test_three_plugin_install_rolls_back_when_project_enable_fails(self):
+    def test_four_plugin_install_rolls_back_when_project_enable_fails(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             destination_root = root / "Plugins"
             packages = []
-            plugins = (deploy.BASE_PLUGIN, deploy.GAS_PLUGIN, deploy.COMMONUI_PLUGIN)
+            plugins = (
+                deploy.BASE_PLUGIN,
+                deploy.GAS_PLUGIN,
+                deploy.COMMONUI_PLUGIN,
+                deploy.ENHANCED_INPUT_PLUGIN,
+            )
             for plugin in plugins:
                 package = root / f"{plugin.name}Package"
                 package.mkdir()
@@ -556,6 +612,48 @@ class WindowsDeploymentScriptTests(unittest.TestCase):
                 ],
             )
 
+    def test_deploy_builds_and_enables_enhanced_input_with_base_for_project_install(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            project_folder = root / "Game"
+            project_folder.mkdir()
+            project = self.write_project(project_folder)
+            built: list[str] = []
+
+            def write_packaged_plugin(
+                engine_root: Path,
+                package_root: Path,
+                log: object,
+                plugin: deploy.PluginBuild,
+            ) -> None:
+                built.append(plugin.name)
+                package_root.mkdir()
+                self.write_package(package_root, plugin.name)
+
+            with mock.patch.object(workflow, "run_packaging", side_effect=write_packaged_plugin):
+                installed = deploy.deploy(
+                    project,
+                    root / "UE_5.8",
+                    replace_existing=False,
+                    include_enhanced_input=True,
+                    install_method=deploy.INSTALL_IN_PROJECT,
+                    log=lambda message: None,
+                )
+
+            self.assertEqual(built, ["UnrealMCP", "UnrealMCPEnhancedInput"])
+            self.assertEqual(
+                [path.name for path in installed],
+                ["UnrealMCP", "UnrealMCPEnhancedInput"],
+            )
+            references = json.loads(project.descriptor.read_text(encoding="utf-8"))["Plugins"]
+            self.assertEqual(
+                references,
+                [
+                    {"Name": "UnrealMCP", "Enabled": True},
+                    {"Name": "UnrealMCPEnhancedInput", "Enabled": True},
+                ],
+            )
+
     def test_engine_install_without_default_enablement_sets_false_and_leaves_project_unchanged(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -616,6 +714,14 @@ class WindowsDeploymentScriptTests(unittest.TestCase):
                 deploy.INSTALL_IN_PROJECT,
                 include_gas=False,
                 include_commonui=1,  # type: ignore[arg-type]
+            )
+        with self.assertRaisesRegex(deploy.DeploymentError, "include_enhanced_input must be Boolean"):
+            deploy.deployment_destinations(
+                project,
+                Path("D:/UE_5.8"),
+                deploy.INSTALL_IN_PROJECT,
+                include_gas=False,
+                include_enhanced_input=1,  # type: ignore[arg-type]
             )
 
     def test_project_install_rolls_back_if_descriptor_changes_during_build(self):
@@ -821,6 +927,28 @@ class WindowsDeploymentScriptTests(unittest.TestCase):
                     str(editor.resolve()),
                 ],
             )
+
+    def test_settings_preview_contains_lm_studio_json_and_codex_toml_entries(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            project = self.write_project(Path(temporary))
+            definition = deploy.mcp_server_definition(
+                project,
+                Path("C:/Python312/python.exe"),
+                writable=True,
+            )
+
+            preview = deploy.format_mcp_settings_preview(definition)
+
+            self.assertIn("mcp.json (LM Studio)", preview)
+            self.assertIn('\"mcpServers\": {', preview)
+            self.assertIn("config.toml (ChatGPT Codex)", preview)
+            self.assertIn("[mcp_servers.unreal-editor]", preview)
+            self.assertIn(f"command = {json.dumps(definition['command'])}", preview)
+            self.assertIn(f"  {json.dumps('--writable')}", preview)
+
+    def test_codex_toml_formatter_rejects_malformed_definition(self):
+        with self.assertRaisesRegex(ValueError, "string command and string args"):
+            deploy.format_codex_toml({"command": "python", "args": [1]})
 
     def test_lifecycle_executable_validation_is_fail_closed(self):
         with tempfile.TemporaryDirectory() as temporary:

@@ -8,23 +8,26 @@ from pathlib import Path
 try:
     from scripts.unreal_tooling.plugins import BASE_PLUGIN as BASE_IDENTITY
     from scripts.unreal_tooling.plugins import COMMONUI_PLUGIN as COMMONUI_IDENTITY
+    from scripts.unreal_tooling.plugins import ENHANCED_INPUT_PLUGIN as ENHANCED_INPUT_IDENTITY
     from scripts.unreal_tooling.plugins import GAS_PLUGIN as GAS_IDENTITY
 except ModuleNotFoundError:
     from unreal_tooling.plugins import BASE_PLUGIN as BASE_IDENTITY  # type: ignore[no-redef]
     from unreal_tooling.plugins import COMMONUI_PLUGIN as COMMONUI_IDENTITY  # type: ignore[no-redef]
+    from unreal_tooling.plugins import ENHANCED_INPUT_PLUGIN as ENHANCED_INPUT_IDENTITY  # type: ignore[no-redef]
     from unreal_tooling.plugins import GAS_PLUGIN as GAS_IDENTITY  # type: ignore[no-redef]
 
 
 PLUGIN_NAME = BASE_IDENTITY.name
 GAS_PLUGIN_NAME = GAS_IDENTITY.name
 COMMONUI_PLUGIN_NAME = COMMONUI_IDENTITY.name
+ENHANCED_INPUT_PLUGIN_NAME = ENHANCED_INPUT_IDENTITY.name
 INSTALL_IN_PROJECT = "project"
 INSTALL_IN_ENGINE_ENABLED = "engine_enabled"
 INSTALL_IN_ENGINE_DISABLED = "engine_disabled"
 INSTALL_METHODS = frozenset(
     {INSTALL_IN_PROJECT, INSTALL_IN_ENGINE_ENABLED, INSTALL_IN_ENGINE_DISABLED}
 )
-MAX_DEPLOYMENT_PLUGINS = 3
+MAX_DEPLOYMENT_PLUGINS = 4
 
 
 @dataclass(frozen=True)
@@ -48,6 +51,11 @@ COMMONUI_PLUGIN = PluginBuild(
     COMMONUI_IDENTITY.descriptor,
     (BASE_IDENTITY.descriptor,),
 )
+ENHANCED_INPUT_PLUGIN = PluginBuild(
+    ENHANCED_INPUT_PLUGIN_NAME,
+    ENHANCED_INPUT_IDENTITY.descriptor,
+    (BASE_IDENTITY.descriptor,),
+)
 
 
 @dataclass(frozen=True)
@@ -59,6 +67,7 @@ class DeploymentRequest:
     include_gas: bool = False
     include_commonui: bool = False
     install_method: str = INSTALL_IN_PROJECT
+    include_enhanced_input: bool = False
 
 
 @dataclass(frozen=True)

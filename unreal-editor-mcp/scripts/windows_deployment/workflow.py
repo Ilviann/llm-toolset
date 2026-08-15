@@ -19,6 +19,7 @@ from .discovery import DeploymentError, validate_supported_engine_root
 from .models import (
     BASE_PLUGIN,
     COMMONUI_PLUGIN,
+    ENHANCED_INPUT_PLUGIN,
     GAS_PLUGIN,
     INSTALL_IN_ENGINE_DISABLED,
     INSTALL_IN_ENGINE_ENABLED,
@@ -45,16 +46,25 @@ def validate_install_method(install_method: str) -> str:
     return install_method
 
 
-def selected_plugins(*, include_gas: bool, include_commonui: bool) -> tuple[PluginBuild, ...]:
+def selected_plugins(
+    *,
+    include_gas: bool,
+    include_commonui: bool,
+    include_enhanced_input: bool = False,
+) -> tuple[PluginBuild, ...]:
     if type(include_gas) is not bool:
         raise DeploymentError("include_gas must be Boolean")
     if type(include_commonui) is not bool:
         raise DeploymentError("include_commonui must be Boolean")
+    if type(include_enhanced_input) is not bool:
+        raise DeploymentError("include_enhanced_input must be Boolean")
     plugins = [BASE_PLUGIN]
     if include_gas:
         plugins.append(GAS_PLUGIN)
     if include_commonui:
         plugins.append(COMMONUI_PLUGIN)
+    if include_enhanced_input:
+        plugins.append(ENHANCED_INPUT_PLUGIN)
     return tuple(plugins)
 
 
@@ -65,9 +75,14 @@ def deployment_destinations(
     *,
     include_gas: bool,
     include_commonui: bool = False,
+    include_enhanced_input: bool = False,
 ) -> tuple[Path, ...]:
     validate_install_method(install_method)
-    plugins = selected_plugins(include_gas=include_gas, include_commonui=include_commonui)
+    plugins = selected_plugins(
+        include_gas=include_gas,
+        include_commonui=include_commonui,
+        include_enhanced_input=include_enhanced_input,
+    )
     if install_method == INSTALL_IN_PROJECT:
         return tuple(plugin_destination(project, plugin.name) for plugin in plugins)
     return tuple(engine_plugin_destination(engine_root, plugin.name) for plugin in plugins)
@@ -124,13 +139,18 @@ def plan_deployment(request: DeploymentRequest) -> DeploymentPlan:
     if type(request.replace_existing) is not bool:
         raise DeploymentError("replace_existing must be Boolean")
     validate_install_method(request.install_method)
-    plugins = selected_plugins(include_gas=request.include_gas, include_commonui=request.include_commonui)
+    plugins = selected_plugins(
+        include_gas=request.include_gas,
+        include_commonui=request.include_commonui,
+        include_enhanced_input=request.include_enhanced_input,
+    )
     destinations = deployment_destinations(
         request.project,
         request.engine_root,
         request.install_method,
         include_gas=request.include_gas,
         include_commonui=request.include_commonui,
+        include_enhanced_input=request.include_enhanced_input,
     )
     existing = tuple(destination for destination in destinations if destination.exists())
     if existing and not request.replace_existing:
@@ -172,8 +192,18 @@ def deploy(
     include_pdb: bool = False,
     include_gas: bool = False,
     include_commonui: bool = False,
+    include_enhanced_input: bool = False,
     install_method: str = INSTALL_IN_PROJECT,
     log: Callable[[str], None],
 ) -> tuple[Path, ...]:
-    request = DeploymentRequest(project, engine_root, replace_existing, include_pdb, include_gas, include_commonui, install_method)
+    request = DeploymentRequest(
+        project=project,
+        engine_root=engine_root,
+        replace_existing=replace_existing,
+        include_pdb=include_pdb,
+        include_gas=include_gas,
+        include_commonui=include_commonui,
+        install_method=install_method,
+        include_enhanced_input=include_enhanced_input,
+    )
     return execute_deployment(plan_deployment(request), log).destinations

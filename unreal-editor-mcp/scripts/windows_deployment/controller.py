@@ -6,7 +6,7 @@ import queue
 import threading
 from pathlib import Path
 
-from .configuration import format_lm_studio_json, mcp_server_definition
+from .configuration import format_mcp_settings_preview, mcp_server_definition
 from .discovery import DeploymentError, locate_project, resolve_engine_root, windows_editor_lifecycle_executable
 from .workflow import deploy, deployment_destinations, validate_install_method
 from .view import DeploymentView
@@ -56,8 +56,16 @@ class DeploymentController(DeploymentView):
             editor_lifecycle = windows_editor_lifecycle_executable(engine) if bool(self.lifecycle_value.get()) else None
             include_gas = bool(self.include_gas_value.get())
             include_commonui = bool(self.include_commonui_value.get())
+            include_enhanced_input = bool(self.include_enhanced_input_value.get())
             install_method = validate_install_method(self.install_method_value.get())
-            destinations = deployment_destinations(project, engine, install_method, include_gas=include_gas, include_commonui=include_commonui)
+            destinations = deployment_destinations(
+                project,
+                engine,
+                install_method,
+                include_gas=include_gas,
+                include_commonui=include_commonui,
+                include_enhanced_input=include_enhanced_input,
+            )
         except DeploymentError as error:
             messagebox.showerror("Cannot install Unreal MCP", str(error))
             return
@@ -77,9 +85,19 @@ class DeploymentController(DeploymentView):
 
         def worker() -> None:
             try:
-                destination_paths = deploy(project, engine, replace_existing=replace_existing, include_pdb=include_pdb, include_gas=include_gas, include_commonui=include_commonui, install_method=install_method, log=lambda message: self.events.put(("log", message)))
+                destination_paths = deploy(
+                    project,
+                    engine,
+                    replace_existing=replace_existing,
+                    include_pdb=include_pdb,
+                    include_gas=include_gas,
+                    include_commonui=include_commonui,
+                    include_enhanced_input=include_enhanced_input,
+                    install_method=install_method,
+                    log=lambda message: self.events.put(("log", message)),
+                )
                 definition = mcp_server_definition(project, writable=writable, editor_lifecycle=editor_lifecycle)
-                self.events.put(("done", (destination_paths, format_lm_studio_json(definition), definition)))
+                self.events.put(("done", (destination_paths, format_mcp_settings_preview(definition))))
             except Exception as error:
                 self.events.put(("error", str(error)))
         threading.Thread(target=worker, name="UnrealMCPDeployment", daemon=True).start()
@@ -92,12 +110,12 @@ class DeploymentController(DeploymentView):
                 if kind == "log":
                     self._append_log(str(payload))
                 elif kind == "done":
-                    destinations, configuration, definition = payload  # type: ignore[misc]
-                    self._set_configuration(configuration, definition)
+                    destinations, configuration = payload  # type: ignore[misc]
+                    self._set_configuration(configuration)
                     self.copy_button.configure(state="normal")
                     self._set_busy(False)
-                    self.status_value.set("Installation complete. Open the project, then copy the JSON into LM Studio.")
-                    messagebox.showinfo("Unreal MCP installed", "Installed at:\n" + "\n".join(str(destination) for destination in destinations) + "\n\nThe LM Studio JSON is ready to copy.")
+                    self.status_value.set("Installation complete. Open the project, then copy the required MCP settings entry.")
+                    messagebox.showinfo("Unreal MCP installed", "Installed at:\n" + "\n".join(str(destination) for destination in destinations) + "\n\nThe MCP settings preview is ready to copy.")
                 elif kind == "error":
                     self._set_busy(False)
                     self.status_value.set("Installation failed. Review the build log and try again.")

@@ -23,6 +23,7 @@
 - [`windows-deployment-install-modes` — Windows deployment companion and install modes](windows-deployment-install-modes.md).
 - [`windows-deployment-commonui` — CommonUI companion deployment option](windows-deployment-commonui.md).
 - [`windows-deployment-codex-preview` — Codex deployment configuration preview](windows-deployment-codex-preview.md).
+- [`windows-deployment-enhanced-input-preview` — Complete companion deployment and settings preview](windows-deployment-enhanced-input-preview.md).
 - [`windows-deployment-validation-fixes` — Deployment selection and Engine validation fixes](windows-deployment-validation-fixes.md).
 - [`python-tooling-decomposition` — Python support-tool responsibility decomposition](python-tooling-decomposition.md).
 - [`asset-family-conformance` — Reusable asset-family verification](asset-family-conformance.md).

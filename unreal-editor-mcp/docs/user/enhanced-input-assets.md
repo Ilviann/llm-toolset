@@ -8,7 +8,7 @@ For an independent Win64 package, run:
 python scripts\package_plugin.py --enhanced-input-companion --engine-root $env:UE58 --target-platforms Win64 --output ..\build\unreal-mcp-enhanced-input-ue58
 ```
 
-Install the packaged companion beside a compatible base plugin and enable both `UnrealMCPEnhancedInput` and Engine `EnhancedInput` in the project. The Windows graphical deployment helper does not yet expose this companion.
+Install the packaged companion beside a compatible base plugin and enable both `UnrealMCPEnhancedInput` and Engine `EnhancedInput` in the project. On Windows, the graphical deployment helper can build, install, and enable the base and Enhanced Input companion together through its independent default-off checkbox.
 
 ## Requests and records
 

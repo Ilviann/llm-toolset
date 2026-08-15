@@ -144,6 +144,11 @@ Support-tooling features change repository utilities without changing Unreal MCP
 - [x] [`windows-deployment-codex-preview` — Codex deployment configuration preview](docs/features/completed/windows-deployment-codex-preview.md) — Show one shared launch definition as LM Studio JSON and separately copyable ChatGPT Codex STDIO fields.
   - Depends on:
     - `windows-deployment-install-modes`
+- [x] [`windows-deployment-enhanced-input-preview` — Complete companion deployment and settings preview](docs/features/completed/windows-deployment-enhanced-input-preview.md) — Deploy every released production companion and show sample LM Studio `mcp.json` and ChatGPT Codex `config.toml` entries in one preview.
+  - Depends on:
+    - `windows-deployment-validation-fixes`
+    - `enhanced-input-assets-inspect`
+    - `windows-deployment-codex-preview`
 - [x] [`windows-deployment-validation-fixes` — Deployment selection and Engine validation fixes](docs/features/completed/windows-deployment-validation-fixes.md) — Support the complete three-plugin transaction and enforce Unreal Engine 5.8+ through one packaging validator.
   - Depends on:
     - `windows-deployment-commonui`

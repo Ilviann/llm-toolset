@@ -31,5 +31,5 @@ References in this directory are grouped by the component that owns the contract
 - [`level-actor-editing-service/`](level-actor-editing-service/index.md) — actor operation matrix, exact identities, transactions, scoped loading, package evidence, verification, and recovery.
 - [`asset-reference-service/`](asset-reference-service/index.md) — exact reference targets, evidence categories, scan completeness, snapshots, cursors, limits, and exclusions.
 - [`asset-deletion-service/`](asset-deletion-service/index.md) — exact delete requests, preflight refusals, retained outcomes, and verified persistence.
-- [`windows-deployment-helper/`](windows-deployment-helper/index.md) — Windows project and Engine selection, binary-package filtering, replace-safe installation, and LM Studio JSON.
+- [`windows-deployment-helper/`](windows-deployment-helper/index.md) — Windows project and Engine selection, production-companion packaging, replace-safe installation, and LM Studio/Codex settings previews.
 - [`asset-family-conformance/`](asset-family-conformance/index.md) — native, Python, packaging, and cross-process family fixtures and common verification gates.
