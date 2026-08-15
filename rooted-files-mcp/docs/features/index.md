@@ -41,6 +41,9 @@ and record missing applicable native verification for completed features in the
 - [`mcp-definition-gui` — Local MCP definition generator](completed/mcp-definition-gui.md)
   — Add a tkinter helper that generates host JSON and copyable Codex STDIO
   launch fields.
+- [`mcp-settings-text-preview` — Host configuration text snippets](completed/mcp-settings-text-preview.md)
+  — Replace the per-field Codex preview with copyable LM Studio `mcp.json` and
+  ChatGPT Codex `config.toml` snippets.
 
 ## Shared roadmap contracts
 

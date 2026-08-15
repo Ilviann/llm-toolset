@@ -34,7 +34,8 @@ Composition depends on configuration/effective policy, the rooted filesystem fac
 - The helper validates and resolves the selected root, current Python
   executable, and repository launcher before presenting configuration.
 - Generated definitions use the direct script launcher, an explicit mode, and
-  the same ordered arguments in JSON and individually copyable fields.
+  the same ordered arguments in LM Studio `mcp.json` and ChatGPT Codex
+  `config.toml` snippets.
 - The helper displays configuration but never writes host configuration files.
 - The shell launcher resolves its own directory and invokes the adjacent helper
   with `python3`.

@@ -6,6 +6,7 @@ from __future__ import annotations
 import json
 import sys
 import tkinter as tk
+from collections.abc import Mapping
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
@@ -74,6 +75,42 @@ def format_mcp_json(server_definition: dict[str, object]) -> str:
     )
 
 
+def format_codex_toml(server_definition: Mapping[str, object]) -> str:
+    """Format a ChatGPT Codex config.toml MCP server entry."""
+
+    command = server_definition.get("command")
+    arguments = server_definition.get("args")
+    if not isinstance(command, str) or not isinstance(arguments, list) or not all(
+        isinstance(argument, str) for argument in arguments
+    ):
+        raise ValueError(
+            "MCP server definition must contain a string command and string args"
+        )
+    encoded_arguments = ",\n".join(
+        f"  {json.dumps(argument, ensure_ascii=False)}" for argument in arguments
+    )
+    return (
+        f"[mcp_servers.{SERVER_NAME}]\n"
+        f"command = {json.dumps(command, ensure_ascii=False)}\n"
+        "args = [\n"
+        f"{encoded_arguments}\n"
+        "]"
+    )
+
+
+def format_mcp_settings_preview(server_definition: Mapping[str, object]) -> str:
+    """Format LM Studio and ChatGPT Codex configuration snippets."""
+
+    return (
+        "mcp.json (LM Studio)\n"
+        "====================\n\n"
+        f"{format_mcp_json(dict(server_definition))}\n\n"
+        "config.toml (ChatGPT Codex)\n"
+        "============================\n\n"
+        f"{format_codex_toml(server_definition)}"
+    )
+
+
 def main() -> None:
     class MCPDefinitionApp:
         def __init__(self, window: tk.Tk) -> None:
@@ -83,9 +120,6 @@ def main() -> None:
 
             self.root_path = tk.StringVar()
             self.mode = tk.StringVar(value="standard")
-            self.server_name = tk.StringVar(value=SERVER_NAME)
-            self.python_path = tk.StringVar()
-            self.argument_values = [tk.StringVar() for _ in range(4)]
             self.status = tk.StringVar(
                 value="Choose the folder that the MCP server may access."
             )
@@ -125,97 +159,53 @@ def main() -> None:
                 container, text="Generate definition", command=self.refresh
             ).grid(row=2, column=0, columnspan=3, sticky="w", pady=(0, 16))
 
-            json_header = ttk.Frame(container)
-            json_header.grid(row=3, column=0, columnspan=3, sticky="ew")
-            json_header.columnconfigure(0, weight=1)
+            settings_header = ttk.Frame(container)
+            settings_header.grid(row=3, column=0, columnspan=3, sticky="ew")
+            settings_header.columnconfigure(0, weight=1)
             ttk.Label(
-                json_header,
-                text="LM Studio mcp.json (complete object)",
+                settings_header,
+                text="MCP settings preview",
             ).grid(row=0, column=0, sticky="w")
             ttk.Button(
-                json_header,
-                text="Copy JSON",
-                command=lambda: self.copy_text(self.json_output.get("1.0", "end-1c")),
+                settings_header,
+                text="Copy settings",
+                command=lambda: self.copy_text(
+                    self.settings_output.get("1.0", "end-1c")
+                ),
             ).grid(row=0, column=1, sticky="e")
 
-            json_frame = ttk.Frame(container)
-            json_frame.grid(
+            settings_frame = ttk.Frame(container)
+            settings_frame.grid(
                 row=5, column=0, columnspan=3, sticky="nsew", pady=(6, 18)
             )
-            json_frame.rowconfigure(0, weight=1)
-            json_frame.columnconfigure(0, weight=1)
-            self.json_output = tk.Text(
-                json_frame,
-                height=13,
+            settings_frame.rowconfigure(0, weight=1)
+            settings_frame.columnconfigure(0, weight=1)
+            self.settings_output = tk.Text(
+                settings_frame,
+                height=25,
                 width=82,
                 wrap="none",
                 font=("TkFixedFont", 11),
                 state="disabled",
             )
-            json_scroll_y = ttk.Scrollbar(
-                json_frame, orient="vertical", command=self.json_output.yview
+            settings_scroll_y = ttk.Scrollbar(
+                settings_frame, orient="vertical", command=self.settings_output.yview
             )
-            json_scroll_x = ttk.Scrollbar(
-                json_frame, orient="horizontal", command=self.json_output.xview
+            settings_scroll_x = ttk.Scrollbar(
+                settings_frame, orient="horizontal", command=self.settings_output.xview
             )
-            self.json_output.configure(
-                yscrollcommand=json_scroll_y.set,
-                xscrollcommand=json_scroll_x.set,
+            self.settings_output.configure(
+                yscrollcommand=settings_scroll_y.set,
+                xscrollcommand=settings_scroll_x.set,
             )
-            self.json_output.grid(row=0, column=0, sticky="nsew")
-            json_scroll_y.grid(row=0, column=1, sticky="ns")
-            json_scroll_x.grid(row=1, column=0, sticky="ew")
-
-            codex = ttk.LabelFrame(
-                container, text="ChatGPT Codex app — STDIO server", padding=10
-            )
-            codex.grid(row=6, column=0, columnspan=3, sticky="ew")
-            codex.columnconfigure(1, weight=1)
-
-            self._copyable_row(
-                codex,
-                row=0,
-                label="Name",
-                value=self.server_name,
-            )
-            self._copyable_row(
-                codex,
-                row=1,
-                label="Command / Python",
-                value=self.python_path,
-            )
-            for index, value in enumerate(self.argument_values, start=1):
-                self._copyable_row(
-                    codex,
-                    row=index + 1,
-                    label=f"Argument {index}",
-                    value=value,
-                )
+            self.settings_output.grid(row=0, column=0, sticky="nsew")
+            settings_scroll_y.grid(row=0, column=1, sticky="ns")
+            settings_scroll_x.grid(row=1, column=0, sticky="ew")
 
             ttk.Label(
                 container,
                 textvariable=self.status,
-            ).grid(row=7, column=0, columnspan=3, sticky="w", pady=(12, 0))
-
-        def _copyable_row(
-            self,
-            parent: ttk.LabelFrame,
-            *,
-            row: int,
-            label: str,
-            value: tk.StringVar,
-        ) -> None:
-            ttk.Label(parent, text=label).grid(
-                row=row, column=0, sticky="w", padx=(0, 10), pady=3
-            )
-            ttk.Entry(parent, textvariable=value, state="readonly").grid(
-                row=row, column=1, sticky="ew", pady=3
-            )
-            ttk.Button(
-                parent,
-                text="Copy",
-                command=lambda item=value: self.copy_text(item.get()),
-            ).grid(row=row, column=2, padx=(10, 0), pady=3)
+            ).grid(row=6, column=0, columnspan=3, sticky="w", pady=(0, 0))
 
         def choose_root(self) -> None:
             selected = filedialog.askdirectory(
@@ -242,22 +232,16 @@ def main() -> None:
                 self.status.set(str(exc))
                 return
 
-            self.python_path.set(str(definition["command"]))
-            arguments = definition["args"]
-            assert isinstance(arguments, list)
-            for variable, argument in zip(self.argument_values, arguments):
-                variable.set(str(argument))
-            self._set_json(format_mcp_json(definition))
+            self._set_settings(format_mcp_settings_preview(definition))
             self.status.set(
-                "Definition ready. Copy the complete JSON or the individual "
-                "Codex STDIO fields."
+                "Settings ready. Copy the mcp.json or config.toml snippet."
             )
 
-        def _set_json(self, value: str) -> None:
-            self.json_output.configure(state="normal")
-            self.json_output.delete("1.0", "end")
-            self.json_output.insert("1.0", value)
-            self.json_output.configure(state="disabled")
+        def _set_settings(self, value: str) -> None:
+            self.settings_output.configure(state="normal")
+            self.settings_output.delete("1.0", "end")
+            self.settings_output.insert("1.0", value)
+            self.settings_output.configure(state="disabled")
 
         def copy_text(self, value: str) -> None:
             if not value:

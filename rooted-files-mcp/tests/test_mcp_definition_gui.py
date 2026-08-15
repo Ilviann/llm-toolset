@@ -9,7 +9,9 @@ from pathlib import Path
 from scripts.generate_mcp_definition import (
     SERVER_NAME,
     build_server_definition,
+    format_codex_toml,
     format_mcp_json,
+    format_mcp_settings_preview,
 )
 
 
@@ -56,6 +58,32 @@ class MCPDefinitionGeneratorTests(unittest.TestCase):
         definition = self.build("markdown")
         parsed = json.loads(format_mcp_json(definition))
         self.assertEqual(parsed, {"mcpServers": {SERVER_NAME: definition}})
+
+    def test_formats_codex_config_toml_entry(self) -> None:
+        definition = self.build("markdown")
+        expected_arguments = ",\n".join(
+            f"  {json.dumps(argument)}" for argument in definition["args"]
+        )
+        self.assertEqual(
+            format_codex_toml(definition),
+            f"[mcp_servers.{SERVER_NAME}]\n"
+            f"command = {json.dumps(definition['command'])}\n"
+            "args = [\n"
+            f"{expected_arguments}\n"
+            "]",
+        )
+
+    def test_formats_combined_settings_preview(self) -> None:
+        definition = self.build()
+        preview = format_mcp_settings_preview(definition)
+        self.assertIn("mcp.json (LM Studio)", preview)
+        self.assertIn(format_mcp_json(definition), preview)
+        self.assertIn("config.toml (ChatGPT Codex)", preview)
+        self.assertIn(format_codex_toml(definition), preview)
+
+    def test_codex_toml_rejects_malformed_definition(self) -> None:
+        with self.assertRaisesRegex(ValueError, "string command and string args"):
+            format_codex_toml({"command": "python", "args": [1]})
 
     def test_generated_definitions_launch_both_server_modes(self) -> None:
         request = json.dumps({

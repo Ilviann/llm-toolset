@@ -370,17 +370,15 @@ Choose the folder that the server may expose, select `standard` or `markdown`,
 and click **Generate definition**. The helper shows:
 
 - a complete `mcpServers` JSON object for LM Studio's `mcp.json` and compatible
-  JSON-based MCP harnesses;
-- the stable server name and absolute Python executable for a ChatGPT Codex app
-  STDIO server; and
-- the server launcher, served root, `--mode`, and selected mode as four
-  individually copyable arguments.
+  JSON-based MCP harnesses; and
+- an `[mcp_servers.rooted-files]` TOML table for the ChatGPT Codex app's
+  `config.toml`.
 
-The displayed Python command is the interpreter used to launch the helper. In
-the ChatGPT Codex app, open **Settings → MCP servers**, add a **STDIO** server,
-and copy the displayed name, command, and arguments in order. The helper only
-displays and copies values; it never writes or merges `mcp.json`,
-`config.toml`, or another host configuration file.
+Both snippets contain the Python interpreter used to launch the helper plus the
+server launcher, served root, `--mode`, and selected mode. Copy the applicable
+snippet and merge its server entry into the target host file. The helper only
+displays and copies values; it never writes or merges `mcp.json`, `config.toml`,
+or another host configuration file.
 
 ## Test
 

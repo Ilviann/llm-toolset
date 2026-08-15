@@ -18,6 +18,10 @@ choose `standard` or `markdown` mode, and copy valid launch configuration into
 LM Studio, another JSON-compatible MCP host, or the ChatGPT Codex app without
 manually locating or escaping paths.
 
+The later [`mcp-settings-text-preview`](mcp-settings-text-preview.md) support
+tooling feature replaces the per-field Codex form preview with a combined LM
+Studio `mcp.json` and ChatGPT Codex `config.toml` text preview.
+
 ### Helper contract
 
 - Provide a directly runnable Python script under `scripts/` using tkinter and

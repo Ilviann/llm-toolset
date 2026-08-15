@@ -22,8 +22,9 @@ definition whose ordered arguments are the launcher, served root, `--mode`, and
 the selected mode.
 
 `format_mcp_json` wraps that definition as the `rooted-files` member of a
-complete `mcpServers` object. The tkinter application displays this JSON plus
-the server name, Python command, and each argument in separate copyable fields.
+complete `mcpServers` object. `format_codex_toml` renders the same command and
+ordered arguments as an `[mcp_servers.rooted-files]` table. The tkinter
+application displays both snippets in one readonly, copyable settings preview.
 It does not write or merge an LM Studio `mcp.json`, Codex `config.toml`, or any
 other host configuration.
 
