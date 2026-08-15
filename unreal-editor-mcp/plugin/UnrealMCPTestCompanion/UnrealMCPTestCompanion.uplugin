@@ -7,6 +7,7 @@
   "Description": "Disposable editor-only fixture for the Unreal MCP companion API.",
   "Category": "Testing",
   "CanContainContent": false,
+  "IsBetaVersion": true,
   "EnabledByDefault": false,
   "Installed": false,
   "unreal_mcp_companion": {

@@ -10,6 +10,7 @@
   "CreatedByURL": "https://github.com/Ilviann/llm-toolset",
   "SupportURL": "ilviann.zed@gmail.com",
   "CanContainContent": false,
+  "IsBetaVersion": true,
   "EnabledByDefault": false,
   "Installed": false,
   "unreal_mcp_companion": {

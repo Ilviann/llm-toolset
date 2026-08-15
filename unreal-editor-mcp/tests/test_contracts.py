@@ -52,6 +52,16 @@ def native_host_source(root=None):
 
 
 class ReleaseContractTests(unittest.TestCase):
+    def test_pre_one_dot_zero_plugins_are_marked_beta(self):
+        for descriptor_path in (ROOT / "plugin").glob("*/*.uplugin"):
+            descriptor = json.loads(descriptor_path.read_text(encoding="utf-8"))
+            if descriptor["VersionName"].startswith("0."):
+                self.assertIs(
+                    descriptor.get("IsBetaVersion"),
+                    True,
+                    f"{descriptor_path.name} must be marked as a beta plugin",
+                )
+
     def test_tool_catalog_has_one_ordered_family_assembler(self):
         assembled = (
             *CORE_TOOLS,
