@@ -48,7 +48,7 @@ Feature identifiers are stable names, not execution indexes. Unfinished features
   - Depends on:
     - `umg-authoring`
     - `companion-plugins`
-- [ ] [`commonui-umg-types-inspect` — CommonUI types in UMG inspection](docs/features/planned/commonui-umg-types-inspect.md) — Expand `asset_inspect` from CommonUI root Widget Blueprints to supported CommonUI widget and value types throughout UMG trees.
+- [x] [`commonui-umg-types-inspect` — CommonUI types in UMG inspection](docs/features/completed/commonui-umg-types-inspect.md) — Expand `asset_inspect` from CommonUI root Widget Blueprints to supported CommonUI widget and value types throughout UMG trees.
   - Depends on:
     - `asset-inspect-umg`
     - `commonui-assets-inspect`
@@ -170,5 +170,6 @@ Feature checkboxes record implementation completion after mandatory Windows veri
   - `companion-asset-adapters`
   - `asset-inspect-data`
   - `gameplay-tag-properties`
+  - `commonui-umg-types-inspect`
 - Windows:
   - None

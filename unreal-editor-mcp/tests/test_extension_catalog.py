@@ -82,7 +82,7 @@ def commonui_capabilities(
             "schema_revision": schema,
             "ready": ready,
             "asset_families": [inspection_family(
-                "commonui_widget", "/Script/CommonUI.CommonUserWidget",
+                "commonui_widget", "/Script/UMG.UserWidget",
             )],
             "contributions": [],
         }],

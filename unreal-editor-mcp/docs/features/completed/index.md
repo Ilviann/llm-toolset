@@ -17,6 +17,7 @@
 - [`gas-ability-blueprints-inspect` — Gameplay Ability Blueprint inspection](gas-ability-blueprints-inspect.md).
 - [`gas-gameplay-effects-inspect` — Gameplay Effect inspection](gas-gameplay-effects-inspect.md).
 - [`commonui-assets-inspect` — Inspect CommonUI Widget Blueprint assets](commonui-assets-inspect.md).
+- [`commonui-umg-types-inspect` — Inspect CommonUI types throughout UMG trees](commonui-umg-types-inspect.md).
 - [`windows-deployment-install-modes` — Windows deployment companion and install modes](windows-deployment-install-modes.md).
 - [`windows-deployment-commonui` — CommonUI companion deployment option](windows-deployment-commonui.md).
 - [`windows-deployment-codex-preview` — Codex deployment configuration preview](windows-deployment-codex-preview.md).

@@ -78,7 +78,7 @@ class ReleaseContractTests(unittest.TestCase):
         native = re.search(r'Version\[\].*TEXT\("([^"]+)"\)', header)
         self.assertIsNotNone(native)
         versions = {project["project"]["version"], plugin["VersionName"], native.group(1), unreal_editor_mcp.__version__}
-        self.assertEqual(versions, {"0.48.0"})
+        self.assertEqual(versions, {"0.49.0"})
 
     def test_companion_api_and_companion_versions_are_internally_consistent(self):
         base = json.loads((ROOT / "plugin/UnrealMCP/UnrealMCP.uplugin").read_text(encoding="utf-8"))
@@ -213,10 +213,13 @@ class ReleaseContractTests(unittest.TestCase):
             self.assertIn(f'"{dependency}"', commonui_build)
         for contract in [
             "commonui_widget", "commonui_activation", "commonui_references",
+            "commonui_widgets", "commonui_widget_detail",
             "UCommonUserWidget", "UCommonActivatableWidget", "ActionDomainOverride",
-            "MaxInspectionRecords", "MaxInspectedProperties",
+            "UCommonTextBlock", "CommonButtonBase", "CommonLazyWidget",
+            "CommonActivatableWidgetContainerBase", "CommonWidgetCarousel",
+            "MaxInspectionRecords", "MaxInspectedProperties", "MaxWidgetTreeWidgets",
             "Capabilities.bInspection", "InspectionAdapter", "AssetFamilies",
-            "WBP_InspectionFixture",
+            "WBP_InspectionFixture", "WBP_OrdinaryWithCommonUIText",
         ]:
             self.assertIn(contract, commonui_source)
         self.assertNotIn("EUnrealMCPExtensionAccess::Mutation", commonui_source)

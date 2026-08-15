@@ -7,6 +7,12 @@
 - Added an independent CommonUI companion checkbox to the Windows deployment helper, including fixed base-dependent packaging, project/Engine installation, and transactional multi-plugin handling without changing runtime or plugin versions.
 - Decomposed Python packaging, Windows deployment, and headless integration support tools behind stable entrypoints, with shared Unreal-local primitives, typed deployment and Blueprint scenario state, focused domain modules, and unchanged runtime/plugin versions.
 
+## 0.49.0 — 2026-08-15
+
+- Expanded the optional CommonUI inspection overlay from `UCommonUserWidget` roots to allowlisted CommonUI widgets anywhere in an otherwise supported Widget Blueprint tree, while preserving base UMG inspection when the companion is absent or rejected.
+- Added the pageable `commonui_widgets` selector and stable nested widget details for 21 frozen button, text, rich/numeric/date text, action display, lazy, activatable container/switcher, tab/list, and carousel families with bounded typed values, relationships, inheritance, and unresolved-safe references.
+- Advanced `UnrealMCPCommonUI` independently to 0.3.0 on unchanged companion API v2/schema revision 2. Added ordinary-root, allowlist, paging, nested-selector, deterministic snapshot, non-mutation, and production-socket coverage; macOS verification remains preferred follow-up work.
+
 ## 0.48.0 — 2026-08-14
 
 - Added built-in base UMG Widget Blueprint inspection through the common `asset_inspect` facade, composing core Blueprint members and graphs with effective inherited/local hierarchy, class defaults, panel-slot layout, presentation, named slots, legacy property bindings, and Designer event bindings.

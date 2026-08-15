@@ -117,7 +117,7 @@ Keep the authoritative checklist in [`ROADMAP.md`](../../ROADMAP.md) synchronize
   - Depends on:
     - `umg-authoring`
     - `companion-plugins`
-- [`commonui-umg-types-inspect` — CommonUI types in UMG inspection](planned/commonui-umg-types-inspect.md) — Expand `asset_inspect` from CommonUI root Widget Blueprints to supported CommonUI widget and value types throughout UMG trees.
+- [`commonui-umg-types-inspect` — CommonUI types in UMG inspection](completed/commonui-umg-types-inspect.md) — Expand `asset_inspect` from CommonUI root Widget Blueprints to supported CommonUI widget and value types throughout UMG trees.
   - Depends on:
     - `asset-inspect-umg`
     - `commonui-assets-inspect`

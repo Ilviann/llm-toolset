@@ -1,16 +1,21 @@
 #include "IUnrealMCPModule.h"
 #include "UnrealMCPCompanionApi.h"
+#include "UnrealMCPCommonUIWidgetTreeInspection.h"
 #include "UnrealMCPCommonUIVersion.h"
 
 #include "CommonActivatableWidget.h"
+#include "CommonTextBlock.h"
 #include "CommonUserWidget.h"
+#include "Blueprint/UserWidget.h"
+#include "Blueprint/WidgetTree.h"
 #include "UnrealMCPWireTypes.h"
 #include "Misc/SecureHash.h"
 #include "Modules/ModuleManager.h"
 #include "UObject/UnrealType.h"
 
-#if WITH_DEV_AUTOMATION_TESTS
 #include "Blueprint/WidgetBlueprintGeneratedClass.h"
+#include "WidgetBlueprint.h"
+#if WITH_DEV_AUTOMATION_TESTS
 #include "HAL/FileManager.h"
 #include "Kismet2/KismetEditorUtilities.h"
 #include "Misc/AutomationTest.h"
@@ -18,7 +23,6 @@
 #include "Misc/Paths.h"
 #include "UObject/Package.h"
 #include "UObject/SavePackage.h"
-#include "WidgetBlueprint.h"
 #endif
 
 namespace
@@ -481,6 +485,16 @@ UCommonUserWidget* ResolveCommonUIWidgetDefaults(UObject* Asset)
         ? Cast<UCommonUserWidget>(GeneratedClass->GetDefaultObject(false)) : nullptr;
 }
 
+UUserWidget* ResolveWidgetDefaults(UObject* Asset)
+{
+    UBlueprint* Blueprint = Cast<UBlueprint>(Asset);
+    UClass* GeneratedClass = Blueprint != nullptr
+        ? (Blueprint->GeneratedClass != nullptr ? Blueprint->GeneratedClass : Blueprint->ParentClass)
+        : nullptr;
+    return GeneratedClass != nullptr
+        ? Cast<UUserWidget>(GeneratedClass->GetDefaultObject(false)) : nullptr;
+}
+
 void ConvertCommonUIInspectionError(
     const FUnrealMCPExtensionError& Input,
     FUnrealMCPError& Output)
@@ -502,17 +516,20 @@ public:
         FUnrealMCPAssetFamilySnapshotBuilder& Snapshot,
         FUnrealMCPError& OutError) override
     {
-        if (Context.bHasPaging || Context.bHasPartialGraphFlag)
+        if (Context.bHasPartialGraphFlag)
         {
             OutError = {TEXT("invalid_argument"),
-                TEXT("CommonUI selectors do not support paging or graph flags")};
+                TEXT("CommonUI selectors do not support graph flags")};
             return false;
         }
         const TArray<FString> Sections = {
-            WidgetSection, ActivationSection, ReferenceSection};
+            WidgetSection, ActivationSection, ReferenceSection,
+            UnrealMCP::CommonUIWidgetTreeInspection::Section};
         for (const FString& Section : Sections)
         {
-            if (!Selectors.Register({Section, {Section}, false, false}, OutError))
+            const bool bWidgetCollection =
+                Section == UnrealMCP::CommonUIWidgetTreeInspection::Section;
+            if (!Selectors.Register({Section, {Section}, bWidgetCollection, false}, OutError))
             {
                 return false;
             }
@@ -530,11 +547,49 @@ public:
                 return false;
             }
         }
-        UCommonUserWidget* Widget = ResolveCommonUIWidgetDefaults(Context.Asset);
-        if (Widget == nullptr)
+        UUserWidget* Defaults = ResolveWidgetDefaults(Context.Asset);
+        if (Defaults == nullptr)
         {
             OutError = {TEXT("invalid_asset"),
-                TEXT("The asset does not represent a CommonUI Widget class")};
+                TEXT("The asset does not represent a Widget Blueprint class")};
+            return false;
+        }
+        UCommonUserWidget* Widget = Cast<UCommonUserWidget>(Defaults);
+        const bool bTreeRoute = SelectedRoute == nullptr
+            || SelectedRoute->Identity == UnrealMCP::CommonUIWidgetTreeInspection::Section;
+        if (bTreeRoute
+            && !UnrealMCP::CommonUIWidgetTreeInspection::Inspect(
+                Context, Document, Snapshot, OutError))
+        {
+            return false;
+        }
+        if (SelectedRoute != nullptr
+            && SelectedRoute->Identity == UnrealMCP::CommonUIWidgetTreeInspection::Section)
+        {
+            return true;
+        }
+        if (Widget == nullptr)
+        {
+            if (SelectedRoute != nullptr)
+            {
+                OutError = {TEXT("unsupported_operation"),
+                    TEXT("Root CommonUI selectors require a UCommonUserWidget-derived Widget Blueprint")};
+                return false;
+            }
+            if (Context.Selector.IsRoot())
+            {
+                TArray<TSharedPtr<FUnrealMCPValue>> Values;
+                Values.Add(MakeShared<FUnrealMCPValueString>(
+                    UnrealMCP::CommonUIWidgetTreeInspection::Section));
+                return Document.Add({TEXT("selectors"), TEXT("array"),
+                    MakeShared<FUnrealMCPValueArray>(MoveTemp(Values))}, OutError);
+            }
+            return true;
+        }
+        if (Context.bHasPaging)
+        {
+            OutError = {TEXT("invalid_argument"),
+                TEXT("Paging parameters require the commonui_widgets collection selector")};
             return false;
         }
         const TSharedRef<FUnrealMCPRecord> Arguments = MakeShared<FUnrealMCPRecord>();
@@ -548,7 +603,8 @@ public:
         {
             for (const FString& Section : Sections)
             {
-                Requested.Add(MakeShared<FUnrealMCPValueString>(Section));
+                if (Section != UnrealMCP::CommonUIWidgetTreeInspection::Section)
+                    Requested.Add(MakeShared<FUnrealMCPValueString>(Section));
             }
         }
         Arguments->SetArrayField(TEXT("sections"), MoveTemp(Requested));
@@ -574,6 +630,7 @@ public:
             if (!Value.IsValid() || !Value->TryGetObject(Block)
                 || Block == nullptr || !Block->IsValid()
                 || !(*Block)->TryGetStringField(TEXT("section"), Section)
+                || Section == UnrealMCP::CommonUIWidgetTreeInspection::Section
                 || !Sections.Contains(Section))
             {
                 OutError = {TEXT("extension_contract_violation"),
@@ -628,7 +685,7 @@ FUnrealMCPCompanionAssetFamily CommonUIWidgetFamily()
 {
     FUnrealMCPCompanionAssetFamily Family;
     Family.FamilyId = TEXT("commonui_widget");
-    Family.NativeClassPath = UCommonUserWidget::StaticClass()->GetPathName();
+    Family.NativeClassPath = UUserWidget::StaticClass()->GetPathName();
     Family.ClassPolicy = EUnrealMCPAssetFamilyClassPolicy::ExactAndDerived;
     Family.Priority = 200;
     Family.RequiredModules = {TEXT("CommonUI")};
@@ -636,22 +693,32 @@ FUnrealMCPCompanionAssetFamily CommonUIWidgetFamily()
     Family.Bounds.MaxValueNodes = 65536;
     Family.Limits = {
         {TEXT("records"), UnrealMCPCommonUI::MaxInspectionRecords},
-        {TEXT("properties"), UnrealMCPCommonUI::MaxInspectedProperties}};
+        {TEXT("properties"), UnrealMCPCommonUI::MaxInspectedProperties},
+        {TEXT("commonui_widgets"), UnrealMCPCommonUI::MaxWidgetTreeWidgets},
+        {TEXT("properties_per_widget"), UnrealMCPCommonUI::MaxPropertiesPerWidget},
+        {TEXT("input_action_references"), UnrealMCPCommonUI::MaxInputActionReferences}};
     Family.Capabilities.bInspection = true;
     Family.SelectorRoutes = {
         {WidgetSection, {WidgetSection}, false, false},
         {ActivationSection, {ActivationSection}, false, false},
-        {ReferenceSection, {ReferenceSection}, false, false}};
+        {ReferenceSection, {ReferenceSection}, false, false},
+        {UnrealMCP::CommonUIWidgetTreeInspection::Section,
+            {UnrealMCP::CommonUIWidgetTreeInspection::Section}, true, false}};
+    Family.StableNestedIdentityKinds = {TEXT("commonui_widget")};
     Family.InspectionAdapter = MakeShared<FCommonUIWidgetAssetInspectionAdapter>();
     Family.SnapshotBuilder = [](UObject* Asset)
     {
         UCommonUserWidget* Widget = ResolveCommonUIWidgetDefaults(Asset);
-        if (Widget == nullptr) return FString();
         FCommonUIWidgetInspectionHandler Handler;
         FUnrealMCPExtensionError Error;
-        FString Fingerprint;
-        return Handler.AppendFingerprint(
-            *Widget, OperationName, Fingerprint, Error) ? Fingerprint : FString();
+        FString RootFingerprint = TEXT("not_commonui_root");
+        if (Widget != nullptr && !Handler.AppendFingerprint(
+                *Widget, OperationName, RootFingerprint, Error))
+            return FString();
+        const FString TreeFingerprint =
+            UnrealMCP::CommonUIWidgetTreeInspection::BuildFingerprint(Asset);
+        return TreeFingerprint.IsEmpty()
+            ? FString() : RootFingerprint + TEXT("\n") + TreeFingerprint;
     };
     return Family;
 }
@@ -664,6 +731,13 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FUnrealMCPCommonUIWidgetInspectionTest::RunTest(const FString& Parameters)
 {
+    int32 FamilyCount = 0;
+    FUnrealMCPError AllowlistError;
+    TestTrue(TEXT("Every frozen CommonUI widget family and property resolves in UE 5.8"),
+        UnrealMCP::CommonUIWidgetTreeInspection::ValidateFrozenAllowlist(
+            FamilyCount, AllowlistError));
+    TestEqual(TEXT("The frozen CommonUI widget-family count is stable"), FamilyCount, 21);
+
     UPackage* Package = CreatePackage(TEXT("/Engine/Transient/UnrealMCPCommonUIInspectionTest"));
     UBlueprint* Blueprint = FKismetEditorUtilities::CreateBlueprint(
         UCommonActivatableWidget::StaticClass(), Package, TEXT("WBP_CommonUIInspectionTest"),
@@ -673,6 +747,16 @@ bool FUnrealMCPCommonUIWidgetInspectionTest::RunTest(const FString& Parameters)
     {
         return false;
     }
+    UWidgetBlueprint* WidgetBlueprint = Cast<UWidgetBlueprint>(Blueprint);
+    UCommonTextBlock* FixtureText = WidgetBlueprint != nullptr
+        ? WidgetBlueprint->WidgetTree->ConstructWidget<UCommonTextBlock>(
+            UCommonTextBlock::StaticClass(), TEXT("FixtureCommonText")) : nullptr;
+    TestNotNull(TEXT("saved CommonUI child fixture is created"), FixtureText);
+    if (WidgetBlueprint == nullptr || FixtureText == nullptr)
+    {
+        return false;
+    }
+    WidgetBlueprint->WidgetTree->RootWidget = FixtureText;
     FKismetEditorUtilities::CompileBlueprint(Blueprint);
     UCommonUserWidget* Defaults = Blueprint->GeneratedClass != nullptr
         ? Cast<UCommonUserWidget>(Blueprint->GeneratedClass->GetDefaultObject(false)) : nullptr;
@@ -708,7 +792,7 @@ bool FUnrealMCPCommonUIWidgetInspectionTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Repeated CommonUI inspection succeeds"),
         BuildPayload(*Defaults, SecondRecords, SecondFingerprint, Error));
     TestEqual(TEXT("All typed CommonUI sections are returned"),
-        FirstRecords.Num(), UnrealMCPCommonUI::MaxInspectionRecords);
+        FirstRecords.Num(), UnrealMCPCommonUI::MaxRootInspectionRecords);
     TestEqual(TEXT("CommonUI fingerprint is deterministic"),
         FirstFingerprint, SecondFingerprint);
     TestEqual(TEXT("CommonUI inspection preserves package dirtiness"),
@@ -765,6 +849,65 @@ bool FUnrealMCPCommonUIWidgetInspectionTest::RunTest(const FString& Parameters)
                 && (*ActivationRecord)->TryGetStringField(TEXT("unavailable_reason"), Reason)
                 && Reason == TEXT("not_activatable_widget"));
     }
+
+    UPackage* OrdinaryPackage = CreatePackage(
+        TEXT("/Engine/Transient/UnrealMCPCommonUIOrdinaryWidgetTest"));
+    UWidgetBlueprint* OrdinaryBlueprint = Cast<UWidgetBlueprint>(
+        FKismetEditorUtilities::CreateBlueprint(
+            UUserWidget::StaticClass(), OrdinaryPackage, TEXT("WBP_OrdinaryWithCommonUIText"),
+            BPTYPE_Normal, UWidgetBlueprint::StaticClass(),
+            UWidgetBlueprintGeneratedClass::StaticClass()));
+    TestNotNull(TEXT("ordinary Widget Blueprint is created"), OrdinaryBlueprint);
+    UCommonTextBlock* CommonText = OrdinaryBlueprint != nullptr
+        ? OrdinaryBlueprint->WidgetTree->ConstructWidget<UCommonTextBlock>(
+            UCommonTextBlock::StaticClass(), TEXT("CommonText")) : nullptr;
+    TestNotNull(TEXT("CommonUI child is created in the ordinary Widget Blueprint"), CommonText);
+    if (OrdinaryBlueprint != nullptr && CommonText != nullptr)
+    {
+        OrdinaryBlueprint->WidgetTree->RootWidget = CommonText;
+        FKismetEditorUtilities::CompileBlueprint(OrdinaryBlueprint);
+        const bool bOrdinaryDirtyBefore = OrdinaryPackage->IsDirty();
+        FUnrealMCPAssetFamilyInspectionContext OrdinaryContext;
+        OrdinaryContext.Asset = OrdinaryBlueprint;
+        OrdinaryContext.Identity = {OrdinaryBlueprint->GetPathName(), TEXT("ordinary_snapshot")};
+        FUnrealMCPAssetFamilyDocumentBuilder OrdinaryDocument{FUnrealMCPAssetFamilyLimits()};
+        FUnrealMCPAssetFamilySelectorRouter OrdinarySelectors{FUnrealMCPAssetFamilyLimits()};
+        FUnrealMCPAssetFamilySnapshotBuilder OrdinarySnapshot{FUnrealMCPAssetFamilyLimits()};
+        TestTrue(TEXT("ordinary Widget Blueprint receives the CommonUI tree overlay"),
+            Adapter.Inspect(OrdinaryContext, OrdinaryDocument, OrdinarySelectors,
+                OrdinarySnapshot, AdapterError));
+        const FUnrealMCPAssetFamilyValueRecord* Collection =
+            OrdinaryDocument.GetRecords().FindByPredicate(
+                [](const FUnrealMCPAssetFamilyValueRecord& Value)
+                { return Value.Path == UnrealMCP::CommonUIWidgetTreeInspection::Section; });
+        const TSharedPtr<FUnrealMCPRecord>* CollectionRecord = nullptr;
+        double Count = 0.0;
+        TestTrue(TEXT("ordinary root advertises one CommonUI child"),
+            Collection != nullptr && Collection->Value.IsValid()
+                && Collection->Value->TryGetObject(CollectionRecord)
+                && CollectionRecord != nullptr && CollectionRecord->IsValid()
+                && (*CollectionRecord)->TryGetNumberField(TEXT("count"), Count)
+                && Count == 1.0);
+
+        FUnrealMCPAssetFamilyInspectionContext PageContext = OrdinaryContext;
+        PageContext.Selector.Segments = {UnrealMCP::CommonUIWidgetTreeInspection::Section};
+        PageContext.PageSize = 1;
+        PageContext.bHasPaging = true;
+        FUnrealMCPAssetFamilyDocumentBuilder PageDocument{FUnrealMCPAssetFamilyLimits()};
+        FUnrealMCPAssetFamilySelectorRouter PageSelectors{FUnrealMCPAssetFamilyLimits()};
+        FUnrealMCPAssetFamilySnapshotBuilder PageSnapshot{FUnrealMCPAssetFamilyLimits()};
+        TestTrue(TEXT("CommonUI widget collection supports bounded paging"),
+            Adapter.Inspect(PageContext, PageDocument, PageSelectors, PageSnapshot, AdapterError));
+        const FUnrealMCPAssetFamilyValueRecord* Page = PageDocument.GetRecords().FindByPredicate(
+            [](const FUnrealMCPAssetFamilyValueRecord& Value)
+            { return Value.Path == UnrealMCP::CommonUIWidgetTreeInspection::Section; });
+        const TArray<TSharedPtr<FUnrealMCPValue>>* PageValues = nullptr;
+        TestTrue(TEXT("CommonUI widget page returns one typed child"),
+            Page != nullptr && Page->Value.IsValid() && Page->Value->TryGetArray(PageValues)
+                && PageValues != nullptr && PageValues->Num() == 1);
+        TestEqual(TEXT("CommonUI child inspection preserves package dirtiness"),
+            OrdinaryPackage->IsDirty(), bOrdinaryDirtyBefore);
+    }
     return true;
 }
 
@@ -791,6 +934,16 @@ bool FUnrealMCPCommonUIWidgetLiveFixtureTest::RunTest(const FString& Parameters)
     {
         return false;
     }
+    UWidgetBlueprint* WidgetBlueprint = Cast<UWidgetBlueprint>(Blueprint);
+    UCommonTextBlock* FixtureText = WidgetBlueprint != nullptr
+        ? WidgetBlueprint->WidgetTree->ConstructWidget<UCommonTextBlock>(
+            UCommonTextBlock::StaticClass(), TEXT("FixtureCommonText")) : nullptr;
+    TestNotNull(TEXT("saved CommonUI child fixture is created"), FixtureText);
+    if (WidgetBlueprint == nullptr || FixtureText == nullptr)
+    {
+        return false;
+    }
+    WidgetBlueprint->WidgetTree->RootWidget = FixtureText;
     FKismetEditorUtilities::CompileBlueprint(Blueprint);
     UCommonUserWidget* Defaults = Blueprint->GeneratedClass != nullptr
         ? Cast<UCommonUserWidget>(Blueprint->GeneratedClass->GetDefaultObject(false)) : nullptr;

@@ -12,7 +12,7 @@ Each file in this directory documents one implemented cohesive component: what i
 - [`companion-extension-registry.md`](companion-extension-registry.md) — companion discovery, admission, lifecycle, capability intersection, and base-owned dispatch policy.
 - [`gas-ability-inspection.md`](gas-ability-inspection.md) — optional GAS companion ownership, Gameplay Ability family classification, typed inspection, fingerprints, and read-only capability policy.
 - [`gas-gameplay-effect-inspection.md`](gas-gameplay-effect-inspection.md) — data-only Gameplay Effect family, typed configuration records, chained references, relationships, fingerprints, and read-only policy.
-- [`commonui-widget-inspection.md`](commonui-widget-inspection.md) — optional CommonUI companion ownership, Widget Blueprint defaults/references, integrated fingerprints, and read-only capability policy.
+- [`commonui-widget-inspection.md`](commonui-widget-inspection.md) — optional CommonUI companion ownership, root defaults, typed tree widgets/relationships, integrated fingerprints, and read-only capability policy.
 - [`editor-lifecycle.md`](editor-lifecycle.md) — opt-in configured launch, graceful shutdown, durable restart, cancellation, and retained records.
 - [`blueprint-family-policy.md`](blueprint-family-policy.md) — explicit Actor/GameMode/GameState/GameInstance/Widget classification, published operation matrix, live family capabilities, and exclusions.
 - [`blueprint-inspector.md`](blueprint-inspector.md) — bounded Asset Registry discovery, exact published-family Blueprint inspection, snapshots, identities, values, and cursors.

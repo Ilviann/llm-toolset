@@ -10,7 +10,7 @@ This component contract defines the accepted design for bounded semantic inspect
 - [`commonui-assets-inspect`](../../features/completed/commonui-assets-inspect.md) adds the released CommonUI root-widget overlay.
 - [`gas-ability-blueprints-inspect`](../../features/completed/gas-ability-blueprints-inspect.md) and [`gas-gameplay-effects-inspect`](../../features/completed/gas-gameplay-effects-inspect.md) add the released GAS overlays.
 - [`asset-inspect-animation`](../../features/planned/asset-inspect-animation.md) adds Animation Blueprint inspection.
-- [`commonui-umg-types-inspect`](../../features/planned/commonui-umg-types-inspect.md) expands CommonUI coverage to widgets and values throughout supported UMG assets.
+- [`commonui-umg-types-inspect`](../../features/completed/commonui-umg-types-inspect.md) expands CommonUI coverage to widgets and values throughout supported UMG assets.
 - [`umg-mvvm-inspect`](../../features/planned/umg-mvvm-inspect.md) adds ViewModel Blueprint and Widget MVVM inspection.
 - [`ai-assets-inspect`](../../features/planned/ai-assets-inspect.md) adds Behavior Tree, Blackboard, EQS, and custom AI Blueprint families.
 - [`enhanced-input-assets-inspect`](../../features/planned/enhanced-input-assets-inspect.md) adds Enhanced Input asset and nested trigger/modifier families.
@@ -75,7 +75,7 @@ Feature front matter and the roadmap are authoritative for direct prerequisites 
 Add or expand `asset_inspect` coverage through the linked planned features for:
 
 - [Animation Blueprints](../../features/planned/asset-inspect-animation.md)
-- [CommonUI types throughout supported UMG assets](../../features/planned/commonui-umg-types-inspect.md)
+- [CommonUI types throughout supported UMG assets](../../features/completed/commonui-umg-types-inspect.md)
 - [MVVM ViewModels and Widget bindings](../../features/planned/umg-mvvm-inspect.md)
 - [Behavior Trees, Blackboards, EQS, and custom AI Blueprints](../../features/planned/ai-assets-inspect.md)
 - [Enhanced Input assets and nested types](../../features/planned/enhanced-input-assets-inspect.md)
