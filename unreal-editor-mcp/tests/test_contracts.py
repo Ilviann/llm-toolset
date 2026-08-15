@@ -30,6 +30,7 @@ ASSET_CORE_PRIVATE = NATIVE_SOURCE / "UnrealMCPAssetCore/Private"
 ASSET_CORE_PUBLIC = NATIVE_SOURCE / "UnrealMCPAssetCore/Public"
 BLUEPRINT_PRIVATE = NATIVE_SOURCE / "UnrealMCPBlueprint/Private"
 UMG_PRIVATE = NATIVE_SOURCE / "UnrealMCPUMG/Private"
+ANIMATION_PRIVATE = NATIVE_SOURCE / "UnrealMCPAnimation/Private"
 CONTENT_PRIVATE = NATIVE_SOURCE / "UnrealMCPContent/Private"
 
 
@@ -40,6 +41,7 @@ def native_command_source():
         ASSET_CORE_PRIVATE / "UnrealMCPAssetCoreModule.cpp",
         BLUEPRINT_PRIVATE / "UnrealMCPBlueprintModule.cpp",
         UMG_PRIVATE / "UnrealMCPUMGModule.cpp",
+        ANIMATION_PRIVATE / "UnrealMCPAnimationModule.cpp",
         CONTENT_PRIVATE / "UnrealMCPContentModule.cpp",
     ]
     return "\n".join(path.read_text(encoding="utf-8") for path in paths)
@@ -78,7 +80,7 @@ class ReleaseContractTests(unittest.TestCase):
         native = re.search(r'Version\[\].*TEXT\("([^"]+)"\)', header)
         self.assertIsNotNone(native)
         versions = {project["project"]["version"], plugin["VersionName"], native.group(1), unreal_editor_mcp.__version__}
-        self.assertEqual(versions, {"0.50.0"})
+        self.assertEqual(versions, {"0.51.0"})
 
     def test_companion_api_and_companion_versions_are_internally_consistent(self):
         base = json.loads((ROOT / "plugin/UnrealMCP/UnrealMCP.uplugin").read_text(encoding="utf-8"))
@@ -294,10 +296,11 @@ class ReleaseContractTests(unittest.TestCase):
         )
         modules = {module["Name"]: module["LoadingPhase"] for module in descriptor["Modules"]}
         expected_domains = [
-            "UnrealMCPAssetCore", "UnrealMCPBlueprint", "UnrealMCPUMG", "UnrealMCPContent",
+            "UnrealMCPAssetCore", "UnrealMCPBlueprint", "UnrealMCPUMG",
+            "UnrealMCPAnimation", "UnrealMCPContent",
         ]
         self.assertEqual(modules["UnrealMCP"], "PostEngineInit")
-        self.assertEqual([modules[name] for name in expected_domains], ["None"] * 4)
+        self.assertEqual([modules[name] for name in expected_domains], ["None"] * 5)
 
         startup = (HOST_PRIVATE / "UnrealMCPModule.cpp").read_text(encoding="utf-8")
         positions = [startup.index(f'TEXT("{name}")') for name in expected_domains]
@@ -313,6 +316,7 @@ class ReleaseContractTests(unittest.TestCase):
                 "gameplay_framework_edit",
             ],
             UMG_PRIVATE / "UnrealMCPUMGModule.cpp": ["widget_tree_edit"],
+            ANIMATION_PRIVATE / "UnrealMCPAnimationModule.cpp": [],
             CONTENT_PRIVATE / "UnrealMCPContentModule.cpp": [
                 "asset_references", "asset_delete", "level_inspect", "level_open",
                 "level_manage", "level_actor_edit", "level_save", "game_data_inspect",
@@ -421,6 +425,35 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertNotIn("MovieScene", adapter + model)
         self.assertIn(
             "UnrealMCP.AssetInspect.UMGHierarchyLayoutBindingsAndExclusions", native_test
+        )
+
+    def test_asset_inspect_animation_uses_a_leaf_animgraph_overlay(self):
+        module = (ANIMATION_PRIVATE / "UnrealMCPAnimationModule.cpp").read_text(encoding="utf-8")
+        adapter = (ANIMATION_PRIVATE / "UnrealMCPAnimationInspectionAdapter.cpp").read_text(encoding="utf-8")
+        build = (NATIVE_SOURCE / "UnrealMCPAnimation/UnrealMCPAnimation.Build.cs").read_text(encoding="utf-8")
+        blueprint = (BLUEPRINT_PRIVATE / "UnrealMCPAssetInspectionAdapters.cpp").read_text(encoding="utf-8")
+        graph_api = (NATIVE_SOURCE / "UnrealMCPBlueprint/Public/UnrealMCPBlueprintGraphInspection.h").read_text(encoding="utf-8")
+        native_test = (ANIMATION_PRIVATE / "Tests/UnrealMCPAutomationTestsAssetInspectAnimation.cpp").read_text(encoding="utf-8")
+        self.assertIn('TEXT("asset_inspect_animation")', module)
+        self.assertIn('"AnimGraph"', build)
+        self.assertNotIn('"AnimGraph"', (NATIVE_SOURCE / "UnrealMCPBlueprint/UnrealMCPBlueprint.Build.cs").read_text(encoding="utf-8"))
+        for contract in [
+            'TEXT("animation_blueprint")', 'TEXT("animation_graphs")',
+            'TEXT("state_machines")', 'TEXT("states")', 'TEXT("transitions")',
+            'TEXT("transition_blends")', 'TEXT("parent_asset_overrides")',
+            "bComposableInspectionOverlay", "UAnimInstance::StaticClass()",
+            "BlueprintGraphInspection::InspectGraph", "BuildSnapshot",
+        ]:
+            self.assertIn(contract, adapter)
+        for classification in [
+            "animation_blueprint_interface", "animation_blueprint_template",
+            "animation_blueprint",
+        ]:
+            self.assertIn(classification, blueprint)
+        self.assertIn("bTraverseInputsFromRoot", graph_api)
+        self.assertIn(
+            "UnrealMCP.AssetInspect.AnimationBlueprintGraphsStatesAndExclusions",
+            native_test,
         )
 
     def test_asset_references_is_published_bounded_and_covered(self):

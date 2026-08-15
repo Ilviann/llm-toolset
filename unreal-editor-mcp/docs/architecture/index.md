@@ -6,7 +6,7 @@ Each file in this directory documents one implemented cohesive component: what i
 - [`python-asset-family-catalog.md`](python-asset-family-catalog.md) — immutable schema, access, command, result, capability, and companion publication descriptors.
 - [`editor-bridge.md`](editor-bridge.md) — plugin composition, credentials, listener/route ownership, dispatch, commands, limits, and heartbeat.
 - [`native-command-catalog.md`](native-command-catalog.md) — fixed typed command descriptors, domain handler composition, capabilities, limits, freeze, and collision policy.
-- [`native-domain-modules.md`](native-domain-modules.md) — host, Asset Core, Blueprint, UMG, and Content module ownership, loading, dependencies, and package boundaries.
+- [`native-domain-modules.md`](native-domain-modules.md) — host, Asset Core, Blueprint, UMG, Animation, and Content module ownership, loading, dependencies, and package boundaries.
 - [`asset-family-registry.md`](asset-family-registry.md) — deterministic built-in family descriptors, independent typed adapters, bounded semantic builders, classification, dependencies, and startup freeze.
 - [`asset-authoring-kernel.md`](asset-authoring-kernel.md) — shared exact-target admission, creation cleanup, transactions, persistence, read-back, and verified rollback.
 - [`companion-extension-registry.md`](companion-extension-registry.md) — companion discovery, admission, lifecycle, capability intersection, and base-owned dispatch policy.
@@ -21,6 +21,7 @@ Each file in this directory documents one implemented cohesive component: what i
 - [`structured-data-inspection.md`](structured-data-inspection.md) — shared safe reflected properties, semantic values, collection descriptors, nested selector routing, and deterministic pages.
 - [`data-asset-table-inspection.md`](data-asset-table-inspection.md) — built-in Data Asset/Data Table families, Primary Asset bundles, schema/row/column views, and game-data snapshot reuse.
 - [`umg-asset-inspection.md`](umg-asset-inspection.md) — built-in base-UMG Widget Blueprint hierarchy, layout, presentation, named slots, bindings, and snapshot overlay.
+- [`animation-blueprint-inspection.md`](animation-blueprint-inspection.md) — built-in Animation Blueprint modes, pose/layer graphs, state machines, transition semantics, exclusions, and snapshot overlay.
 - [`blueprint-action-catalog.md`](blueprint-action-catalog.md) — bounded live graph-action discovery, filters, opaque identities, caching, and invalidation.
 - [`blueprint-graph-editor.md`](blueprint-graph-editor.md) — request decoding, focused node/pin operation handlers, transactional graph editing, identity completion, and result read-back.
 - [`blueprint-block-replacement.md`](blueprint-block-replacement.md) — complete logic-unit boundaries, scratch compilation, semantic parity, transactional apply, and rollback.

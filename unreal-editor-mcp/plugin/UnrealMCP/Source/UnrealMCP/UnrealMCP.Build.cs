@@ -9,6 +9,7 @@ public class UnrealMCP : ModuleRules
         DynamicallyLoadedModuleNames.AddRange(new[]
         {
             "UnrealMCPUMG",
+            "UnrealMCPAnimation",
             "UnrealMCPContent"
         });
         PrivateDependencyModuleNames.AddRange(new[]

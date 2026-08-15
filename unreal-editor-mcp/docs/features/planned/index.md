@@ -1,6 +1,5 @@
 # Planned features
 
-- [`asset-inspect-animation` — Animation Blueprint semantic inspection](asset-inspect-animation.md).
 - [`ai-assets-inspect` — Unreal AI asset inspection](ai-assets-inspect.md).
 - [`enhanced-input-assets-inspect` — Enhanced Input asset inspection](enhanced-input-assets-inspect.md).
 - [`umg-mvvm-inspect` — UMG ViewModel and View Binding inspection](umg-mvvm-inspect.md).

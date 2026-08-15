@@ -20,7 +20,8 @@ from unreal_editor_mcp.errors import BridgeError, ErrorCode  # noqa: E402
 from unreal_editor_mcp.project import ProjectLayout  # noqa: E402
 
 from .assets import run_asset_scenario, verify_restarted_assets
-from .automation import prepare_commonui_widget_fixture, prepare_gas_effect_fixture, prepare_phase_two_fixture, run_automation
+from .animation import inspect_animation_fixture, verify_restarted_animation
+from .automation import prepare_animation_fixture, prepare_commonui_widget_fixture, prepare_gas_effect_fixture, prepare_phase_two_fixture, run_automation
 from .blueprints import author_blueprint_scenario, prepare_blueprint_scenario, verify_restarted_blueprints
 from .capability_contract import verify_capability_contract
 from .companions import verify_companion_scenario
@@ -144,6 +145,54 @@ def run_widget_restart_integration(
     return 0
 
 
+def run_animation_restart_integration(
+    executable: Path,
+    layout: ProjectLayout,
+    environment: dict[str, str],
+) -> int:
+    """Run the focused Animation Blueprint save/socket/restart inspection gate."""
+    fixture = prepare_animation_fixture(executable, layout.descriptor, environment)
+    if fixture != "/Game/UnrealMCPAnimation/ABP_InspectionFixture.ABP_InspectionFixture":
+        raise AssertionError(f"Animation Blueprint fixture path mismatch: {fixture!r}")
+    command = [
+        str(executable), str(layout.descriptor), "-unattended", "-nop4", "-nosplash",
+        "-nullrhi", "-nosound", "-nocrashreports", "-NoAssetRegistryCache",
+        "-DDC-ForceMemoryCache",
+    ]
+    process_config = EditorProcessConfig(
+        executable, layout.descriptor, tuple(command[2:]), ROOT, environment,
+    )
+    with tempfile.TemporaryFile() as log:
+        bridge = None
+        process = launch_editor(process_config, log)
+        try:
+            wait_until_ready(layout, process, time.monotonic() + 120.0)
+            bridge = UnrealBridge(layout, timeout=3.0)
+            snapshot = inspect_animation_fixture(bridge)
+            shutdown_editor(bridge, process)
+        except Exception:
+            log.seek(0)
+            sys.stderr.buffer.write(log.read()[-32_000:])
+            raise
+        finally:
+            stop_editor(process, bridge=bridge)
+        bridge = None
+        process = launch_editor(process_config, log)
+        try:
+            wait_until_ready(layout, process, time.monotonic() + 120.0)
+            bridge = UnrealBridge(layout, timeout=3.0)
+            verify_restarted_animation(bridge, snapshot)
+            shutdown_editor(bridge, process)
+        except Exception:
+            log.seek(0)
+            sys.stderr.buffer.write(log.read()[-32_000:])
+            raise
+        finally:
+            stop_editor(process, bridge=bridge)
+    print("Integration passed: Animation Blueprint save, socket inspection, and restart")
+    return 0
+
+
 
 def main() -> int:
     engine = required_path(ENGINE_ROOT_ENV)
@@ -190,16 +239,23 @@ def main() -> int:
         layout.root / "Content" / "UnrealMCPCommonUI" / "WBP_InspectionFixture.uasset"
     )
     commonui_fixture.unlink(missing_ok=True)
+    animation_fixture = (
+        layout.root / "Content" / "UnrealMCPAnimation" / "ABP_InspectionFixture.uasset"
+    )
+    animation_fixture.unlink(missing_ok=True)
     if sys.argv[1:] == ["--automation-only"]:
         return run_automation(executable, layout.descriptor, environment)
     if len(sys.argv) == 3 and sys.argv[1] == "--automation-filter":
         return run_automation(executable, layout.descriptor, environment, sys.argv[2])
     if sys.argv[1:] == ["--widget-only"]:
         return run_widget_restart_integration(executable, layout, environment)
+    if sys.argv[1:] == ["--animation-only"]:
+        return run_animation_restart_integration(executable, layout, environment)
     if sys.argv[1:]:
         raise SystemExit(
             "usage: run_headless_integration.py "
             "[--automation-only | --automation-filter PREFIX | --widget-only | "
+            "--animation-only | "
             "--readonly-lifecycle-only]"
         )
     saved_fixture_snapshot = prepare_phase_two_fixture(executable, layout.descriptor, environment)
@@ -214,6 +270,12 @@ def main() -> int:
     if commonui_widget_fixture \
             != "/Game/UnrealMCPCommonUI/WBP_InspectionFixture.WBP_InspectionFixture":
         raise AssertionError(f"CommonUI Widget fixture path mismatch: {commonui_widget_fixture!r}")
+    animation_fixture_path = prepare_animation_fixture(
+        executable, layout.descriptor, environment,
+    )
+    if animation_fixture_path \
+            != "/Game/UnrealMCPAnimation/ABP_InspectionFixture.ABP_InspectionFixture":
+        raise AssertionError(f"Animation Blueprint fixture path mismatch: {animation_fixture_path!r}")
     command = [
         str(executable), str(layout.descriptor), "-unattended", "-nop4", "-nosplash",
         "-nullrhi", "-nosound", "-nocrashreports", "-NoAssetRegistryCache",
@@ -277,6 +339,7 @@ def main() -> int:
                 phase_fifteen_game_instance,
             )
             widget_scenario = author_widget_scenario(bridge)
+            animation_snapshot = inspect_animation_fixture(bridge)
             verify_readonly_mode(
                 bridge,
                 layout,
@@ -319,6 +382,7 @@ def main() -> int:
             if restored_game_mode.get("verified") is not True or restored_game_instance.get("verified") is not True:
                 raise AssertionError("Phase 16 framework settings did not survive restart and restore")
             verify_restarted_widgets(reloaded_bridge, widget_scenario)
+            verify_restarted_animation(reloaded_bridge, animation_snapshot)
             verify_restarted_game_data_and_level(
                 reloaded_bridge,
                 phase_seventeen_game_data,

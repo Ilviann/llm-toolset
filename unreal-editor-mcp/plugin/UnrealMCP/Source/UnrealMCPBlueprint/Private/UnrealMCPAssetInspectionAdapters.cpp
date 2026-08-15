@@ -2,6 +2,8 @@
 
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "AssetRegistry/IAssetRegistry.h"
+#include "Animation/AnimBlueprint.h"
+#include "Animation/AnimInstance.h"
 #include "Blueprint/UserWidget.h"
 #include "Components/ActorComponent.h"
 #include "Components/SceneComponent.h"
@@ -42,6 +44,7 @@
 #include "UnrealMCPAssetFamilyRegistry.h"
 #include "UnrealMCPAssetInspectionService.h"
 #include "UnrealMCPBlueprintInspectionSupport.h"
+#include "UnrealMCPBlueprintGraphInspection.h"
 #include "UnrealMCPBlueprintInspector.h"
 #include "UnrealMCPK2TypeCodec.h"
 #include "UnrealMCPPropertyCodec.h"
@@ -91,6 +94,8 @@ struct FGraphSelection
     FString Kind;
     FString Name;
     FString Selector;
+    bool bTraverseInputsFromRoot = false;
+    TFunction<void(UEdGraphNode*, const TSharedRef<FUnrealMCPRecord>&)> DecorateNode;
 };
 
 bool IsUnreserved(uint8 Byte)
@@ -245,7 +250,24 @@ FClassification Classify(UObject* AssetObject, UBlueprint* Blueprint)
     UClass* Represented = Blueprint->GeneratedClass != nullptr ? Blueprint->GeneratedClass : Blueprint->ParentClass;
     Result.RepresentedClass = Represented != nullptr ? Represented->GetPathName() : FString();
     Result.ParentType = Blueprint->ParentClass != nullptr ? Blueprint->ParentClass->GetPathName() : FString();
-    if (Blueprint->BlueprintType == BPTYPE_Interface)
+    if (const UAnimBlueprint* AnimBlueprint = Cast<UAnimBlueprint>(Blueprint))
+    {
+        Result.bDeepBlueprint = true;
+        if (Blueprint->BlueprintType == BPTYPE_Interface)
+        {
+            Result.Type = TEXT("animation_blueprint_interface");
+            Result.bInterface = true;
+        }
+        else if (AnimBlueprint->bIsTemplate)
+        {
+            Result.Type = TEXT("animation_blueprint_template");
+        }
+        else
+        {
+            Result.Type = TEXT("animation_blueprint");
+        }
+    }
+    else if (Blueprint->BlueprintType == BPTYPE_Interface)
     {
         Result.Type = TEXT("interface_blueprint");
         Result.bDeepBlueprint = true;
@@ -726,7 +748,8 @@ void AddRootDeclarations(UBlueprint* Blueprint, const FClassification& Classific
     TArray<TSharedPtr<FUnrealMCPValue>> FunctionValues;
     for (UEdGraph* Graph : Functions)
     {
-        if (Graph == nullptr || FunctionValues.Num() >= MaximumRootEntries) continue;
+        if (Graph == nullptr || FunctionValues.Num() >= MaximumRootEntries
+            || Graph->GetClass()->GetPathName().StartsWith(TEXT("/Script/AnimGraph.Animation"))) continue;
         const TSharedRef<FUnrealMCPRecord> Function = MakeShared<FUnrealMCPRecord>();
         Function->SetStringField(TEXT("name"), Graph->GetName());
         Function->SetObjectField(TEXT("signature"), SignatureFromGraph(Graph));
@@ -929,7 +952,10 @@ TSet<UEdGraphNode*> EventSlice(UEdGraphNode* Root)
     return Result;
 }
 
-TArray<UEdGraphNode*> TraversalOrder(const TSet<UEdGraphNode*>& Base, UEdGraphNode* PreferredRoot)
+TArray<UEdGraphNode*> TraversalOrder(
+    const TSet<UEdGraphNode*>& Base,
+    UEdGraphNode* PreferredRoot,
+    bool bTraverseInputsFromRoot)
 {
     TArray<UEdGraphNode*> Result;
     TSet<UEdGraphNode*> Seen;
@@ -951,7 +977,8 @@ TArray<UEdGraphNode*> TraversalOrder(const TSet<UEdGraphNode*>& Base, UEdGraphNo
         TArray<UEdGraphNode*> Next;
         for (UEdGraphPin* Pin : Node->Pins)
         {
-            if (!IsSemanticPin(Node, Pin) || Pin->Direction != EGPD_Output) continue;
+            if (!IsSemanticPin(Node, Pin)
+                || Pin->Direction != (bTraverseInputsFromRoot ? EGPD_Input : EGPD_Output)) continue;
             for (UEdGraphPin* Linked : Pin->LinkedTo)
                 if (Linked != nullptr && Linked->GetOwningNodeUnchecked() != nullptr && Base.Contains(Linked->GetOwningNodeUnchecked()))
                     Next.AddUnique(Linked->GetOwningNodeUnchecked());
@@ -1109,6 +1136,7 @@ TSharedRef<FUnrealMCPRecord> BuildGraphBody(const FGraphSelection& Selection, co
             Value->SetArrayField(TEXT("inputs"), Inputs);
             Value->SetArrayField(TEXT("outputs"), Outputs);
             if (!Arguments->Values.IsEmpty()) Value->SetObjectField(TEXT("arguments"), Arguments);
+            if (Selection.DecorateNode) Selection.DecorateNode(Node, Value);
             if (bVerbose)
             {
                 const TSharedRef<FUnrealMCPRecord> Debug = MakeShared<FUnrealMCPRecord>();
@@ -1280,7 +1308,8 @@ bool BuildSelectedGraph(const FRequest& Request, const FString& AssetPath, const
         OutError = {TEXT("data_limit_exceeded"), TEXT("The selected graph exceeds the complete graph response limit")};
         return false;
     }
-    const TArray<UEdGraphNode*> Order = TraversalOrder(BaseNodes, Selection.EventRoot);
+    const TArray<UEdGraphNode*> Order = TraversalOrder(
+        BaseNodes, Selection.EventRoot, Selection.bTraverseInputsFromRoot);
     int32 Low = 1;
     int32 High = Order.Num();
     int32 Best = 0;
@@ -2025,4 +2054,40 @@ bool RegisterBuiltInAdapters(
     return UnrealMCP::AssetCore::RegisterNeutralAssetAdapter(Registry, OutError)
         && RegisterBlueprintAdapter(Registry, OutError);
 }
+}
+
+bool UnrealMCP::BlueprintGraphInspection::InspectGraph(
+    const FUnrealMCPAssetFamilyInspectionContext& Context,
+    const FSelection& Selection,
+    FUnrealMCPAssetFamilyDocumentBuilder& Document,
+    FUnrealMCPError& OutError)
+{
+    using namespace AssetInspectionPrivate;
+    using namespace AssetInspectionAdaptersPrivate;
+    if (Selection.Graph == nullptr || Selection.Name.IsEmpty() || Selection.Selector.IsEmpty())
+    {
+        OutError = {TEXT("not_found"), TEXT("The selected Blueprint graph is unavailable")};
+        return false;
+    }
+    FRequest Request = RequestFromContext(Context);
+    FGraphSelection Internal;
+    Internal.Graph = Selection.Graph;
+    Internal.EventRoot = Selection.PreferredRoot;
+    Internal.Kind = Selection.Kind;
+    Internal.Name = Selection.Name;
+    Internal.Selector = Selection.Selector;
+    Internal.bTraverseInputsFromRoot = Selection.bTraverseInputsFromRoot;
+    Internal.DecorateNode = Selection.DecorateNode;
+    const FClassification Classification = Classify(Context.Asset, Cast<UBlueprint>(Context.Asset));
+    TSharedPtr<FUnrealMCPRecord> Result;
+    if (!BuildSelectedGraph(
+        Request, Context.Identity.ObjectPath, Context.Identity.SnapshotId,
+        Classification, Internal, Result, OutError)) return false;
+    for (const TPair<FString, TSharedPtr<FUnrealMCPValue>>& Field : Result->Values)
+    {
+        if (Field.Key == TEXT("format") || Field.Key == TEXT("schema_version")
+            || Field.Key == TEXT("snapshot_id") || Field.Key == TEXT("asset")) continue;
+        if (!Document.Add({Field.Key, TEXT("record"), Field.Value}, OutError)) return false;
+    }
+    return true;
 }

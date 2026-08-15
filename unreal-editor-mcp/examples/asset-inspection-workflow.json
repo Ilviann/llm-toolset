@@ -18,5 +18,20 @@
       "page_size": 10,
       "page_index": 0
     }
+  },
+  {
+    "tool": "asset_inspect",
+    "arguments": {
+      "asset_path": "/Game/Characters/ABP_Player",
+      "selector": "animation_graphs/AnimGraph",
+      "allow_partial_graph": false
+    }
+  },
+  {
+    "tool": "asset_inspect",
+    "arguments": {
+      "asset_path": "/Game/Characters/ABP_Player",
+      "selector": "state_machines/AnimGraph/Locomotion"
+    }
   }
 ]

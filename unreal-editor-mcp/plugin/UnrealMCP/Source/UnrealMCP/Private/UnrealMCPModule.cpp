@@ -94,6 +94,7 @@ public:
             TEXT("UnrealMCPAssetCore"),
             TEXT("UnrealMCPBlueprint"),
             TEXT("UnrealMCPUMG"),
+            TEXT("UnrealMCPAnimation"),
             TEXT("UnrealMCPContent")};
         BuiltInDomainModules.Reset();
         for (const FName ModuleName : BuiltInModuleOrder)

@@ -2,7 +2,7 @@
 
 ## Ownership
 
-The base plugin is one external plugin with five editor modules:
+The base plugin is one external plugin with six editor modules:
 
 - `UnrealMCP` is the host and composition root. It owns transport,
   authentication, lifecycle, companion API v2, extension discovery, and final
@@ -13,6 +13,7 @@ The base plugin is one external plugin with five editor modules:
 - `UnrealMCPBlueprint` owns Blueprint inspection, policy, graph authoring,
   mutation, gameplay-framework assignment, and shared reflected value codecs.
 - `UnrealMCPUMG` owns Widget tree, layout, style, and binding authoring plus the base-UMG `asset_inspect` semantic overlay.
+- `UnrealMCPAnimation` owns the built-in Animation Blueprint semantic inspection overlay and keeps `AnimGraph` editor dependencies isolated to one read-only leaf module.
 - `UnrealMCPContent` owns asset references/deletion, Levels, user-defined
   structs, and Data Tables.
 
@@ -21,16 +22,16 @@ directory. Public headers exist only for typed cross-domain contracts.
 
 ## Composition and dependency direction
 
-All four domain descriptors use `LoadingPhase: None`. During host startup,
-`UnrealMCPModule.cpp` explicitly loads Asset Core, Blueprint, UMG, then Content.
+All five domain descriptors use `LoadingPhase: None`. During host startup,
+`UnrealMCPModule.cpp` explicitly loads Asset Core, Blueprint, UMG, Animation, then Content.
 The host asks each module to register asset families, freezes the family
 registry, discovers companions, and then composes commands through
 `FUnrealMCPDomainRegistrar`.
 
-Asset Core is the inward shared boundary. Blueprint depends on Asset Core; UMG
-and Content depend on Asset Core and Blueprint; none depends on the host.
+Asset Core is the inward shared boundary. Blueprint depends on Asset Core; UMG,
+Animation, and Content depend on Asset Core and Blueprint; none depends on the host.
 `UnrealMCP` has a static Asset Core dependency, a private Blueprint dependency
-for its companion compatibility boundary, and dynamic UMG/Content dependencies.
+for its companion compatibility boundary, and dynamic UMG/Animation/Content dependencies.
 The Blueprint reflected-value boundary links the engine-wide `GameplayTags`
 module. The base does not link `GameplayAbilities` or `GameplayTasks`, and this
 dependency does not cross the companion API.

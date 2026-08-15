@@ -7,6 +7,12 @@
 - Added an independent CommonUI companion checkbox to the Windows deployment helper, including fixed base-dependent packaging, project/Engine installation, and transactional multi-plugin handling without changing runtime or plugin versions.
 - Decomposed Python packaging, Windows deployment, and headless integration support tools behind stable entrypoints, with shared Unreal-local primitives, typed deployment and Blueprint scenario state, focused domain modules, and unchanged runtime/plugin versions.
 
+## 0.51.0 — 2026-08-15
+
+- Added built-in read-only Animation Blueprint inspection for regular, template, and Animation Layer Interface assets, composing common Blueprint members and K2 semantics with animation settings, pose/layer graphs, state machines, states, conduits, aliases, transitions, and parent asset overrides.
+- Added semantic layer signatures, output-oriented complete/partial graph traversal, normalized animation-node facts, deterministic topology selectors and cumulative snapshots, with explicit media, runtime, debug-pose, compiler-layout, and referenced-asset traversal exclusions.
+- Added the isolated `UnrealMCPAnimation` leaf module, focused native/Python/headless coverage, UE 5.8 Windows build and base packaging gates, and complete architecture/type/user documentation. Companion API v2 and companion versions remain unchanged; macOS verification remains preferred follow-up work.
+
 ## 0.50.0 — 2026-08-15
 
 - Expanded the optional GAS companion with exact read-only `asset_inspect` overlays for static and actor Gameplay Cue Notify, Attribute Set, Gameplay Mod Magnitude Calculation, and Gameplay Effect Execution Calculation Blueprint assets while preserving released Ability/Effect output and base behavior when GAS is unavailable.

@@ -22,7 +22,7 @@ Feature identifiers are stable names, not execution indexes. Unfinished features
   - Depends on:
     - `asset-inspect-core`
     - `native-domain-modules`
-- [ ] [`asset-inspect-animation` — Animation Blueprint semantic inspection](docs/features/planned/asset-inspect-animation.md) — Extend the facade to pose graphs, layers and state machines.
+- [x] [`asset-inspect-animation` — Animation Blueprint semantic inspection](docs/features/completed/asset-inspect-animation.md) — Extend the facade to pose graphs, layers and state machines.
   - Depends on:
     - `asset-inspect-core`
     - `native-domain-modules`
@@ -172,5 +172,6 @@ Feature checkboxes record implementation completion after mandatory Windows veri
   - `gameplay-tag-properties`
   - `commonui-umg-types-inspect`
   - `gas-supporting-assets-inspect`
+  - `asset-inspect-animation`
 - Windows:
   - None

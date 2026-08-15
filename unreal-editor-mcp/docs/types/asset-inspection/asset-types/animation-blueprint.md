@@ -143,7 +143,7 @@ Do not return the current skeletal mesh component, owning Actor, active state, s
 
 ## Implementation implications
 
-- Animation Blueprints are not currently a published inspection family. `asset-inspect-animation` requires a new classifier plus `AnimGraph` editor-module traversal for pose graphs, state machines, states, conduits, aliases, transitions, layers, and parent asset overrides.
+- Animation Blueprints are a published built-in inspection family. `UnrealMCPAnimation` owns the `AnimGraph`-dependent overlay for pose graphs, state machines, states, conduits, aliases, transitions, layers, and parent asset overrides while the common Blueprint adapter owns shared members and K2 semantics.
 - Reuse the common Blueprint variable, event, function, macro, graph, node, link, property-codec, snapshot, and verbose-debug infrastructure. Reuse paging only for non-graph indexes such as parent asset overrides; pose, state-machine, state, conduit, transition-rule, and transition-blend graphs remain atomic.
 - Treat editor graphs as the semantic source. Compiled baked state-machine and anim-node records may validate or supplement stable facts but must not replace source graph traversal or leak compiler layout details.
 - The base plugin can implement this through Unreal Engine and AnimGraph dependencies; no domain companion is required.

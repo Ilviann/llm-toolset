@@ -1,5 +1,6 @@
 # Completed features
 
+- [`asset-inspect-animation` — Animation Blueprint semantic inspection](asset-inspect-animation.md).
 - [`asset-inspect-umg` — Base UMG Widget Blueprint inspection](asset-inspect-umg.md).
 - [`gameplay-tag-properties` — Gameplay Tag property values](gameplay-tag-properties.md).
 - [`asset-inspect-data` — Data Asset and Data Table inspection](asset-inspect-data.md).

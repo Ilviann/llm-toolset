@@ -91,7 +91,7 @@ Keep the authoritative checklist in [`ROADMAP.md`](../../ROADMAP.md) synchronize
   - Depends on:
     - `asset-inspect-core`
     - `native-domain-modules`
-- [`asset-inspect-animation` — Animation Blueprint semantic inspection](planned/asset-inspect-animation.md) — Extend the facade to pose graphs, layers and state machines.
+- [`asset-inspect-animation` — Animation Blueprint semantic inspection](completed/asset-inspect-animation.md) — Extend the facade to pose graphs, layers and state machines.
   - Depends on:
     - `asset-inspect-core`
     - `native-domain-modules`
