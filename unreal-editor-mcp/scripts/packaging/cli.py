@@ -13,12 +13,14 @@ from .models import PackageRequest
 from .service import (
     COMMONUI_DESCRIPTOR,
     DEFAULT_COMMONUI_OUTPUT,
+    DEFAULT_ENHANCED_INPUT_OUTPUT,
     DEFAULT_FIXTURE_OUTPUT,
     DEFAULT_GAS_OUTPUT,
     DEFAULT_OUTPUT,
     ENGINE_ROOT_ENV,
     FIXTURE_DESCRIPTOR,
     GAS_DESCRIPTOR,
+    ENHANCED_INPUT_DESCRIPTOR,
     PLUGIN_DESCRIPTOR,
     PackagingError,
     display_command,
@@ -35,6 +37,7 @@ def create_parser() -> argparse.ArgumentParser:
     selection.add_argument("--companion-fixture", action="store_true", help="package the disposable UnrealMCPTestCompanion instead of the base plugin")
     selection.add_argument("--gas-companion", action="store_true", help="package the optional UnrealMCPGAS companion instead of the base plugin")
     selection.add_argument("--commonui-companion", action="store_true", help="package the optional UnrealMCPCommonUI companion instead of the base plugin")
+    selection.add_argument("--enhanced-input-companion", action="store_true", help="package the optional UnrealMCPEnhancedInput companion instead of the base plugin")
     parser.add_argument("--engine-root", type=Path, help=f"Unreal Engine installation root; defaults to {ENGINE_ROOT_ENV}.")
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT, help=f"package destination (default: {DEFAULT_OUTPUT})")
     parser.add_argument("--target-platforms", metavar="PLATFORM[+PLATFORM...]", help="optional UAT target-platform filter, for example Mac or Win64+Linux")
@@ -60,6 +63,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             FIXTURE_DESCRIPTOR if arguments.companion_fixture
             else GAS_DESCRIPTOR if arguments.gas_companion
             else COMMONUI_DESCRIPTOR if arguments.commonui_companion
+            else ENHANCED_INPUT_DESCRIPTOR if arguments.enhanced_input_companion
             else PLUGIN_DESCRIPTOR
         )
         output = arguments.output
@@ -70,7 +74,12 @@ def main(argv: Sequence[str] | None = None) -> int:
                 output = DEFAULT_GAS_OUTPUT
             elif arguments.commonui_companion:
                 output = DEFAULT_COMMONUI_OUTPUT
-        is_companion = arguments.companion_fixture or arguments.gas_companion or arguments.commonui_companion
+            elif arguments.enhanced_input_companion:
+                output = DEFAULT_ENHANCED_INPUT_OUTPUT
+        is_companion = (
+            arguments.companion_fixture or arguments.gas_companion
+            or arguments.commonui_companion or arguments.enhanced_input_companion
+        )
         prepared = prepare_package(PackageRequest(
             engine_root=configured_engine,
             output=output,

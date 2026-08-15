@@ -7,6 +7,12 @@
 - Added an independent CommonUI companion checkbox to the Windows deployment helper, including fixed base-dependent packaging, project/Engine installation, and transactional multi-plugin handling without changing runtime or plugin versions.
 - Decomposed Python packaging, Windows deployment, and headless integration support tools behind stable entrypoints, with shared Unreal-local primitives, typed deployment and Blueprint scenario state, focused domain modules, and unchanged runtime/plugin versions.
 
+## 0.52.0 — 2026-08-15
+
+- Added the independent `UnrealMCPEnhancedInput` 0.1.0 companion with five read-only `asset_inspect` families for Input Actions, Mapping Contexts, deprecated player-mappable configs, and custom trigger/modifier Blueprints while keeping Enhanced Input dependencies outside the base plugin.
+- Added ordered mapping/profile and nested trigger/modifier records, player-mappable metadata, allowlisted persisted settings, explicit unsupported custom data, stable identities, cumulative fingerprints, and UE 5.8 legacy guidance without input evaluation, runtime-user-settings access, or mutation.
+- Added exact Python catalog admission, focused native Automation, persistent fixtures, production-socket restart coverage, base/companion packaging support, architecture/type/user documentation, and Windows adaptive/forced-unity/non-unity verification. Companion API v2/schema revision 2 remain unchanged; macOS verification remains preferred follow-up work.
+
 ## 0.51.0 — 2026-08-15
 
 - Added built-in read-only Animation Blueprint inspection for regular, template, and Animation Layer Interface assets, composing common Blueprint members and K2 semantics with animation settings, pose/layer graphs, state machines, states, conduits, aliases, transitions, and parent asset overrides.

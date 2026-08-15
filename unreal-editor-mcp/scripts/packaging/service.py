@@ -24,6 +24,7 @@ try:
         APPLICATION_ROOT,
         BASE_PLUGIN,
         COMMONUI_PLUGIN,
+        ENHANCED_INPUT_PLUGIN,
         FIXTURE_PLUGIN,
         GAS_PLUGIN,
         WORKSPACE_ROOT,
@@ -43,6 +44,7 @@ except ModuleNotFoundError:  # Direct script execution exposes scripts/ as the i
         APPLICATION_ROOT,
         BASE_PLUGIN,
         COMMONUI_PLUGIN,
+        ENHANCED_INPUT_PLUGIN,
         FIXTURE_PLUGIN,
         GAS_PLUGIN,
         WORKSPACE_ROOT,
@@ -56,10 +58,12 @@ PLUGIN_DESCRIPTOR = BASE_PLUGIN.descriptor
 FIXTURE_DESCRIPTOR = FIXTURE_PLUGIN.descriptor
 GAS_DESCRIPTOR = GAS_PLUGIN.descriptor
 COMMONUI_DESCRIPTOR = COMMONUI_PLUGIN.descriptor
+ENHANCED_INPUT_DESCRIPTOR = ENHANCED_INPUT_PLUGIN.descriptor
 DEFAULT_OUTPUT = WORKSPACE_ROOT / "build" / "unreal-editor-mcp"
 DEFAULT_FIXTURE_OUTPUT = WORKSPACE_ROOT / "build" / "unreal-mcp-test-companion"
 DEFAULT_GAS_OUTPUT = WORKSPACE_ROOT / "build" / "unreal-mcp-gas"
 DEFAULT_COMMONUI_OUTPUT = WORKSPACE_ROOT / "build" / "unreal-mcp-commonui"
+DEFAULT_ENHANCED_INPUT_OUTPUT = WORKSPACE_ROOT / "build" / "unreal-mcp-enhanced-input"
 MAX_PLUGIN_DESCRIPTOR_BYTES = 1024 * 1024
 PACKAGING_OWNED_DESCRIPTOR_FIELDS = frozenset({"EngineVersion", "Installed"})
 _PLATFORM_NAME = re.compile(r"^[A-Za-z][A-Za-z0-9_]*$")

@@ -99,7 +99,7 @@ Keep the authoritative checklist in [`ROADMAP.md`](../../ROADMAP.md) synchronize
   - Depends on:
     - `asset-inspect-core`
     - `companion-asset-adapters`
-- [`enhanced-input-assets-inspect` — Enhanced Input asset inspection](planned/enhanced-input-assets-inspect.md) — Inspect Input Actions, Mapping Contexts, and supported trigger/modifier types through `asset_inspect`.
+- [`enhanced-input-assets-inspect` — Enhanced Input asset inspection](completed/enhanced-input-assets-inspect.md) — Inspect Input Actions, Mapping Contexts, legacy configs, and supported trigger/modifier types through `asset_inspect`.
   - Depends on:
     - `asset-inspect-core`
     - `companion-asset-adapters`
@@ -250,7 +250,7 @@ The default installation remains an exact-version pair:
 
 `commonui-assets-inspect` and `commonui-umg-types-inspect` use the independent optional editor-only `UnrealMCPCommonUI` companion plugin. It owns every direct `CommonUI` plugin and module dependency, reuses the same base extension and bridge contracts, and has an independent semantic version while requiring the same `companion_api_version` as `UnrealMCP`. CommonUI capabilities remain unavailable unless Unreal reports the `CommonUI` plugin effectively enabled for the configured project and its required modules loaded. The base plugin must retain its complete non-CommonUI contract when the companion is absent or CommonUI is missing, disabled, or unloaded.
 
-`ai-assets-inspect` and `enhanced-input-assets-inspect` add independent optional editor-only `UnrealMCPAI` and `UnrealMCPEnhancedInput` companions. Each owns its direct Engine module or plugin dependencies, contributes only fixed `asset_inspect` families and selectors through the released companion adapter seam, and leaves the base plugin's complete contract available when absent or unready.
+`ai-assets-inspect` plans an independent optional editor-only `UnrealMCPAI` companion. The released `enhanced-input-assets-inspect` feature uses the independent `UnrealMCPEnhancedInput` companion. Each owns its direct Engine dependencies, contributes only fixed `asset_inspect` families and selectors through the released companion adapter seam, and leaves the base plugin's complete contract available when absent or unready.
 
 `pcg-graph-inspect` adds an independent optional editor-only `UnrealMCPPCG` companion plugin. It owns every direct PCG plugin and module dependency, reuses the same base extension and bridge contracts, and has an independent semantic version while requiring the same `companion_api_version` as `UnrealMCP`. PCG capabilities remain unavailable unless Unreal reports its `PCG` plugin effectively enabled for the configured project and the editor loads it successfully; an Engine-default enablement is valid, while an explicit project disablement wins. The base plugin must retain its complete non-PCG contract when the companion is absent or the Engine plugin is missing, disabled, or unloaded.
 
@@ -300,7 +300,7 @@ The MVVM features extend `asset_inspect` and existing Blueprint and Widget tools
 
 The CommonUI features extend `asset_inspect` and existing Blueprint and Widget tools rather than adding a separate model-facing CommonUI tool. The released `commonui-assets-inspect` feature allowlists `UCommonUserWidget`-derived Widget Blueprints and adds bounded typed widget, activation, and reference records. `commonui-umg-types-inspect` expands semantic coverage to allowlisted CommonUI child widgets and stored CommonUI value types in any otherwise supported Widget Blueprint. `commonui-assets-authoring` can later add creation and updating only for inspected records that public editor APIs can mutate safely.
 
-The AI and Enhanced Input inspection features add only fixed `asset_inspect` families and nested semantic records. AI scope is bounded to Behavior Trees, Blackboards, EQS, and named custom Blueprint node bases; Enhanced Input scope is bounded to actions, mapping contexts, legacy player-mappable configs, and named trigger/modifier types. Runtime execution, simulation, debugger state, project settings, and unrestricted reflection remain excluded.
+The planned AI and released Enhanced Input inspection features add only fixed `asset_inspect` families and nested semantic records. AI scope is bounded to Behavior Trees, Blackboards, EQS, and named custom Blueprint node bases; Enhanced Input scope is bounded to actions, mapping contexts, legacy player-mappable configs, and trigger/modifier types. Runtime execution, simulation, debugger state, project settings, and unrestricted reflection remain excluded.
 
 Review and update every detailed PCG contract against the executable tool catalog, companion foundation, and supported Unreal public APIs before implementation. The only stable functional scope is inspection and authoring of PCG Graph assets plus inspection and authoring of PCG-related level actors, components, and other supported level objects. Current tool mappings, operation shapes, snapshots, validation, asynchronous lifecycle, persistence, limits, and verification details are provisional.
 

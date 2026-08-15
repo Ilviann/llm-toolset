@@ -1,7 +1,7 @@
 {
   "FileVersion": 3,
-  "Version": 510000,
-  "VersionName": "0.51.0",
+  "Version": 520000,
+  "VersionName": "0.52.0",
   "companion_api_version": 2,
   "FriendlyName": "Unreal Editor MCP",
   "Description": "Authenticated localhost bridge for offline-first Unreal Editor MCP workflows.",

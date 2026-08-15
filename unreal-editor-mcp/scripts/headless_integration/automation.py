@@ -78,6 +78,7 @@ def run_automation(executable: Path, project: Path, environment: dict[str, str],
         "SupportingAssetInspection",
         "WidgetBlueprintInspection",
         "WidgetBlueprintLiveFixture",
+        "AssetInspection",
         "Protocol",
     )
     if test_filter == "UnrealMCP":
@@ -129,6 +130,10 @@ def run_automation(executable: Path, project: Path, environment: dict[str, str],
     elif test_filter == "UnrealMCP.CommonUI":
         expected = tuple(name for name in all_expected if name in {
             "WidgetBlueprintInspection", "WidgetBlueprintLiveFixture",
+        })
+    elif test_filter == "UnrealMCP.EnhancedInput":
+        expected = tuple(name for name in all_expected if name in {
+            "AssetInspection", "LiveFixture",
         })
     else:
         leaf = test_filter.rsplit(".", 1)[-1]
@@ -269,6 +274,38 @@ def prepare_animation_fixture(
             or not fixtures:
         sys.stderr.write(output[-32_000:])
         raise RuntimeError("Animation Blueprint saved fixture preparation failed")
+    return fixtures[-1]
+
+
+def prepare_enhanced_input_fixture(
+    executable: Path, project: Path, environment: dict[str, str],
+) -> str:
+    command = [
+        str(executable), str(project), "-unattended", "-nop4", "-nosplash", "-nullrhi",
+        "-stdout", "-FullStdOutLogOutput", "-nocrashreports", "-NoAssetRegistryCache",
+        "-DDC-ForceMemoryCache",
+        "-ExecCmds=Automation RunTests UnrealMCP.EnhancedInput.LiveFixture;Quit",
+        "-TestExit=Automation Test Queue Empty",
+    ]
+    with tempfile.TemporaryFile() as log:
+        process = subprocess.Popen(
+            command, cwd=ROOT, env=environment, stdout=log, stderr=subprocess.STDOUT,
+        )
+        try:
+            return_code = process.wait(timeout=180.0)
+        except subprocess.TimeoutExpired:
+            stop_editor(process)
+            raise RuntimeError("Enhanced Input fixture preparation exceeded the three-minute deadline")
+        log.seek(0)
+        output = log.read().decode("utf-8", errors="replace")
+    marker = "UNREAL_MCP_ENHANCED_INPUT_FIXTURES="
+    fixtures = [
+        line.split(marker, 1)[1].split()[0]
+        for line in output.splitlines() if marker in line
+    ]
+    if return_code != 0 or "Result={Success} Name={LiveFixture}" not in output or not fixtures:
+        sys.stderr.write(output[-32_000:])
+        raise RuntimeError("Enhanced Input saved fixture preparation failed")
     return fixtures[-1]
 
 

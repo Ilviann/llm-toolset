@@ -39,7 +39,18 @@ COMMONUI_PLUGIN = PluginIdentity(
     APPLICATION_ROOT / "plugin" / "UnrealMCPCommonUI" / "UnrealMCPCommonUI.uplugin",
     (BASE_PLUGIN.name,),
 )
+ENHANCED_INPUT_PLUGIN = PluginIdentity(
+    "UnrealMCPEnhancedInput",
+    APPLICATION_ROOT
+    / "plugin"
+    / "UnrealMCPEnhancedInput"
+    / "UnrealMCPEnhancedInput.uplugin",
+    (BASE_PLUGIN.name,),
+)
 PLUGINS = {
     plugin.name: plugin
-    for plugin in (BASE_PLUGIN, FIXTURE_PLUGIN, GAS_PLUGIN, COMMONUI_PLUGIN)
+    for plugin in (
+        BASE_PLUGIN, FIXTURE_PLUGIN, GAS_PLUGIN, COMMONUI_PLUGIN,
+        ENHANCED_INPUT_PLUGIN,
+    )
 }

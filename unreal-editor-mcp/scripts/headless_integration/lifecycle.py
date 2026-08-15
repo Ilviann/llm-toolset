@@ -21,11 +21,12 @@ from unreal_editor_mcp.project import ProjectLayout  # noqa: E402
 
 from .assets import run_asset_scenario, verify_restarted_assets
 from .animation import inspect_animation_fixture, verify_restarted_animation
-from .automation import prepare_animation_fixture, prepare_commonui_widget_fixture, prepare_gas_effect_fixture, prepare_phase_two_fixture, run_automation
+from .automation import prepare_animation_fixture, prepare_commonui_widget_fixture, prepare_enhanced_input_fixture, prepare_gas_effect_fixture, prepare_phase_two_fixture, run_automation
 from .blueprints import author_blueprint_scenario, prepare_blueprint_scenario, verify_restarted_blueprints
 from .capability_contract import verify_capability_contract
 from .companions import verify_companion_scenario
 from .game_data import author_phase_seventeen_game_data, verify_restarted_game_data_and_level
+from .enhanced_input_scenario import inspect_enhanced_input_fixtures, verify_restarted_enhanced_input
 from .level_editing import author_level_edit_scenario, verify_restarted_level_edit
 from .level_management import manage_disposable_level, verify_restarted_level_deletion
 from .level_opening import open_acceptance_level
@@ -193,6 +194,56 @@ def run_animation_restart_integration(
     return 0
 
 
+def run_enhanced_input_restart_integration(
+    executable: Path,
+    layout: ProjectLayout,
+    environment: dict[str, str],
+) -> int:
+    """Run focused Enhanced Input fixture, socket, and restart inspection."""
+    fixture_paths = prepare_enhanced_input_fixture(
+        executable, layout.descriptor, environment,
+    )
+    if "/Game/UnrealMCPEnhancedInput/IA_InspectionFixture" not in fixture_paths:
+        raise AssertionError(f"Enhanced Input fixture paths mismatch: {fixture_paths!r}")
+    command = [
+        str(executable), str(layout.descriptor), "-unattended", "-nop4", "-nosplash",
+        "-nullrhi", "-nosound", "-nocrashreports", "-NoAssetRegistryCache",
+        "-DDC-ForceMemoryCache",
+    ]
+    process_config = EditorProcessConfig(
+        executable, layout.descriptor, tuple(command[2:]), ROOT, environment,
+    )
+    with tempfile.TemporaryFile() as log:
+        bridge = None
+        process = launch_editor(process_config, log)
+        try:
+            wait_until_ready(layout, process, time.monotonic() + 120.0)
+            bridge = UnrealBridge(layout, timeout=3.0)
+            snapshots = inspect_enhanced_input_fixtures(bridge)
+            shutdown_editor(bridge, process)
+        except Exception:
+            log.seek(0)
+            sys.stderr.buffer.write(log.read()[-32_000:])
+            raise
+        finally:
+            stop_editor(process, bridge=bridge)
+        bridge = None
+        process = launch_editor(process_config, log)
+        try:
+            wait_until_ready(layout, process, time.monotonic() + 120.0)
+            bridge = UnrealBridge(layout, timeout=3.0)
+            verify_restarted_enhanced_input(bridge, snapshots)
+            shutdown_editor(bridge, process)
+        except Exception:
+            log.seek(0)
+            sys.stderr.buffer.write(log.read()[-32_000:])
+            raise
+        finally:
+            stop_editor(process, bridge=bridge)
+    print("Integration passed: Enhanced Input fixture, socket inspection, and restart")
+    return 0
+
+
 
 def main() -> int:
     engine = required_path(ENGINE_ROOT_ENV)
@@ -243,6 +294,12 @@ def main() -> int:
         layout.root / "Content" / "UnrealMCPAnimation" / "ABP_InspectionFixture.uasset"
     )
     animation_fixture.unlink(missing_ok=True)
+    enhanced_input_fixture_dir = layout.root / "Content" / "UnrealMCPEnhancedInput"
+    for name in (
+        "IA_InspectionFixture", "IMC_InspectionFixture", "PMI_LegacyFixture",
+        "BP_InputTriggerFixture", "BP_InputModifierFixture",
+    ):
+        (enhanced_input_fixture_dir / f"{name}.uasset").unlink(missing_ok=True)
     if sys.argv[1:] == ["--automation-only"]:
         return run_automation(executable, layout.descriptor, environment)
     if len(sys.argv) == 3 and sys.argv[1] == "--automation-filter":
@@ -251,11 +308,13 @@ def main() -> int:
         return run_widget_restart_integration(executable, layout, environment)
     if sys.argv[1:] == ["--animation-only"]:
         return run_animation_restart_integration(executable, layout, environment)
+    if sys.argv[1:] == ["--enhanced-input-only"]:
+        return run_enhanced_input_restart_integration(executable, layout, environment)
     if sys.argv[1:]:
         raise SystemExit(
             "usage: run_headless_integration.py "
             "[--automation-only | --automation-filter PREFIX | --widget-only | "
-            "--animation-only | "
+            "--animation-only | --enhanced-input-only | "
             "--readonly-lifecycle-only]"
         )
     saved_fixture_snapshot = prepare_phase_two_fixture(executable, layout.descriptor, environment)
@@ -276,6 +335,14 @@ def main() -> int:
     if animation_fixture_path \
             != "/Game/UnrealMCPAnimation/ABP_InspectionFixture.ABP_InspectionFixture":
         raise AssertionError(f"Animation Blueprint fixture path mismatch: {animation_fixture_path!r}")
+    enhanced_input_fixture_paths = prepare_enhanced_input_fixture(
+        executable, layout.descriptor, environment,
+    )
+    if "/Game/UnrealMCPEnhancedInput/IA_InspectionFixture" \
+            not in enhanced_input_fixture_paths:
+        raise AssertionError(
+            f"Enhanced Input fixture paths mismatch: {enhanced_input_fixture_paths!r}"
+        )
     command = [
         str(executable), str(layout.descriptor), "-unattended", "-nop4", "-nosplash",
         "-nullrhi", "-nosound", "-nocrashreports", "-NoAssetRegistryCache",
@@ -340,6 +407,7 @@ def main() -> int:
             )
             widget_scenario = author_widget_scenario(bridge)
             animation_snapshot = inspect_animation_fixture(bridge)
+            enhanced_input_snapshots = inspect_enhanced_input_fixtures(bridge)
             verify_readonly_mode(
                 bridge,
                 layout,
@@ -383,6 +451,7 @@ def main() -> int:
                 raise AssertionError("Phase 16 framework settings did not survive restart and restore")
             verify_restarted_widgets(reloaded_bridge, widget_scenario)
             verify_restarted_animation(reloaded_bridge, animation_snapshot)
+            verify_restarted_enhanced_input(reloaded_bridge, enhanced_input_snapshots)
             verify_restarted_game_data_and_level(
                 reloaded_bridge,
                 phase_seventeen_game_data,

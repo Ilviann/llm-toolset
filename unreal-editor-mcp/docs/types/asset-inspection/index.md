@@ -13,7 +13,7 @@ This component contract defines the accepted design for bounded semantic inspect
 - [`commonui-umg-types-inspect`](../../features/completed/commonui-umg-types-inspect.md) expands CommonUI coverage to widgets and values throughout supported UMG assets.
 - [`umg-mvvm-inspect`](../../features/planned/umg-mvvm-inspect.md) adds ViewModel Blueprint and Widget MVVM inspection.
 - [`ai-assets-inspect`](../../features/planned/ai-assets-inspect.md) adds Behavior Tree, Blackboard, EQS, and custom AI Blueprint families.
-- [`enhanced-input-assets-inspect`](../../features/planned/enhanced-input-assets-inspect.md) adds Enhanced Input asset and nested trigger/modifier families.
+- [`enhanced-input-assets-inspect`](../../features/completed/enhanced-input-assets-inspect.md) adds released Enhanced Input asset and nested trigger/modifier families.
 - [`gas-supporting-assets-inspect`](../../features/completed/gas-supporting-assets-inspect.md) expands GAS coverage to supporting Blueprint asset families.
 
 Feature front matter and the roadmap are authoritative for direct prerequisites and implementation order.
@@ -78,7 +78,7 @@ Add or expand `asset_inspect` coverage through the linked planned features for:
 - [CommonUI types throughout supported UMG assets](../../features/completed/commonui-umg-types-inspect.md)
 - [MVVM ViewModels and Widget bindings](../../features/planned/umg-mvvm-inspect.md)
 - [Behavior Trees, Blackboards, EQS, and custom AI Blueprints](../../features/planned/ai-assets-inspect.md)
-- [Enhanced Input assets and nested types](../../features/planned/enhanced-input-assets-inspect.md)
+- [Enhanced Input assets and nested types](../enhanced-input-asset-inspection/index.md)
 - [Supporting GAS Cue Notify, Attribute Set, and calculation Blueprints](../../features/completed/gas-supporting-assets-inspect.md)
 
 Materials, Material Functions, Niagara Systems, and Niagara Emitters remain uncommitted candidates without roadmap features.
@@ -91,7 +91,7 @@ Materials, Material Functions, Niagara Systems, and Niagara Emitters remain unco
 - Data Tables reuse the separate game-data schema/value collectors and snapshots behind `asset_inspect`; `game_data_inspect` remains published for its cursor-oriented contract.
 - Ordinary Widget Blueprint logic and tree inspection is implemented by the base `asset-inspect-umg` overlay. Released CommonUI inspection covers `UCommonUserWidget`-derived roots; broader CommonUI tree/value inspection and MVVM inspection remain separate planned features.
 - GAS Ability, GAS Effect, Cue Notify, Attribute Set, and calculation collectors compose through optional inspection overlays. Their absence or rejection changes no base family, schema, or response contract.
-- AI and Enhanced Input inspection remain planned as independent companion-contributed families so the base plugin retains no direct dependency on those systems.
+- AI inspection remains planned as an independent companion contribution. Released Enhanced Input inspection uses the same optional boundary, so the base plugin retains no direct dependency on either system.
 
 ## Current repository evidence
 

@@ -108,6 +108,37 @@ def commonui_capabilities(
     }
 
 
+def enhanced_input_capabilities(
+    *, ready=True, schema=EXTENSION_SCHEMA_REVISION, api=COMPANION_API_VERSION,
+):
+    return {
+        "companion_api_version": api,
+        "companions": [{
+            "extension_id": "unreal-mcp-enhanced-input",
+            "companion_api_version": api,
+            "schema_revision": schema,
+            "ready": ready,
+            "asset_families": [
+                inspection_family("input_action", "/Script/EnhancedInput.InputAction"),
+                inspection_family(
+                    "input_mapping_context", "/Script/EnhancedInput.InputMappingContext",
+                ),
+                inspection_family(
+                    "input_modifier_blueprint", "/Script/EnhancedInput.InputModifier",
+                ),
+                inspection_family(
+                    "input_trigger_blueprint", "/Script/EnhancedInput.InputTrigger",
+                ),
+                inspection_family(
+                    "player_mappable_input_config",
+                    "/Script/EnhancedInput.PlayerMappableInputConfig",
+                ),
+            ],
+            "contributions": [],
+        }],
+    }
+
+
 class ExtensionCatalogTests(unittest.TestCase):
     def tool(self, writable, name, native=None):
         base = tools_for_configuration(writable=writable, lifecycle_enabled=False)
@@ -191,6 +222,18 @@ class ExtensionCatalogTests(unittest.TestCase):
         )
         for tool in tools:
             self.assertNotIn("unreal-mcp-commonui", json.dumps(tool))
+
+    def test_enhanced_input_adapter_keeps_the_shared_asset_inspect_schema_stable(self):
+        tool = self.tool(False, "asset_inspect", enhanced_input_capabilities())
+        self.assertNotIn("input_mapping_context", json.dumps(tool))
+
+    def test_enhanced_input_companion_never_adds_a_mutation_branch(self):
+        tools = compose_extension_tools(
+            tools_for_configuration(writable=True, lifecycle_enabled=False),
+            enhanced_input_capabilities(), writable=True,
+        )
+        for tool in tools:
+            self.assertNotIn("unreal-mcp-enhanced-input", json.dumps(tool))
 
     def test_server_rejects_forged_extensions_before_dispatch_and_routes_known_exact_schema(self):
         class Bridge:

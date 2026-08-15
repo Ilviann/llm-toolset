@@ -30,10 +30,6 @@ Feature identifiers are stable names, not execution indexes. Unfinished features
   - Depends on:
     - `asset-inspect-core`
     - `companion-asset-adapters`
-- [ ] [`enhanced-input-assets-inspect` — Enhanced Input asset inspection](docs/features/planned/enhanced-input-assets-inspect.md) — Inspect Input Actions, Mapping Contexts, and supported trigger/modifier types through `asset_inspect`.
-  - Depends on:
-    - `asset-inspect-core`
-    - `companion-asset-adapters`
 - [ ] [`umg-mvvm-inspect` — UMG ViewModel and View Binding inspection](docs/features/planned/umg-mvvm-inspect.md) — Inspect MVVM ViewModel Blueprints and Widget View Bindings through `asset_inspect` and an optional companion plugin.
   - Depends on:
     - `umg-authoring`
@@ -173,5 +169,6 @@ Feature checkboxes record implementation completion after mandatory Windows veri
   - `commonui-umg-types-inspect`
   - `gas-supporting-assets-inspect`
   - `asset-inspect-animation`
+  - `enhanced-input-assets-inspect`
 - Windows:
   - None

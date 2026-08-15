@@ -1,0 +1,38 @@
+{
+  "FileVersion": 3,
+  "Version": 10000,
+  "VersionName": "0.1.0",
+  "companion_api_version": 2,
+  "FriendlyName": "Unreal MCP Enhanced Input",
+  "Description": "Optional read-only Enhanced Input asset inspection companion for Unreal MCP.",
+  "Category": "Editor",
+  "CreatedBy": "Ilviann Zed",
+  "CreatedByURL": "https://github.com/Ilviann/llm-toolset",
+  "SupportURL": "ilviann.zed@gmail.com",
+  "CanContainContent": false,
+  "EnabledByDefault": false,
+  "Installed": false,
+  "unreal_mcp_companion": {
+    "extension_id": "unreal-mcp-enhanced-input",
+    "schema_revision": 2,
+    "owning_module": "UnrealMCPEnhancedInput",
+    "required_engine_plugins": ["EnhancedInput"]
+  },
+  "Plugins": [
+    {
+      "Name": "UnrealMCP",
+      "Enabled": true
+    },
+    {
+      "Name": "EnhancedInput",
+      "Enabled": true
+    }
+  ],
+  "Modules": [
+    {
+      "Name": "UnrealMCPEnhancedInput",
+      "Type": "Editor",
+      "LoadingPhase": "None"
+    }
+  ]
+}

@@ -80,48 +80,60 @@ class ReleaseContractTests(unittest.TestCase):
         native = re.search(r'Version\[\].*TEXT\("([^"]+)"\)', header)
         self.assertIsNotNone(native)
         versions = {project["project"]["version"], plugin["VersionName"], native.group(1), unreal_editor_mcp.__version__}
-        self.assertEqual(versions, {"0.51.0"})
+        self.assertEqual(versions, {"0.52.0"})
 
     def test_companion_api_and_companion_versions_are_internally_consistent(self):
         base = json.loads((ROOT / "plugin/UnrealMCP/UnrealMCP.uplugin").read_text(encoding="utf-8"))
         fixture = json.loads((ROOT / "plugin/UnrealMCPTestCompanion/UnrealMCPTestCompanion.uplugin").read_text(encoding="utf-8"))
         gas = json.loads((ROOT / "plugin/UnrealMCPGAS/UnrealMCPGAS.uplugin").read_text(encoding="utf-8"))
         commonui = json.loads((ROOT / "plugin/UnrealMCPCommonUI/UnrealMCPCommonUI.uplugin").read_text(encoding="utf-8"))
+        enhanced_input = json.loads((ROOT / "plugin/UnrealMCPEnhancedInput/UnrealMCPEnhancedInput.uplugin").read_text(encoding="utf-8"))
         base_header = (ASSET_CORE_PUBLIC / "UnrealMCPVersion.h").read_text(encoding="utf-8")
         fixture_header = (ROOT / "plugin/UnrealMCPTestCompanion/Source/UnrealMCPTestCompanion/Public/UnrealMCPTestCompanionVersion.h").read_text(encoding="utf-8")
         gas_header = (ROOT / "plugin/UnrealMCPGAS/Source/UnrealMCPGAS/Public/UnrealMCPGASVersion.h").read_text(encoding="utf-8")
         commonui_header = (ROOT / "plugin/UnrealMCPCommonUI/Source/UnrealMCPCommonUI/Public/UnrealMCPCommonUIVersion.h").read_text(encoding="utf-8")
+        enhanced_input_header = (ROOT / "plugin/UnrealMCPEnhancedInput/Source/UnrealMCPEnhancedInput/Public/UnrealMCPEnhancedInputVersion.h").read_text(encoding="utf-8")
         base_api = re.search(r"CompanionApiVersion\s*=\s*(\d+)", base_header)
         fixture_api = re.search(r"CompanionApiVersion\s*=\s*(\d+)", fixture_header)
         gas_api = re.search(r"CompanionApiVersion\s*=\s*(\d+)", gas_header)
         commonui_api = re.search(r"CompanionApiVersion\s*=\s*(\d+)", commonui_header)
+        enhanced_input_api = re.search(r"CompanionApiVersion\s*=\s*(\d+)", enhanced_input_header)
         fixture_version = re.search(r'Version\[\].*TEXT\("([^"]+)"\)', fixture_header)
         gas_version = re.search(r'Version\[\].*TEXT\("([^"]+)"\)', gas_header)
         commonui_version = re.search(r'Version\[\].*TEXT\("([^"]+)"\)', commonui_header)
+        enhanced_input_version = re.search(r'Version\[\].*TEXT\("([^"]+)"\)', enhanced_input_header)
         self.assertIsNotNone(base_api)
         self.assertIsNotNone(fixture_api)
         self.assertIsNotNone(gas_api)
         self.assertIsNotNone(commonui_api)
+        self.assertIsNotNone(enhanced_input_api)
         self.assertIsNotNone(fixture_version)
         self.assertIsNotNone(gas_version)
         self.assertIsNotNone(commonui_version)
+        self.assertIsNotNone(enhanced_input_version)
         self.assertEqual({base["companion_api_version"], fixture["companion_api_version"],
                           gas["companion_api_version"], commonui["companion_api_version"],
+                          enhanced_input["companion_api_version"],
                           int(base_api.group(1)), int(fixture_api.group(1)),
-                     int(gas_api.group(1)), int(commonui_api.group(1))}, {2})
+                     int(gas_api.group(1)), int(commonui_api.group(1)),
+                     int(enhanced_input_api.group(1))}, {2})
         self.assertEqual(fixture["VersionName"], fixture_version.group(1))
         self.assertEqual(gas["VersionName"], gas_version.group(1))
         self.assertEqual(commonui["VersionName"], commonui_version.group(1))
+        self.assertEqual(enhanced_input["VersionName"], enhanced_input_version.group(1))
         self.assertNotEqual(fixture["VersionName"], base["VersionName"])
         self.assertNotEqual(gas["VersionName"], base["VersionName"])
         self.assertNotEqual(commonui["VersionName"], base["VersionName"])
+        self.assertNotEqual(enhanced_input["VersionName"], base["VersionName"])
         self.assertEqual(base["Modules"][0]["LoadingPhase"], "PostEngineInit")
         self.assertEqual(fixture["Modules"][0]["LoadingPhase"], "None")
         self.assertEqual(gas["Modules"][0]["LoadingPhase"], "None")
         self.assertEqual(commonui["Modules"][0]["LoadingPhase"], "None")
+        self.assertEqual(enhanced_input["Modules"][0]["LoadingPhase"], "None")
         self.assertEqual(fixture["unreal_mcp_companion"]["schema_revision"], 2)
         self.assertEqual(gas["unreal_mcp_companion"]["schema_revision"], 2)
         self.assertEqual(commonui["unreal_mcp_companion"]["schema_revision"], 2)
+        self.assertEqual(enhanced_input["unreal_mcp_companion"]["schema_revision"], 2)
 
         registry = (
             ROOT
@@ -233,6 +245,30 @@ class ReleaseContractTests(unittest.TestCase):
             self.assertIn(f'TEXT("{section}")', inspection_query)
             self.assertIn(f'TEXT("{section}")', inspection_support)
 
+    def test_enhanced_input_companion_is_read_only_bounded_and_keeps_base_independent(self):
+        base_build = (ROOT / "plugin/UnrealMCP/Source/UnrealMCP/UnrealMCP.Build.cs").read_text(encoding="utf-8")
+        companion_root = ROOT / "plugin/UnrealMCPEnhancedInput/Source/UnrealMCPEnhancedInput"
+        companion_build = (companion_root / "UnrealMCPEnhancedInput.Build.cs").read_text(encoding="utf-8")
+        source = "\n".join(
+            path.read_text(encoding="utf-8")
+            for path in sorted((companion_root / "Private").glob("*.cpp"))
+        )
+        self.assertNotIn('"EnhancedInput"', base_build)
+        for dependency in ["EnhancedInput", "InputCore"]:
+            self.assertIn(f'"{dependency}"', companion_build)
+        for contract in [
+            "input_action", "input_mapping_context", "player_mappable_input_config",
+            "input_trigger_blueprint", "input_modifier_blueprint",
+            "UInputAction", "UInputMappingContext", "UPlayerMappableInputConfig",
+            "UInputTrigger", "UInputModifier", "unsupported_custom_data",
+            "MaxMappings", "MaxNestedObjects", "MaxPersistedProperties",
+            "Capabilities.bInspection", "InspectionAdapter", "AssetFamilies",
+            "IA_InspectionFixture", "IMC_InspectionFixture",
+            "BP_InputTriggerFixture", "BP_InputModifierFixture",
+        ]:
+            self.assertIn(contract, source)
+        self.assertNotIn("EUnrealMCPExtensionAccess::Mutation", source)
+
     def test_public_companion_api_does_not_expose_bridge_or_credentials(self):
         api = (
             ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Public/UnrealMCPCompanionApi.h"
@@ -256,7 +292,10 @@ class ReleaseContractTests(unittest.TestCase):
             "CreationAdapter", "EditingAdapter", "SnapshotBuilder",
         ]:
             self.assertIn(required, api)
-        for companion in ["UnrealMCPGAS", "UnrealMCPCommonUI", "UnrealMCPTestCompanion"]:
+        for companion in [
+            "UnrealMCPGAS", "UnrealMCPCommonUI", "UnrealMCPEnhancedInput",
+            "UnrealMCPTestCompanion",
+        ]:
             root = ROOT / "plugin" / companion / "Source" / companion
             source = "\n".join(
                 path.read_text(encoding="utf-8") for path in sorted(root.rglob("*.cpp"))

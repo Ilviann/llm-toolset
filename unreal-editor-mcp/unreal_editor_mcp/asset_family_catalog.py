@@ -380,6 +380,18 @@ CATALOG_ENTRIES: Final = (
         schema_revision=EXTENSION_SCHEMA_REVISION,
         native_family_ids=("commonui_widget",),
     ),
+    AssetFamilyPublication(
+        "enhanced-input-companion",
+        extension_id="unreal-mcp-enhanced-input",
+        schema_revision=EXTENSION_SCHEMA_REVISION,
+        native_family_ids=(
+            "input_action",
+            "input_mapping_context",
+            "input_modifier_blueprint",
+            "input_trigger_blueprint",
+            "player_mappable_input_config",
+        ),
+    ),
 )
 
 ASSET_FAMILY_CATALOG: Final = StaticAssetFamilyCatalog(CATALOG_ENTRIES)

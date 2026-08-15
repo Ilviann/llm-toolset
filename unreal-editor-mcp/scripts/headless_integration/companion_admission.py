@@ -65,3 +65,28 @@ def verify_companion_admission(capabilities: dict[str, object]) -> None:
         raise AssertionError(
             f"CommonUI asset family is not exactly read-only: {commonui_families!r}"
         )
+    enhanced_input = next(
+        (item for item in companions if isinstance(item, dict)
+         and item.get("extension_id") == "unreal-mcp-enhanced-input"),
+        None,
+    )
+    if enhanced_input is None or enhanced_input.get("ready") is not True \
+            or enhanced_input.get("read_support") is not True \
+            or enhanced_input.get("mutation_support") is not False \
+            or enhanced_input.get("contributions") != []:
+        raise AssertionError(
+            f"Enhanced Input inspection companion is not exactly registered: {enhanced_input!r}"
+        )
+    enhanced_input_families = {
+        item.get("family_id"): item
+        for item in enhanced_input.get("asset_families", []) if isinstance(item, dict)
+    }
+    if set(enhanced_input_families) != {
+            "input_action", "input_mapping_context", "input_modifier_blueprint",
+            "input_trigger_blueprint", "player_mappable_input_config",
+            } or any(item.get("operations") != {
+                "inspect": True, "create": False, "edit": False,
+            } for item in enhanced_input_families.values()):
+        raise AssertionError(
+            f"Enhanced Input asset families are not exactly read-only: {enhanced_input_families!r}"
+        )

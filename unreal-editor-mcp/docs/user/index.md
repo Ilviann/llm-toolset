@@ -10,6 +10,7 @@ Start with the [project README](../../README.md) for installation, first connect
 - [Gameplay Effect inspection](gameplay-effects.md) — data-only GAS effect discovery, typed configuration records, chained references, limits, and read-only examples.
 - [Supporting GAS asset inspection](gas-supporting-assets.md) — Cue Notify, Attribute Set, magnitude-calculation, and execution-calculation Blueprint records, limits, and examples.
 - [CommonUI Widget Blueprint inspection](commonui-widget-blueprints.md) — optional CommonUI companion setup, root defaults, typed tree-widget records, paging, limits, and read-only examples.
+- [Enhanced Input asset inspection](enhanced-input-assets.md) — optional Enhanced Input companion setup, actions, mapping contexts, legacy configs, triggers/modifiers, bounds, and examples.
 - [Levels and assets](levels-and-assets.md) — level discovery, inspection, opening, management, transactional actor editing, verified saving, asset references, and safe deletion.
 - [Asset inspection](asset-inspection.md) — exact paths, semantic roots, selectors, graphs, paging, YAML, and exclusions.
 - [Blueprint graph authoring](graph-authoring.md) — action discovery, node lifecycle, complete logic-unit replacement, pin defaults, and connections.
