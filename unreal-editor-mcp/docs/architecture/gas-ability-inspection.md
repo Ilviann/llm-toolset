@@ -18,7 +18,7 @@ The companion fingerprint covers its full bounded typed state even when paged ou
 
 The companion retains direct build dependencies on `GameplayAbilities`, `GameplayTags`, and `GameplayTasks`. Native admission uses the enabled Gameplay Abilities plugin plus its owning `GameplayAbilities` module as the live dependency gate because Unreal does not consistently register the linked tag and task runtime modules as independently loaded.
 
-The companion is independently versioned at 0.3.0, requires global `companion_api_version: 2` and schema revision 2, and can be packaged separately with `scripts/package_plugin.py --gas-companion`. Its inspection-only API-v2 family composes the four typed collector records into one `gameplay_ability` block and selector through `asset_inspect`; it adds no GAS authoring capability. The Windows deployment helper can build and install this companion with a compatible base package.
+The companion is independently versioned at 0.4.0, requires global `companion_api_version: 2` and schema revision 2, and can be packaged separately with `scripts/package_plugin.py --gas-companion`. Its inspection-only API-v2 family composes the four typed collector records into one `gameplay_ability` block and selector through `asset_inspect`; it adds no GAS authoring capability. The Windows deployment helper can build and install this companion with a compatible base package.
 
 ## Verification
 

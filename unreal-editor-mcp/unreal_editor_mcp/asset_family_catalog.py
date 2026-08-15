@@ -364,7 +364,15 @@ CATALOG_ENTRIES: Final = (
         "gas-companion",
         extension_id="unreal-mcp-gas",
         schema_revision=EXTENSION_SCHEMA_REVISION,
-        native_family_ids=("gameplay_ability", "gameplay_effect"),
+        native_family_ids=(
+            "attribute_set",
+            "gameplay_ability",
+            "gameplay_cue_notify_actor",
+            "gameplay_cue_notify_static",
+            "gameplay_effect",
+            "gameplay_effect_execution_calculation",
+            "gameplay_mod_magnitude_calculation",
+        ),
     ),
     AssetFamilyPublication(
         "commonui-companion",

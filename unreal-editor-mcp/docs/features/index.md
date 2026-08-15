@@ -156,7 +156,7 @@ Keep the authoritative checklist in [`ROADMAP.md`](../../ROADMAP.md) synchronize
 - [`gas-gameplay-effects-inspect` — Gameplay Effect inspection](completed/gas-gameplay-effects-inspect.md) — Add bounded typed inspection of existing data-only Gameplay Effect Blueprint assets through the GAS companion.
   - Depends on:
     - `gas-ability-blueprints-inspect`
-- [`gas-supporting-assets-inspect` — Supporting Gameplay Ability System asset inspection](planned/gas-supporting-assets-inspect.md) — Inspect Gameplay Cue Notify, Attribute Set, magnitude-calculation, and execution-calculation Blueprint assets through `asset_inspect`.
+- [`gas-supporting-assets-inspect` — Supporting Gameplay Ability System asset inspection](completed/gas-supporting-assets-inspect.md) — Inspect Gameplay Cue Notify, Attribute Set, magnitude-calculation, and execution-calculation Blueprint assets through `asset_inspect`.
   - Depends on:
     - `gas-ability-blueprints-inspect`
     - `gas-gameplay-effects-inspect`

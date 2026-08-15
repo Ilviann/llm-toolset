@@ -7,6 +7,11 @@ def verify_gas_inspection(bridge: UnrealBridge) -> None:
     fixtures = (
         ("/Game/UnrealMCPGAS/GE_InspectionFixture.GE_InspectionFixture", "gameplay_effect"),
         ("/Game/UnrealMCPGAS/GA_EffectReferenceFixture.GA_EffectReferenceFixture", "gameplay_ability"),
+        ("/Game/UnrealMCPGAS/GCN_StaticFixture.GCN_StaticFixture", "gameplay_cue_notify"),
+        ("/Game/UnrealMCPGAS/GCN_ActorFixture.GCN_ActorFixture", "gameplay_cue_notify"),
+        ("/Game/UnrealMCPGAS/AS_InspectionFixture.AS_InspectionFixture", "attribute_set"),
+        ("/Game/UnrealMCPGAS/MMC_InspectionFixture.MMC_InspectionFixture", "gameplay_mod_magnitude_calculation"),
+        ("/Game/UnrealMCPGAS/Exec_InspectionFixture.Exec_InspectionFixture", "gameplay_effect_execution_calculation"),
     )
     for path, section in fixtures:
         first = bridge.call("asset_inspect", {"asset_path": path})

@@ -26,6 +26,13 @@
 #include "Misc/SecureHash.h"
 #include "UObject/UnrealType.h"
 
+namespace UnrealMCPGAS
+{
+#if WITH_DEV_AUTOMATION_TESTS
+bool PrepareSupportingAssetLiveFixtures(FString& OutFixtureList);
+#endif
+}
+
 #if WITH_DEV_AUTOMATION_TESTS
 #include "HAL/FileManager.h"
 #include "Kismet2/KismetEditorUtilities.h"
@@ -1961,7 +1968,11 @@ bool FUnrealMCPGASGameplayEffectLiveFixtureTest::RunTest(const FString& Paramete
         AbilityDefaults, EffectBlueprint->GeneratedClass);
     FKismetEditorUtilities::CompileBlueprint(AbilityBlueprint);
     TestTrue(TEXT("saved Gameplay Ability reference fixture persists"), SaveBlueprint(AbilityBlueprint));
+    FString SupportingFixtures;
+    TestTrue(TEXT("saved supporting GAS fixtures persist"),
+        UnrealMCPGAS::PrepareSupportingAssetLiveFixtures(SupportingFixtures));
     UE_LOG(LogTemp, Display, TEXT("UNREAL_MCP_GAS_EFFECT_FIXTURE=%s"), *EffectBlueprint->GetPathName());
+    UE_LOG(LogTemp, Display, TEXT("UNREAL_MCP_GAS_SUPPORTING_FIXTURES=%s"), *SupportingFixtures);
     return true;
 }
 #endif

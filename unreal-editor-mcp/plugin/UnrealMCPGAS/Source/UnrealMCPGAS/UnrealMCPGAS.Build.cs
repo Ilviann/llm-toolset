@@ -11,7 +11,7 @@ public class UnrealMCPGAS : ModuleRules
         });
         PrivateDependencyModuleNames.AddRange(new[]
         {
-            "GameplayAbilities", "GameplayTags", "GameplayTasks",
+            "BlueprintGraph", "GameplayAbilities", "GameplayTags", "GameplayTasks",
             "Kismet", "UnrealEd"
         });
     }

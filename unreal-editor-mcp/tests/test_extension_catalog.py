@@ -65,6 +65,25 @@ def gas_capabilities(*, ready=True, schema=EXTENSION_SCHEMA_REVISION, api=COMPAN
                 inspection_family(
                     "gameplay_effect", "/Script/GameplayAbilities.GameplayEffect",
                 ),
+                inspection_family(
+                    "attribute_set", "/Script/GameplayAbilities.AttributeSet",
+                ),
+                inspection_family(
+                    "gameplay_cue_notify_actor",
+                    "/Script/GameplayAbilities.GameplayCueNotify_Actor",
+                ),
+                inspection_family(
+                    "gameplay_cue_notify_static",
+                    "/Script/GameplayAbilities.GameplayCueNotify_Static",
+                ),
+                inspection_family(
+                    "gameplay_effect_execution_calculation",
+                    "/Script/GameplayAbilities.GameplayEffectExecutionCalculation",
+                ),
+                inspection_family(
+                    "gameplay_mod_magnitude_calculation",
+                    "/Script/GameplayAbilities.GameplayModMagnitudeCalculation",
+                ),
             ],
             "contributions": [],
         }],

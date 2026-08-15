@@ -13,6 +13,7 @@ References in this directory are grouped by the component that owns the contract
 - [`asset-inspection/`](asset-inspection/index.md) — general asset-inspection request, YAML response, selector, graph, collection, inheritance, and asset-family contracts.
 - [`gas-ability-inspection/`](gas-ability-inspection/index.md) — Gameplay Ability family, typed policy/tag/trigger/effect records, inheritance, bounds, capabilities, and exclusions.
 - [`gas-gameplay-effect-inspection/`](gas-gameplay-effect-inspection/index.md) — Gameplay Effect family, typed configuration/component/reference records, relationships, inheritance, bounds, and exclusions.
+- [`gas-supporting-asset-inspection/`](gas-supporting-asset-inspection/index.md) — Cue Notify, Attribute Set, and calculation Blueprint families, typed policies/references, bounds, and exclusions.
 - [`commonui-widget-inspection/`](commonui-widget-inspection/index.md) — CommonUI root defaults, allowlisted UMG tree widgets, typed values/relationships, inheritance, bounds, capabilities, and exclusions.
 - [`blueprint-family-policy/`](blueprint-family-policy/index.md) — supported Actor/GameMode/GameState/GameInstance/Widget classifications, operation matrix, live capabilities, result fields, and exclusions.
 - [`blueprint-inspector/`](blueprint-inspector/index.md) — published-family Blueprint queries, pages, snapshots, identities, and bounded value encodings.

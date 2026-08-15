@@ -76,7 +76,7 @@ Feature identifiers are stable names, not execution indexes. Unfinished features
     - `commonui-assets-inspect`
     - `gas-ability-blueprints-inspect`
     - `gas-gameplay-effects-inspect`
-- [ ] [`gas-supporting-assets-inspect` — Supporting Gameplay Ability System asset inspection](docs/features/planned/gas-supporting-assets-inspect.md) — Inspect Gameplay Cue Notify, Attribute Set, magnitude-calculation, and execution-calculation Blueprint assets through `asset_inspect`.
+- [x] [`gas-supporting-assets-inspect` — Supporting Gameplay Ability System asset inspection](docs/features/completed/gas-supporting-assets-inspect.md) — Inspect Gameplay Cue Notify, Attribute Set, magnitude-calculation, and execution-calculation Blueprint assets through `asset_inspect`.
   - Depends on:
     - `gas-ability-blueprints-inspect`
     - `gas-gameplay-effects-inspect`
@@ -171,5 +171,6 @@ Feature checkboxes record implementation completion after mandatory Windows veri
   - `asset-inspect-data`
   - `gameplay-tag-properties`
   - `commonui-umg-types-inspect`
+  - `gas-supporting-assets-inspect`
 - Windows:
   - None

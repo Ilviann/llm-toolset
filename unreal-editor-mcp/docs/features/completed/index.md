@@ -24,6 +24,7 @@
 - [`windows-deployment-validation-fixes` — Deployment selection and Engine validation fixes](windows-deployment-validation-fixes.md).
 - [`python-tooling-decomposition` — Python support-tool responsibility decomposition](python-tooling-decomposition.md).
 - [`asset-family-conformance` — Reusable asset-family verification](asset-family-conformance.md).
+- [`gas-supporting-assets-inspect` — Supporting Gameplay Ability System asset inspection](gas-supporting-assets-inspect.md).
 
 - [`phase-4` — Reliable mutations, Actor components, and defaults](phase-4.md).
 - [`phase-5` — Blueprint member variables](phase-5.md).

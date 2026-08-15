@@ -4,7 +4,7 @@
 
 namespace UnrealMCPGAS
 {
-inline constexpr TCHAR Version[] = TEXT("0.3.0");
+inline constexpr TCHAR Version[] = TEXT("0.4.0");
 inline constexpr int32 CompanionApiVersion = 2;
 inline constexpr int32 ExtensionSchemaRevision = 2;
 inline constexpr int32 MaxTagsPerContainer = 256;
@@ -24,4 +24,12 @@ inline constexpr int32 MaxGameplayEffectRelationships = 64;
 inline constexpr int32 MaxGameplayEffectCollectionScan = 2048;
 inline constexpr int32 MaxGameplayEffectChainDepth = 8;
 inline constexpr int32 MaxGameplayEffectChainAssets = 128;
+inline constexpr int32 MaxSupportingInspectionRecords = 4;
+inline constexpr int32 MaxSupportingProperties = 64;
+inline constexpr int32 MaxSupportingReferences = 128;
+inline constexpr int32 MaxSupportingAttributes = 256;
+inline constexpr int32 MaxSupportingCaptures = 128;
+inline constexpr int32 MaxSupportingCollectionScan = 2048;
+inline constexpr int32 MaxSupportingPropertyBytes = 4096;
+inline constexpr int32 MaxSupportingTraversalDepth = 8;
 }

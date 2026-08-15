@@ -15,6 +15,10 @@
 namespace UnrealMCPGAS
 {
 FUnrealMCPCompanionAssetFamily MakeGameplayEffectInspectionFamily();
+TArray<FUnrealMCPCompanionAssetFamily> MakeSupportingAssetInspectionFamilies();
+#if WITH_DEV_AUTOMATION_TESTS
+bool PrepareSupportingAssetLiveFixtures(FString& OutFixtureList);
+#endif
 }
 
 #if WITH_DEV_AUTOMATION_TESTS
@@ -747,6 +751,7 @@ public:
         Registration.RequiredEngineModules = {TEXT("GameplayAbilities")};
         Registration.AssetFamilies.Add(GameplayAbilityFamily());
         Registration.AssetFamilies.Add(UnrealMCPGAS::MakeGameplayEffectInspectionFamily());
+        Registration.AssetFamilies.Append(UnrealMCPGAS::MakeSupportingAssetInspectionFamilies());
         RegistrationResult = IUnrealMCPModule::Get().RegisterCompanion(Registration, *this);
     }
 

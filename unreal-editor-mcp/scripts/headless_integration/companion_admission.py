@@ -36,7 +36,12 @@ def verify_companion_admission(capabilities: dict[str, object]) -> None:
         item.get("family_id"): item for item in gas.get("asset_families", [])
         if isinstance(item, dict)
     }
-    if set(gas_families) != {"gameplay_ability", "gameplay_effect"} \
+    if set(gas_families) != {
+            "attribute_set", "gameplay_ability", "gameplay_cue_notify_actor",
+            "gameplay_cue_notify_static", "gameplay_effect",
+            "gameplay_effect_execution_calculation",
+            "gameplay_mod_magnitude_calculation",
+            } \
             or any(item.get("operations") != {
                 "inspect": True, "create": False, "edit": False,
             } for item in gas_families.values()):

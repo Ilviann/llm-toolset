@@ -78,7 +78,7 @@ class ReleaseContractTests(unittest.TestCase):
         native = re.search(r'Version\[\].*TEXT\("([^"]+)"\)', header)
         self.assertIsNotNone(native)
         versions = {project["project"]["version"], plugin["VersionName"], native.group(1), unreal_editor_mcp.__version__}
-        self.assertEqual(versions, {"0.49.0"})
+        self.assertEqual(versions, {"0.50.0"})
 
     def test_companion_api_and_companion_versions_are_internally_consistent(self):
         base = json.loads((ROOT / "plugin/UnrealMCP/UnrealMCP.uplugin").read_text(encoding="utf-8"))
@@ -147,6 +147,10 @@ class ReleaseContractTests(unittest.TestCase):
             "gameplay_effect_tags", "gameplay_effect_granted_abilities",
             "gameplay_effect_additional_effects", "gameplay_effect_requirements",
             "gameplay_effect_components", "gameplay_effect_relationships",
+            "gameplay_cue_notify_static", "gameplay_cue_notify_actor",
+            "attribute_set", "gameplay_mod_magnitude_calculation",
+            "gameplay_effect_execution_calculation", "gameplay_cue_notify",
+            "MaxSupportingAttributes", "MaxSupportingCaptures",
             "MaxTagsPerContainer", "MaxAbilityTriggers",
             "Capabilities.bInspection", "InspectionAdapter", "AssetFamilies",
         ]:

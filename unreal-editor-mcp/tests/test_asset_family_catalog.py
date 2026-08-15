@@ -162,12 +162,19 @@ class AssetFamilyCatalogTests(unittest.TestCase):
             }
         ability = family("gameplay_ability", "/Script/GameplayAbilities.GameplayAbility")
         effect = family("gameplay_effect", "/Script/GameplayAbilities.GameplayEffect")
+        supporting = [
+            family("attribute_set", "/Script/GameplayAbilities.AttributeSet"),
+            family("gameplay_cue_notify_actor", "/Script/GameplayAbilities.GameplayCueNotify_Actor"),
+            family("gameplay_cue_notify_static", "/Script/GameplayAbilities.GameplayCueNotify_Static"),
+            family("gameplay_effect_execution_calculation", "/Script/GameplayAbilities.GameplayEffectExecutionCalculation"),
+            family("gameplay_mod_magnitude_calculation", "/Script/GameplayAbilities.GameplayModMagnitudeCalculation"),
+        ]
         native = {
             "companion_api_version": 2,
             "companions": [{
                 "extension_id": "unreal-mcp-gas", "companion_api_version": 2,
                 "schema_revision": 2, "ready": True,
-                "asset_families": [ability, effect],
+                "asset_families": [ability, effect, *supporting],
                 "contributions": [],
             }],
         }

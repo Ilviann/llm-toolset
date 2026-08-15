@@ -180,7 +180,11 @@ def main() -> int:
         missing_ok=True
     )
     gas_fixture_dir = layout.root / "Content" / "UnrealMCPGAS"
-    for name in ("GE_InspectionFixture", "GA_EffectReferenceFixture"):
+    for name in (
+        "GE_InspectionFixture", "GA_EffectReferenceFixture", "GCN_StaticFixture",
+        "GCN_ActorFixture", "AS_InspectionFixture", "MMC_InspectionFixture",
+        "Exec_InspectionFixture",
+    ):
         (gas_fixture_dir / f"{name}.uasset").unlink(missing_ok=True)
     commonui_fixture = (
         layout.root / "Content" / "UnrealMCPCommonUI" / "WBP_InspectionFixture.uasset"

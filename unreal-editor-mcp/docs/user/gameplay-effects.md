@@ -1,8 +1,8 @@
 # Gameplay Effect inspection
 
-> `UnrealMCPGAS` 0.3.0 exposes Gameplay Effect inspection through `asset_inspect`; it does not publish GAS authoring.
+> `UnrealMCPGAS` 0.4.0 exposes Gameplay Effect inspection through `asset_inspect`; it does not publish GAS authoring.
 
-Install and enable the base `UnrealMCP` plugin, optional `UnrealMCPGAS` 0.3.0 companion, and Engine Gameplay Ability System plugin, then restart Unreal Editor. The base and companion versions are independent; companion API v2 and schema revision 2 must match the base and Python catalog exactly.
+Install and enable the base `UnrealMCP` plugin, optional `UnrealMCPGAS` 0.4.0 companion, and Engine Gameplay Ability System plugin, then restart Unreal Editor. The base and companion versions are independent; companion API v2 and schema revision 2 must match the base and Python catalog exactly.
 
 An admitted `unreal-mcp-gas` companion publishes the exact inspection-only family `gameplay_effect`. A root `asset_inspect` call preserves base identity and adds selector and block `gameplay_effect`. The block groups the eleven bounded typed collectors under `duration`, `modifiers`, `executions`, `stacking`, `cues`, `tags`, `components`, `granted_abilities`, `additional_effects`, `requirements`, and `relationships`. The companion fingerprint participates in the common snapshot.
 

@@ -8,6 +8,7 @@ Start with the [project README](../../README.md) for installation, first connect
 - [Companion plugins](companion-plugins.md) — installation, exact compatibility, access filtering, capabilities, packaging, and author boundary.
 - [Gameplay Ability Blueprint inspection](gameplay-ability-blueprints.md) — optional GAS companion setup, capability checks, typed read records, limits, and examples.
 - [Gameplay Effect inspection](gameplay-effects.md) — data-only GAS effect discovery, typed configuration records, chained references, limits, and read-only examples.
+- [Supporting GAS asset inspection](gas-supporting-assets.md) — Cue Notify, Attribute Set, magnitude-calculation, and execution-calculation Blueprint records, limits, and examples.
 - [CommonUI Widget Blueprint inspection](commonui-widget-blueprints.md) — optional CommonUI companion setup, root defaults, typed tree-widget records, paging, limits, and read-only examples.
 - [Levels and assets](levels-and-assets.md) — level discovery, inspection, opening, management, transactional actor editing, verified saving, asset references, and safe deletion.
 - [Asset inspection](asset-inspection.md) — exact paths, semantic roots, selectors, graphs, paging, YAML, and exclusions.
