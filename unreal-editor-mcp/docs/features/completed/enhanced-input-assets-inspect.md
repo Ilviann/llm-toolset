@@ -33,6 +33,6 @@ released_in: "0.52.0"
 
 ### Verification
 
-UE 5.8 public headers establish every asset, mapping, settings, trigger, and modifier boundary. Native Automation covers all five families, built-in nested objects, custom Blueprints, deterministic fingerprints, non-mutation, and persistent fixtures. Python tests cover exact family admission, stable shared schemas, packaging selection, and release metadata. Windows adaptive, forced-unity, non-unity, production-socket restart, full Automation, and isolated base/companion packaging gates complete the release; macOS verification remains preferred follow-up work.
+UE 5.8 public headers establish every asset, mapping, settings, trigger, and modifier boundary. Native Automation covers all five families, built-in nested objects, custom Blueprints, deterministic fingerprints, non-mutation, and persistent fixtures. Python tests cover exact family admission, stable shared schemas, packaging selection, and release metadata. Windows adaptive, forced-unity, non-unity, production-socket restart, full Automation, and isolated base/companion packaging gates complete the release; macOS follow-up passed on 2026-08-15 through the corresponding focused/full native, production-socket restart, three-mode build, and isolated universal base/companion package gates.
 
 [Back to roadmap](../../../ROADMAP.md) · [Wire contracts](../../types/enhanced-input-asset-inspection/index.md) · [User guide](../../user/enhanced-input-assets.md)

@@ -30,6 +30,6 @@ released_in: "0.49.0"
 
 ### Verification
 
-Frozen-class/property validation covers all 21 categories. Native behavioral coverage includes CommonUI roots, an ordinary `UUserWidget` root with a Common Text child, collection paging, nested selection, snapshots, unresolved references, and package-dirtiness preservation. The production-socket fixture persists a CommonUI child and verifies root, page, detail, and repeat-read behavior after restart.
+Frozen-class/property validation covers all 21 categories. Native behavioral coverage includes CommonUI roots, an ordinary `UUserWidget` root with a Common Text child, collection paging, nested selection, snapshots, unresolved references, and package-dirtiness preservation. The production-socket fixture persists a CommonUI child and verifies root, page, detail, and repeat-read behavior after restart. macOS follow-up passed on 2026-08-15 through the full native and production-socket gates, all three editor build modes, and isolated universal CommonUI packaging.
 
 [Back to roadmap](../../../ROADMAP.md) · [Wire contracts](../../types/commonui-widget-inspection/index.md) · [User guide](../../user/commonui-widget-blueprints.md)

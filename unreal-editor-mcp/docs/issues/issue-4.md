@@ -1,4 +1,4 @@
-# Issue 4: macOS lifecycle readiness times out after editor launch
+# Issue 4: macOS lifecycle launch exits before bridge readiness
 
 ## Status
 
@@ -6,7 +6,7 @@ Open. Reproduced consistently on macOS with Unreal Engine 5.8.1.
 
 ## Summary
 
-The lifecycle-only native acceptance cannot complete on macOS. The committed command currently rejects non-Windows hosts, and invoking its otherwise host-neutral acceptance helper with the supported macOS `UnrealEditor` app binary consistently returns a bridge timeout during the initial lifecycle `launch` operation.
+The lifecycle-only native acceptance cannot complete on macOS. The committed command currently rejects non-Windows hosts, and invoking its otherwise host-neutral acceptance helper with the supported macOS `UnrealEditor` app binary fails during the initial lifecycle `launch` operation before an authenticated ready bridge is observed.
 
 ## Environment
 
@@ -22,21 +22,21 @@ The readonly+lifecycle MCP server launches the configured editor, observes an au
 
 ## Actual result
 
-The editor process starts and publishes discovery, but the lifecycle `launch` operation returns the stable `timeout` bridge error before reporting readiness. The failure reproduced twice from a clean stopped state. After each failure, the launched editor remained alive; a later direct authenticated `editor_shutdown` call succeeded and reported zero dirty packages.
+The 2026-08-15 acceptance attempt returned the stable `editor_unavailable` lifecycle error because the configured editor exited with return code 0 before its bridge became ready. The committed `--readonly-lifecycle-only` entrypoint separately rejected macOS as Windows-only. No editor process, listener, or discovery heartbeat remained after the failed attempt.
 
-The full macOS production integration, readonly tool-content preservation, native `UnrealMCP.Readonly.PreservationAcrossReadonlyFlows` Automation test, adaptive and true forced-unity builds, and universal base packaging all pass. The failure is isolated to the separate lifecycle-only launch/readiness acceptance.
+The full macOS production integration, readonly tool-content preservation, native `UnrealMCP.Readonly.PreservationAcrossReadonlyFlows` Automation test, adaptive/forced-unity/non-unity builds, and universal base packaging all pass. The failure is isolated to the separate lifecycle-only launch/readiness acceptance.
 
 ## Impact
 
 - `readonly-mode` remains in the macOS native platform test backlog.
 - macOS content-readonly behavior is verified, but configured lifecycle launch/restart cannot yet be claimed as natively accepted.
-- A failed lifecycle launch can leave the disposable editor running and require a later graceful shutdown.
+- The current failed lifecycle launch exits cleanly before readiness, so restart and shutdown assertions cannot run.
 
 ## Investigation
 
 1. Make `scripts/run_headless_integration.py --readonly-lifecycle-only` select the supported macOS app binary as well as Windows `UnrealEditor.exe` while continuing to reject Linux.
-2. Trace the interval between discovery publication, HTTP bridge readiness, and the first lifecycle `_verify_bridge` call.
-3. Determine whether lifecycle launch must retry transient authenticated bridge timeouts until the existing bounded startup deadline instead of failing on the first discovery-backed call.
+2. Trace the configured editor's clean early exit and the interval between process launch, discovery publication, HTTP bridge readiness, and the first lifecycle `_verify_bridge` call.
+3. Determine whether lifecycle launch must retry transient discovery/readiness states until the existing bounded startup deadline.
 4. Preserve exact process ID, project hash, bridge version and instance checks while adding any readiness retry.
 5. Ensure every failed acceptance path gracefully shuts down an editor that the helper launched.
 

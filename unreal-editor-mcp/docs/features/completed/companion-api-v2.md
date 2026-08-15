@@ -31,6 +31,6 @@ released_in: "0.44.0"
 
 - Covered exact descriptor/compiled/base equality, v1 and schema mismatch rejection, missing or unavailable dependencies, duplicate and late registration, owner-checked shutdown, capability/adapter mismatch, family collisions, all three capability seams, selector routes, stable nested identities, deterministic capabilities, and unchanged base-only operation.
 - Passed the full Python suite, adaptive/forced-unity/non-unity UE 5.8 editor builds, all native Automation cases, full production-socket headless integration, separate Win64 base/GAS/CommonUI/fixture packaging, documentation lint, and repository diff checks on Windows.
-- macOS native verification remains preferred non-blocking follow-up work; Linux remains outside the supported scope.
+- macOS native follow-up passed on 2026-08-15 through full native and production-socket coverage plus isolated universal base, GAS, CommonUI, and fixture packages; Linux remains outside the supported scope.
 
 [Back to roadmap](../../../ROADMAP.md) · [Shared roadmap contracts](../index.md)

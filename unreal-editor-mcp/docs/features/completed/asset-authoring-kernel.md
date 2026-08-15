@@ -25,6 +25,6 @@ released_in: "0.41.0"
 
 - `UnrealMCP.AssetAuthoring.KernelLifecycle` covers collision refusal, exact failed-creation cleanup, stale admission, no-op cancellation, failed-postcondition restoration, successful commit, and Undo/Redo.
 - Existing Phase 3, Phase 17, Widget-tree, and UMG Automation cases retain compile/save failure, creation retry, identity, stale edit, persistence, unrelated-content, and read-back coverage through the migrated paths.
-- UE 5.8 adaptive and true forced-unity Windows editor-target builds, all native Automation, the Python suite, headless integration, and base Win64 packaging are the 0.41.0 release gates. macOS native verification remains preferred follow-up work.
+- UE 5.8 adaptive and true forced-unity Windows editor-target builds, all native Automation, the Python suite, headless integration, and base Win64 packaging are the 0.41.0 release gates. macOS native follow-up passed on 2026-08-15 through the full Automation, production-socket restart, adaptive/forced-unity/non-unity build, and universal base-package gates.
 
 [Back to roadmap](../../../ROADMAP.md) · [Shared roadmap contracts](../index.md)

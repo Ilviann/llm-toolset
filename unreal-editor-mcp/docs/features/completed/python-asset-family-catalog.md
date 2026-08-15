@@ -25,6 +25,6 @@ released_in: "0.42.0"
 
 - `tests/test_asset_family_catalog.py` covers deterministic composition, duplicate and conflicting entries, invalid descriptors, unavailable or malformed native command catalogs, readonly filtering, operation mapping, result policy, and schema isolation.
 - Existing extension, server/stdio, schema, release-contract, UTF-8, and YAML tests cover exact companion intersection, unavailable native capabilities, MCP initialization/list/call behavior, argument rejection before dispatch, and unchanged safe-YAML output.
-- The complete Python suite, production-socket lifecycle integration, UE 5.8 Windows verification, and base Win64 packaging are the 0.42.0 release gates. macOS native verification remains preferred follow-up work; Linux remains outside the supported and verified scope.
+- The complete Python suite, production-socket lifecycle integration, UE 5.8 Windows verification, and base Win64 packaging are the 0.42.0 release gates. macOS native follow-up passed on 2026-08-15 through 190 Python tests, full production-socket restart integration, all three editor build modes, and universal base packaging; Linux remains outside the supported and verified scope.
 
 [Back to roadmap](../../../ROADMAP.md) · [Shared roadmap contracts](../index.md)

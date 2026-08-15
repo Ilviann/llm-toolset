@@ -53,6 +53,9 @@ and unavailable-state gates without copying their implementation.
   Blueprint, Widget, and Game Data fixtures plus the test companion. Existing
   focused native and headless tests continue to own family-specific Unreal
   semantics.
+- macOS follow-up passed on 2026-08-15 through the native conformance matrix,
+  Python fixtures, full production-socket restart workflow, and universal base
+  and test-companion packages.
 - This is support tooling only: public commands, schemas, capabilities, runtime
   behavior, companion API v1, and plugin versions are unchanged.
 

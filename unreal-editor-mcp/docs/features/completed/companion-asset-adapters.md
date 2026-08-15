@@ -13,7 +13,7 @@ released_in: "0.45.0"
 
 **Outcome:** Approved companion families participate in the common asset inspection infrastructure while unavailable companions expose neither records nor mutations.
 
-**Implementation status:** Completed in 0.45.0 with `UnrealMCPGAS` 0.3.0 and `UnrealMCPCommonUI` 0.2.0 on unchanged companion API v2 and schema revision 2. Windows passed the Python, native Automation, production-socket lifecycle, adaptive/forced-unity/non-unity build, and independent packaging gates. macOS verification remains preferred non-blocking follow-up work; Linux is out of scope.
+**Implementation status:** Completed in 0.45.0 with `UnrealMCPGAS` 0.3.0 and `UnrealMCPCommonUI` 0.2.0 on unchanged companion API v2 and schema revision 2. Windows passed the Python, native Automation, production-socket lifecycle, adaptive/forced-unity/non-unity build, and independent packaging gates. macOS passed the corresponding follow-up gates on 2026-08-15; Linux is out of scope.
 
 **Depends on:**
 
@@ -35,5 +35,6 @@ released_in: "0.45.0"
 - Native Automation covers registration/admission, cumulative base/companion inspection, selector routing and collision rejection, deterministic snapshots, repeat reads, and unchanged package and Blueprint state.
 - The full Windows production-socket lifecycle verifies Gameplay Ability, Gameplay Effect, and CommonUI root/selector reads and repeatability across the authenticated `asset_inspect` facade.
 - Adaptive, true forced-unity, and explicit non-unity UE 5.8 editor builds plus isolated base, GAS, CommonUI, and fixture Win64 packages are release gates.
+- macOS follow-up passed on 2026-08-15 through the corresponding native, production-socket restart, three-mode build, and isolated universal-package gates.
 
 [Back to roadmap](../../../ROADMAP.md) · [Shared roadmap contracts](../index.md)

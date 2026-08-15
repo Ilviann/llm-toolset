@@ -11,7 +11,7 @@ released_in: "0.46.0"
 
 **Outcome:** The established `asset_inspect` tool analyzes structured project data through the same deterministic YAML, selector, paging, snapshot, and error contracts as gameplay Blueprints.
 
-**Implementation status:** Completed in 0.46.0. Windows passed the Python, native Automation, production-socket, adaptive/forced-unity/non-unity build, and base-plugin packaging gates. macOS verification remains preferred follow-up work; Linux is out of scope.
+**Implementation status:** Completed in 0.46.0. Windows passed the Python, native Automation, production-socket, adaptive/forced-unity/non-unity build, and base-plugin packaging gates. macOS passed the corresponding follow-up gates on 2026-08-15; Linux is out of scope.
 
 **Depends on:**
 
@@ -32,5 +32,6 @@ released_in: "0.46.0"
 - The existing core asset-inspection Automation suite covers Data Asset Blueprint classification alongside every prior Blueprint, selector, paging, limit, and neutral-family regression.
 - Python contract and full-suite tests cover registration, codec reuse, exact unchanged tool publication, release metadata, and deterministic safe-YAML framing.
 - Windows release verification covers adaptive, true forced-unity, explicit non-unity, headless production-socket lifecycle, and Win64 packaging from Unreal Engine 5.8.
+- macOS follow-up passed on 2026-08-15 through full native Automation, production-socket restart, all three editor build modes, and universal base packaging.
 
 [Back to roadmap](../../../ROADMAP.md) · [Shared roadmap contracts](../index.md)

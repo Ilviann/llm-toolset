@@ -26,6 +26,6 @@ released_in: "0.40.0"
 - `UnrealMCP.AssetInspect.CoreFamiliesSelectorsPagingAndLimits` re-runs every released core family, media/neutral, selector, paging, graph-limit, UTF-8, snapshot, invalid-input, and non-mutation case through the registry-backed service.
 - `UnrealMCP.AssetInspect.AdapterIsolation` proves an exact descriptor overrides only its neutral fallback while core Blueprint and unsupported-family selection remain unchanged.
 - The complete Python suite covers the unchanged MCP schema, deterministic safe YAML, strict UTF-8 stdio, limits, errors, and catalog. UE 5.8 native Automation, lifecycle/restart acceptance, adaptive and true forced-unity Windows builds, and base Win64 packaging are the release gates for 0.40.0.
-- macOS native verification remains preferred follow-up work; Linux remains outside the supported and verified scope.
+- macOS native follow-up passed on 2026-08-15 through the full Automation, production-socket restart, build-mode, and universal base-package gates; Linux remains outside the supported and verified scope.
 
 [Back to roadmap](../../../ROADMAP.md) · [Shared roadmap contracts](../index.md)

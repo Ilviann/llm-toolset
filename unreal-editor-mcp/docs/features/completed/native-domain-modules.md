@@ -43,7 +43,9 @@ families add dependencies and implementation only to their owning domain.
 - Base, GAS, and CommonUI Win64 packaging apply the existing descriptor and
   binary gates. A representative incremental build relinks only affected
   modules; the packaging build supplies the clean-build release gate.
-- macOS native verification remains preferred follow-up work. Linux remains
-  outside the supported and verified scope.
+- macOS native follow-up passed on 2026-08-15 through adaptive, forced-unity,
+  and non-unity builds, all Automation cases, full headless integration, and
+  universal package verification. Linux remains outside the supported and
+  verified scope.
 
 [Back to roadmap](../../../ROADMAP.md) · [Shared roadmap contracts](../index.md)

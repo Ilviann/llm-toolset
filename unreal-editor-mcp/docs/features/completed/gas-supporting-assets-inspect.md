@@ -34,6 +34,6 @@ released_in: "0.50.0"
 
 ### Verification
 
-UE 5.8 public headers established all class/property/accessor boundaries. Native Automation covers every class root, Attribute Set declaration, selectors, snapshots, and non-mutation. Persistent fixtures exercise every family through production-socket inspection after restart. Python catalog/contract tests cover exact companion admission and schemas; Windows adaptive, forced-unity, non-unity, full Automation, lifecycle, and isolated base/GAS packaging gates complete the release. macOS verification remains preferred follow-up work.
+UE 5.8 public headers established all class/property/accessor boundaries. Native Automation covers every class root, Attribute Set declaration, selectors, snapshots, and non-mutation. Persistent fixtures exercise every family through production-socket inspection after restart. Python catalog/contract tests cover exact companion admission and schemas; Windows adaptive, forced-unity, non-unity, full Automation, lifecycle, and isolated base/GAS packaging gates complete the release. macOS follow-up passed on 2026-08-15 through the corresponding native, production-socket restart, build-mode, and isolated universal base/GAS package gates.
 
 [Back to roadmap](../../../ROADMAP.md) · [Wire contracts](../../types/gas-supporting-asset-inspection/index.md) · [User guide](../../user/gas-supporting-assets.md)

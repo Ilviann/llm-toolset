@@ -30,6 +30,6 @@ released_in: "0.51.0"
 
 - Native Automation covers regular/template/interface modes, pose graphs, state-machine topology, transitions, deterministic selection, exclusions, and dirty-state preservation.
 - Python contracts verify leaf-module ownership, isolated `AnimGraph` linkage, classifier routes, public graph reuse, capabilities, and packaging composition.
-- Windows UE 5.8 builds, headless production-socket inspection, restart determinism, and base packaging form the release gate. macOS verification remains a preferred follow-up.
+- Windows UE 5.8 builds, headless production-socket inspection, restart determinism, and base packaging form the release gate. macOS follow-up passed on 2026-08-15 through focused native and production-socket restart coverage, all three editor build modes, and universal base packaging.
 
 [Back to roadmap](../../../ROADMAP.md) · [Animation Blueprint contract](../../types/asset-inspection/asset-types/animation-blueprint.md)

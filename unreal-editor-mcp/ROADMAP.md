@@ -166,18 +166,5 @@ Feature checkboxes record implementation completion after mandatory Windows veri
 
 - macOS:
   - `readonly-mode` — lifecycle-only acceptance is blocked by [`issue-4`](docs/issues/issue-4.md).
-  - `asset-inspection-adapters`
-  - `asset-authoring-kernel`
-  - `python-asset-family-catalog`
-  - `asset-family-conformance`
-  - `native-domain-modules`
-  - `companion-api-v2`
-  - `companion-asset-adapters`
-  - `asset-inspect-data`
-  - `gameplay-tag-properties`
-  - `commonui-umg-types-inspect`
-  - `gas-supporting-assets-inspect`
-  - `asset-inspect-animation`
-  - `enhanced-input-assets-inspect`
 - Windows:
   - None

@@ -30,6 +30,6 @@ released_in: "0.47.0"
 - Native: 62 `UnrealMCP` Automation cases passed, including focused codec, Blueprint default/component, Data Table, structured asset-inspection, rejection, dirty-state, Undo/Redo, compile, and save coverage.
 - Cross-process: the production-socket lifecycle passed creation, exact semantic read-back, replay, invalid-write preservation, graceful shutdown, restart, and persisted read-back.
 - Windows: adaptive, true forced-unity, and explicit non-unity UE 5.8 Editor builds passed. Base-only Win64 packaging passed without either optional companion.
-- macOS verification remains in the non-blocking native platform backlog.
+- macOS follow-up passed on 2026-08-15 through the 67-case native suite, production-socket restart workflow, all three editor build modes, and universal base packaging.
 
 [Back to roadmap](../../../ROADMAP.md) · [Shared roadmap contracts](../index.md)
