@@ -155,6 +155,9 @@ Support-tooling features change repository utilities without changing Unreal MCP
 - [x] [`python-tooling-decomposition` — Python support-tool responsibility decomposition](docs/features/completed/python-tooling-decomposition.md) — Split Unreal-local packaging, deployment, and headless Python tools along narrow reusable responsibility boundaries without behavior changes.
   - Depends on:
     - `windows-deployment-validation-fixes`
+- [x] [`xcode-app-environment` — Pinned Xcode application environment](docs/features/completed/xcode-app-environment.md) — Read `XCODE26_1_1` as `Xcode.app` and derive `Contents/Developer` in macOS support tools.
+  - Depends on:
+    - `python-tooling-decomposition`
 - [x] [`windows-deployment-multimodule` — Multi-module binary deployment](docs/features/completed/windows-deployment-multimodule.md) — Strip implementation source while retaining precompiled rules for every declared plugin module.
   - Depends on:
     - `native-domain-modules`

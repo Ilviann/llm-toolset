@@ -23,6 +23,7 @@ from .service import (
     ENHANCED_INPUT_DESCRIPTOR,
     PLUGIN_DESCRIPTOR,
     PackagingError,
+    XCODE_APP_ENV,
     display_command,
     execute_package,
     prepare_package,
@@ -41,7 +42,7 @@ def create_parser() -> argparse.ArgumentParser:
     parser.add_argument("--engine-root", type=Path, help=f"Unreal Engine installation root; defaults to {ENGINE_ROOT_ENV}.")
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT, help=f"package destination (default: {DEFAULT_OUTPUT})")
     parser.add_argument("--target-platforms", metavar="PLATFORM[+PLATFORM...]", help="optional UAT target-platform filter, for example Mac or Win64+Linux")
-    parser.add_argument("--developer-dir", type=Path, help="macOS Xcode Contents/Developer path; defaults to UNREAL_MCP_DEVELOPER_DIR.")
+    parser.add_argument("--developer-dir", type=Path, help=f"macOS Xcode Contents/Developer path; defaults to {XCODE_APP_ENV}/Contents/Developer.")
     parser.add_argument("--strict-includes", action="store_true", help="ask UAT to disable PCH and unity builds while checking includes")
     parser.add_argument("--unversioned", action="store_true", help="do not embed the current Unreal Engine version in the packaged descriptor")
     parser.add_argument("--dry-run", action="store_true", help="validate inputs and print the UAT command without running it")

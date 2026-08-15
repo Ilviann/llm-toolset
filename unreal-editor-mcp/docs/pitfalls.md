@@ -40,6 +40,6 @@ The plugin removes any previous discovery record before its startup gate. The Py
 
 ## Xcode selection was required, but no Xcode defect was found
 
-UnrealBuildTool described Xcode 26.1.1 as a non-standard Xcode because it was selected from a project-specific location rather than assumed from the global developer directory. Supplying `DEVELOPER_DIR="$UNREAL_MCP_DEVELOPER_DIR"` consistently selected the intended compiler and SDK, and native compilation and linking succeeded.
+UnrealBuildTool described Xcode 26.1.1 as a non-standard Xcode because it was selected from a project-specific location rather than assumed from the global developer directory. Setting `XCODE26_1_1` to `Xcode.app` and supplying the derived `DEVELOPER_DIR="$XCODE26_1_1/Contents/Developer"` consistently selected the intended compiler and SDK, and native compilation and linking succeeded. Repository tools perform this derivation themselves.
 
 No Xcode compiler, linker, code-signing, or SDK defect was encountered. The initial native compile corrections—matching Unreal's public forward declarations and using the correct ticker delegate-handle type—were plugin integration mistakes exposed by compilation, not Xcode behavior.

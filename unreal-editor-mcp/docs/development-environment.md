@@ -21,7 +21,7 @@ Configure these project-specific environment variables with absolute paths. Do n
 | --- | --- |
 | `UE58` | Installed Unreal Engine 5.8 root containing `Engine/`. |
 | `UNREAL_MCP_TEST_UPROJECT` | Disposable test descriptor at `ue-test/ue58/UnrealMCPTest.uproject`. |
-| `UNREAL_MCP_DEVELOPER_DIR` | macOS only: Xcode 26.1.1 `Contents/Developer` directory used for builds and headless tests. |
+| `XCODE26_1_1` | macOS only: Xcode 26.1.1 application directory, ending in `Xcode.app`. Repository tools append `Contents/Developer` before setting `DEVELOPER_DIR`. |
 
 Derive the Unreal tools from `UE58`; do not configure separate paths for each executable:
 
@@ -62,9 +62,9 @@ test -d "$UE58/Engine"
 test -f "$UNREAL_MCP_TEST_UPROJECT"
 test -x "$UE58/Engine/Build/BatchFiles/Mac/GenerateProjectFiles.sh"
 test -x "$UE58/Engine/Build/BatchFiles/Mac/Build.sh"
-test -x "$UNREAL_MCP_DEVELOPER_DIR/usr/bin/xcodebuild"
-env DEVELOPER_DIR="$UNREAL_MCP_DEVELOPER_DIR" xcodebuild -version
-env DEVELOPER_DIR="$UNREAL_MCP_DEVELOPER_DIR" xcodebuild -checkFirstLaunchStatus
+test -x "$XCODE26_1_1/Contents/Developer/usr/bin/xcodebuild"
+env DEVELOPER_DIR="$XCODE26_1_1/Contents/Developer" xcodebuild -version
+env DEVELOPER_DIR="$XCODE26_1_1/Contents/Developer" xcodebuild -checkFirstLaunchStatus
 ```
 
 On Windows PowerShell, configure the two common variables and verify the engine, project, and Win64 SDK:
@@ -81,12 +81,12 @@ Test-Path "$env:UE58\Engine\Build\BatchFiles\Build.bat"
 Generate project files and compile the editor target before beginning or upgrading native plugin work. On macOS:
 
 ```sh
-env DEVELOPER_DIR="$UNREAL_MCP_DEVELOPER_DIR" \
+env DEVELOPER_DIR="$XCODE26_1_1/Contents/Developer" \
   "$UE58/Engine/Build/BatchFiles/Mac/GenerateProjectFiles.sh" \
   -project="$UNREAL_MCP_TEST_UPROJECT" \
   -game
 
-env DEVELOPER_DIR="$UNREAL_MCP_DEVELOPER_DIR" \
+env DEVELOPER_DIR="$XCODE26_1_1/Contents/Developer" \
   "$UE58/Engine/Build/BatchFiles/Mac/Build.sh" \
   UnrealMCPTestEditor Mac Development \
   -Project="$UNREAL_MCP_TEST_UPROJECT" \
@@ -106,13 +106,13 @@ On Windows PowerShell:
 
 The direct Windows build does not require generated Visual Studio project files. UnrealBuildTool writes normal logs and caches outside the repository. Sandboxed development environments must explicitly permit those writes rather than redirecting or disabling Unreal's standard behavior.
 
-`scripts/run_headless_integration.py` derives the headless executable from the current host: the macOS app binary, `UnrealEditor-Cmd.exe` on Windows, and the Linux editor binary. Only macOS requires and forwards `UNREAL_MCP_DEVELOPER_DIR`.
+`scripts/run_headless_integration.py` derives the headless executable from the current host: the macOS app binary, `UnrealEditor-Cmd.exe` on Windows, and the Linux editor binary. Only macOS requires `XCODE26_1_1`; the runner appends `Contents/Developer`, validates `usr/bin/xcodebuild`, and forwards the result as `DEVELOPER_DIR`.
 
 On Windows, run `python scripts/run_headless_integration.py --readonly-lifecycle-only` for the committed lifecycle-only acceptance against `UnrealEditor.exe`. It requires no pre-existing editor process and verifies the exact ten-tool catalog, access rejection, real launch/restart/shutdown, bridge replacement, and unchanged project-owned content.
 
 ## Binary plugin packaging
 
-`scripts/package_plugin.py` invokes the configured engine's platform-appropriate `RunUAT` launcher with the standard `BuildPlugin` command. It accepts the engine only through `UE58` or the explicit `--engine-root` override, requires bounded `Build.version` metadata reporting Unreal Engine 5.8 or newer, keeps base and companion descriptors fixed to repository-owned paths, and passes every UAT argument as a subprocess array. After UAT completes, the wrapper restores every source-owned descriptor field while retaining UAT ownership of `Installed` and `EngineVersion`; verification rejects stripped companion API metadata, companion identity, load phase, default enablement, dependencies, or other source contracts. On macOS it also requires `UNREAL_MCP_DEVELOPER_DIR`, `DEVELOPER_DIR`, or `--developer-dir` and exports the resolved value as `DEVELOPER_DIR` for the child build.
+`scripts/package_plugin.py` invokes the configured engine's platform-appropriate `RunUAT` launcher with the standard `BuildPlugin` command. It accepts the engine only through `UE58` or the explicit `--engine-root` override, requires bounded `Build.version` metadata reporting Unreal Engine 5.8 or newer, keeps base and companion descriptors fixed to repository-owned paths, and passes every UAT argument as a subprocess array. After UAT completes, the wrapper restores every source-owned descriptor field while retaining UAT ownership of `Installed` and `EngineVersion`; verification rejects stripped companion API metadata, companion identity, load phase, default enablement, dependencies, or other source contracts. On macOS it requires `XCODE26_1_1` or the explicit `--developer-dir` override. The environment variable points to `Xcode.app`; the tool appends `Contents/Developer`, validates `usr/bin/xcodebuild`, and exports the derived path as `DEVELOPER_DIR` for the child build. The explicit override continues to accept a `Contents/Developer` directory.
 
 From the application directory, package for the host's installed platforms with:
 

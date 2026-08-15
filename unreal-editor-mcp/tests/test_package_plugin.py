@@ -56,6 +56,7 @@ class PackagePluginScriptTests(unittest.TestCase):
             self.assertEqual(result, 0)
             self.assertIn(str(run_uat.resolve()), stdout.getvalue())
             self.assertIn("defaults to UE58", package_plugin.create_parser().format_help())
+            self.assertIn("XCODE26_1_1/Contents/Developer", package_plugin.create_parser().format_help())
 
     def test_build_command_uses_fixed_plugin_and_output_arguments(self):
         run_uat = Path("/Engine/RunUAT.sh")
@@ -180,6 +181,56 @@ class PackagePluginScriptTests(unittest.TestCase):
             environment = package_plugin.configure_environment("Darwin", developer_dir)
             self.assertEqual(environment["DEVELOPER_DIR"], str(developer_dir.resolve()))
             package_plugin.configure_environment("Windows", None)
+
+    def test_environment_derives_developer_directory_from_xcode_app(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            xcode_app = Path(temporary) / "Xcode.app"
+            developer_dir = xcode_app / "Contents" / "Developer"
+            xcodebuild = developer_dir / "usr" / "bin" / "xcodebuild"
+            xcodebuild.parent.mkdir(parents=True)
+            xcodebuild.write_bytes(b"")
+
+            with mock.patch.dict(
+                os.environ,
+                {
+                    "XCODE26_1_1": str(xcode_app),
+                    "DEVELOPER_DIR": "/unexpected/global/developer/directory",
+                },
+                clear=True,
+            ):
+                environment = package_plugin.configure_environment("Darwin", None)
+
+            self.assertEqual(environment["DEVELOPER_DIR"], str(developer_dir.resolve()))
+
+    def test_environment_rejects_old_developer_directory_variable(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            developer_dir = Path(temporary)
+            with (
+                mock.patch.dict(
+                    os.environ,
+                    {"UNREAL_MCP_DEVELOPER_DIR": str(developer_dir)},
+                    clear=True,
+                ),
+                self.assertRaisesRegex(package_plugin.PackagingError, "XCODE26_1_1"),
+            ):
+                package_plugin.configure_environment("Darwin", None)
+
+    def test_environment_rejects_xcode_app_without_xcodebuild(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            xcode_app = Path(temporary) / "Xcode.app"
+            xcode_app.mkdir()
+            with (
+                mock.patch.dict(
+                    os.environ,
+                    {"XCODE26_1_1": str(xcode_app)},
+                    clear=True,
+                ),
+                self.assertRaisesRegex(
+                    package_plugin.PackagingError,
+                    "does not point to an Xcode app",
+                ),
+            ):
+                package_plugin.configure_environment("Darwin", None)
 
     def test_target_platform_validation_rejects_duplicates_and_shell_text(self):
         self.assertEqual(package_plugin.normalize_target_platforms("Win64+Linux"), "Win64+Linux")

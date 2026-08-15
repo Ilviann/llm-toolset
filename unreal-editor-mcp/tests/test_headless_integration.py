@@ -101,7 +101,7 @@ class HeadlessIntegrationScriptTests(unittest.TestCase):
             with self.assertRaises(SystemExit):
                 run_headless_integration.resolve_editor_executable(engine, "Plan9")
 
-    def test_developer_directory_is_required_only_on_macos(self):
+    def test_xcode_app_is_required_only_on_macos(self):
         with patch.dict(os.environ, {}, clear=True):
             windows_environment = run_headless_integration.configure_editor_environment("Windows")
             linux_environment = run_headless_integration.configure_editor_environment("Linux")
@@ -111,14 +111,29 @@ class HeadlessIntegrationScriptTests(unittest.TestCase):
                 run_headless_integration.configure_editor_environment("Darwin")
 
         with tempfile.TemporaryDirectory() as temporary:
-            developer = Path(temporary)
+            xcode_app = Path(temporary) / "Xcode.app"
+            developer = xcode_app / "Contents" / "Developer"
+            xcodebuild = developer / "usr" / "bin" / "xcodebuild"
+            xcodebuild.parent.mkdir(parents=True)
+            xcodebuild.write_bytes(b"")
             with patch.dict(
                 os.environ,
-                {"UNREAL_MCP_DEVELOPER_DIR": str(developer)},
+                {"XCODE26_1_1": str(xcode_app)},
                 clear=True,
             ):
                 environment = run_headless_integration.configure_editor_environment("Darwin")
             self.assertEqual(environment["DEVELOPER_DIR"], str(developer.resolve()))
+
+    def test_old_or_inherited_developer_directory_does_not_replace_xcode_app(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            developer = Path(temporary)
+            for variable in ("UNREAL_MCP_DEVELOPER_DIR", "DEVELOPER_DIR"):
+                with (
+                    self.subTest(variable=variable),
+                    patch.dict(os.environ, {variable: str(developer)}, clear=True),
+                    self.assertRaisesRegex(SystemExit, "XCODE26_1_1"),
+                ):
+                    run_headless_integration.configure_editor_environment("Darwin")
 
     def test_readonly_acceptance_exercises_every_tool_and_ignores_generated_state(self):
         from headless_integration.readonly_mode import READONLY_TOOL_NAMES, verify_readonly_mode

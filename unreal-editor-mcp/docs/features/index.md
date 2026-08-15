@@ -150,6 +150,7 @@ Keep the authoritative checklist in [`ROADMAP.md`](../../ROADMAP.md) synchronize
   - Depends on:
     - `windows-deployment-commonui`
 - [`python-tooling-decomposition` — Python support-tool responsibility decomposition](completed/python-tooling-decomposition.md) — Split Unreal-local packaging, deployment, and headless Python tools along narrow reusable responsibility boundaries without behavior changes.
+- [`xcode-app-environment` — Pinned Xcode application environment](completed/xcode-app-environment.md) — Derive the macOS developer directory from an Xcode 26.1.1 application path.
   - Depends on:
     - `windows-deployment-validation-fixes`
 - [`windows-deployment-multimodule` — Multi-module binary deployment](completed/windows-deployment-multimodule.md) — Strip implementation source while retaining precompiled rules for every declared plugin module.

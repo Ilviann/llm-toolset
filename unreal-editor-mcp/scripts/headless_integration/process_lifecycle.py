@@ -18,6 +18,8 @@ from unreal_editor_mcp.bridge import BRIDGE_PATH, UnrealBridge
 from unreal_editor_mcp.discovery import read_discovery
 from unreal_editor_mcp.errors import BridgeError
 from unreal_editor_mcp.project import ProjectLayout
+from unreal_tooling.engines import configure_build_environment
+from unreal_tooling.errors import ToolingError
 
 
 @dataclass(frozen=True)
@@ -67,10 +69,10 @@ def resolve_lifecycle_editor_executable(engine: Path, host_system: str) -> Path:
 
 
 def configure_editor_environment(host_system: str) -> dict[str, str]:
-    environment = dict(os.environ)
-    if host_system == "Darwin":
-        environment["DEVELOPER_DIR"] = str(required_path("UNREAL_MCP_DEVELOPER_DIR"))
-    return environment
+    try:
+        return configure_build_environment(host_system, None)
+    except ToolingError as error:
+        raise SystemExit(str(error)) from error
 
 
 def launch_editor(config: EditorProcessConfig, log: object) -> subprocess.Popen[bytes]:

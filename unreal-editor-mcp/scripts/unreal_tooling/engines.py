@@ -12,6 +12,8 @@ from .paths import read_json_object, resolved
 
 
 ENGINE_ROOT_ENV = "UE58"
+XCODE_APP_ENV = "XCODE26_1_1"
+XCODE_DEVELOPER_RELATIVE = Path("Contents/Developer")
 MIN_UNREAL_ENGINE_VERSION = (5, 8)
 MAX_ENGINE_VERSION_BYTES = 64 * 1024
 
@@ -105,15 +107,23 @@ def configure_build_environment(
     if host_system != "Darwin":
         return configured_environment
     configured = developer_dir
+    xcode_app: Path | None = None
     if configured is None:
-        value = source.get("UNREAL_MCP_DEVELOPER_DIR") or source.get("DEVELOPER_DIR")
-        configured = Path(value) if value else None
+        value = source.get(XCODE_APP_ENV)
+        if value:
+            xcode_app = resolved(Path(value))
+            configured = xcode_app / XCODE_DEVELOPER_RELATIVE
     if configured is None:
         raise ToolingError(
-            "UNREAL_MCP_DEVELOPER_DIR or --developer-dir is required for a reproducible macOS build"
+            f"{XCODE_APP_ENV} or --developer-dir is required for a reproducible macOS build"
         )
     configured = resolved(configured)
     if not (configured / "usr" / "bin" / "xcodebuild").is_file():
+        if xcode_app is not None:
+            raise ToolingError(
+                f"{XCODE_APP_ENV} does not point to an Xcode app containing "
+                f"Contents/Developer/usr/bin/xcodebuild: {xcode_app}"
+            )
         raise ToolingError(
             f"developer directory does not contain usr/bin/xcodebuild: {configured}"
         )
