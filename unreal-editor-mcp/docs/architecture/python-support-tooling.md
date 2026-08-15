@@ -17,6 +17,7 @@ Repository support tools live under `scripts/` and remain standard-library-only,
 - Blueprint fixture and authored handoffs use frozen mapping-compatible records grouped into declaration, family, replacement, node, pin, and aggregate state.
 - Retried readiness, lost-response reconciliation, and cursor collection are bounded shared infrastructure. Mutation replay retains the original operation ID.
 - Ambient `DEVELOPER_DIR` and the retired `UNREAL_MCP_DEVELOPER_DIR` do not satisfy the pinned macOS Xcode requirement.
+- Headless integration resolves only `ue-test/ue58/UnrealMCPTest.uproject` relative to the application checkout. No environment variable, current working directory, or command-line argument can retarget destructive integration scenarios to another project.
 
 ## Verification
 

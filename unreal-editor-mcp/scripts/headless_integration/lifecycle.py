@@ -48,12 +48,22 @@ from .readonly_mode import verify_readonly_mode, verify_windows_readonly_lifecyc
 from .widgets import author_widget_scenario, verify_restarted_widgets
 
 ENGINE_ROOT_ENV = "UE58"
-TEST_PROJECT_ENV = "UNREAL_MCP_TEST_UPROJECT"
+TEST_PROJECT_RELATIVE = Path("ue-test/ue58/UnrealMCPTest.uproject")
 
 GAMEPLAY_TAG_FIXTURE = """[/Script/GameplayTags.GameplayTagsList]
 GameplayTagList=(Tag="UnrealMCP.Test",DevComment="Unreal MCP automation fixture")
 GameplayTagList=(Tag="UnrealMCP.Test.Child",DevComment="Unreal MCP automation fixture")
 """
+
+
+def resolve_test_project(application_root: Path = ROOT) -> Path:
+    project = (application_root / TEST_PROJECT_RELATIVE).resolve()
+    if not project.is_file():
+        raise SystemExit(
+            "disposable Unreal MCP test project is required at the fixed "
+            f"checkout path: {project}"
+        )
+    return project
 
 
 def prepare_gameplay_tag_fixture(layout: ProjectLayout) -> None:
@@ -247,7 +257,7 @@ def run_enhanced_input_restart_integration(
 
 def main() -> int:
     engine = required_path(ENGINE_ROOT_ENV)
-    project = required_path(TEST_PROJECT_ENV)
+    project = resolve_test_project()
     host_system = platform.system()
     executable = resolve_editor_executable(engine, host_system)
     environment = configure_editor_environment(host_system)

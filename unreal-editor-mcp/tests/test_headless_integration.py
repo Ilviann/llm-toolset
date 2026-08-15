@@ -47,15 +47,20 @@ class HeadlessIntegrationScriptTests(unittest.TestCase):
         self.assertTrue(callable(game_data_levels.open_acceptance_level))
         self.assertTrue(callable(widgets.author_widget_scenario))
 
-    def test_runner_requests_ue58_and_disposable_project_environment_paths(self):
+    def test_runner_requests_ue58_and_resolves_fixed_disposable_project(self):
         from headless_integration import lifecycle
 
         with (
             patch.object(
                 lifecycle,
                 "required_path",
-                side_effect=[Path("engine"), Path("project")],
+                return_value=Path("engine"),
             ) as required_path,
+            patch.object(
+                lifecycle,
+                "resolve_test_project",
+                return_value=Path("project"),
+            ) as resolve_test_project,
             patch.object(
                 lifecycle,
                 "resolve_editor_executable",
@@ -65,13 +70,31 @@ class HeadlessIntegrationScriptTests(unittest.TestCase):
         ):
             lifecycle.main()
 
-        self.assertEqual(
-            required_path.call_args_list,
-            [
-                unittest.mock.call("UE58"),
-                unittest.mock.call("UNREAL_MCP_TEST_UPROJECT"),
-            ],
-        )
+        required_path.assert_called_once_with("UE58")
+        resolve_test_project.assert_called_once_with()
+
+    def test_disposable_project_uses_fixed_checkout_path(self):
+        from headless_integration.lifecycle import resolve_test_project
+
+        with tempfile.TemporaryDirectory() as temporary:
+            application_root = Path(temporary)
+            expected = (
+                application_root
+                / "ue-test"
+                / "ue58"
+                / "UnrealMCPTest.uproject"
+            )
+            expected.parent.mkdir(parents=True)
+            expected.write_text("{}", encoding="utf-8")
+
+            self.assertEqual(resolve_test_project(application_root), expected.resolve())
+
+        with tempfile.TemporaryDirectory() as temporary:
+            with self.assertRaisesRegex(
+                SystemExit,
+                r"fixed checkout path: .*ue-test[\\/]ue58[\\/]UnrealMCPTest\.uproject",
+            ):
+                resolve_test_project(Path(temporary))
 
     def test_editor_executable_is_selected_for_each_supported_host(self):
         expected_paths = {

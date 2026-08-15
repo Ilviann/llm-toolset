@@ -158,6 +158,9 @@ Support-tooling features change repository utilities without changing Unreal MCP
 - [x] [`xcode-app-environment` — Pinned Xcode application environment](docs/features/completed/xcode-app-environment.md) — Read `XCODE26_1_1` as `Xcode.app` and derive `Contents/Developer` in macOS support tools.
   - Depends on:
     - `python-tooling-decomposition`
+- [x] [`fixed-ue58-test-project` — Fixed UE 5.8 test-project path](docs/features/completed/fixed-ue58-test-project.md) — Resolve the disposable project from the application checkout without a project-path environment variable.
+  - Depends on:
+    - `python-tooling-decomposition`
 - [x] [`windows-deployment-multimodule` — Multi-module binary deployment](docs/features/completed/windows-deployment-multimodule.md) — Strip implementation source while retaining precompiled rules for every declared plugin module.
   - Depends on:
     - `native-domain-modules`

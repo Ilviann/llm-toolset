@@ -8,7 +8,7 @@ Gameplay Tag property values allow at most 256 characters per exact tag name and
 
 ## Offline development and tests
 
-Configure `UE58` and point `UNREAL_MCP_TEST_UPROJECT` at `ue-test/ue58/UnrealMCPTest.uproject` as described in [`docs/development-environment.md`](../development-environment.md). macOS additionally requires `XCODE26_1_1` pointing to `Xcode.app`; repository tools append `Contents/Developer`. Windows uses the configured engine's Win64 editor and installed Visual Studio toolchain. The parent `ue-test/` directory is disposable and entirely ignored.
+Configure `UE58` as described in [`docs/development-environment.md`](../development-environment.md). The runner always resolves `ue-test/ue58/UnrealMCPTest.uproject` from the current application checkout; there is no project-path environment variable or command-line override. macOS additionally requires `XCODE26_1_1` pointing to `Xcode.app`; repository tools append `Contents/Developer`. Windows uses the configured engine's Win64 editor and installed Visual Studio toolchain. The parent `ue-test/` directory is disposable and entirely ignored.
 
 Run the dependency-free Python suite:
 
@@ -24,7 +24,7 @@ macOS:
 env DEVELOPER_DIR="$XCODE26_1_1/Contents/Developer" \
   "$UE58/Engine/Build/BatchFiles/Mac/Build.sh" \
   UnrealMCPTestEditor Mac Development \
-  -Project="$UNREAL_MCP_TEST_UPROJECT" -WaitMutex -NoHotReloadFromIDE
+  -Project="$PWD/ue-test/ue58/UnrealMCPTest.uproject" -WaitMutex -NoHotReloadFromIDE
 ```
 
 Windows PowerShell:
@@ -32,7 +32,7 @@ Windows PowerShell:
 ```powershell
 & "$env:UE58\Engine\Build\BatchFiles\Build.bat" `
   UnrealMCPTestEditor Win64 Development `
-  "-Project=$env:UNREAL_MCP_TEST_UPROJECT" -WaitMutex -NoHotReloadFromIDE
+  "-Project=$((Resolve-Path 'ue-test\ue58\UnrealMCPTest.uproject').Path)" -WaitMutex -NoHotReloadFromIDE
 ```
 
 Run the Unreal Automation Tests:

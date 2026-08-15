@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Removed the `UNREAL_MCP_TEST_UPROJECT` development requirement; headless integration now resolves only the fixed checkout-relative `ue-test/ue58/UnrealMCPTest.uproject` descriptor and fails clearly when it is absent, without changing runtime or plugin versions.
 - Qualified 13 completed native-platform backlog features on Apple Silicon macOS 26.5.2 with Unreal Engine 5.8.1 and Xcode 26.1.1: 190 Python tests, 67 native Automation cases, adaptive/forced-unity/non-unity editor builds, the complete production-socket restart workflow, focused Widget Blueprint/Animation Blueprint/Enhanced Input restart gates, and isolated universal `arm64`/`x86_64` base, fixture, GAS, CommonUI, and Enhanced Input packages all passed. `readonly-mode` remains the sole macOS backlog item because lifecycle-only acceptance is still blocked by issue 4.
 - Fixed Windows binary deployment for multi-module plugins by validating the bounded descriptor module list, stripping module-owned and UAT-generated implementation source, and retaining and configuring each module's precompiled Unreal Build Tool rules without changing runtime or plugin versions.
 - Added reusable native, Python-catalog, plugin-packaging, and production-bridge asset-family conformance fixtures covering independent capability states, unavailable dependencies and companions, deterministic inspection, bounded selectors/snapshots, authoring cleanup and recovery, retained lost-response results, persistence, restart read-back, and unrelated-state preservation without changing runtime or plugin versions.

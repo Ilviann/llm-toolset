@@ -20,7 +20,6 @@ Configure these project-specific environment variables with absolute paths. Do n
 | Variable | Required value |
 | --- | --- |
 | `UE58` | Installed Unreal Engine 5.8 root containing `Engine/`. |
-| `UNREAL_MCP_TEST_UPROJECT` | Disposable test descriptor at `ue-test/ue58/UnrealMCPTest.uproject`. |
 | `XCODE26_1_1` | macOS only: Xcode 26.1.1 application directory, ending in `Xcode.app`. Repository tools append `Contents/Developer` before setting `DEVELOPER_DIR`. |
 
 Derive the Unreal tools from `UE58`; do not configure separate paths for each executable:
@@ -39,7 +38,7 @@ The authenticated bridge token is not an environment variable. The Unreal plugin
 
 ## Disposable Unreal project
 
-Use `ue-test/ue58/` as the local Unreal Engine 5.8 project for plugin compilation, Unreal Automation Tests, command-line editor checks, and cross-process bridge integration. The parent `ue-test/` directory is ignored because Unreal regenerates substantial machine-specific state and can hold separate engine-version subfolders.
+Use `ue-test/ue58/` as the local Unreal Engine 5.8 project for plugin compilation, Unreal Automation Tests, command-line editor checks, and cross-process bridge integration. The descriptor must be at the fixed checkout-relative path `ue-test/ue58/UnrealMCPTest.uproject`; the headless runner resolves that path from its own application checkout and provides no environment-variable or command-line override. The parent `ue-test/` directory is ignored because Unreal regenerates substantial machine-specific state and can hold separate engine-version subfolders.
 
 The test project must:
 
@@ -54,12 +53,12 @@ Never run mutation, failure-recovery, or cleanup integration tests against a per
 
 ## Setup verification
 
-On macOS, run these checks from the repository root after configuring all three variables:
+On macOS, run these checks from the `unreal-editor-mcp` application directory after configuring the applicable variables:
 
 ```sh
 python3 --version
 test -d "$UE58/Engine"
-test -f "$UNREAL_MCP_TEST_UPROJECT"
+test -f "ue-test/ue58/UnrealMCPTest.uproject"
 test -x "$UE58/Engine/Build/BatchFiles/Mac/GenerateProjectFiles.sh"
 test -x "$UE58/Engine/Build/BatchFiles/Mac/Build.sh"
 test -x "$XCODE26_1_1/Contents/Developer/usr/bin/xcodebuild"
@@ -67,12 +66,12 @@ env DEVELOPER_DIR="$XCODE26_1_1/Contents/Developer" xcodebuild -version
 env DEVELOPER_DIR="$XCODE26_1_1/Contents/Developer" xcodebuild -checkFirstLaunchStatus
 ```
 
-On Windows PowerShell, configure the two common variables and verify the engine, project, and Win64 SDK:
+On Windows PowerShell, run from the `unreal-editor-mcp` application directory, configure `UE58`, and verify the engine, fixed project, and Win64 SDK:
 
 ```powershell
 python --version
 Test-Path "$env:UE58\Engine"
-Test-Path $env:UNREAL_MCP_TEST_UPROJECT
+Test-Path 'ue-test\ue58\UnrealMCPTest.uproject'
 Test-Path "$env:UE58\Engine\Build\BatchFiles\Build.bat"
 & "$env:UE58\Engine\Build\BatchFiles\RunUAT.bat" `
   Turnkey -command=VerifySdk -platform=Win64 -utf8output
@@ -83,13 +82,13 @@ Generate project files and compile the editor target before beginning or upgradi
 ```sh
 env DEVELOPER_DIR="$XCODE26_1_1/Contents/Developer" \
   "$UE58/Engine/Build/BatchFiles/Mac/GenerateProjectFiles.sh" \
-  -project="$UNREAL_MCP_TEST_UPROJECT" \
+  -project="$PWD/ue-test/ue58/UnrealMCPTest.uproject" \
   -game
 
 env DEVELOPER_DIR="$XCODE26_1_1/Contents/Developer" \
   "$UE58/Engine/Build/BatchFiles/Mac/Build.sh" \
   UnrealMCPTestEditor Mac Development \
-  -Project="$UNREAL_MCP_TEST_UPROJECT" \
+  -Project="$PWD/ue-test/ue58/UnrealMCPTest.uproject" \
   -WaitMutex \
   -NoHotReloadFromIDE
 ```
@@ -99,14 +98,14 @@ On Windows PowerShell:
 ```powershell
 & "$env:UE58\Engine\Build\BatchFiles\Build.bat" `
   UnrealMCPTestEditor Win64 Development `
-  "-Project=$env:UNREAL_MCP_TEST_UPROJECT" `
+  "-Project=$((Resolve-Path 'ue-test\ue58\UnrealMCPTest.uproject').Path)" `
   -WaitMutex `
   -NoHotReloadFromIDE
 ```
 
 The direct Windows build does not require generated Visual Studio project files. UnrealBuildTool writes normal logs and caches outside the repository. Sandboxed development environments must explicitly permit those writes rather than redirecting or disabling Unreal's standard behavior.
 
-`scripts/run_headless_integration.py` derives the headless executable from the current host: the macOS app binary, `UnrealEditor-Cmd.exe` on Windows, and the Linux editor binary. Only macOS requires `XCODE26_1_1`; the runner appends `Contents/Developer`, validates `usr/bin/xcodebuild`, and forwards the result as `DEVELOPER_DIR`.
+`scripts/run_headless_integration.py` derives the fixed disposable project from its application checkout and derives the headless executable from the current host: the macOS app binary, `UnrealEditor-Cmd.exe` on Windows, and the Linux editor binary. Only macOS requires `XCODE26_1_1`; the runner appends `Contents/Developer`, validates `usr/bin/xcodebuild`, and forwards the result as `DEVELOPER_DIR`.
 
 On Windows, run `python scripts/run_headless_integration.py --readonly-lifecycle-only` for the committed lifecycle-only acceptance against `UnrealEditor.exe`. It requires no pre-existing editor process and verifies the exact ten-tool catalog, access rejection, real launch/restart/shutdown, bridge replacement, and unchanged project-owned content.
 
