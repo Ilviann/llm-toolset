@@ -1,6 +1,5 @@
 # Planned features
 
-- [`ai-assets-inspect` — Unreal AI asset inspection](ai-assets-inspect.md).
 - [`umg-mvvm-inspect` — UMG ViewModel and View Binding inspection](umg-mvvm-inspect.md).
 - [`umg-mvvm` — UMG ViewModel and View Binding authoring](umg-mvvm.md).
 - [`commonui-assets-authoring` — Create/update assets with CommonUI plugin dependencies](commonui-assets-authoring.md).

@@ -95,7 +95,7 @@ Keep the authoritative checklist in [`ROADMAP.md`](../../ROADMAP.md) synchronize
   - Depends on:
     - `asset-inspect-core`
     - `native-domain-modules`
-- [`ai-assets-inspect` — Unreal AI asset inspection](planned/ai-assets-inspect.md) — Inspect Behavior Trees, Blackboards, Environment Queries, and supported custom AI Blueprint node classes through `asset_inspect`.
+- [`ai-assets-inspect` — Unreal AI asset inspection](completed/ai-assets-inspect.md) — Inspect Behavior Trees, Blackboards, Environment Queries, and supported custom AI Blueprint node classes through `asset_inspect`.
   - Depends on:
     - `asset-inspect-core`
     - `companion-asset-adapters`
@@ -260,7 +260,7 @@ The default installation remains an exact-version pair:
 
 `commonui-assets-inspect` and `commonui-umg-types-inspect` use the independent optional editor-only `UnrealMCPCommonUI` companion plugin. It owns every direct `CommonUI` plugin and module dependency, reuses the same base extension and bridge contracts, and has an independent semantic version while requiring the same `companion_api_version` as `UnrealMCP`. CommonUI capabilities remain unavailable unless Unreal reports the `CommonUI` plugin effectively enabled for the configured project and its required modules loaded. The base plugin must retain its complete non-CommonUI contract when the companion is absent or CommonUI is missing, disabled, or unloaded.
 
-`ai-assets-inspect` plans an independent optional editor-only `UnrealMCPAI` companion. The released `enhanced-input-assets-inspect` feature uses the independent `UnrealMCPEnhancedInput` companion. Each owns its direct Engine dependencies, contributes only fixed `asset_inspect` families and selectors through the released companion adapter seam, and leaves the base plugin's complete contract available when absent or unready.
+The released `ai-assets-inspect` and `enhanced-input-assets-inspect` features use independent optional editor-only `UnrealMCPAI` and `UnrealMCPEnhancedInput` companions. Each owns its direct Engine dependencies, contributes only fixed `asset_inspect` families and selectors through the released companion adapter seam, and leaves the base plugin's complete contract available when absent or unready.
 
 `pcg-graph-inspect` adds an independent optional editor-only `UnrealMCPPCG` companion plugin. It owns every direct PCG plugin and module dependency, reuses the same base extension and bridge contracts, and has an independent semantic version while requiring the same `companion_api_version` as `UnrealMCP`. PCG capabilities remain unavailable unless Unreal reports its `PCG` plugin effectively enabled for the configured project and the editor loads it successfully; an Engine-default enablement is valid, while an explicit project disablement wins. The base plugin must retain its complete non-PCG contract when the companion is absent or the Engine plugin is missing, disabled, or unloaded.
 

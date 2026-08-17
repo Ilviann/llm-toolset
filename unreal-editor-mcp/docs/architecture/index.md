@@ -15,6 +15,7 @@ Each file in this directory documents one implemented cohesive component: what i
 - [`gas-supporting-asset-inspection.md`](gas-supporting-asset-inspection.md) — Cue Notify, Attribute Set, and calculation Blueprint families, typed persisted semantics, fingerprints, bounds, and read-only policy.
 - [`commonui-widget-inspection.md`](commonui-widget-inspection.md) — optional CommonUI companion ownership, root defaults, typed tree widgets/relationships, integrated fingerprints, and read-only capability policy.
 - [`enhanced-input-asset-inspection.md`](enhanced-input-asset-inspection.md) — optional Enhanced Input companion ownership, action/mapping/legacy/custom Blueprint records, stable nested identities, and read-only policy.
+- [`ai-asset-inspection.md`](ai-asset-inspection.md) — optional AI companion ownership, Behavior Tree/Blackboard/EQS/custom Blueprint records, static topology, and read-only policy.
 - [`editor-lifecycle.md`](editor-lifecycle.md) — opt-in configured launch, graceful shutdown, durable restart, cancellation, and retained records.
 - [`blueprint-family-policy.md`](blueprint-family-policy.md) — explicit Actor/GameMode/GameState/GameInstance/Widget classification, published operation matrix, live family capabilities, and exclusions.
 - [`blueprint-inspector.md`](blueprint-inspector.md) — bounded Asset Registry discovery, exact published-family Blueprint inspection, snapshots, identities, values, and cursors.

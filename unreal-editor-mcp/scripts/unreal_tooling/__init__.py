@@ -14,6 +14,7 @@ from .engines import (
 from .errors import ToolingError
 from .paths import is_reparse_point, is_within, read_json_object, resolved
 from .plugins import (
+    AI_PLUGIN,
     APPLICATION_ROOT,
     BASE_PLUGIN,
     COMMONUI_PLUGIN,
@@ -26,6 +27,7 @@ from .plugins import (
 )
 
 __all__ = [
+    "AI_PLUGIN",
     "APPLICATION_ROOT",
     "BASE_PLUGIN",
     "COMMONUI_PLUGIN",

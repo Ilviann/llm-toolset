@@ -26,7 +26,7 @@ Feature identifiers are stable names, not execution indexes. Unfinished features
   - Depends on:
     - `asset-inspect-core`
     - `native-domain-modules`
-- [ ] [`ai-assets-inspect` — Unreal AI asset inspection](docs/features/planned/ai-assets-inspect.md) — Inspect Behavior Trees, Blackboards, Environment Queries, and supported custom AI Blueprint node classes through `asset_inspect`.
+- [x] [`ai-assets-inspect` — Unreal AI asset inspection](docs/features/completed/ai-assets-inspect.md) — Inspect Behavior Trees, Blackboards, Environment Queries, and supported custom AI Blueprint node classes through `asset_inspect`.
   - Depends on:
     - `asset-inspect-core`
     - `companion-asset-adapters`
@@ -172,5 +172,6 @@ Feature checkboxes record implementation completion after mandatory Windows veri
 
 - macOS:
   - `readonly-mode` — lifecycle-only acceptance is blocked by [`issue-4`](docs/issues/issue-4.md).
+  - `ai-assets-inspect` — repeat native, production-socket restart, three-mode build, and isolated universal base/AI package gates.
 - Windows:
   - None

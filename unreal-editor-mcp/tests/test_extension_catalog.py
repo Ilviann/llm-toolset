@@ -139,6 +139,32 @@ def enhanced_input_capabilities(
     }
 
 
+def ai_capabilities(
+    *, ready=True, schema=EXTENSION_SCHEMA_REVISION, api=COMPANION_API_VERSION,
+):
+    families = (
+        ("behavior_tree", "/Script/AIModule.BehaviorTree"),
+        ("blackboard", "/Script/AIModule.BlackboardData"),
+        ("bt_decorator_blueprint", "/Script/AIModule.BTDecorator_BlueprintBase"),
+        ("bt_service_blueprint", "/Script/AIModule.BTService_BlueprintBase"),
+        ("bt_task_blueprint", "/Script/AIModule.BTTask_BlueprintBase"),
+        ("environment_query", "/Script/AIModule.EnvQuery"),
+        ("eqs_context_blueprint", "/Script/AIModule.EnvQueryContext_BlueprintBase"),
+        ("eqs_generator_blueprint", "/Script/AIModule.EnvQueryGenerator_BlueprintBase"),
+    )
+    return {
+        "companion_api_version": api,
+        "companions": [{
+            "extension_id": "unreal-mcp-ai",
+            "companion_api_version": api,
+            "schema_revision": schema,
+            "ready": ready,
+            "asset_families": [inspection_family(*family) for family in families],
+            "contributions": [],
+        }],
+    }
+
+
 class ExtensionCatalogTests(unittest.TestCase):
     def tool(self, writable, name, native=None):
         base = tools_for_configuration(writable=writable, lifecycle_enabled=False)
@@ -234,6 +260,18 @@ class ExtensionCatalogTests(unittest.TestCase):
         )
         for tool in tools:
             self.assertNotIn("unreal-mcp-enhanced-input", json.dumps(tool))
+
+    def test_ai_adapter_keeps_the_shared_asset_inspect_schema_stable(self):
+        tool = self.tool(False, "asset_inspect", ai_capabilities())
+        self.assertNotIn("behavior_tree", json.dumps(tool))
+
+    def test_ai_companion_never_adds_a_mutation_branch(self):
+        tools = compose_extension_tools(
+            tools_for_configuration(writable=True, lifecycle_enabled=False),
+            ai_capabilities(), writable=True,
+        )
+        for tool in tools:
+            self.assertNotIn("unreal-mcp-ai", json.dumps(tool))
 
     def test_server_rejects_forged_extensions_before_dispatch_and_routes_known_exact_schema(self):
         class Bridge:

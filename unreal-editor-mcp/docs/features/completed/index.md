@@ -1,5 +1,6 @@
 # Completed features
 
+- [`ai-assets-inspect` — Unreal AI asset inspection](ai-assets-inspect.md).
 - [`asset-inspect-animation` — Animation Blueprint semantic inspection](asset-inspect-animation.md).
 - [`enhanced-input-assets-inspect` — Enhanced Input asset inspection](enhanced-input-assets-inspect.md).
 - [`asset-inspect-umg` — Base UMG Widget Blueprint inspection](asset-inspect-umg.md).

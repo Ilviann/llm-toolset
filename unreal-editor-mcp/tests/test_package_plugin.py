@@ -136,6 +136,20 @@ class PackagePluginScriptTests(unittest.TestCase):
         self.assertIn(f"-Dependencies={package_plugin.PLUGIN_DESCRIPTOR}", command)
         self.assertIn("-StrictIncludes", command)
 
+    def test_ai_build_uses_its_independent_descriptor_and_base_dependency(self):
+        command = package_plugin.build_command(
+            Path("/Engine/RunUAT.sh"),
+            Path("/Workspace/build/unreal-mcp-ai"),
+            "Win64",
+            strict_includes=True,
+            unversioned=False,
+            plugin_descriptor=package_plugin.AI_DESCRIPTOR,
+            dependency_plugins=(package_plugin.PLUGIN_DESCRIPTOR,),
+        )
+        self.assertIn(f"-Plugin={package_plugin.AI_DESCRIPTOR}", command)
+        self.assertIn(f"-Dependencies={package_plugin.PLUGIN_DESCRIPTOR}", command)
+        self.assertIn("-StrictIncludes", command)
+
     def test_engine_validation_selects_the_platform_launcher(self):
         with tempfile.TemporaryDirectory() as temporary:
             engine_root = Path(temporary)

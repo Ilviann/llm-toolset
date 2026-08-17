@@ -2,7 +2,7 @@
 
 `asset_inspect` reads one exact `/Game` asset. Both `/Game/Actors/BP_Door` and `/Game/Actors/BP_Door.BP_Door` resolve to the canonical object path; discovery, `/Engine`, plugin mounts, filesystem paths, traversal, and media retrieval are unavailable.
 
-Omit `selector` for a compact root containing asset identity, one stable snapshot, semantic family blocks, and exact child selectors. Built-in deep families are Actor and gameplay-framework Blueprints, standalone Actor Component Blueprints, Blueprint Interfaces, base UMG Widget Blueprints, regular/template/Animation Layer Interface Animation Blueprints, Data Asset and Primary Data Asset instances, their Blueprint/Data-Only Blueprint class variants, and Data Tables. MVVM, Materials, and Niagara do not yet receive deep built-in records. When admitted, optional GAS and CommonUI companions add their own bounded blocks and selectors without replacing the base identity.
+Omit `selector` for a compact root containing asset identity, one stable snapshot, semantic family blocks, and exact child selectors. Built-in deep families are Actor and gameplay-framework Blueprints, standalone Actor Component Blueprints, Blueprint Interfaces, base UMG Widget Blueprints, regular/template/Animation Layer Interface Animation Blueprints, Data Asset and Primary Data Asset instances, their Blueprint/Data-Only Blueprint class variants, and Data Tables. MVVM, Materials, and Niagara do not yet receive deep built-in records. When admitted, optional GAS, CommonUI, Enhanced Input, and AI companions add their own bounded blocks and selectors without replacing the base identity.
 
 ```json
 {"asset_path":"/Game/Actors/BP_Door"}

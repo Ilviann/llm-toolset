@@ -1,0 +1,35 @@
+{
+  "FileVersion": 3,
+  "Version": 10000,
+  "VersionName": "0.1.0",
+  "companion_api_version": 2,
+  "FriendlyName": "Unreal MCP AI",
+  "Description": "Optional read-only Unreal AI asset inspection companion for Unreal MCP.",
+  "Category": "Editor",
+  "CreatedBy": "Ilviann Zed",
+  "CreatedByURL": "https://github.com/Ilviann/llm-toolset",
+  "SupportURL": "ilviann.zed@gmail.com",
+  "CanContainContent": false,
+  "IsBetaVersion": true,
+  "EnabledByDefault": false,
+  "Installed": false,
+  "unreal_mcp_companion": {
+    "extension_id": "unreal-mcp-ai",
+    "schema_revision": 2,
+    "owning_module": "UnrealMCPAI",
+    "required_engine_plugins": []
+  },
+  "Plugins": [
+    {
+      "Name": "UnrealMCP",
+      "Enabled": true
+    }
+  ],
+  "Modules": [
+    {
+      "Name": "UnrealMCPAI",
+      "Type": "Editor",
+      "LoadingPhase": "None"
+    }
+  ]
+}

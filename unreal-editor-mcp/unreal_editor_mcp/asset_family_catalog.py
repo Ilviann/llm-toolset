@@ -392,6 +392,21 @@ CATALOG_ENTRIES: Final = (
             "player_mappable_input_config",
         ),
     ),
+    AssetFamilyPublication(
+        "ai-companion",
+        extension_id="unreal-mcp-ai",
+        schema_revision=EXTENSION_SCHEMA_REVISION,
+        native_family_ids=(
+            "behavior_tree",
+            "blackboard",
+            "bt_decorator_blueprint",
+            "bt_service_blueprint",
+            "bt_task_blueprint",
+            "environment_query",
+            "eqs_context_blueprint",
+            "eqs_generator_blueprint",
+        ),
+    ),
 )
 
 ASSET_FAMILY_CATALOG: Final = StaticAssetFamilyCatalog(CATALOG_ENTRIES)

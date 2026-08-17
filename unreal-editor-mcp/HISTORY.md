@@ -10,6 +10,12 @@
 - Added an independent CommonUI companion checkbox to the Windows deployment helper, including fixed base-dependent packaging, project/Engine installation, and transactional multi-plugin handling without changing runtime or plugin versions.
 - Decomposed Python packaging, Windows deployment, and headless integration support tools behind stable entrypoints, with shared Unreal-local primitives, typed deployment and Blueprint scenario state, focused domain modules, and unchanged runtime/plugin versions.
 
+## 0.53.0 — 2026-08-17
+
+- Added the independent `UnrealMCPAI` 0.1.0 companion with eight read-only `asset_inspect` families for Behavior Trees, Blackboards, Environment Queries, and custom task, decorator, service, EQS generator, and EQS context Blueprints while keeping AI dependencies outside the base plugin.
+- Added bounded static tree topology, inherited Blackboard schemas, ordered EQS option/test semantics, fixed Blueprint override/default overlays, typed unsupported plugin subclasses, stable identities, structural diagnostics, and cumulative snapshots without AI execution, live/debug state, recursive reference traversal, or mutation.
+- Added exact Python catalog admission, focused native Automation, persistent fixtures, production-socket restart coverage, independent packaging, and indexed architecture/type/user documentation. Companion API v2/schema revision 2 remain unchanged; macOS verification remains preferred follow-up work.
+
 ## 0.52.0 — 2026-08-15
 
 - Added the independent `UnrealMCPEnhancedInput` 0.1.0 companion with five read-only `asset_inspect` families for Input Actions, Mapping Contexts, deprecated player-mappable configs, and custom trigger/modifier Blueprints while keeping Enhanced Input dependencies outside the base plugin.

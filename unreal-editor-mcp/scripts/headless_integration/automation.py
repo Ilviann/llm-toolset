@@ -135,6 +135,10 @@ def run_automation(executable: Path, project: Path, environment: dict[str, str],
         expected = tuple(name for name in all_expected if name in {
             "AssetInspection", "LiveFixture",
         })
+    elif test_filter == "UnrealMCP.AI":
+        expected = tuple(name for name in all_expected if name in {
+            "AssetInspection", "LiveFixture",
+        })
     else:
         leaf = test_filter.rsplit(".", 1)[-1]
         expected = (leaf,) if leaf in all_expected else ()
@@ -306,6 +310,38 @@ def prepare_enhanced_input_fixture(
     if return_code != 0 or "Result={Success} Name={LiveFixture}" not in output or not fixtures:
         sys.stderr.write(output[-32_000:])
         raise RuntimeError("Enhanced Input saved fixture preparation failed")
+    return fixtures[-1]
+
+
+def prepare_ai_fixture(
+    executable: Path, project: Path, environment: dict[str, str],
+) -> str:
+    command = [
+        str(executable), str(project), "-unattended", "-nop4", "-nosplash", "-nullrhi",
+        "-stdout", "-FullStdOutLogOutput", "-nocrashreports", "-NoAssetRegistryCache",
+        "-DDC-ForceMemoryCache",
+        "-ExecCmds=Automation RunTests UnrealMCP.AI.LiveFixture;Quit",
+        "-TestExit=Automation Test Queue Empty",
+    ]
+    with tempfile.TemporaryFile() as log:
+        process = subprocess.Popen(
+            command, cwd=ROOT, env=environment, stdout=log, stderr=subprocess.STDOUT,
+        )
+        try:
+            return_code = process.wait(timeout=180.0)
+        except subprocess.TimeoutExpired:
+            stop_editor(process)
+            raise RuntimeError("AI fixture preparation exceeded the three-minute deadline")
+        log.seek(0)
+        output = log.read().decode("utf-8", errors="replace")
+    marker = "UNREAL_MCP_AI_FIXTURES="
+    fixtures = [
+        line.split(marker, 1)[1].split()[0]
+        for line in output.splitlines() if marker in line
+    ]
+    if return_code != 0 or "Result={Success} Name={LiveFixture}" not in output or not fixtures:
+        sys.stderr.write(output[-32_000:])
+        raise RuntimeError("AI saved fixture preparation failed")
     return fixtures[-1]
 
 

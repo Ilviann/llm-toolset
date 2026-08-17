@@ -12,7 +12,7 @@ This component contract defines the accepted design for bounded semantic inspect
 - [`asset-inspect-animation`](../../features/completed/asset-inspect-animation.md) adds Animation Blueprint inspection.
 - [`commonui-umg-types-inspect`](../../features/completed/commonui-umg-types-inspect.md) expands CommonUI coverage to widgets and values throughout supported UMG assets.
 - [`umg-mvvm-inspect`](../../features/planned/umg-mvvm-inspect.md) adds ViewModel Blueprint and Widget MVVM inspection.
-- [`ai-assets-inspect`](../../features/planned/ai-assets-inspect.md) adds Behavior Tree, Blackboard, EQS, and custom AI Blueprint families.
+- [`ai-assets-inspect`](../../features/completed/ai-assets-inspect.md) adds Behavior Tree, Blackboard, EQS, and custom AI Blueprint families.
 - [`enhanced-input-assets-inspect`](../../features/completed/enhanced-input-assets-inspect.md) adds released Enhanced Input asset and nested trigger/modifier families.
 - [`gas-supporting-assets-inspect`](../../features/completed/gas-supporting-assets-inspect.md) expands GAS coverage to supporting Blueprint asset families.
 
@@ -77,7 +77,7 @@ Add or expand `asset_inspect` coverage through the linked planned features for:
 - [Animation Blueprints](asset-types/animation-blueprint.md)
 - [CommonUI types throughout supported UMG assets](../../features/completed/commonui-umg-types-inspect.md)
 - [MVVM ViewModels and Widget bindings](../../features/planned/umg-mvvm-inspect.md)
-- [Behavior Trees, Blackboards, EQS, and custom AI Blueprints](../../features/planned/ai-assets-inspect.md)
+- [Behavior Trees, Blackboards, EQS, and custom AI Blueprints](../ai-asset-inspection/index.md)
 - [Enhanced Input assets and nested types](../enhanced-input-asset-inspection/index.md)
 - [Supporting GAS Cue Notify, Attribute Set, and calculation Blueprints](../../features/completed/gas-supporting-assets-inspect.md)
 

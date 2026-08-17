@@ -1,6 +1,6 @@
 # Unreal Editor MCP
 
-Unreal Editor MCP 0.52.0 is an offline-first MCP bridge for Unreal Engine 5.8+. It pairs a dependency-free Python 3.10+ stdio server with an editor-only C++ plugin.
+Unreal Editor MCP 0.53.0 is an offline-first MCP bridge for Unreal Engine 5.8+. It pairs a dependency-free Python 3.10+ stdio server with an editor-only C++ plugin.
 
 Readonly access is the released default. Project-content mutation requires the explicit `--writable` trust decision; optional editor lifecycle control remains independent.
 
@@ -11,6 +11,8 @@ The optional `UnrealMCPGAS` 0.4.0 companion adds bounded read-only `asset_inspec
 The optional `UnrealMCPCommonUI` 0.3.0 companion adds bounded read-only `asset_inspect` blocks and selectors for CommonUI root defaults and allowlisted CommonUI widgets anywhere in a supported Widget Blueprint tree. It keeps all CommonUI dependencies outside the base plugin and uses exact companion API v2. See the [CommonUI Widget inspection guide](docs/user/commonui-widget-blueprints.md).
 
 The optional `UnrealMCPEnhancedInput` 0.1.0 companion adds bounded read-only `asset_inspect` records for Input Actions, Mapping Contexts, deprecated player-mappable configs, and custom trigger/modifier Blueprints. It preserves ordered inline triggers/modifiers and mappings without evaluating input or adding Enhanced Input dependencies to the base plugin. See the [Enhanced Input inspection guide](docs/user/enhanced-input-assets.md).
+
+The optional `UnrealMCPAI` 0.1.0 companion adds bounded read-only `asset_inspect` records for Behavior Trees, Blackboards, Environment Queries, and custom task/decorator/service/generator/context Blueprints. It reports static topology and persisted semantic policy without executing AI or adding AI dependencies to the base plugin. See the [AI asset inspection guide](docs/user/ai-assets.md).
 
 The base plugin also deeply inspects regular, template, and Animation Layer Interface Animation Blueprints, including settings, pose/layer signatures and graphs, state-machine topology, states, conduits, aliases, transitions, custom blends, and parent asset overrides. Animation media and live/debug pose state remain excluded.
 
@@ -32,7 +34,7 @@ Python 3.10 or newer with tkinter is required. The build and installation are of
 
 1. Copy [`plugin/UnrealMCP`](plugin/UnrealMCP) to `<YourProject>/Plugins/UnrealMCP`, or add this repository's `plugin/` directory to `AdditionalPluginDirectories` in a disposable development `.uproject`.
 2. Enable `UnrealMCP` and compile the project's Editor target with Unreal Engine 5.8 or newer.
-3. Open the project and wait for `Unreal MCP 0.52.0 ready on 127.0.0.1:15485` in the editor log.
+3. Open the project and wait for `Unreal MCP 0.53.0 ready on 127.0.0.1:15485` in the editor log.
 4. Create a virtual environment and install the Python package offline:
 
    ```sh

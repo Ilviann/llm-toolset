@@ -20,8 +20,9 @@ from unreal_editor_mcp.errors import BridgeError, ErrorCode  # noqa: E402
 from unreal_editor_mcp.project import ProjectLayout  # noqa: E402
 
 from .assets import run_asset_scenario, verify_restarted_assets
+from .ai_scenario import inspect_ai_fixtures, verify_restarted_ai
 from .animation import inspect_animation_fixture, verify_restarted_animation
-from .automation import prepare_animation_fixture, prepare_commonui_widget_fixture, prepare_enhanced_input_fixture, prepare_gas_effect_fixture, prepare_phase_two_fixture, run_automation
+from .automation import prepare_ai_fixture, prepare_animation_fixture, prepare_commonui_widget_fixture, prepare_enhanced_input_fixture, prepare_gas_effect_fixture, prepare_phase_two_fixture, run_automation
 from .blueprints import author_blueprint_scenario, prepare_blueprint_scenario, verify_restarted_blueprints
 from .capability_contract import verify_capability_contract
 from .companions import verify_companion_scenario
@@ -254,6 +255,54 @@ def run_enhanced_input_restart_integration(
     return 0
 
 
+def run_ai_restart_integration(
+    executable: Path,
+    layout: ProjectLayout,
+    environment: dict[str, str],
+) -> int:
+    """Run focused AI fixture, socket, and restart inspection."""
+    fixture_paths = prepare_ai_fixture(executable, layout.descriptor, environment)
+    if "/Game/UnrealMCPAI/BT_InspectionFixture" not in fixture_paths:
+        raise AssertionError(f"AI fixture paths mismatch: {fixture_paths!r}")
+    command = [
+        str(executable), str(layout.descriptor), "-unattended", "-nop4", "-nosplash",
+        "-nullrhi", "-nosound", "-nocrashreports", "-NoAssetRegistryCache",
+        "-DDC-ForceMemoryCache",
+    ]
+    process_config = EditorProcessConfig(
+        executable, layout.descriptor, tuple(command[2:]), ROOT, environment,
+    )
+    with tempfile.TemporaryFile() as log:
+        bridge = None
+        process = launch_editor(process_config, log)
+        try:
+            wait_until_ready(layout, process, time.monotonic() + 120.0)
+            bridge = UnrealBridge(layout, timeout=3.0)
+            snapshots = inspect_ai_fixtures(bridge)
+            shutdown_editor(bridge, process)
+        except Exception:
+            log.seek(0)
+            sys.stderr.buffer.write(log.read()[-32_000:])
+            raise
+        finally:
+            stop_editor(process, bridge=bridge)
+        bridge = None
+        process = launch_editor(process_config, log)
+        try:
+            wait_until_ready(layout, process, time.monotonic() + 120.0)
+            bridge = UnrealBridge(layout, timeout=3.0)
+            verify_restarted_ai(bridge, snapshots)
+            shutdown_editor(bridge, process)
+        except Exception:
+            log.seek(0)
+            sys.stderr.buffer.write(log.read()[-32_000:])
+            raise
+        finally:
+            stop_editor(process, bridge=bridge)
+    print("Integration passed: AI fixtures, socket inspection, and restart")
+    return 0
+
+
 
 def main() -> int:
     engine = required_path(ENGINE_ROOT_ENV)
@@ -310,6 +359,13 @@ def main() -> int:
         "BP_InputTriggerFixture", "BP_InputModifierFixture",
     ):
         (enhanced_input_fixture_dir / f"{name}.uasset").unlink(missing_ok=True)
+    ai_fixture_dir = layout.root / "Content" / "UnrealMCPAI"
+    for name in (
+        "BB_InspectionFixture", "BT_InspectionFixture", "EQS_InspectionFixture",
+        "BP_BTTaskFixture", "BP_BTDecoratorFixture", "BP_BTServiceFixture",
+        "BP_EQSGeneratorFixture", "BP_EQSContextFixture",
+    ):
+        (ai_fixture_dir / f"{name}.uasset").unlink(missing_ok=True)
     if sys.argv[1:] == ["--automation-only"]:
         return run_automation(executable, layout.descriptor, environment)
     if len(sys.argv) == 3 and sys.argv[1] == "--automation-filter":
@@ -320,11 +376,13 @@ def main() -> int:
         return run_animation_restart_integration(executable, layout, environment)
     if sys.argv[1:] == ["--enhanced-input-only"]:
         return run_enhanced_input_restart_integration(executable, layout, environment)
+    if sys.argv[1:] == ["--ai-only"]:
+        return run_ai_restart_integration(executable, layout, environment)
     if sys.argv[1:]:
         raise SystemExit(
             "usage: run_headless_integration.py "
             "[--automation-only | --automation-filter PREFIX | --widget-only | "
-            "--animation-only | --enhanced-input-only | "
+            "--animation-only | --enhanced-input-only | --ai-only | "
             "--readonly-lifecycle-only]"
         )
     saved_fixture_snapshot = prepare_phase_two_fixture(executable, layout.descriptor, environment)
@@ -353,6 +411,9 @@ def main() -> int:
         raise AssertionError(
             f"Enhanced Input fixture paths mismatch: {enhanced_input_fixture_paths!r}"
         )
+    ai_fixture_paths = prepare_ai_fixture(executable, layout.descriptor, environment)
+    if "/Game/UnrealMCPAI/BT_InspectionFixture" not in ai_fixture_paths:
+        raise AssertionError(f"AI fixture paths mismatch: {ai_fixture_paths!r}")
     command = [
         str(executable), str(layout.descriptor), "-unattended", "-nop4", "-nosplash",
         "-nullrhi", "-nosound", "-nocrashreports", "-NoAssetRegistryCache",
@@ -418,6 +479,7 @@ def main() -> int:
             widget_scenario = author_widget_scenario(bridge)
             animation_snapshot = inspect_animation_fixture(bridge)
             enhanced_input_snapshots = inspect_enhanced_input_fixtures(bridge)
+            ai_snapshots = inspect_ai_fixtures(bridge)
             verify_readonly_mode(
                 bridge,
                 layout,
@@ -462,6 +524,7 @@ def main() -> int:
             verify_restarted_widgets(reloaded_bridge, widget_scenario)
             verify_restarted_animation(reloaded_bridge, animation_snapshot)
             verify_restarted_enhanced_input(reloaded_bridge, enhanced_input_snapshots)
+            verify_restarted_ai(reloaded_bridge, ai_snapshots)
             verify_restarted_game_data_and_level(
                 reloaded_bridge,
                 phase_seventeen_game_data,

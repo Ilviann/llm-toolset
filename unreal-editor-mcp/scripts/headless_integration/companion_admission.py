@@ -90,3 +90,25 @@ def verify_companion_admission(capabilities: dict[str, object]) -> None:
         raise AssertionError(
             f"Enhanced Input asset families are not exactly read-only: {enhanced_input_families!r}"
         )
+    ai = next(
+        (item for item in companions if isinstance(item, dict)
+         and item.get("extension_id") == "unreal-mcp-ai"),
+        None,
+    )
+    if ai is None or ai.get("ready") is not True \
+            or ai.get("read_support") is not True \
+            or ai.get("mutation_support") is not False \
+            or ai.get("contributions") != []:
+        raise AssertionError(f"AI inspection companion is not exactly registered: {ai!r}")
+    ai_families = {
+        item.get("family_id"): item
+        for item in ai.get("asset_families", []) if isinstance(item, dict)
+    }
+    if set(ai_families) != {
+            "behavior_tree", "blackboard", "bt_decorator_blueprint",
+            "bt_service_blueprint", "bt_task_blueprint", "environment_query",
+            "eqs_context_blueprint", "eqs_generator_blueprint",
+            } or any(item.get("operations") != {
+                "inspect": True, "create": False, "edit": False,
+            } for item in ai_families.values()):
+        raise AssertionError(f"AI asset families are not exactly read-only: {ai_families!r}")

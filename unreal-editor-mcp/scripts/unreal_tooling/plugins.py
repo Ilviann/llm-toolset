@@ -47,10 +47,15 @@ ENHANCED_INPUT_PLUGIN = PluginIdentity(
     / "UnrealMCPEnhancedInput.uplugin",
     (BASE_PLUGIN.name,),
 )
+AI_PLUGIN = PluginIdentity(
+    "UnrealMCPAI",
+    APPLICATION_ROOT / "plugin" / "UnrealMCPAI" / "UnrealMCPAI.uplugin",
+    (BASE_PLUGIN.name,),
+)
 PLUGINS = {
     plugin.name: plugin
     for plugin in (
         BASE_PLUGIN, FIXTURE_PLUGIN, GAS_PLUGIN, COMMONUI_PLUGIN,
-        ENHANCED_INPUT_PLUGIN,
+        ENHANCED_INPUT_PLUGIN, AI_PLUGIN,
     )
 }
