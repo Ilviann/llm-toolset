@@ -12,6 +12,8 @@ and execution environments, as described below.
 
 - [`rooted-files-mcp`](rooted-files-mcp/README.md): a root-confined, text-only
   filesystem MCP server designed for small, locally hosted LLMs.
+- [`markdown-mcp`](markdown-mcp/README.md): a root-confined MCP server for
+  exact Markdown section reads and optional atomic section editing.
 - [`godot-editor-mcp`](godot-editor-mcp/README.md): an authenticated localhost
   bridge for controlling the Godot 4.7 editor, usable with both small local LLMs
   and large online LLMs. Its

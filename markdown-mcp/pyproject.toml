@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools==80.9.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "markdown-mcp"
+version = "0.1.0"
+description = "Small, dependency-free MCP server for rooted Markdown section access"
+authors = [{ name = "Ilviann Zed", email = "ilviann.zed@gmail.com" }]
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+classifiers = [
+    "Operating System :: MacOS",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
+]
+
+[project.urls]
+Homepage = "https://github.com/Ilviann/llm-toolset"
+
+[project.scripts]
+markdown-mcp = "markdown_mcp.server:main"
+
+[tool.setuptools.packages.find]
+include = ["markdown_mcp*"]
