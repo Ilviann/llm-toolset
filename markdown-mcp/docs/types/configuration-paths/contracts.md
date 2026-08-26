@@ -32,3 +32,17 @@ confinement checks succeed.
 length, rejects NUL, and optionally forbids fragments. `revalidate` repeats
 resolution for a previously authorized plain path and requires the same target
 and parent. `PathAccessError` messages contain no resolved host path.
+
+## Host launch definition
+
+**Source:** `scripts/generate_mcp_config.py`
+
+`build_server_definition` resolves an existing Markdown root, Python executable,
+and direct `server.py` launcher. It returns a JSON-compatible STDIO definition
+whose ordered arguments are the launcher and root followed by `--writable` only
+for writable mode.
+
+`format_mcp_json` wraps that definition as the stable `markdown` member of a
+complete `mcpServers` object. `format_codex_toml` renders the same command and
+arguments in an `[mcp_servers.markdown]` table. The combined preview is
+copy-only and does not persist host configuration.

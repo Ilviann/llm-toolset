@@ -1,6 +1,8 @@
 # Architecture index
 
 - [`configuration.md`](configuration.md) — startup arguments and immutable mode.
+- [`host-configuration-helper.md`](host-configuration-helper.md) — validated
+  LM Studio and Codex launch configuration previews.
 - [`path-resolution.md`](path-resolution.md) — fragment splitting, extension
   policy, and root confinement.
 - [`markdown-processing.md`](markdown-processing.md) — exact-source parsing,

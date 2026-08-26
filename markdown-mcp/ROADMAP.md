@@ -11,6 +11,15 @@ There are currently no active feature requests.
   - Depends on: none
   - Released in: 0.1.0
 
+## Support tooling
+
+Support-tooling features change repository utilities without changing Markdown
+MCP runtime functionality or triggering application version changes.
+
+- [x] [`mcp-config-generator` — Host configuration helper](docs/features/completed/mcp-config-generator.md)
+  - Depends on:
+    - `markdown-sections`
+
 ## Native platform test backlog
 
 - macOS: `markdown-sections`

@@ -59,6 +59,27 @@ Read-only example:
 Add `"--writable"` to the `args` array to enable edits. On Windows, JSON paths
 may use forward slashes or escaped backslashes.
 
+## Configuration helper
+
+The local Tkinter helper generates copyable configuration with absolute paths.
+Launch it from macOS or Linux with:
+
+```sh
+/path/to/markdown-mcp/scripts/generate_mcp_config.sh
+```
+
+On Windows, use:
+
+```bat
+C:\path\to\markdown-mcp\scripts\generate_mcp_config.cmd
+```
+
+Choose the existing Markdown root and leave editing disabled for read-only
+access, or enable it to add `--writable`. The helper shows a complete LM Studio
+`mcp.json` object and a Codex `[mcp_servers.markdown]` `config.toml` entry. Copy
+and merge the applicable snippet into the host configuration. The helper never
+writes or merges host configuration files.
+
 ## Tools
 
 Read-only mode exposes:

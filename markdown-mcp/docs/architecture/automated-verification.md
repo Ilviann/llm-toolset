@@ -8,6 +8,8 @@ platform contracts with dependency-free tests.
 ## Owned source
 
 - `tests/test_configuration.py` — startup settings.
+- `tests/test_mcp_config_generator.py` — host configuration rendering and
+  generated process launches.
 - `tests/test_paths.py` — path and fragment authority.
 - `tests/test_markdown.py` — pure parser and transformations.
 - `tests/test_filesystem.py` — bytes, limits, edits, races, and cleanup.
