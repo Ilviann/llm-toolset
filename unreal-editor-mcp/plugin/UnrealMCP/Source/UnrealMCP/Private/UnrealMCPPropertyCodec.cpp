@@ -4,6 +4,7 @@
 #include "Dom/JsonValue.h"
 #include "Misc/PackageName.h"
 #include "UnrealMCPProtocol.h"
+#include "UnrealMCPVersion.h"
 #include "UObject/SoftObjectPath.h"
 #include "UObject/UnrealType.h"
 
@@ -77,23 +78,83 @@ UEnum* PropertyEnum(FProperty* Property)
     return nullptr;
 }
 
-TSharedPtr<FJsonValue> EncodeValue(UObject* Object, FProperty* Property, const FString& Kind)
+bool IsReadableStructType(const FStructProperty* Property, const TCHAR* Path)
 {
-    const void* Address = Property->ContainerPtrToValuePtr<void>(Object);
-    if (const FBoolProperty* Bool = CastField<FBoolProperty>(Property)) return MakeShared<FJsonValueBoolean>(Bool->GetPropertyValue(Address));
+    return Property != nullptr && Property->Struct != nullptr && Property->Struct->GetPathName() == Path;
+}
+
+bool IsReadable(const FProperty* Property, FString& OutKind, int32 Depth, bool bRequireEditable)
+{
+    if (Property == nullptr || Depth > UnrealMCP::MaxGameDataDepth || Property->ArrayDim != 1
+        || (bRequireEditable && !Property->HasAnyPropertyFlags(CPF_Edit))
+        || Property->HasAnyPropertyFlags(CPF_Transient | CPF_DisableEditOnTemplate | CPF_Deprecated | CPF_EditorOnly
+            | CPF_InstancedReference | CPF_ContainsInstancedReference | CPF_ExportObject)
+        || Property->IsA<FSetProperty>() || Property->IsA<FMapProperty>()
+        || Property->IsA<FDelegateProperty>() || Property->IsA<FMulticastDelegateProperty>() || Property->IsA<FInterfaceProperty>())
+    {
+        return false;
+    }
+    if (Property->IsA<FBoolProperty>()) OutKind = TEXT("bool");
+    else if (Property->IsA<FNumericProperty>() && PropertyEnum(const_cast<FProperty*>(Property)) == nullptr) OutKind = TEXT("number");
+    else if (Property->IsA<FNameProperty>()) OutKind = TEXT("name");
+    else if (Property->IsA<FStrProperty>()) OutKind = TEXT("string");
+    else if (Property->IsA<FTextProperty>()) OutKind = TEXT("text");
+    else if (PropertyEnum(const_cast<FProperty*>(Property)) != nullptr) OutKind = TEXT("enum");
+    else if (const FStructProperty* Struct = CastField<FStructProperty>(Property))
+    {
+        if (IsReadableStructType(Struct, TEXT("/Script/CoreUObject.Guid"))) OutKind = TEXT("guid");
+        else if (IsReadableStructType(Struct, TEXT("/Script/GameplayTags.GameplayTag"))) OutKind = TEXT("gameplay_tag");
+        else if (IsReadableStructType(Struct, TEXT("/Script/GameplayTags.GameplayTagContainer"))) OutKind = TEXT("gameplay_tag_container");
+        else
+        {
+            int32 Fields = 0;
+            for (TFieldIterator<FProperty> It(Struct->Struct); It; ++It)
+            {
+                if (It->HasAnyPropertyFlags(CPF_Transient | CPF_Deprecated | CPF_EditorOnly)) continue;
+                if (++Fields > UnrealMCP::MaxGameDataFields) return false;
+                FString ChildKind;
+                if (!IsReadable(*It, ChildKind, Depth + 1, false)) return false;
+            }
+            OutKind = TEXT("struct");
+        }
+    }
+    else if (const FArrayProperty* Array = CastField<FArrayProperty>(Property))
+    {
+        FString ChildKind;
+        if (!IsReadable(Array->Inner, ChildKind, Depth + 1, false)) return false;
+        OutKind = TEXT("array");
+    }
+    else if (Property->IsA<FClassProperty>() || Property->IsA<FSoftClassProperty>()) OutKind = TEXT("class_reference");
+    else if (Property->IsA<FObjectPropertyBase>() || Property->IsA<FSoftObjectProperty>()) OutKind = TEXT("object_reference");
+    else return false;
+    return true;
+}
+
+bool EncodeReadableGameplayTag(const UScriptStruct* Struct, const void* Address, FString& Out)
+{
+    const FNameProperty* TagName = Struct != nullptr
+        ? CastField<FNameProperty>(Struct->FindPropertyByName(TEXT("TagName"))) : nullptr;
+    if (TagName == nullptr || Address == nullptr) return false;
+    Out = TagName->GetPropertyValue(TagName->ContainerPtrToValuePtr<void>(Address)).ToString();
+    return Out.Len() <= 128;
+}
+
+bool EncodeValueAt(UObject* Object, FProperty* Property, const void* Address, int32 Depth, TSharedPtr<FJsonValue>& Out)
+{
+    if (Address == nullptr || Depth > UnrealMCP::MaxGameDataDepth) return false;
+    if (const FBoolProperty* Bool = CastField<FBoolProperty>(Property)) { Out = MakeShared<FJsonValueBoolean>(Bool->GetPropertyValue(Address)); return true; }
     if (const FNumericProperty* Numeric = CastField<FNumericProperty>(Property); Numeric != nullptr && PropertyEnum(Property) == nullptr)
     {
-        return MakeShared<FJsonValueNumber>(Numeric->IsFloatingPoint()
+        Out = MakeShared<FJsonValueNumber>(Numeric->IsFloatingPoint()
             ? Numeric->GetFloatingPointPropertyValue(Address)
             : static_cast<double>(Numeric->GetSignedIntPropertyValue(Address)));
+        return true;
     }
-    if (const FNameProperty* Name = CastField<FNameProperty>(Property)) return MakeShared<FJsonValueString>(Name->GetPropertyValue(Address).ToString());
-    if (const FStrProperty* String = CastField<FStrProperty>(Property)) return MakeShared<FJsonValueString>(String->GetPropertyValue(Address));
-    if (const FTextProperty* Text = CastField<FTextProperty>(Property)) return MakeShared<FJsonValueString>(Text->GetPropertyValue(Address).ToString());
+    if (const FNameProperty* Name = CastField<FNameProperty>(Property)) { Out = MakeShared<FJsonValueString>(Name->GetPropertyValue(Address).ToString()); return true; }
+    if (const FStrProperty* String = CastField<FStrProperty>(Property)) { Out = MakeShared<FJsonValueString>(String->GetPropertyValue(Address).Left(UnrealMCP::MaxStringLength)); return true; }
+    if (const FTextProperty* Text = CastField<FTextProperty>(Property)) { Out = MakeShared<FJsonValueString>(Text->GetPropertyValue(Address).ToString().Left(UnrealMCP::MaxStringLength)); return true; }
     if (UEnum* Enum = PropertyEnum(Property))
     {
-        FString Exported;
-        UnrealMCP::PropertyCodec::ExportValueText(Object, Property, Exported);
         if (IsFlagsEnum(Enum))
         {
             int64 NumericValue = 0;
@@ -113,27 +174,107 @@ TSharedPtr<FJsonValue> EncodeValue(UObject* Object, FProperty* Property, const F
                     Names.Add(MakeShared<FJsonValueString>(Enum->GetNameStringByIndex(Index)));
                 }
             }
-            return MakeShared<FJsonValueArray>(Names);
+            Out = MakeShared<FJsonValueArray>(Names);
+            return true;
         }
-        return MakeShared<FJsonValueString>(Exported);
+        int64 NumericValue = 0;
+        if (const FEnumProperty* EnumProperty = CastField<FEnumProperty>(Property))
+            NumericValue = EnumProperty->GetUnderlyingProperty()->GetSignedIntPropertyValue(Address);
+        else NumericValue = CastFieldChecked<FByteProperty>(Property)->GetPropertyValue(Address);
+        const FString Name = Enum->GetNameStringByValue(NumericValue);
+        if (Name.IsEmpty()) return false;
+        Out = MakeShared<FJsonValueString>(Name);
+        return true;
     }
     if (const FSoftObjectProperty* SoftObject = CastField<FSoftObjectProperty>(Property))
     {
-        return MakeShared<FJsonValueString>(SoftObject->GetPropertyValue(Address).ToSoftObjectPath().ToString());
+        Out = MakeShared<FJsonValueString>(SoftObject->GetPropertyValue(Address).ToSoftObjectPath().ToString());
+        return true;
     }
     if (const FClassProperty* Class = CastField<FClassProperty>(Property))
     {
         const UClass* Value = Cast<UClass>(Class->GetObjectPropertyValue(Address));
-        return MakeShared<FJsonValueString>(Value != nullptr ? Value->GetPathName() : FString());
+        if (!IsSafeReferencedObject(Value)) return false;
+        Out = MakeShared<FJsonValueString>(Value != nullptr ? Value->GetPathName() : FString());
+        return true;
     }
     if (const FObjectPropertyBase* ObjectProperty = CastField<FObjectPropertyBase>(Property))
     {
         const UObject* Value = ObjectProperty->GetObjectPropertyValue(Address);
-        return MakeShared<FJsonValueString>(Value != nullptr ? Value->GetPathName() : FString());
+        if (!IsSafeReferencedObject(Value)) return false;
+        Out = MakeShared<FJsonValueString>(Value != nullptr ? Value->GetPathName() : FString());
+        return true;
     }
-    FString Exported;
-    UnrealMCP::PropertyCodec::ExportValueText(Object, Property, Exported);
-    return MakeShared<FJsonValueString>(Exported.Left(4096));
+    if (const FStructProperty* Struct = CastField<FStructProperty>(Property))
+    {
+        if (IsReadableStructType(Struct, TEXT("/Script/CoreUObject.Guid")))
+        {
+            Out = MakeShared<FJsonValueString>(static_cast<const FGuid*>(Address)->ToString(EGuidFormats::Digits).ToLower());
+            return true;
+        }
+        if (IsReadableStructType(Struct, TEXT("/Script/GameplayTags.GameplayTag")))
+        {
+            FString Name;
+            if (!EncodeReadableGameplayTag(Struct->Struct, Address, Name)) return false;
+            Out = MakeShared<FJsonValueString>(Name);
+            return true;
+        }
+        if (IsReadableStructType(Struct, TEXT("/Script/GameplayTags.GameplayTagContainer")))
+        {
+            const FArrayProperty* Tags = CastField<FArrayProperty>(Struct->Struct->FindPropertyByName(TEXT("GameplayTags")));
+            const FStructProperty* Tag = Tags != nullptr ? CastField<FStructProperty>(Tags->Inner) : nullptr;
+            if (Tags == nullptr || Tag == nullptr) return false;
+            FScriptArrayHelper Helper(Tags, Tags->ContainerPtrToValuePtr<void>(Address));
+            if (Helper.Num() > UnrealMCP::MaxGameDataCollectionItems) return false;
+            TArray<FString> Names;
+            for (int32 Index = 0; Index < Helper.Num(); ++Index)
+            {
+                FString Name;
+                if (!EncodeReadableGameplayTag(Tag->Struct, Helper.GetRawPtr(Index), Name)) return false;
+                Names.Add(Name);
+            }
+            Names.Sort();
+            TArray<TSharedPtr<FJsonValue>> Values;
+            for (const FString& Name : Names) Values.Add(MakeShared<FJsonValueString>(Name));
+            Out = MakeShared<FJsonValueArray>(Values);
+            return true;
+        }
+        if (SafeStructs.Contains(Struct->Struct->GetFName()))
+        {
+            FString Exported;
+            if (!Property->ExportText_Direct(Exported, Address, nullptr, Object, PPF_None)) return false;
+            Out = MakeShared<FJsonValueString>(Exported.Left(UnrealMCP::MaxStringLength));
+            return true;
+        }
+        const TSharedRef<FJsonObject> Fields = MakeShared<FJsonObject>();
+        for (TFieldIterator<FProperty> It(Struct->Struct); It; ++It)
+        {
+            if (It->HasAnyPropertyFlags(CPF_Transient | CPF_Deprecated | CPF_EditorOnly)) continue;
+            TSharedPtr<FJsonValue> Child;
+            if (!EncodeValueAt(Object, *It, It->ContainerPtrToValuePtr<void>(Address), Depth + 1, Child)) return false;
+            Fields->SetField(Struct->Struct->GetAuthoredNameForField(*It), Child);
+        }
+        const TSharedRef<FJsonObject> Tagged = MakeShared<FJsonObject>();
+        Tagged->SetStringField(TEXT("kind"), TEXT("struct"));
+        Tagged->SetObjectField(TEXT("fields"), Fields);
+        Out = MakeShared<FJsonValueObject>(Tagged);
+        return true;
+    }
+    if (const FArrayProperty* Array = CastField<FArrayProperty>(Property))
+    {
+        FScriptArrayHelper Helper(Array, Address);
+        if (Helper.Num() > UnrealMCP::MaxGameDataCollectionItems) return false;
+        TArray<TSharedPtr<FJsonValue>> Values;
+        for (int32 Index = 0; Index < Helper.Num(); ++Index)
+        {
+            TSharedPtr<FJsonValue> Child;
+            if (!EncodeValueAt(Object, Array->Inner, Helper.GetRawPtr(Index), Depth + 1, Child)) return false;
+            Values.Add(Child);
+        }
+        Out = MakeShared<FJsonValueArray>(Values);
+        return true;
+    }
+    return false;
 }
 
 bool ImportReference(UObject* Object, FProperty* Property, const FString& Path, FUnrealMCPError& OutError)
@@ -258,15 +399,30 @@ bool UnrealMCP::PropertyCodec::IsSupportedEditable(const FProperty* Property, FS
     return true;
 }
 
+bool UnrealMCP::PropertyCodec::IsSupportedReadable(const FProperty* Property, FString& OutKind)
+{
+    return IsReadable(Property, OutKind, 0, true);
+}
+
 TSharedRef<FJsonObject> UnrealMCP::PropertyCodec::Encode(UObject* Object, FProperty* Property)
 {
     const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
     Result->SetStringField(TEXT("name"), Property != nullptr ? Property->GetName() : FString());
     FString Kind;
-    const bool bSupported = Object != nullptr && IsSupportedEditable(Property, Kind);
+    const bool bSupported = Object != nullptr && IsSupportedReadable(Property, Kind);
     Result->SetBoolField(TEXT("supported"), bSupported);
     Result->SetStringField(TEXT("type"), bSupported ? Kind : TEXT("unsupported"));
-    if (bSupported) Result->SetField(TEXT("value"), EncodeValue(Object, Property, Kind));
+    if (bSupported)
+    {
+        TSharedPtr<FJsonValue> Value;
+        if (EncodeValueAt(Object, Property, Property->ContainerPtrToValuePtr<void>(Object), 0, Value))
+            Result->SetField(TEXT("value"), Value);
+        else
+        {
+            Result->SetBoolField(TEXT("supported"), false);
+            Result->SetStringField(TEXT("type"), TEXT("unsupported"));
+        }
+    }
     return Result;
 }
 

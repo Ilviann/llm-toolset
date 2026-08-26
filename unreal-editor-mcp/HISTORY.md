@@ -4,6 +4,12 @@
 
 - Standardized Unreal Engine 5.8 development tooling on the `UE58` environment variable and moved the disposable integration project to `ue-test/ue58/`.
 
+## 0.33.0 — 2026-08-27
+
+- Extended `game_data_inspect` and `blueprint_inspect` with bounded read-only gameplay-tag/container, GUID, text, enum, soft-reference, soft-reference-array, and nested reflected-struct values.
+- Preserved supported Data Table fields when a sibling type is unsupported, and added exact read-only `UDataAsset`/`UPrimaryDataAsset` property inspection including Data Table and other asset references.
+- Added child-Blueprint lookup of inherited components by ancestor-stable identity or exact name, effective child-template values, per-template/property origin metadata, synchronized capabilities/schemas/examples, and Windows native/Python coverage; advanced the exact-version pair to 0.33.0 and the disposable test companion to 0.1.2. macOS verification remains preferred follow-up work.
+
 ## 0.32.2 — 2026-08-04
 
 - Fixed Blueprint inspection crashes when a Blueprint-owned reflected property, including a class-reference member, was exported or fingerprinted against a parent CDO that did not contain that field. Reflected property exports now use Unreal's archetype-size-aware default lookup across member, class, component, widget, and slot inspection.

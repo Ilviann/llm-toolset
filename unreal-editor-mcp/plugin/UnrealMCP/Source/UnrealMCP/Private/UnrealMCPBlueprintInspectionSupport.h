@@ -14,6 +14,7 @@
 #include "EdGraph/EdGraphPin.h"
 #include "EdGraphSchema_K2.h"
 #include "Engine/Blueprint.h"
+#include "Engine/InheritableComponentHandler.h"
 #include "Engine/SCS_Node.h"
 #include "Engine/SimpleConstructionScript.h"
 #include "GameFramework/Actor.h"
@@ -548,8 +549,85 @@ static bool ReadPropertyNames(const FJsonObject& Arguments, TSet<FString>& OutNa
     return true;
 }
 
-static FString AddComponentDefaults(UActorComponent* Template, const TSet<FString>& RequestedProperties, const TSharedRef<FJsonObject>& Component)
+static UActorComponent* DirectComponentOverride(UBlueprint* Blueprint, const USCS_Node* Node)
 {
+    UInheritableComponentHandler* Handler = Blueprint != nullptr
+        ? Blueprint->GetInheritableComponentHandler(false) : nullptr;
+    return Handler != nullptr && Node != nullptr
+        ? Handler->GetOverridenComponentTemplate(FComponentKey(Node)) : nullptr;
+}
+
+static UBlueprint* ParentBlueprint(UBlueprint* Blueprint)
+{
+    return Blueprint != nullptr && Blueprint->ParentClass != nullptr
+        ? UBlueprint::GetBlueprintFromClass(Blueprint->ParentClass) : nullptr;
+}
+
+static UBlueprint* EffectiveTemplateSource(UBlueprint* Inspected, UBlueprint* Declared, const USCS_Node* Node)
+{
+    for (UBlueprint* Current = Inspected; Current != nullptr; Current = ParentBlueprint(Current))
+    {
+        if (DirectComponentOverride(Current, Node) != nullptr) return Current;
+        if (Current == Declared) return Declared;
+    }
+    return Declared;
+}
+
+static UBlueprint* PropertyValueSource(
+    UBlueprint* Inspected, UBlueprint* Declared, const USCS_Node* Node, const FProperty* Property)
+{
+    if (Property == nullptr) return nullptr;
+    for (UBlueprint* Current = Inspected; Current != nullptr; Current = ParentBlueprint(Current))
+    {
+        if (UActorComponent* Override = DirectComponentOverride(Current, Node))
+        {
+            FProperty* OverrideProperty = Override->GetClass()->FindPropertyByName(Property->GetFName());
+            if (OverrideProperty != nullptr
+                && !UnrealMCP::PropertyCodec::IsIdenticalToArchetype(Override, OverrideProperty)) return Current;
+        }
+        if (Current == Declared) break;
+    }
+    if (Node != nullptr && Node->ComponentTemplate != nullptr)
+    {
+        FProperty* DeclaredProperty = Node->ComponentTemplate->GetClass()->FindPropertyByName(Property->GetFName());
+        if (DeclaredProperty != nullptr
+            && !UnrealMCP::PropertyCodec::IsIdenticalToArchetype(Node->ComponentTemplate, DeclaredProperty)) return Declared;
+    }
+    return nullptr;
+}
+
+static void AddPropertyOrigin(
+    const TSharedRef<FJsonObject>& Encoded,
+    const FProperty* Property,
+    UBlueprint* Inspected,
+    UBlueprint* Declared,
+    const USCS_Node* Node)
+{
+    if (Inspected == nullptr || Declared == nullptr || Node == nullptr || Property == nullptr) return;
+    UBlueprint* Source = PropertyValueSource(Inspected, Declared, Node, Property);
+    const bool bInheritedComponent = Inspected != Declared;
+    Encoded->SetStringField(TEXT("value_origin"), !bInheritedComponent ? TEXT("local")
+        : Source == Inspected ? TEXT("local_override") : TEXT("inherited"));
+    Encoded->SetStringField(TEXT("source_blueprint"), Source != nullptr ? Source->GetPathName() : FString());
+    Encoded->SetStringField(TEXT("source_class"), Source == nullptr && Node->ComponentClass != nullptr
+        ? Node->ComponentClass->GetPathName() : FString());
+}
+
+static FString AddComponentDefaults(
+    UActorComponent* Template,
+    const TSet<FString>& RequestedProperties,
+    const TSharedRef<FJsonObject>& Component,
+    UBlueprint* Inspected = nullptr,
+    UBlueprint* Declared = nullptr,
+    const USCS_Node* Node = nullptr)
+{
+    if (Inspected != nullptr && Declared != nullptr && Node != nullptr)
+    {
+        UBlueprint* Source = EffectiveTemplateSource(Inspected, Declared, Node);
+        Component->SetStringField(TEXT("template_value_origin"), Inspected == Declared ? TEXT("local")
+            : Source == Inspected ? TEXT("local_override") : TEXT("inherited"));
+        Component->SetStringField(TEXT("template_source_blueprint"), Source != nullptr ? Source->GetPathName() : FString());
+    }
     TArray<FProperty*> Changed;
     for (TFieldIterator<FProperty> It(Template->GetClass(), EFieldIterationFlags::IncludeSuper); It; ++It)
     {
@@ -568,11 +646,16 @@ static FString AddComponentDefaults(UActorComponent* Template, const TSet<FStrin
     {
         FProperty* Property = Changed[Index];
         FString Kind;
-        const bool bSupported = UnrealMCP::PropertyCodec::IsSupportedEditable(Property, Kind);
+        const bool bSupported = UnrealMCP::PropertyCodec::IsSupportedReadable(Property, Kind);
         FString Encoded;
         UnrealMCP::PropertyCodec::ExportValueText(Template, Property, Encoded);
         Fingerprint.Add(Property->GetName() + TEXT("|") + (bSupported ? Kind : TEXT("unsupported")) + TEXT("|") + Encoded);
-        if (Index < Count) Defaults.Add(MakeShared<FJsonValueObject>(UnrealMCP::PropertyCodec::Encode(Template, Property)));
+        if (Index < Count)
+        {
+            const TSharedRef<FJsonObject> EncodedValue = UnrealMCP::PropertyCodec::Encode(Template, Property);
+            AddPropertyOrigin(EncodedValue, Property, Inspected, Declared, Node);
+            Defaults.Add(MakeShared<FJsonValueObject>(EncodedValue));
+        }
     }
     Component->SetArrayField(TEXT("changed_defaults"), Defaults);
     Component->SetNumberField(TEXT("changed_default_count"), Changed.Num());
@@ -584,8 +667,10 @@ static FString AddComponentDefaults(UActorComponent* Template, const TSet<FStrin
         TArray<TSharedPtr<FJsonValue>> Editable;
         for (const FString& Name : Sorted)
         {
-            Editable.Add(MakeShared<FJsonValueObject>(UnrealMCP::PropertyCodec::Encode(
-                Template, Template->GetClass()->FindPropertyByName(FName(*Name)))));
+            FProperty* Property = Template->GetClass()->FindPropertyByName(FName(*Name));
+            const TSharedRef<FJsonObject> EncodedValue = UnrealMCP::PropertyCodec::Encode(Template, Property);
+            AddPropertyOrigin(EncodedValue, Property, Inspected, Declared, Node);
+            Editable.Add(MakeShared<FJsonValueObject>(EncodedValue));
         }
         Component->SetArrayField(TEXT("editable_properties"), Editable);
     }
@@ -600,7 +685,7 @@ static void AddClassDefaultFingerprint(UBlueprint* Blueprint, TArray<FString>& F
     {
         FProperty* Property = *It;
         FString Kind;
-        if (UnrealMCP::PropertyCodec::IsSupportedEditable(Property, Kind)
+        if (UnrealMCP::PropertyCodec::IsSupportedReadable(Property, Kind)
             && !UnrealMCP::PropertyCodec::IsIdenticalToArchetype(Defaults, Property))
         {
             FString Encoded;

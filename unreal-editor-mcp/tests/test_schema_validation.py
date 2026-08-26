@@ -42,6 +42,15 @@ class SchemaValidationTests(unittest.TestCase):
         with self.assertRaises(SchemaValidationError):
             validate_tool_arguments("b", schema)
 
+    def test_rejects_a_not_shape(self):
+        schema = {
+            "type": "object",
+            "not": {"required": ["left", "right"]},
+        }
+        validate_tool_arguments({"left": 1}, schema)
+        with self.assertRaises(SchemaValidationError):
+            validate_tool_arguments({"left": 1, "right": 2}, schema)
+
     def test_validates_typed_additional_properties_and_property_names(self):
         schema = {
             "type": "object",

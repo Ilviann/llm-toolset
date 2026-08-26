@@ -11,6 +11,7 @@ struct FUnrealMCPError;
 namespace UnrealMCP::GameDataValueCodec
 {
 TSharedRef<FJsonObject> EncodeType(const FProperty* Property);
+bool IsSupportedForInspection(const FProperty* Property, int32 Depth = 0);
 bool Encode(const FProperty* Property, const void* Value, int32 Depth,
     TSharedPtr<FJsonValue>& OutValue, FUnrealMCPError& OutError);
 bool Decode(const FProperty* Property, void* Value, const TSharedPtr<FJsonValue>& Input,

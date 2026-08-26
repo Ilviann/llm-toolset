@@ -7,6 +7,7 @@
 
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "AssetRegistry/IAssetRegistry.h"
+#include "Engine/DataAsset.h"
 #include "Engine/DataTable.h"
 #include "Kismet2/StructureEditorUtils.h"
 #include "Misc/SecureHash.h"
@@ -38,7 +39,7 @@ FString Guid(const FGuid& Value)
     return Value.IsValid() ? Value.ToString(EGuidFormats::Digits).ToLower() : FString();
 }
 
-TSharedRef<FJsonObject> SchemaRecord(const UScriptStruct* Struct, const FProperty* Property)
+TSharedRef<FJsonObject> SchemaRecord(const UStruct* Struct, const FProperty* Property)
 {
     const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
     Result->SetStringField(TEXT("name"), Struct->GetAuthoredNameForField(Property));
@@ -73,7 +74,7 @@ bool Build(
 {
     FString InputPath;
     if (!Arguments.TryGetStringField(TEXT("target"), OutTarget)
-        || (OutTarget != TEXT("user_defined_struct") && OutTarget != TEXT("data_table"))
+        || (OutTarget != TEXT("user_defined_struct") && OutTarget != TEXT("data_table") && OutTarget != TEXT("data_asset"))
         || !Arguments.TryGetStringField(TEXT("asset_path"), InputPath)
         || !NormalizeAssetPath(InputPath, OutObjectPath, OutPackage))
     {
@@ -83,7 +84,9 @@ bool Build(
     if ((OutTarget == TEXT("user_defined_struct")
             && !HasOnlyFields(Arguments, {TEXT("target"), TEXT("asset_path"), TEXT("page_size")}))
         || (OutTarget == TEXT("data_table")
-            && !HasOnlyFields(Arguments, {TEXT("target"), TEXT("asset_path"), TEXT("row_names"), TEXT("page_size")})))
+            && !HasOnlyFields(Arguments, {TEXT("target"), TEXT("asset_path"), TEXT("row_names"), TEXT("page_size")}))
+        || (OutTarget == TEXT("data_asset")
+            && !HasOnlyFields(Arguments, {TEXT("target"), TEXT("asset_path"), TEXT("property_names"), TEXT("page_size")})))
     {
         OutError = {TEXT("invalid_argument"), TEXT("game_data_inspect accepts only fields for its exact target")};
         return false;
@@ -138,7 +141,7 @@ bool Build(
         OutMetadata->SetArrayField(TEXT("dependencies"), Values);
         OutMetadata->SetBoolField(TEXT("dependencies_truncated"), bTruncated);
     }
-    else
+    else if (OutTarget == TEXT("data_table"))
     {
         UDataTable* Table = Cast<UDataTable>(Asset);
         if (Table == nullptr || Table->GetRowStruct() == nullptr)
@@ -213,6 +216,86 @@ bool Build(
             return false;
         }
         OutMetadata->SetNumberField(TEXT("row_count"), Table->GetRowMap().Num());
+    }
+    else
+    {
+        UDataAsset* DataAsset = Cast<UDataAsset>(Asset);
+        if (DataAsset == nullptr)
+        {
+            OutError = {TEXT("wrong_type"), TEXT("The asset is not a Data Asset")};
+            return false;
+        }
+        TSet<FString> Filter;
+        if (Arguments.HasField(TEXT("property_names")))
+        {
+            const TArray<TSharedPtr<FJsonValue>>* Names = nullptr;
+            if (!Arguments.TryGetArrayField(TEXT("property_names"), Names) || Names == nullptr
+                || Names->IsEmpty() || Names->Num() > UnrealMCP::MaxGameDataFields)
+            {
+                OutError = {TEXT("invalid_argument"), TEXT("property_names must be one bounded non-empty array")};
+                return false;
+            }
+            for (const TSharedPtr<FJsonValue>& Value : *Names)
+            {
+                FString Name;
+                if (!Value->TryGetString(Name) || !ValidName(Name) || Filter.Contains(Name))
+                {
+                    OutError = {TEXT("invalid_argument"), TEXT("property_names contains an invalid or duplicate exact name")};
+                    return false;
+                }
+                Filter.Add(Name);
+            }
+        }
+        OutMetadata->SetStringField(TEXT("class_path"), DataAsset->GetClass()->GetPathName());
+        OutMetadata->SetBoolField(TEXT("primary_data_asset"), DataAsset->IsA<UPrimaryDataAsset>());
+        int32 FieldCount = 0;
+        int32 UnsupportedCount = 0;
+        TSet<FString> Found;
+        for (TFieldIterator<FProperty> It(DataAsset->GetClass(), EFieldIterationFlags::IncludeSuper); It; ++It)
+        {
+            FProperty* Property = *It;
+            if (!Property->HasAnyPropertyFlags(CPF_Edit)
+                || Property->HasAnyPropertyFlags(CPF_Transient | CPF_Deprecated | CPF_EditorOnly)) continue;
+            if (++FieldCount > UnrealMCP::MaxGameDataFields)
+            {
+                OutError = {TEXT("data_limit_exceeded"), TEXT("The Data Asset exceeds the reflected property limit")};
+                return false;
+            }
+            const FString AuthoredName = DataAsset->GetClass()->GetAuthoredNameForField(Property);
+            const bool bSelected = Filter.IsEmpty() || Filter.Contains(Property->GetName()) || Filter.Contains(AuthoredName);
+            if (bSelected)
+            {
+                Found.Add(Filter.Contains(Property->GetName()) ? Property->GetName() : AuthoredName);
+            }
+            OutSchema.Add(MakeShared<FJsonValueObject>(SchemaRecord(DataAsset->GetClass(), Property)));
+            const TSharedRef<FJsonObject> Record = MakeShared<FJsonObject>();
+            Record->SetStringField(TEXT("kind"), TEXT("property"));
+            Record->SetStringField(TEXT("name"), AuthoredName);
+            Record->SetStringField(TEXT("property_name"), Property->GetName());
+            Record->SetObjectField(TEXT("type"), UnrealMCP::GameDataValueCodec::EncodeType(Property));
+            TSharedPtr<FJsonValue> Encoded;
+            FUnrealMCPError ValueError;
+            const bool bSupported = UnrealMCP::GameDataValueCodec::Encode(
+                Property, Property->ContainerPtrToValuePtr<void>(DataAsset), 0, Encoded, ValueError);
+            Record->SetBoolField(TEXT("supported"), bSupported);
+            if (bSupported) Record->SetField(TEXT("value"), Encoded);
+            else
+            {
+                ++UnsupportedCount;
+                Record->SetStringField(TEXT("error"), ValueError.Code.IsEmpty() ? TEXT("unsupported_type") : ValueError.Code);
+                Record->SetStringField(TEXT("message"), ValueError.Message.Left(256));
+            }
+            const TSharedPtr<FJsonValue> RecordValue = MakeShared<FJsonValueObject>(Record);
+            FingerprintRecords.Add(RecordValue);
+            if (bSelected) OutRecords.Add(RecordValue);
+        }
+        if (!Filter.IsEmpty() && Found.Num() != Filter.Num())
+        {
+            OutError = {TEXT("not_found"), TEXT("One or more requested Data Asset properties do not exist")};
+            return false;
+        }
+        OutMetadata->SetNumberField(TEXT("property_count"), FieldCount);
+        OutMetadata->SetNumberField(TEXT("unsupported_property_count"), UnsupportedCount);
     }
     const TSharedRef<FJsonObject> Fingerprint = MakeShared<FJsonObject>();
     Fingerprint->SetStringField(TEXT("target"), OutTarget);

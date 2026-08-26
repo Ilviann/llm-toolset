@@ -32,6 +32,17 @@ def _validate(value: Any, schema: Mapping[str, Any], root: Mapping[str, Any], pa
         _validate(value, resolved, root, path)
         return
 
+    excluded = schema.get("not")
+    if excluded is not None:
+        if not isinstance(excluded, Mapping):
+            raise RuntimeError("not must contain a schema")
+        try:
+            _validate(value, excluded, root, path)
+        except SchemaValidationError:
+            pass
+        else:
+            raise SchemaValidationError(f"{path} matches a forbidden shape")
+
     alternatives = schema.get("oneOf")
     if alternatives is not None:
         if not isinstance(alternatives, Sequence) or isinstance(alternatives, str):

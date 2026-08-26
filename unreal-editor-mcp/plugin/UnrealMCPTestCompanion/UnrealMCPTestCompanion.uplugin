@@ -1,7 +1,7 @@
 {
   "FileVersion": 3,
-  "Version": 10001,
-  "VersionName": "0.1.1",
+  "Version": 10002,
+  "VersionName": "0.1.2",
   "companion_api_version": 1,
   "FriendlyName": "Unreal MCP Test Companion",
   "Description": "Disposable editor-only fixture for the Unreal MCP companion API.",

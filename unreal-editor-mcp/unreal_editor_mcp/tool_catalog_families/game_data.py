@@ -110,7 +110,7 @@ _ROW_WRITE = {
 GAME_DATA_TOOLS: Final = (
     {
         "name": "game_data_inspect",
-        "description": "Inspect one user-defined struct schema or one bounded page of typed Data Table rows from an exact structural snapshot.",
+        "description": "Inspect one user-defined struct, typed Data Table, or Data Asset through bounded reflected values from an exact structural snapshot.",
         "inputSchema": {
             "oneOf": [
                 {
@@ -129,6 +129,20 @@ GAME_DATA_TOOLS: Final = (
                         "target": {"const": "data_table"},
                         "asset_path": _PATH,
                         "row_names": {
+                            "type": "array", "minItems": 1, "maxItems": 64,
+                            "items": {"type": "string", "minLength": 1, "maxLength": 128},
+                        },
+                        "page_size": {"type": "integer", "minimum": 1, "maximum": 100},
+                    },
+                    "required": ["target", "asset_path"],
+                    "additionalProperties": False,
+                },
+                {
+                    "type": "object",
+                    "properties": {
+                        "target": {"const": "data_asset"},
+                        "asset_path": _PATH,
+                        "property_names": {
                             "type": "array", "minItems": 1, "maxItems": 64,
                             "items": {"type": "string", "minLength": 1, "maxLength": 128},
                         },

@@ -2,7 +2,7 @@
 
 ## Ownership
 
-`FUnrealMCPGameDataService` is the `game_data_inspect` and `game_data_edit` facade and owns opaque inspection cursors. `UnrealMCPGameDataRequestValidation` owns exact target/operation shapes plus bounded names, paths, identities, and page sizes. `UnrealMCPGameDataOperationHandlers` owns user-defined struct creation/evolution, Data Table creation and row mutation, dependency preflight, transactions, package saving, and verified edit orchestration. `UnrealMCPGameDataInspectionBuilder` owns structural inspection, dependency metadata, row/schema records, query-independent snapshots, and common saved-edit result envelopes. `UnrealMCPGameDataValueCodec` owns bounded reflected row values independently of Blueprint class/component defaults.
+`FUnrealMCPGameDataService` is the `game_data_inspect` and `game_data_edit` facade and owns opaque inspection cursors. `UnrealMCPGameDataRequestValidation` owns exact target/operation shapes plus bounded names, paths, identities, and page sizes. `UnrealMCPGameDataOperationHandlers` owns user-defined struct creation/evolution, Data Table creation and row mutation, dependency preflight, transactions, package saving, and verified edit orchestration. `UnrealMCPGameDataInspectionBuilder` owns structural inspection, dependency metadata, Data Table row/schema records, bounded Data Asset property records, query-independent snapshots, and common saved-edit result envelopes. `UnrealMCPGameDataValueCodec` owns bounded reflected values independently of Blueprint class/component defaults.
 
 ## Dependency direction
 
@@ -10,14 +10,15 @@ The HTTP bridge owns one lazily created service and admits `game_data_edit` thro
 
 ## Invariants
 
-- Targets are exactly `user_defined_struct` or `data_table`; every operation has one exact native-validated shape.
+- Inspection targets are exactly `user_defined_struct`, `data_table`, or read-only `data_asset`; edit targets remain exactly `user_defined_struct` or `data_table`. Every operation has one exact native-validated shape.
 - Read access covers visible mounted assets. Mutation uses the shared `/Game` and symlink-free local-project-plugin scope policy.
 - User-defined struct members use persistent `VarGuid` identities. Add, rename, type/default update, reorder, and reject-only removal are supported; every accepted result is compiled, saved, and read back.
 - Member identity and destructive dependency preflight complete before the transaction or package modification begins. Type changes and removals reject if the bounded Asset Registry dependency scan finds any referencer or truncates, preserving the package's prior dirty state. No dependent asset is silently rewritten by a destructive schema edit.
-- Data Tables bind to one exact live native `FTableRowBase` descendant or user-defined struct. Their schema, sorted row names, and typed values contribute to one query-independent snapshot.
+- Data Tables bind to one exact live native `FTableRowBase` descendant or user-defined struct. Their schema, sorted row names, and typed values contribute to one query-independent snapshot. One unsupported row field becomes an explicit per-field sentinel while supported siblings remain available; bounds and malformed data still fail the request.
+- Data Asset inspection accepts only `UDataAsset`/`UPrimaryDataAsset`, enumerates at most 64 editable non-transient reflected properties, optionally selects exact property names, and includes the complete bounded property set in its snapshot. It never edits or saves the asset.
 - Add, replace, rename, remove, and mixed batch upsert/remove operations prevalidate complete staged rows before mutation. Batch names must be unique ignoring `FName` case semantics, and upserts cannot overlap removals.
 - `preserve_unspecified` is explicit and valid only when a row already exists. Otherwise omitted fields receive the live row-struct defaults.
-- Row values are bounded reflected values, never unrestricted Unreal serialization text. Arbitrary instanced object graphs, interfaces, delegates, transient/editor-only references, unsupported properties, filesystem import/export, and code are rejected.
+- Inspection values are bounded reflected values, never unrestricted Unreal serialization text. They include gameplay tags/containers, GUIDs, text, enum values, compatible hard/soft object and class references, arrays, and bounded nested structs. Arbitrary instanced object graphs, interfaces, delegates, transient/editor-only references, filesystem import/export, and code remain unsupported; inspection isolates an unsupported property instead of hiding supported siblings.
 - Accepted edits save before returning and report `saved: true`, `dirty: false`, the new snapshot, and bounded changed names. Unexpected read-back/save failure performs explicit transaction restoration and re-saves restored state.
 - Inspection cursors are single-use, retained for 30 seconds, and bound to the full asset snapshot even when the initial query selects named rows.
 

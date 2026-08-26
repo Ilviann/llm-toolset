@@ -427,6 +427,8 @@ class ServerStdioTests(unittest.TestCase):
             {"mode": "discover", "package_path": "/Engine", "asset_name": "BP_Light"},
             {"mode": "inspect", "asset_path": "/Game/Actors/BP_Light.BP_Light", "sections": ["summary", "nodes"], "include_inherited": True},
             {"mode": "inspect", "asset_path": "/Game/Actors/BP_Light.BP_Light", "sections": ["variables"], "member_id": "e" * 32},
+            {"mode": "inspect", "asset_path": "/Game/Actors/BP_Light.BP_Light", "sections": ["components"],
+             "component_name": "InheritedMesh", "property_names": ["StaticMesh"]},
             {"mode": "inspect", "asset_path": "/Game/Actors/BP_Light.BP_Light", "sections": ["functions", "parameters"], "function_id": "f" * 32},
             {"mode": "inspect", "asset_path": "/Game/Actors/BP_Light.BP_Light", "sections": ["local_variables"], "local_id": "d" * 32},
             {"mode": "inspect", "asset_path": "/Game/Actors/BP_Light.BP_Light", "sections": ["macros", "parameters"], "macro_id": "c" * 32},
@@ -449,6 +451,7 @@ class ServerStdioTests(unittest.TestCase):
             {"cursor": "short"},
             {"cursor": "a" * 32, "mode": "discover"},
             {"mode": "inspect", "asset_path": "/Game/A.A", "page_size": 101},
+            {"mode": "inspect", "asset_path": "/Game/A.A", "component_id": "a" * 32, "component_name": "Mesh"},
         )
         for arguments in invalid:
             with self.subTest(arguments=arguments):
@@ -906,6 +909,8 @@ class ServerStdioTests(unittest.TestCase):
             ("game_data_inspect", {"target": "user_defined_struct", "asset_path": "/Game/Data/ST_Weapon.ST_Weapon"}),
             ("game_data_inspect", {"target": "data_table", "asset_path": "/Game/Data/DT_Weapons.DT_Weapons",
                                    "row_names": ["Pistol", "Rifle"], "page_size": 10}),
+            ("game_data_inspect", {"target": "data_asset", "asset_path": "/Game/Data/DA_Weapon.DA_Weapon",
+                                   "property_names": ["WeaponTable", "Icon"], "page_size": 10}),
             ("game_data_inspect", {"cursor": "c" * 32, "page_size": 50}),
             ("game_data_edit", {"operation_id": operation_id, "target": "user_defined_struct", "operation": "create",
                                 "asset_path": "/Game/Data/ST_Weapon", "members": [member]}),
@@ -934,6 +939,7 @@ class ServerStdioTests(unittest.TestCase):
         invalid = (
             ("game_data_inspect", {"target": "user_defined_struct", "asset_path": "/Game/ST.ST", "row_names": ["x"]}),
             ("game_data_inspect", {"target": "data_table", "asset_path": "/Game/DT.DT", "page_size": 101}),
+            ("game_data_inspect", {"target": "data_asset", "asset_path": "/Game/DA.DA", "row_names": ["x"]}),
             ("game_data_edit", {"operation_id": operation_id, "target": "user_defined_struct", "operation": "create",
                                 "asset_path": "/Game/ST", "members": []}),
             ("game_data_edit", {"operation_id": operation_id, "target": "data_table", "operation": "add_row",

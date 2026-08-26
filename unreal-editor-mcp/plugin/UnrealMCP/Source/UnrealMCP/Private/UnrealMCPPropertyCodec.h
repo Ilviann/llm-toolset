@@ -10,6 +10,7 @@ struct FUnrealMCPError;
 
 namespace UnrealMCP::PropertyCodec
 {
+bool IsSupportedReadable(const FProperty* Property, FString& OutKind);
 bool IsSupportedEditable(const FProperty* Property, FString& OutKind);
 bool IsIdenticalToArchetype(const UObject* Object, const FProperty* Property);
 bool ExportValueText(const UObject* Object, const FProperty* Property, FString& OutText);

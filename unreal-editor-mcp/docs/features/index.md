@@ -35,6 +35,10 @@ Keep the authoritative checklist in [`ROADMAP.md`](../../ROADMAP.md) synchronize
 - [`phase-15` — GameInstance family](completed/phase-15.md) — Add GameInstance family support.
 - [`phase-16` — Multiplayer Blueprint authoring and framework assignment](completed/phase-16.md) — Add RPC custom events, replication settings, and narrow GameMode/GameInstance project assignment.
 - [`phase-17` — User-defined structs and Data Tables](completed/phase-17.md) — Add bounded row-schema and typed game-design table authoring.
+- [`reflected-inspection` — Reflected values, inherited components, and Data Assets](completed/reflected-inspection.md) — Extend bounded read-only inspection across richer reflected values, inherited component templates, and Data Assets.
+  - Depends on:
+    - `phase-4`
+    - `phase-17`
 - [`asset-references` — Find asset references](completed/asset-references.md) — Find bounded serialized and live-memory referencers for one exact mounted asset.
 - [`asset-delete` — Delete asset](completed/asset-delete.md) — Safely delete one exact unreferenced asset package through Unreal Editor.
   - Depends on:
@@ -168,7 +172,7 @@ Keep the public surface compact. Add typed operations to these remaining tool fa
 | `blueprint_action_catalog` | `phase-8` | Discover a bounded set of context-valid graph actions without mutation |
 | `blueprint_graph_edit` | `phase-11` | Perform one typed node, pin, connection, position, or removal mutation |
 | `gameplay_framework_edit` | `phase-16` | Assign only the configured project's default GameMode or GameInstance class |
-| `game_data_inspect` | `phase-17` | Inspect one bounded user-defined struct or Data Table schema/row page |
+| `game_data_inspect` | `reflected-inspection` | Inspect one bounded user-defined struct, Data Table schema/row page, or Data Asset property page |
 | `game_data_edit` | `phase-17` | Create or mutate one bounded user-defined struct or Data Table transaction |
 | `asset_references` | `asset-references` | Find bounded serialized and live-memory referencers for one exact mounted asset |
 | `asset_delete` | `asset-delete` | Delete one exact unreferenced asset package through a retained, verified editor operation |

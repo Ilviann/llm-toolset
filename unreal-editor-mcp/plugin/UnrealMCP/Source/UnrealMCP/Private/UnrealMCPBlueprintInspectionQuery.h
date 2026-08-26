@@ -11,6 +11,7 @@ struct FInspectionQuery
     TSet<FString> Sections;
     FString GraphFilter;
     FString ComponentFilter;
+    FString ComponentNameFilter;
     FString MemberFilter;
     FString FunctionFilter;
     FString LocalFilter;
@@ -22,7 +23,7 @@ struct FInspectionQuery
 
 static bool DecodeInspectionQuery(const FJsonObject& Arguments, FInspectionQuery& Out, FUnrealMCPError& OutError)
 {
-    if (!HasOnlyFields(Arguments, {TEXT("mode"), TEXT("asset_path"), TEXT("sections"), TEXT("graph_id"), TEXT("component_id"), TEXT("member_id"),
+    if (!HasOnlyFields(Arguments, {TEXT("mode"), TEXT("asset_path"), TEXT("sections"), TEXT("graph_id"), TEXT("component_id"), TEXT("component_name"), TEXT("member_id"),
         TEXT("function_id"), TEXT("local_id"), TEXT("macro_id"), TEXT("custom_event_id"), TEXT("widget_id"),
         TEXT("property_names"), TEXT("include_inherited"), TEXT("page_size")}))
     {
@@ -82,6 +83,19 @@ static bool DecodeInspectionQuery(const FJsonObject& Arguments, FInspectionQuery
     if (Out.Sections.Contains(TEXT("class_defaults")) && Out.PropertyNames.IsEmpty())
     {
         OutError = {TEXT("invalid_argument"), TEXT("class_defaults inspection requires one or more targeted property_names")};
+        return false;
+    }
+    if (Arguments.HasField(TEXT("component_name"))
+        && (!Arguments.TryGetStringField(TEXT("component_name"), Out.ComponentNameFilter)
+            || Out.ComponentNameFilter.IsEmpty() || Out.ComponentNameFilter.Len() > 128
+            || !FName::IsValidXName(Out.ComponentNameFilter, INVALID_NAME_CHARACTERS)))
+    {
+        OutError = {TEXT("invalid_argument"), TEXT("component_name must be one exact bounded component name")};
+        return false;
+    }
+    if (!Out.ComponentFilter.IsEmpty() && !Out.ComponentNameFilter.IsEmpty())
+    {
+        OutError = {TEXT("invalid_argument"), TEXT("component_id and component_name are mutually exclusive")};
         return false;
     }
     if (Out.Sections.Contains(TEXT("widget_defaults"))

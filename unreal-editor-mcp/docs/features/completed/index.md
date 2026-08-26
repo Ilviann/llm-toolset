@@ -19,6 +19,7 @@
 - [`phase-15` — GameInstance family](phase-15.md).
 - [`phase-16` — Multiplayer Blueprint authoring and framework assignment](phase-16.md).
 - [`phase-17` — User-defined structs and Data Tables](phase-17.md).
+- [`reflected-inspection` — Reflected values, inherited components, and Data Assets](reflected-inspection.md).
 - [`editor-launch` — Optional configured editor launch](editor-launch.md).
 - [`editor-shutdown` — Optional graceful editor shutdown](editor-shutdown.md).
 - [`editor-restart` — Optional durable editor restart](editor-restart.md).

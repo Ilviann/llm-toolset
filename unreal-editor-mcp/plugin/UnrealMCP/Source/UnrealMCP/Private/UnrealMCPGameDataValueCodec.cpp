@@ -60,7 +60,7 @@ bool IsUnsafe(const FProperty* Property)
     return Property == nullptr || Property->ArrayDim != 1
         || Property->HasAnyPropertyFlags(
             CPF_Transient | CPF_Deprecated | CPF_EditorOnly | CPF_InstancedReference
-            | CPF_ContainsInstancedReference | CPF_ExportObject)
+            | CPF_ExportObject)
         || Property->IsA<FDelegateProperty>() || Property->IsA<FMulticastDelegateProperty>() || Property->IsA<FInterfaceProperty>();
 }
 
@@ -107,6 +107,50 @@ FProperty* FindAuthoredProperty(const UScriptStruct* Struct, const FString& Name
     }
     return nullptr;
 }
+
+bool IsStruct(const FStructProperty* Property, const TCHAR* Path)
+{
+    return Property != nullptr && Property->Struct != nullptr && Property->Struct->GetPathName() == Path;
+}
+
+bool EncodeGameplayTag(const UScriptStruct* Struct, const void* Value, FString& Out)
+{
+    if (Struct == nullptr || Value == nullptr) return false;
+    const FNameProperty* TagName = CastField<FNameProperty>(Struct->FindPropertyByName(TEXT("TagName")));
+    if (TagName == nullptr) return false;
+    Out = TagName->GetPropertyValue(TagName->ContainerPtrToValuePtr<void>(Value)).ToString();
+    return Out.Len() <= 128;
+}
+
+bool EncodeGameplayTagContainer(const UScriptStruct* Struct, const void* Value, TArray<TSharedPtr<FJsonValue>>& Out)
+{
+    if (Struct == nullptr || Value == nullptr) return false;
+    const FArrayProperty* Tags = CastField<FArrayProperty>(Struct->FindPropertyByName(TEXT("GameplayTags")));
+    const FStructProperty* Tag = Tags != nullptr ? CastField<FStructProperty>(Tags->Inner) : nullptr;
+    if (Tags == nullptr || Tag == nullptr || !IsStruct(Tag, TEXT("/Script/GameplayTags.GameplayTag"))) return false;
+    FScriptArrayHelper Helper(Tags, Tags->ContainerPtrToValuePtr<void>(Value));
+    if (Helper.Num() > UnrealMCP::MaxGameDataCollectionItems) return false;
+    TArray<FString> Names;
+    Names.Reserve(Helper.Num());
+    for (int32 Index = 0; Index < Helper.Num(); ++Index)
+    {
+        FString Name;
+        if (!EncodeGameplayTag(Tag->Struct, Helper.GetRawPtr(Index), Name)) return false;
+        Names.Add(Name);
+    }
+    Names.Sort();
+    for (const FString& Name : Names) Out.Add(MakeShared<FJsonValueString>(Name));
+    return true;
+}
+
+TSharedRef<FJsonObject> UnsupportedValue(const FProperty* Property, const FUnrealMCPError& Error)
+{
+    const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+    Result->SetStringField(TEXT("kind"), TEXT("unsupported"));
+    Result->SetObjectField(TEXT("type"), UnrealMCP::GameDataValueCodec::EncodeType(Property));
+    Result->SetStringField(TEXT("reason"), Error.Message.Left(256));
+    return Result;
+}
 }
 
 TSharedRef<FJsonObject> UnrealMCP::GameDataValueCodec::EncodeType(const FProperty* Property)
@@ -114,7 +158,9 @@ TSharedRef<FJsonObject> UnrealMCP::GameDataValueCodec::EncodeType(const FPropert
     FEdGraphPinType PinType;
     if (Property != nullptr && GetDefault<UEdGraphSchema_K2>()->ConvertPropertyToPinType(Property, PinType))
     {
-        return UnrealMCP::K2TypeCodec::EncodeType(PinType);
+        const TSharedRef<FJsonObject> Result = UnrealMCP::K2TypeCodec::EncodeType(PinType);
+        if (!IsSupportedForInspection(Property)) Result->SetBoolField(TEXT("supported"), false);
+        return Result;
     }
     const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
     Result->SetStringField(TEXT("category"), TEXT("unsupported"));
@@ -123,6 +169,30 @@ TSharedRef<FJsonObject> UnrealMCP::GameDataValueCodec::EncodeType(const FPropert
     Result->SetBoolField(TEXT("const"), false);
     Result->SetBoolField(TEXT("supported"), false);
     return Result;
+}
+
+bool UnrealMCP::GameDataValueCodec::IsSupportedForInspection(const FProperty* Property, int32 Depth)
+{
+    if (Depth > UnrealMCP::MaxGameDataDepth || IsUnsafe(Property)) return false;
+    if (Property->IsA<FBoolProperty>() || Property->IsA<FNameProperty>() || Property->IsA<FStrProperty>()
+        || Property->IsA<FTextProperty>() || PropertyEnum(Property) != nullptr
+        || Property->IsA<FNumericProperty>() || Property->IsA<FClassProperty>()
+        || Property->IsA<FSoftObjectProperty>() || Property->IsA<FObjectPropertyBase>())
+    {
+        return true;
+    }
+    if (const FStructProperty* Struct = CastField<FStructProperty>(Property))
+    {
+        return Struct->Struct != nullptr;
+    }
+    if (const FArrayProperty* Array = CastField<FArrayProperty>(Property))
+        return IsSupportedForInspection(Array->Inner, Depth + 1);
+    if (const FSetProperty* Set = CastField<FSetProperty>(Property))
+        return IsSupportedForInspection(Set->ElementProp, Depth + 1);
+    if (const FMapProperty* Map = CastField<FMapProperty>(Property))
+        return IsSupportedForInspection(Map->KeyProp, Depth + 1)
+            && IsSupportedForInspection(Map->ValueProp, Depth + 1);
+    return false;
 }
 
 bool UnrealMCP::GameDataValueCodec::Encode(
@@ -201,6 +271,28 @@ bool UnrealMCP::GameDataValueCodec::Encode(
     }
     if (const FStructProperty* StructProperty = CastField<FStructProperty>(Property))
     {
+        if (IsStruct(StructProperty, TEXT("/Script/CoreUObject.Guid")))
+        {
+            const FGuid& Guid = *static_cast<const FGuid*>(Value);
+            OutValue = MakeShared<FJsonValueString>(Guid.ToString(EGuidFormats::Digits).ToLower());
+            return true;
+        }
+        if (IsStruct(StructProperty, TEXT("/Script/GameplayTags.GameplayTag")))
+        {
+            FString Name;
+            if (!EncodeGameplayTag(StructProperty->Struct, Value, Name))
+            { OutError = {TEXT("unsupported_type"), TEXT("The gameplay-tag value could not be encoded")}; return false; }
+            OutValue = MakeShared<FJsonValueString>(Name);
+            return true;
+        }
+        if (IsStruct(StructProperty, TEXT("/Script/GameplayTags.GameplayTagContainer")))
+        {
+            TArray<TSharedPtr<FJsonValue>> Tags;
+            if (!EncodeGameplayTagContainer(StructProperty->Struct, Value, Tags))
+            { OutError = {TEXT("unsupported_type"), TEXT("The gameplay-tag container could not be encoded")}; return false; }
+            OutValue = MakeShared<FJsonValueArray>(Tags);
+            return true;
+        }
         bool bSucceeded = false;
         const TSharedRef<FJsonObject> Fields = EncodeFields(StructProperty->Struct, Value, Depth + 1, OutError, bSucceeded);
         if (!bSucceeded) return false;
@@ -429,7 +521,16 @@ TSharedRef<FJsonObject> UnrealMCP::GameDataValueCodec::EncodeFields(
     {
         if (++Count > UnrealMCP::MaxGameDataFields) { OutError = {TEXT("data_limit_exceeded"), TEXT("The live row schema exceeds the field limit")}; return Result; }
         TSharedPtr<FJsonValue> Value;
-        if (!Encode(*It, It->ContainerPtrToValuePtr<void>(Data), Depth, Value, OutError)) return Result;
+        FUnrealMCPError FieldError;
+        if (!Encode(*It, It->ContainerPtrToValuePtr<void>(Data), Depth, Value, FieldError))
+        {
+            if (FieldError.Code != TEXT("unsupported_type"))
+            {
+                OutError = FieldError;
+                return Result;
+            }
+            Value = MakeShared<FJsonValueObject>(UnsupportedValue(*It, FieldError));
+        }
         Result->SetField(Struct->GetAuthoredNameForField(*It), Value);
     }
     bSucceeded = true;

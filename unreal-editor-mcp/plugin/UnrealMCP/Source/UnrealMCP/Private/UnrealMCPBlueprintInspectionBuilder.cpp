@@ -26,6 +26,7 @@ bool BuildInspection(
     const TSet<FString>& Sections = Query.Sections;
     const FString& GraphFilter = Query.GraphFilter;
     const FString& ComponentFilter = Query.ComponentFilter;
+    const FString& ComponentNameFilter = Query.ComponentNameFilter;
     const FString& MemberFilter = Query.MemberFilter;
     const FString& FunctionFilter = Query.FunctionFilter;
     const FString& LocalFilter = Query.LocalFilter;
@@ -73,7 +74,7 @@ bool BuildInspection(
 
     TArray<TPair<UBlueprint*, FString>> Owners;
     if (!CollectOverviewAndComponents(Blueprint, AssetPath, bWasLoaded, bDirtyBefore, bIncludeInherited,
-        ComponentFilter, PropertyNames, Sections, Sink, Owners, OutError)) return false;
+        ComponentFilter, ComponentNameFilter, PropertyNames, Sections, Sink, Owners, OutError)) return false;
     if (!CollectMembers(Blueprint, Owners, Sections, MemberFilter, Sink, OutError)) return false;
     if (!CollectFunctionsAndLocals(Blueprint, Owners, Sections, FunctionFilter, LocalFilter,
         MacroFilter, CustomEventFilter, Sink, OutError)) return false;

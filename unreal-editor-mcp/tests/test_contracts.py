@@ -55,7 +55,7 @@ class ReleaseContractTests(unittest.TestCase):
         native = re.search(r'Version\[\].*TEXT\("([^"]+)"\)', header)
         self.assertIsNotNone(native)
         versions = {project["project"]["version"], plugin["VersionName"], native.group(1), unreal_editor_mcp.__version__}
-        self.assertEqual(versions, {"0.32.2"})
+        self.assertEqual(versions, {"0.33.0"})
 
     def test_companion_api_and_companion_versions_are_internally_consistent(self):
         base = json.loads((ROOT / "plugin/UnrealMCP/UnrealMCP.uplugin").read_text(encoding="utf-8"))
@@ -307,11 +307,13 @@ class ReleaseContractTests(unittest.TestCase):
         test = (ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private/Tests/UnrealMCPAutomationTestsPhase17.cpp").read_text(encoding="utf-8")
         for command in ["game_data_inspect", "game_data_edit"]:
             self.assertIn(f'TEXT("{command}")', bridge)
-        for feature in ["user_defined_struct_authoring", "typed_data_tables", "game_data_batch_editing"]:
+        for feature in ["user_defined_struct_authoring", "typed_data_tables", "game_data_batch_editing",
+                        "data_asset_inspection", "reflected_inspection_values", "inherited_component_effective_defaults"]:
             self.assertIn(f'TEXT("{feature}"), true', bridge)
         for operation in ["add_member", "reorder_member", "add_row", "replace_row", "rename_row", "remove_row", "batch"]:
             self.assertIn(f'TEXT("{operation}")', service)
         self.assertIn('UnrealMCP.Phase17.GameDataAuthoring', test)
+        self.assertIn('UnrealMCP.ReflectedInspection.GameDataAndDataAssets', test)
 
     def test_game_data_and_graph_editor_have_focused_native_boundaries(self):
         root = ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private"

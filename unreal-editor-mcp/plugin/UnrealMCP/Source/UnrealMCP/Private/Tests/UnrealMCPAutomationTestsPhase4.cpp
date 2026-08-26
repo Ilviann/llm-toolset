@@ -1,6 +1,7 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 #include "UnrealMCPAutomationTestSupport.h"
+#include "Engine/InheritableComponentHandler.h"
 
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FUnrealMCPPhase4OperationLedgerTest, "UnrealMCP.Phase4.OperationLedger", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -370,6 +371,180 @@ bool FUnrealMCPPhase4ComponentAndDefaultTest::RunTest(const FString& Parameters)
     FKismetEditorUtilities::CompileBlueprint(Blueprint, EBlueprintCompileOptions::None, &Log);
     TestEqual(TEXT("edited Blueprint compiles without errors"), Log.NumErrors, 0);
     TestTrue(TEXT("edited Blueprint saves"), SaveBlueprintFixture(Blueprint));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FUnrealMCPInheritedComponentInspectionTest,
+    "UnrealMCP.ReflectedInspection.InheritedComponentTemplates",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FUnrealMCPInheritedComponentInspectionTest::RunTest(const FString& Parameters)
+{
+    using namespace UnrealMCP::Tests;
+    const FString Prefix = TEXT("/Game/UnrealMCPTests/") + FGuid::NewGuid().ToString(EGuidFormats::Digits);
+    UBlueprint* Parent = CreateBlueprintFixture(Prefix + TEXT("/BP_ComponentParent"), AActor::StaticClass(), false);
+    if (!TestNotNull(TEXT("component parent Blueprint exists"), Parent)
+        || !TestNotNull(TEXT("parent SCS exists"), Parent->SimpleConstructionScript.Get())) return false;
+    USCS_Node* Node = Parent->SimpleConstructionScript->CreateNode(UTextRenderComponent::StaticClass(), TEXT("InheritedText"));
+    Parent->SimpleConstructionScript->AddNode(Node);
+    UTextRenderComponent* ParentTemplate = Cast<UTextRenderComponent>(Node->ComponentTemplate);
+    if (!TestNotNull(TEXT("parent text template exists"), ParentTemplate)) return false;
+    ParentTemplate->SetWorldSize(44.0f);
+    ParentTemplate->SetText(FText::FromString(TEXT("Inherited Text")));
+    FKismetEditorUtilities::CompileBlueprint(Parent);
+
+    UBlueprint* Child = CreateBlueprintFixture(Prefix + TEXT("/BP_ComponentChild"), Parent->GeneratedClass, false);
+    if (!TestNotNull(TEXT("component child Blueprint exists"), Child)) return false;
+    UInheritableComponentHandler* Handler = Child->GetInheritableComponentHandler(true);
+    UTextRenderComponent* ChildOverride = Handler != nullptr
+        ? Cast<UTextRenderComponent>(Handler->CreateOverridenComponentTemplate(FComponentKey(Node))) : nullptr;
+    if (!TestNotNull(TEXT("child component override template exists"), ChildOverride)) return false;
+    ChildOverride->SetWorldSize(88.0f);
+    FBlueprintEditorUtils::MarkBlueprintAsModified(Child);
+    FKismetEditorUtilities::CompileBlueprint(Child);
+
+    const FString ComponentId = Node->VariableGuid.ToString(EGuidFormats::Digits).ToLower();
+    FUnrealMCPBlueprintInspector Inspector;
+    TSharedPtr<FJsonObject> Result;
+    FUnrealMCPError Error;
+    const TSharedRef<FJsonObject> ById = InspectArguments(Child->GetPathName());
+    ById->SetArrayField(TEXT("sections"), {MakeShared<FJsonValueString>(TEXT("components"))});
+    ById->SetStringField(TEXT("component_id"), ComponentId);
+    ById->SetArrayField(TEXT("property_names"), {
+        MakeShared<FJsonValueString>(TEXT("WorldSize")), MakeShared<FJsonValueString>(TEXT("Text"))});
+    if (!TestTrue(TEXT("parent stable component ID targets the child effective template"),
+        Inspector.Execute(ById, Result, Error)))
+    {
+        AddError(Error.Code + TEXT(": ") + Error.Message);
+        return false;
+    }
+    const TSharedPtr<FJsonObject> Component = Result->GetArrayField(TEXT("records"))[0]->AsObject();
+    TestEqual(TEXT("targeted inherited identity is preserved"), Component->GetStringField(TEXT("id")), ComponentId);
+    TestEqual(TEXT("component remains declared by its parent"),
+        Component->GetStringField(TEXT("owner_blueprint")), Parent->GetPathName());
+    TestEqual(TEXT("effective template reports a child override"),
+        Component->GetStringField(TEXT("template_value_origin")), FString(TEXT("local_override")));
+    TestEqual(TEXT("effective template source is the child"),
+        Component->GetStringField(TEXT("template_source_blueprint")), Child->GetPathName());
+    TMap<FString, TSharedPtr<FJsonObject>> Properties;
+    for (const TSharedPtr<FJsonValue>& Value : Component->GetArrayField(TEXT("editable_properties")))
+    {
+        const TSharedPtr<FJsonObject> Property = Value->AsObject();
+        Properties.Add(Property->GetStringField(TEXT("name")), Property);
+    }
+    TestEqual(TEXT("child override value is effective"), Properties[TEXT("WorldSize")]->GetNumberField(TEXT("value")), 88.0);
+    TestEqual(TEXT("child override is distinguished"),
+        Properties[TEXT("WorldSize")]->GetStringField(TEXT("value_origin")), FString(TEXT("local_override")));
+    TestEqual(TEXT("child override source is explicit"),
+        Properties[TEXT("WorldSize")]->GetStringField(TEXT("source_blueprint")), Child->GetPathName());
+    TestEqual(TEXT("unchanged inherited value remains effective"),
+        Properties[TEXT("Text")]->GetStringField(TEXT("value")), FString(TEXT("Inherited Text")));
+    TestEqual(TEXT("unchanged value is distinguished as inherited"),
+        Properties[TEXT("Text")]->GetStringField(TEXT("value_origin")), FString(TEXT("inherited")));
+    TestEqual(TEXT("inherited value source is explicit"),
+        Properties[TEXT("Text")]->GetStringField(TEXT("source_blueprint")), Parent->GetPathName());
+
+    const TSharedRef<FJsonObject> ByName = InspectArguments(Child->GetPathName());
+    ByName->SetArrayField(TEXT("sections"), {MakeShared<FJsonValueString>(TEXT("components"))});
+    ByName->SetStringField(TEXT("component_name"), TEXT("InheritedText"));
+    TestTrue(TEXT("inherited component name targets the child effective template"), Inspector.Execute(ByName, Result, Error));
+    TestEqual(TEXT("name lookup returns the inherited stable identity"),
+        Result->GetArrayField(TEXT("records"))[0]->AsObject()->GetStringField(TEXT("id")), ComponentId);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FUnrealMCPBlueprintReflectedValuesTest,
+    "UnrealMCP.ReflectedInspection.BlueprintPropertyValues",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FUnrealMCPBlueprintReflectedValuesTest::RunTest(const FString& Parameters)
+{
+    using namespace UnrealMCP::Tests;
+    UClass* ComponentClass = LoadObject<UClass>(
+        nullptr, TEXT("/Script/UnrealMCPTestCompanion.UnrealMCPInspectionComponent"));
+    if (!TestNotNull(TEXT("extended component fixture class is available"), ComponentClass)) return false;
+    const FString PackageName = TEXT("/Game/UnrealMCPTests/")
+        + FGuid::NewGuid().ToString(EGuidFormats::Digits) + TEXT("/BP_ExtendedDefaults");
+    UBlueprint* Blueprint = CreateBlueprintFixture(PackageName, AActor::StaticClass(), false);
+    if (!TestNotNull(TEXT("extended-default Blueprint exists"), Blueprint)) return false;
+    USCS_Node* Node = Blueprint->SimpleConstructionScript->CreateNode(ComponentClass, TEXT("InspectionValues"));
+    Blueprint->SimpleConstructionScript->AddNode(Node);
+    UActorComponent* Template = Node->ComponentTemplate;
+    if (!TestNotNull(TEXT("extended component template exists"), Template)) return false;
+
+    auto Property = [ComponentClass](const TCHAR* Name) { return ComponentClass->FindPropertyByName(FName(Name)); };
+    auto SetTag = [](FStructProperty* TagProperty, void* Container, const FString& Name)
+    {
+        void* Tag = TagProperty->ContainerPtrToValuePtr<void>(Container);
+        FNameProperty* TagName = CastFieldChecked<FNameProperty>(TagProperty->Struct->FindPropertyByName(TEXT("TagName")));
+        TagName->SetPropertyValue(TagName->ContainerPtrToValuePtr<void>(Tag), FName(*Name));
+    };
+    SetTag(CastFieldChecked<FStructProperty>(Property(TEXT("Tag"))), Template, TEXT("Test.Blueprint"));
+    FStructProperty* ContainerProperty = CastFieldChecked<FStructProperty>(Property(TEXT("Tags")));
+    void* TagContainer = ContainerProperty->ContainerPtrToValuePtr<void>(Template);
+    FArrayProperty* TagsProperty = CastFieldChecked<FArrayProperty>(ContainerProperty->Struct->FindPropertyByName(TEXT("GameplayTags")));
+    FScriptArrayHelper Tags(TagsProperty, TagsProperty->ContainerPtrToValuePtr<void>(TagContainer));
+    FStructProperty* InnerTag = CastFieldChecked<FStructProperty>(TagsProperty->Inner);
+    for (const TCHAR* Name : {TEXT("Test.Second"), TEXT("Test.First")})
+    {
+        const int32 Index = Tags.AddValue();
+        FNameProperty* TagName = CastFieldChecked<FNameProperty>(InnerTag->Struct->FindPropertyByName(TEXT("TagName")));
+        TagName->SetPropertyValue(TagName->ContainerPtrToValuePtr<void>(Tags.GetRawPtr(Index)), FName(Name));
+    }
+    *CastFieldChecked<FStructProperty>(Property(TEXT("Id")))->ContainerPtrToValuePtr<FGuid>(Template)
+        = FGuid(5, 6, 7, 8);
+    CastFieldChecked<FTextProperty>(Property(TEXT("Label")))->SetPropertyValue_InContainer(
+        Template, FText::FromString(TEXT("Blueprint Text")));
+    FEnumProperty* State = CastFieldChecked<FEnumProperty>(Property(TEXT("State")));
+    State->GetUnderlyingProperty()->SetIntPropertyValue(
+        State->ContainerPtrToValuePtr<void>(Template), static_cast<int64>(1));
+    const FSoftObjectPath CubePath(TEXT("/Engine/BasicShapes/Cube.Cube"));
+    CastFieldChecked<FSoftObjectProperty>(Property(TEXT("Asset")))->SetPropertyValue_InContainer(
+        Template, FSoftObjectPtr(CubePath));
+    CastFieldChecked<FSoftObjectProperty>(Property(TEXT("Class")))->SetPropertyValue_InContainer(
+        Template, FSoftObjectPtr(FSoftObjectPath(TEXT("/Script/Engine.Actor"))));
+    FArrayProperty* AssetsProperty = CastFieldChecked<FArrayProperty>(Property(TEXT("Assets")));
+    FScriptArrayHelper Assets(AssetsProperty, AssetsProperty->ContainerPtrToValuePtr<void>(Template));
+    const int32 AssetIndex = Assets.AddValue();
+    CastFieldChecked<FSoftObjectProperty>(AssetsProperty->Inner)->SetPropertyValue(
+        Assets.GetRawPtr(AssetIndex), FSoftObjectPtr(CubePath));
+    FStructProperty* NestedProperty = CastFieldChecked<FStructProperty>(Property(TEXT("Nested")));
+    void* Nested = NestedProperty->ContainerPtrToValuePtr<void>(Template);
+    CastFieldChecked<FIntProperty>(NestedProperty->Struct->FindPropertyByName(TEXT("Count")))->SetPropertyValue_InContainer(Nested, 23);
+    CastFieldChecked<FTextProperty>(NestedProperty->Struct->FindPropertyByName(TEXT("Label")))->SetPropertyValue_InContainer(
+        Nested, FText::FromString(TEXT("Nested Blueprint Text")));
+    FKismetEditorUtilities::CompileBlueprint(Blueprint);
+
+    FUnrealMCPBlueprintInspector Inspector;
+    TSharedPtr<FJsonObject> Result;
+    FUnrealMCPError Error;
+    const TSharedRef<FJsonObject> Arguments = InspectArguments(Blueprint->GetPathName());
+    Arguments->SetArrayField(TEXT("sections"), {MakeShared<FJsonValueString>(TEXT("components"))});
+    Arguments->SetStringField(TEXT("component_name"), TEXT("InspectionValues"));
+    TArray<TSharedPtr<FJsonValue>> Requested;
+    for (const TCHAR* Name : {TEXT("Tag"), TEXT("Tags"), TEXT("Id"), TEXT("Label"), TEXT("State"),
+        TEXT("Asset"), TEXT("Class"), TEXT("Assets"), TEXT("Nested")})
+        Requested.Add(MakeShared<FJsonValueString>(Name));
+    Arguments->SetArrayField(TEXT("property_names"), Requested);
+    if (!TestTrue(TEXT("Blueprint reflected defaults inspect"), Inspector.Execute(Arguments, Result, Error)))
+    {
+        AddError(Error.Code + TEXT(": ") + Error.Message);
+        return false;
+    }
+    TMap<FString, TSharedPtr<FJsonObject>> Values;
+    for (const TSharedPtr<FJsonValue>& Value : Result->GetArrayField(TEXT("records"))[0]->AsObject()->GetArrayField(TEXT("editable_properties")))
+    {
+        const TSharedPtr<FJsonObject> Encoded = Value->AsObject();
+        Values.Add(Encoded->GetStringField(TEXT("name")), Encoded);
+    }
+    TestEqual(TEXT("Blueprint gameplay tag reads"), Values[TEXT("Tag")]->GetStringField(TEXT("value")), FString(TEXT("Test.Blueprint")));
+    TestEqual(TEXT("Blueprint gameplay-tag container reads"), Values[TEXT("Tags")]->GetArrayField(TEXT("value")).Num(), 2);
+    TestEqual(TEXT("Blueprint GUID reads"), Values[TEXT("Id")]->GetStringField(TEXT("value")), FString(TEXT("00000005000000060000000700000008")));
+    TestEqual(TEXT("Blueprint FText reads"), Values[TEXT("Label")]->GetStringField(TEXT("value")), FString(TEXT("Blueprint Text")));
+    TestEqual(TEXT("Blueprint enum reads"), Values[TEXT("State")]->GetStringField(TEXT("value")), FString(TEXT("Ready")));
+    TestEqual(TEXT("Blueprint soft object reads"), Values[TEXT("Asset")]->GetStringField(TEXT("value")), CubePath.ToString());
+    TestEqual(TEXT("Blueprint soft class reads"), Values[TEXT("Class")]->GetStringField(TEXT("value")), FString(TEXT("/Script/Engine.Actor")));
+    TestEqual(TEXT("Blueprint soft-reference array reads"), Values[TEXT("Assets")]->GetArrayField(TEXT("value")).Num(), 1);
+    TestEqual(TEXT("Blueprint nested reflected struct reads"),
+        static_cast<int32>(Values[TEXT("Nested")]->GetObjectField(TEXT("value"))->GetObjectField(TEXT("fields"))->GetNumberField(TEXT("Count"))), 23);
     return true;
 }
 

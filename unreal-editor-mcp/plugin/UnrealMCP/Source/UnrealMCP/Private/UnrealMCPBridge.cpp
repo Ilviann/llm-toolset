@@ -589,6 +589,9 @@ TSharedPtr<FJsonObject> FUnrealMCPBridge::Capabilities() const
     Features->SetBoolField(TEXT("user_defined_struct_authoring"), true);
     Features->SetBoolField(TEXT("typed_data_tables"), true);
     Features->SetBoolField(TEXT("game_data_batch_editing"), true);
+    Features->SetBoolField(TEXT("data_asset_inspection"), true);
+    Features->SetBoolField(TEXT("reflected_inspection_values"), true);
+    Features->SetBoolField(TEXT("inherited_component_effective_defaults"), true);
     Features->SetBoolField(TEXT("asset_reference_discovery"), true);
     Features->SetBoolField(TEXT("asset_reference_live_memory"), true);
     Features->SetBoolField(TEXT("asset_delete"), true);

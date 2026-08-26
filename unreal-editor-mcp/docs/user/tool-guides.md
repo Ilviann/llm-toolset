@@ -2,7 +2,7 @@
 
 This page is the navigation entry point for every released tool family. For installation, first connection, and the concise contract overview, start with the [project README](../../README.md).
 
-Unreal Editor MCP 0.32.2 is an offline-first MCP bridge for Unreal Engine 5.7.x. It pairs a dependency-free Python 3.10+ stdio server with an editor-only C++ plugin. Readonly mode is the default and exposes these nine tools in deterministic order:
+Unreal Editor MCP 0.33.0 is an offline-first MCP bridge for Unreal Engine 5.7.x. It pairs a dependency-free Python 3.10+ stdio server with an editor-only C++ plugin. Readonly mode is the default and exposes these nine tools in deterministic order:
 
 - `capabilities` always reports the configured project name/hash and Python surface. With an active bridge it also reports exact plugin/Unreal versions, commands, features, listener state, effective limits, and the Blueprint-family matrix; otherwise `native_capabilities_available` and `bridge_ready` are false and native-only fields are absent.
 - `editor_state` reports project identity, bridge readiness, play/simulate/save/GC state, and concise queued-operation state.
@@ -10,9 +10,9 @@ Unreal Editor MCP 0.32.2 is an offline-first MCP bridge for Unreal Engine 5.7.x.
 - `asset_references` finds bounded Asset Registry and live-memory referencers for one exact mounted asset without loading candidate packages.
 - `level_inspect` discovers mounted World assets, reports the current map snapshot, pages World Partition actor descriptors, and inspects exact actor/component properties.
 - `level_open` safely opens one exact mounted World asset through the retained operation ledger without saving, discarding, or dirtying project content.
-- `blueprint_inspect` discovers every published Blueprint family across mounted content and returns bounded pages of one selected Blueprint's structure.
+- `blueprint_inspect` discovers every published Blueprint family across mounted content and returns bounded pages of one selected Blueprint's structure, including effective inherited component-template values and provenance.
 - `blueprint_action_catalog` discovers bounded context-valid function, variable, event, flow-control, cast, literal, and operator actions for one exact Blueprint graph snapshot.
-- `game_data_inspect` reads one user-defined struct schema or bounded page of typed Data Table rows from an exact asset snapshot.
+- `game_data_inspect` reads one user-defined struct schema, bounded typed Data Table row page, or bounded read-only Data Asset property page from an exact asset snapshot.
 
 Starting the server with `--writable` is an explicit trust decision and exposes twenty-five tools. It inserts `operation_cancel` immediately after `operation_status`, then adds these project-content mutation tools in their established family order:
 
@@ -32,7 +32,7 @@ Starting the server with `--writable` is an explicit trust decision and exposes 
 - `gameplay_framework_edit` assigns only the active project's default GameMode or GameInstance class with stale-value and project-identity preconditions.
 - `game_data_edit` creates or atomically edits user-defined structs and typed Data Table rows with validation, saving, and read-back.
 
-`--editor-lifecycle <absolute-executable>` independently appends `editor_lifecycle`, producing ten readonly-with-lifecycle tools or twenty-six writable-with-lifecycle tools. It provides configured launch, safe graceful shutdown, durable restart, and lifecycle cancellation. CSV/JSON filesystem import/export, Curve Tables, Data Assets, arbitrary UObject assets, supplied struct code, General Project Settings beyond the narrow framework operation, unrestricted world overrides, runtime server/client control, builds, Blueprint reparenting, console access, unrestricted reflection, forced process termination, and code execution remain unavailable.
+`--editor-lifecycle <absolute-executable>` independently appends `editor_lifecycle`, producing ten readonly-with-lifecycle tools or twenty-six writable-with-lifecycle tools. It provides configured launch, safe graceful shutdown, durable restart, and lifecycle cancellation. CSV/JSON filesystem import/export, Curve Tables, Data Asset mutation, arbitrary UObject assets, supplied struct code, General Project Settings beyond the narrow framework operation, unrestricted world overrides, runtime server/client control, builds, Blueprint reparenting, console access, unrestricted reflection, forced process termination, and code execution remain unavailable.
 
 ## Task guides
 
@@ -127,9 +127,9 @@ See [Gameplay frameworks and data](gameplay-and-data.md#gamemode-and-gamestate-f
 
 See [Gameplay frameworks and data](gameplay-and-data.md#gameinstance-family).
 
-## User-defined structs and Data Tables
+## User-defined structs, Data Tables, and Data Assets
 
-See [Gameplay frameworks and data](gameplay-and-data.md#user-defined-structs-and-data-tables).
+See [Gameplay frameworks and data](gameplay-and-data.md#user-defined-structs-data-tables-and-data-assets).
 
 ## Multiplayer authoring and framework assignment
 

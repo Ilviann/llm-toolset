@@ -83,6 +83,7 @@ BLUEPRINT_TOOLS: Final = (
                         },
                         "graph_id": _COMPONENT_ID,
                         "component_id": _COMPONENT_ID,
+                        "component_name": {"type": "string", "minLength": 1, "maxLength": 128},
                         "member_id": _MEMBER_ID,
                         "function_id": _FUNCTION_ID,
                         "local_id": _LOCAL_ID,
@@ -99,6 +100,7 @@ BLUEPRINT_TOOLS: Final = (
                         "page_size": {"type": "integer", "minimum": 1, "maximum": 100},
                     },
                     "required": ["mode", "asset_path"],
+                    "not": {"required": ["component_id", "component_name"]},
                     "additionalProperties": False,
                 },
                 {

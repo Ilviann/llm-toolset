@@ -1,6 +1,9 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 #include "UnrealMCPAutomationTestSupport.h"
+#include "Engine/DataAsset.h"
+#include "Engine/DataTable.h"
+#include "UObject/StructOnScope.h"
 
 namespace
 {
@@ -30,6 +33,64 @@ bool Inspect(FUnrealMCPGameDataService& Service, const FString& Target, const FS
     const TSharedRef<FJsonObject> Arguments = MakeShared<FJsonObject>(); Arguments->SetStringField(TEXT("target"), Target);
     Arguments->SetStringField(TEXT("asset_path"), AssetPath); Arguments->SetNumberField(TEXT("page_size"), PageSize);
     return Service.Inspect(Arguments, Out, Error);
+}
+
+FProperty* TestProperty(const UStruct* Owner, const TCHAR* Name)
+{
+    return Owner != nullptr ? Owner->FindPropertyByName(FName(Name)) : nullptr;
+}
+
+void SetTagValue(const FStructProperty* TagProperty, void* Container, const FString& Name)
+{
+    void* Tag = TagProperty->ContainerPtrToValuePtr<void>(Container);
+    FNameProperty* TagName = CastFieldChecked<FNameProperty>(TagProperty->Struct->FindPropertyByName(TEXT("TagName")));
+    TagName->SetPropertyValue(TagName->ContainerPtrToValuePtr<void>(Tag), FName(*Name));
+}
+
+void SetInspectionFixtureValues(UScriptStruct* RowStruct, void* Row, UDataTable* ReferenceTable)
+{
+    SetTagValue(CastFieldChecked<FStructProperty>(TestProperty(RowStruct, TEXT("Tag"))), Row, TEXT("Test.Primary"));
+    FStructProperty* ContainerProperty = CastFieldChecked<FStructProperty>(TestProperty(RowStruct, TEXT("Tags")));
+    void* Container = ContainerProperty->ContainerPtrToValuePtr<void>(Row);
+    FArrayProperty* TagsProperty = CastFieldChecked<FArrayProperty>(ContainerProperty->Struct->FindPropertyByName(TEXT("GameplayTags")));
+    FScriptArrayHelper Tags(TagsProperty, TagsProperty->ContainerPtrToValuePtr<void>(Container));
+    for (const TCHAR* Name : {TEXT("Test.Secondary"), TEXT("Test.Primary")})
+    {
+        const int32 Index = Tags.AddValue();
+        FStructProperty* InnerTag = CastFieldChecked<FStructProperty>(TagsProperty->Inner);
+        FNameProperty* TagName = CastFieldChecked<FNameProperty>(InnerTag->Struct->FindPropertyByName(TEXT("TagName")));
+        TagName->SetPropertyValue(TagName->ContainerPtrToValuePtr<void>(Tags.GetRawPtr(Index)), FName(Name));
+    }
+    *CastFieldChecked<FStructProperty>(TestProperty(RowStruct, TEXT("Id")))->ContainerPtrToValuePtr<FGuid>(Row)
+        = FGuid(1, 2, 3, 4);
+    CastFieldChecked<FTextProperty>(TestProperty(RowStruct, TEXT("Label")))->SetPropertyValue_InContainer(
+        Row, FText::FromString(TEXT("Inspection Text")));
+    FEnumProperty* State = CastFieldChecked<FEnumProperty>(TestProperty(RowStruct, TEXT("State")));
+    State->GetUnderlyingProperty()->SetIntPropertyValue(State->ContainerPtrToValuePtr<void>(Row), static_cast<int64>(1));
+    CastFieldChecked<FSoftObjectProperty>(TestProperty(RowStruct, TEXT("Table")))->SetPropertyValue_InContainer(
+        Row, FSoftObjectPtr(FSoftObjectPath(ReferenceTable)));
+    CastFieldChecked<FSoftObjectProperty>(TestProperty(RowStruct, TEXT("Class")))->SetPropertyValue_InContainer(
+        Row, FSoftObjectPtr(FSoftObjectPath(TEXT("/Script/Engine.Actor"))));
+    FArrayProperty* TablesProperty = CastFieldChecked<FArrayProperty>(TestProperty(RowStruct, TEXT("Tables")));
+    FScriptArrayHelper Tables(TablesProperty, TablesProperty->ContainerPtrToValuePtr<void>(Row));
+    const int32 TableIndex = Tables.AddValue();
+    CastFieldChecked<FSoftObjectProperty>(TablesProperty->Inner)->SetPropertyValue(
+        Tables.GetRawPtr(TableIndex), FSoftObjectPtr(FSoftObjectPath(ReferenceTable)));
+    FStructProperty* NestedProperty = CastFieldChecked<FStructProperty>(TestProperty(RowStruct, TEXT("Nested")));
+    void* Nested = NestedProperty->ContainerPtrToValuePtr<void>(Row);
+    CastFieldChecked<FIntProperty>(TestProperty(NestedProperty->Struct, TEXT("Count")))->SetPropertyValue_InContainer(Nested, 17);
+    CastFieldChecked<FTextProperty>(TestProperty(NestedProperty->Struct, TEXT("Label")))->SetPropertyValue_InContainer(
+        Nested, FText::FromString(TEXT("Nested Text")));
+}
+
+TSharedPtr<FJsonObject> RecordByName(const TSharedPtr<FJsonObject>& Result, const FString& Name)
+{
+    for (const TSharedPtr<FJsonValue>& Value : Result->GetArrayField(TEXT("records")))
+    {
+        const TSharedPtr<FJsonObject> Record = Value->AsObject();
+        if (Record.IsValid() && Record->GetStringField(TEXT("name")) == Name) return Record;
+    }
+    return nullptr;
 }
 }
 
@@ -134,6 +195,90 @@ bool FUnrealMCPPhase17GameDataAuthoringTest::RunTest(const FString& Parameters)
     const TSharedPtr<FJsonObject> NativeReadBack = Result->GetArrayField(TEXT("records"))[0]->AsObject()->GetObjectField(TEXT("values"));
     TestEqual(TEXT("native name value reads back"), NativeReadBack->GetStringField(TEXT("Name")), FString(TEXT("hand_l")));
     TestEqual(TEXT("native mirrored-name value reads back"), NativeReadBack->GetStringField(TEXT("MirroredName")), FString(TEXT("hand_r")));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FUnrealMCPReflectedInspectionTest,
+    "UnrealMCP.ReflectedInspection.GameDataAndDataAssets",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FUnrealMCPReflectedInspectionTest::RunTest(const FString& Parameters)
+{
+    using namespace UnrealMCP::Tests;
+    UScriptStruct* RowStruct = LoadObject<UScriptStruct>(
+        nullptr, TEXT("/Script/UnrealMCPTestCompanion.UnrealMCPInspectionRow"));
+    UClass* DataAssetClass = LoadObject<UClass>(
+        nullptr, TEXT("/Script/UnrealMCPTestCompanion.UnrealMCPInspectionDataAsset"));
+    if (!TestNotNull(TEXT("extended row fixture type is available"), RowStruct)
+        || !TestNotNull(TEXT("Data Asset fixture type is available"), DataAssetClass)) return false;
+
+    const FString Prefix = TEXT("/Game/UnrealMCPTests/") + FGuid::NewGuid().ToString(EGuidFormats::Digits);
+    const FString TablePackageName = Prefix + TEXT("/DT_ExtendedInspection");
+    UPackage* TablePackage = CreatePackage(*TablePackageName);
+    UDataTable* Table = NewObject<UDataTable>(
+        TablePackage, FName(TEXT("DT_ExtendedInspection")), RF_Public | RF_Standalone);
+    FStructOnScope Row(RowStruct);
+    SetInspectionFixtureValues(RowStruct, Row.GetStructMemory(), Table);
+    TMap<FName, const uint8*> Rows;
+    Rows.Add(TEXT("Fixture"), Row.GetStructMemory());
+    const TArray<FString> Problems = Table->CreateTableFromRawData(Rows, RowStruct);
+    TestEqual(TEXT("extended row fixture creates without import problems"), Problems.Num(), 0);
+    FAssetRegistryModule::AssetCreated(Table);
+
+    FUnrealMCPGameDataService Service;
+    TSharedPtr<FJsonObject> Result;
+    FUnrealMCPError Error;
+    if (!TestTrue(TEXT("extended Data Table remains inspectable with an unsupported sibling"),
+        Inspect(Service, TEXT("data_table"), Table->GetPathName(), Result, Error)))
+    {
+        AddError(Error.Code + TEXT(": ") + Error.Message);
+        return false;
+    }
+    const TSharedPtr<FJsonObject> Values = Result->GetArrayField(TEXT("records"))[0]->AsObject()->GetObjectField(TEXT("values"));
+    TestEqual(TEXT("gameplay tag is compact"), Values->GetStringField(TEXT("Tag")), FString(TEXT("Test.Primary")));
+    TestEqual(TEXT("gameplay-tag container is explicit-only and bounded"), Values->GetArrayField(TEXT("Tags")).Num(), 2);
+    TestEqual(TEXT("GUID is canonical"), Values->GetStringField(TEXT("Id")), FString(TEXT("00000001000000020000000300000004")));
+    TestEqual(TEXT("FText reads as text"), Values->GetStringField(TEXT("Label")), FString(TEXT("Inspection Text")));
+    TestEqual(TEXT("enum reads as its enumerator"), Values->GetStringField(TEXT("State")), FString(TEXT("Ready")));
+    TestEqual(TEXT("soft table reference is tagged"), Values->GetObjectField(TEXT("Table"))->GetStringField(TEXT("path")), Table->GetPathName());
+    TestEqual(TEXT("soft-reference array survives"), Values->GetArrayField(TEXT("Tables")).Num(), 1);
+    TestEqual(TEXT("nested reflected struct survives"),
+        static_cast<int32>(Values->GetObjectField(TEXT("Nested"))->GetObjectField(TEXT("fields"))->GetNumberField(TEXT("Count"))), 17);
+    TestEqual(TEXT("unsupported field remains explicit"),
+        Values->GetObjectField(TEXT("UnsupportedObject"))->GetStringField(TEXT("kind")), FString(TEXT("unsupported")));
+
+    const FString AssetPackageName = Prefix + TEXT("/DA_ExtendedInspection");
+    UPackage* AssetPackage = CreatePackage(*AssetPackageName);
+    UDataAsset* DataAsset = NewObject<UDataAsset>(
+        AssetPackage, DataAssetClass, FName(TEXT("DA_ExtendedInspection")), RF_Public | RF_Standalone);
+    FStructProperty* ValueProperty = CastFieldChecked<FStructProperty>(TestProperty(DataAssetClass, TEXT("Value")));
+    ValueProperty->CopyCompleteValue(ValueProperty->ContainerPtrToValuePtr<void>(DataAsset), Row.GetStructMemory());
+    CastFieldChecked<FObjectPropertyBase>(TestProperty(DataAssetClass, TEXT("ReferencedTable")))->SetObjectPropertyValue_InContainer(
+        DataAsset, Table);
+    CastFieldChecked<FSoftObjectProperty>(TestProperty(DataAssetClass, TEXT("SoftTable")))->SetPropertyValue_InContainer(
+        DataAsset, FSoftObjectPtr(FSoftObjectPath(Table)));
+    FArrayProperty* SoftTablesProperty = CastFieldChecked<FArrayProperty>(TestProperty(DataAssetClass, TEXT("SoftTables")));
+    FScriptArrayHelper SoftTables(SoftTablesProperty, SoftTablesProperty->ContainerPtrToValuePtr<void>(DataAsset));
+    const int32 SoftTableIndex = SoftTables.AddValue();
+    CastFieldChecked<FSoftObjectProperty>(SoftTablesProperty->Inner)->SetPropertyValue(
+        SoftTables.GetRawPtr(SoftTableIndex), FSoftObjectPtr(FSoftObjectPath(Table)));
+    FAssetRegistryModule::AssetCreated(DataAsset);
+
+    if (!TestTrue(TEXT("generic Data Asset inspection succeeds"),
+        Inspect(Service, TEXT("data_asset"), DataAsset->GetPathName(), Result, Error)))
+    {
+        AddError(Error.Code + TEXT(": ") + Error.Message);
+        return false;
+    }
+    TestEqual(TEXT("Data Asset class is reported"),
+        Result->GetObjectField(TEXT("metadata"))->GetStringField(TEXT("class_path")), DataAssetClass->GetPathName());
+    TestEqual(TEXT("hard Data Table reference is visible"),
+        RecordByName(Result, TEXT("ReferencedTable"))->GetObjectField(TEXT("value"))->GetStringField(TEXT("path")), Table->GetPathName());
+    TestEqual(TEXT("Data Asset soft-reference array is visible"),
+        RecordByName(Result, TEXT("SoftTables"))->GetArrayField(TEXT("value")).Num(), 1);
+    TestFalse(TEXT("unsupported Data Asset property is isolated"),
+        RecordByName(Result, TEXT("UnsupportedObject"))->GetBoolField(TEXT("supported")));
+    TestTrue(TEXT("supported Data Asset siblings remain available"),
+        RecordByName(Result, TEXT("Value"))->GetBoolField(TEXT("supported")));
     return true;
 }
 

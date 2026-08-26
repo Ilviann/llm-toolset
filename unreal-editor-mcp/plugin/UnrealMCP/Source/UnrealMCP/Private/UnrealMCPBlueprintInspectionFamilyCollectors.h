@@ -12,6 +12,7 @@ static bool CollectOverviewAndComponents(
     bool bDirtyBefore,
     bool bIncludeInherited,
     const FString& ComponentFilter,
+    const FString& ComponentNameFilter,
     const TSet<FString>& PropertyNames,
     const TSet<FString>& Sections,
     FInspectionSink& Sink,
@@ -47,7 +48,7 @@ if (Sections.Contains(TEXT("compile_state")))
 }
 
 Owners.Emplace(Blueprint, AssetPath);
-if (bIncludeInherited)
+if (bIncludeInherited || !ComponentFilter.IsEmpty() || !ComponentNameFilter.IsEmpty())
 {
     for (UClass* Class = Blueprint->ParentClass; Class != nullptr; Class = Class->GetSuperClass())
     {
@@ -59,7 +60,7 @@ if (bIncludeInherited)
     }
 }
 
-bool bComponentFound = ComponentFilter.IsEmpty();
+bool bComponentFound = ComponentFilter.IsEmpty() && ComponentNameFilter.IsEmpty();
 for (const TPair<UBlueprint*, FString>& Owner : Owners)
 {
     if (Owner.Key->SimpleConstructionScript == nullptr) continue;
@@ -74,15 +75,23 @@ for (const TPair<UBlueprint*, FString>& Owner : Owners)
         if (Node == nullptr) continue;
         const TSharedRef<FJsonObject> Value = Record(TEXT("component"));
         const FString Id = GuidString(Node->VariableGuid);
-        if (Id == ComponentFilter) bComponentFound = true;
+        const FString Name = Node->GetVariableName().ToString();
+        const bool bMatches = (ComponentFilter.IsEmpty() && ComponentNameFilter.IsEmpty())
+            || (!ComponentFilter.IsEmpty() && Id == ComponentFilter)
+            || (!ComponentNameFilter.IsEmpty() && Name == ComponentNameFilter);
+        if (bMatches) bComponentFound = true;
         const USCS_Node* const* Parent = Parents.Find(Node);
         FString DefaultsFingerprint;
-        if (Node->ComponentTemplate != nullptr) DefaultsFingerprint = AddComponentDefaults(Node->ComponentTemplate, PropertyNames, Value);
-        if (Sections.Contains(TEXT("components")) && (ComponentFilter.IsEmpty() || ComponentFilter == Id))
+        UActorComponent* EffectiveTemplate = Blueprint->GeneratedClass != nullptr
+            ? Node->GetActualComponentTemplate(Cast<UBlueprintGeneratedClass>(Blueprint->GeneratedClass)) : nullptr;
+        if (EffectiveTemplate == nullptr) EffectiveTemplate = Node->ComponentTemplate;
+        if (EffectiveTemplate != nullptr)
+            DefaultsFingerprint = AddComponentDefaults(EffectiveTemplate, PropertyNames, Value, Blueprint, Owner.Key, Node);
+        if (Sections.Contains(TEXT("components")) && bMatches)
         {
             Value->SetStringField(TEXT("id"), Id);
             Value->SetBoolField(TEXT("identity_stable"), !Id.IsEmpty());
-            Value->SetStringField(TEXT("name"), Node->GetVariableName().ToString());
+            Value->SetStringField(TEXT("name"), Name);
             Value->SetStringField(TEXT("class_path"), Node->ComponentClass != nullptr ? Node->ComponentClass->GetPathName() : FString());
             Value->SetStringField(TEXT("owner_blueprint"), Owner.Value);
             Value->SetBoolField(TEXT("inherited"), Owner.Key != Blueprint);
@@ -99,13 +108,7 @@ for (const TPair<UBlueprint*, FString>& Owner : Owners)
             + TEXT("|") + (Parent != nullptr && *Parent != nullptr ? GuidString((*Parent)->VariableGuid) : FString()) + TEXT("|") + DefaultsFingerprint);
     }
 }
-if (!bComponentFound)
-{
-    OutError = {TEXT("not_found"), TEXT("The requested component identity was not found")};
-    return false;
-}
-
-if (bIncludeInherited && Blueprint->GeneratedClass != nullptr)
+if ((bIncludeInherited || !ComponentNameFilter.IsEmpty()) && Blueprint->GeneratedClass != nullptr)
 {
     if (AActor* DefaultsActor = Cast<AActor>(Blueprint->GeneratedClass->GetDefaultObject(false)))
     {
@@ -120,7 +123,10 @@ if (bIncludeInherited && Blueprint->GeneratedClass != nullptr)
             if (Component == nullptr || Component->CreationMethod != EComponentCreationMethod::Native) continue;
             const TSharedRef<FJsonObject> Value = Record(TEXT("component"));
             const FString DefaultsFingerprint = AddComponentDefaults(Component, PropertyNames, Value);
-            if (Sections.Contains(TEXT("components")) && ComponentFilter.IsEmpty())
+            const bool bMatches = ComponentFilter.IsEmpty()
+                && (ComponentNameFilter.IsEmpty() || Component->GetName() == ComponentNameFilter);
+            if (bMatches) bComponentFound = true;
+            if (Sections.Contains(TEXT("components")) && bMatches)
             {
                 Value->SetStringField(TEXT("id"), FString());
                 Value->SetBoolField(TEXT("identity_stable"), false);
@@ -141,6 +147,12 @@ if (bIncludeInherited && Blueprint->GeneratedClass != nullptr)
                 + Component->GetClass()->GetPathName() + TEXT("|") + DefaultsFingerprint);
         }
     }
+}
+
+if (!bComponentFound)
+{
+    OutError = {TEXT("not_found"), TEXT("The requested component identity or name was not found")};
+    return false;
 }
 
 if (Sections.Contains(TEXT("class_defaults")))

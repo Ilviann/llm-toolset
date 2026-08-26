@@ -65,6 +65,12 @@
     "row_names": ["PrimaryItem"],
     "page_size": 1
   },
+  "inspect_data_asset_references": {
+    "target": "data_asset",
+    "asset_path": "/Game/ExampleData/DA_ItemCatalog.DA_ItemCatalog",
+    "property_names": ["ItemTable", "Icon", "ItemClass", "RelatedTables"],
+    "page_size": 10
+  },
   "replace_power_and_preserve_other_fields": {
     "operation_id": "33333333333333333333333333333333",
     "target": "data_table",
