@@ -250,6 +250,8 @@ bool FUnrealMCPReflectedInspectionTest::RunTest(const FString& Parameters)
     UPackage* AssetPackage = CreatePackage(*AssetPackageName);
     UDataAsset* DataAsset = NewObject<UDataAsset>(
         AssetPackage, DataAssetClass, FName(TEXT("DA_ExtendedInspection")), RF_Public | RF_Standalone);
+    *CastFieldChecked<FStructProperty>(TestProperty(DataAssetClass, TEXT("Id")))->ContainerPtrToValuePtr<FGuid>(DataAsset)
+        = FGuid(9, 10, 11, 12);
     FStructProperty* ValueProperty = CastFieldChecked<FStructProperty>(TestProperty(DataAssetClass, TEXT("Value")));
     ValueProperty->CopyCompleteValue(ValueProperty->ContainerPtrToValuePtr<void>(DataAsset), Row.GetStructMemory());
     CastFieldChecked<FObjectPropertyBase>(TestProperty(DataAssetClass, TEXT("ReferencedTable")))->SetObjectPropertyValue_InContainer(
@@ -271,6 +273,9 @@ bool FUnrealMCPReflectedInspectionTest::RunTest(const FString& Parameters)
     }
     TestEqual(TEXT("Data Asset class is reported"),
         Result->GetObjectField(TEXT("metadata"))->GetStringField(TEXT("class_path")), DataAssetClass->GetPathName());
+    TestEqual(TEXT("direct Data Asset GUID is canonical"),
+        RecordByName(Result, TEXT("Id"))->GetStringField(TEXT("value")),
+        FString(TEXT("000000090000000a0000000b0000000c")));
     TestEqual(TEXT("hard Data Table reference is visible"),
         RecordByName(Result, TEXT("ReferencedTable"))->GetObjectField(TEXT("value"))->GetStringField(TEXT("path")), Table->GetPathName());
     TestEqual(TEXT("Data Asset soft-reference array is visible"),

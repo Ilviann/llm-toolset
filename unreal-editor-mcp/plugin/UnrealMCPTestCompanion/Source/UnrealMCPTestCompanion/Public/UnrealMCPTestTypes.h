@@ -130,6 +130,9 @@ class UNREALMCPTESTCOMPANION_API UUnrealMCPInspectionDataAsset : public UDataAss
 
 public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unreal MCP Test")
+    FGuid Id;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unreal MCP Test")
     FUnrealMCPInspectionRow Value;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unreal MCP Test")
