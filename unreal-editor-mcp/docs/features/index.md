@@ -22,6 +22,7 @@ Keep the authoritative checklist in [`ROADMAP.md`](../../ROADMAP.md) synchronize
 ## Feature catalog
 
 - [`phase-4` — Reliable mutations, Actor components, and defaults](completed/phase-4.md) — Add reliable mutation delivery, Actor component editing, and Blueprint/component defaults.
+- [`gameplay-attribute-inspect` — Gameplay Attribute value inspection](completed/gameplay-attribute-inspect.md) — Inspect bounded Gameplay Attribute identities in K2 and reflected defaults.
 - [`phase-5` — Blueprint member variables](completed/phase-5.md) — Add typed Blueprint member-variable inspection and editing.
 - [`phase-6` — Function signatures and local variables](completed/phase-6.md) — Add function signatures, function shells, and local variables.
 - [`phase-7` — Macros and custom events](completed/phase-7.md) — Add macro and custom-event shells with matching inspection.

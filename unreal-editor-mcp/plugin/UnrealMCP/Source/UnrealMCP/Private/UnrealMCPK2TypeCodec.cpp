@@ -1,5 +1,7 @@
 #include "UnrealMCPK2TypeCodec.h"
 
+#include "UnrealMCPGameplayAttributeCodec.h"
+
 #include "EdGraphSchema_K2.h"
 #include "Misc/PackageName.h"
 #include "UObject/SoftObjectPath.h"
@@ -355,6 +357,14 @@ bool ReadAtom(
 
 TSharedRef<FJsonObject> EncodeAtom(FName Category, const UObject* TypeObject, const FString& Text)
 {
+    if (Category == UEdGraphSchema_K2::PC_Struct && UnrealMCP::GameplayAttributeCodec::IsType(TypeObject))
+    {
+        TSharedPtr<FJsonObject> Attribute;
+        if (UnrealMCP::GameplayAttributeCodec::Encode(Text, Attribute) && Attribute.IsValid()) return Attribute.ToSharedRef();
+        const TSharedRef<FJsonObject> Unavailable = MakeShared<FJsonObject>();
+        Unavailable->SetStringField(TEXT("kind"), TEXT("unavailable"));
+        return Unavailable;
+    }
     const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
     if (IsReferenceCategory(Category))
     {

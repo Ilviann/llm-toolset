@@ -1,5 +1,7 @@
 #include "UnrealMCPPropertyCodec.h"
 
+#include "UnrealMCPGameplayAttributeCodec.h"
+
 #include "Dom/JsonObject.h"
 #include "Dom/JsonValue.h"
 #include "Misc/PackageName.h"
@@ -105,6 +107,7 @@ bool IsReadable(const FProperty* Property, FString& OutKind, int32 Depth, bool b
         if (IsReadableStructType(Struct, TEXT("/Script/CoreUObject.Guid"))) OutKind = TEXT("guid");
         else if (IsReadableStructType(Struct, TEXT("/Script/GameplayTags.GameplayTag"))) OutKind = TEXT("gameplay_tag");
         else if (IsReadableStructType(Struct, TEXT("/Script/GameplayTags.GameplayTagContainer"))) OutKind = TEXT("gameplay_tag_container");
+        else if (UnrealMCP::GameplayAttributeCodec::IsType(Struct->Struct)) OutKind = TEXT("gameplay_attribute");
         else
         {
             int32 Fields = 0;
@@ -237,6 +240,15 @@ bool EncodeValueAt(UObject* Object, FProperty* Property, const void* Address, in
             TArray<TSharedPtr<FJsonValue>> Values;
             for (const FString& Name : Names) Values.Add(MakeShared<FJsonValueString>(Name));
             Out = MakeShared<FJsonValueArray>(Values);
+            return true;
+        }
+        if (UnrealMCP::GameplayAttributeCodec::IsType(Struct->Struct))
+        {
+            FString Exported;
+            TSharedPtr<FJsonObject> Attribute;
+            if (!Property->ExportText_Direct(Exported, Address, nullptr, Object, PPF_None)
+                || !UnrealMCP::GameplayAttributeCodec::Encode(Exported, Attribute) || !Attribute.IsValid()) return false;
+            Out = MakeShared<FJsonValueObject>(Attribute.ToSharedRef());
             return true;
         }
         if (SafeStructs.Contains(Struct->Struct->GetFName()))

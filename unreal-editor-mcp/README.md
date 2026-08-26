@@ -1,6 +1,6 @@
 # Unreal Editor MCP
 
-Unreal Editor MCP 0.33.0 is an offline-first MCP bridge for Unreal Engine 5.7.x. It pairs a dependency-free Python 3.10+ stdio server with an editor-only C++ plugin.
+Unreal Editor MCP 0.34.0 is an offline-first MCP bridge for Unreal Engine 5.7.x. It pairs a dependency-free Python 3.10+ stdio server with an editor-only C++ plugin.
 
 Readonly access is the released default. Project-content mutation requires the explicit `--writable` trust decision; optional editor lifecycle control remains independent.
 
@@ -26,7 +26,7 @@ Python 3.10 or newer with tkinter is required. The build and installation are of
 
 1. Copy [`plugin/UnrealMCP`](plugin/UnrealMCP) to `<YourProject>/Plugins/UnrealMCP`, or add this repository's `plugin/` directory to `AdditionalPluginDirectories` in a disposable development `.uproject`.
 2. Enable `UnrealMCP` and compile the project's Editor target with Unreal Engine 5.7.x.
-3. Open the project and wait for `Unreal MCP 0.33.0 ready on 127.0.0.1:15485` in the editor log.
+3. Open the project and wait for `Unreal MCP 0.34.0 ready on 127.0.0.1:15485` in the editor log.
 4. Create a virtual environment and install the Python package offline:
 
    ```sh

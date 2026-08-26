@@ -4,6 +4,11 @@
 
 - Standardized Unreal Engine 5.8 development tooling on the `UE58` environment variable and moved the disposable integration project to `ue-test/ue58/`.
 
+## 0.34.0 — 2026-08-27
+
+- Added bounded inspection-only `FGameplayAttribute` values to Blueprint variable/pin defaults and targeted component/class defaults, including live resolution, compatibility, attribute name, property path, and owner path without adding a base-plugin GameplayAbilities dependency.
+- Added compiled Blueprint and reflected CDO Automation coverage and advanced the exact Python/base-plugin version pair to 0.34.0. Companion API v1 and companion versions are unchanged; macOS verification remains preferred follow-up work.
+
 ## 0.33.0 — 2026-08-27
 
 - Extended `game_data_inspect` and `blueprint_inspect` with bounded read-only gameplay-tag/container, GUID, text, enum, soft-reference, soft-reference-array, and nested reflected-struct values.

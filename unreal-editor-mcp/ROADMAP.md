@@ -97,5 +97,6 @@ Feature checkboxes record implementation completion after mandatory Windows veri
   - `gas-ability-blueprints-inspect`
   - `gas-gameplay-effects-inspect`
   - `reflected-inspection`
+  - `gameplay-attribute-inspect`
 - Windows:
   - None

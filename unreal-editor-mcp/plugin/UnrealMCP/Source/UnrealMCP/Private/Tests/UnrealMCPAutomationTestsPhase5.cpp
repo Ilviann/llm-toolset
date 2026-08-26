@@ -64,6 +64,43 @@ bool FUnrealMCPPhase5K2TypeCodecTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("map default decodes"), UnrealMCP::K2TypeCodec::DecodeDefault(MapType, MapDefault, Encoded, Error));
     TestEqual(TEXT("map default has canonical bounded text"), Encoded, FString(TEXT("((\"Score\",7))")));
 
+    UScriptStruct* GameplayAttributeStruct = LoadObject<UScriptStruct>(
+        nullptr, TEXT("/Script/GameplayAbilities.GameplayAttribute"), nullptr, LOAD_NoWarn | LOAD_Quiet);
+    UClass* AttributeSetClass = LoadObject<UClass>(
+        nullptr, TEXT("/Script/GameplayAbilities.AbilitySystemTestAttributeSet"), nullptr, LOAD_NoWarn | LOAD_Quiet);
+    FProperty* HealthProperty = AttributeSetClass != nullptr
+        ? AttributeSetClass->FindPropertyByName(TEXT("Health")) : nullptr;
+    FProperty* ManaProperty = AttributeSetClass != nullptr
+        ? AttributeSetClass->FindPropertyByName(TEXT("Mana")) : nullptr;
+    if (TestNotNull(TEXT("Gameplay Attribute K2 type is available"), GameplayAttributeStruct)
+        && TestNotNull(TEXT("Gameplay Attribute owner fixture is available"), AttributeSetClass)
+        && TestNotNull(TEXT("legacy float Gameplay Attribute fixture is available"), HealthProperty)
+        && TestNotNull(TEXT("Gameplay Attribute Data fixture is available"), ManaProperty))
+    {
+        FEdGraphPinType GameplayAttributeType;
+        GameplayAttributeType.PinCategory = UEdGraphSchema_K2::PC_Struct;
+        GameplayAttributeType.PinSubCategoryObject = GameplayAttributeStruct;
+        const FString AttributeText = FString::Printf(TEXT("(Attribute=%s,AttributeOwner=%s)"),
+            *HealthProperty->GetPathName(), *AttributeSetClass->GetPathName());
+        const TSharedRef<FJsonObject> AttributeDefault = UnrealMCP::K2TypeCodec::EncodeDefault(
+            GameplayAttributeType, AttributeText);
+        TestEqual(TEXT("Gameplay Attribute default has a typed kind"),
+            AttributeDefault->GetStringField(TEXT("kind")), FString(TEXT("gameplay_attribute")));
+        TestTrue(TEXT("Gameplay Attribute default resolves"), AttributeDefault->GetBoolField(TEXT("resolved")));
+        TestTrue(TEXT("Gameplay Attribute default is compatible"), AttributeDefault->GetBoolField(TEXT("compatible")));
+        TestEqual(TEXT("Gameplay Attribute default exposes its name"),
+            AttributeDefault->GetStringField(TEXT("name")), FString(TEXT("Health")));
+        TestEqual(TEXT("Gameplay Attribute default exposes its property path"),
+            AttributeDefault->GetStringField(TEXT("property_path")), HealthProperty->GetPathName());
+        const FString DataAttributeText = FString::Printf(TEXT("(Attribute=%s,AttributeOwner=%s)"),
+            *ManaProperty->GetPathName(), *AttributeSetClass->GetPathName());
+        TestTrue(TEXT("Gameplay Attribute Data default is compatible"),
+            UnrealMCP::K2TypeCodec::EncodeDefault(GameplayAttributeType, DataAttributeText)->GetBoolField(TEXT("compatible")));
+        TestEqual(TEXT("malformed Gameplay Attribute defaults remain explicit"),
+            UnrealMCP::K2TypeCodec::EncodeDefault(GameplayAttributeType, TEXT("invalid"))->GetStringField(TEXT("kind")),
+            FString(TEXT("unavailable")));
+    }
+
     FEdGraphPinType Unsupported;
     TestFalse(TEXT("unknown type rejects"), UnrealMCP::K2TypeCodec::DecodeType(K2Type(TEXT("wildcard")), Unsupported, Error));
     TestEqual(TEXT("unknown type error is stable"), Error.Code, FString(TEXT("unsupported_type")));
@@ -241,6 +278,27 @@ bool FUnrealMCPPhase5MemberVariableTest::RunTest(const FString& Parameters)
     ClassType.PinSubCategoryObject = AActor::StaticClass();
     TestTrue(TEXT("Blueprint-owned class-reference member is added"), FBlueprintEditorUtils::AddMemberVariable(
         Blueprint, TEXT("ActorClass"), ClassType, AActor::StaticClass()->GetPathName()));
+
+    UScriptStruct* GameplayAttributeStruct = LoadObject<UScriptStruct>(
+        nullptr, TEXT("/Script/GameplayAbilities.GameplayAttribute"), nullptr, LOAD_NoWarn | LOAD_Quiet);
+    UClass* AttributeSetClass = LoadObject<UClass>(
+        nullptr, TEXT("/Script/GameplayAbilities.AbilitySystemTestAttributeSet"), nullptr, LOAD_NoWarn | LOAD_Quiet);
+    FProperty* HealthProperty = AttributeSetClass != nullptr
+        ? AttributeSetClass->FindPropertyByName(TEXT("Health")) : nullptr;
+    if (!TestNotNull(TEXT("Gameplay Attribute member type is available"), GameplayAttributeStruct)
+        || !TestNotNull(TEXT("Gameplay Attribute member owner is available"), AttributeSetClass)
+        || !TestNotNull(TEXT("Gameplay Attribute member target is available"), HealthProperty)) return false;
+    FEdGraphPinType GameplayAttributeType;
+    GameplayAttributeType.PinCategory = UEdGraphSchema_K2::PC_Struct;
+    GameplayAttributeType.PinSubCategoryObject = GameplayAttributeStruct;
+    const FString GameplayAttributeDefault = FString::Printf(TEXT("(Attribute=%s,AttributeOwner=%s)"),
+        *HealthProperty->GetPathName(), *AttributeSetClass->GetPathName());
+    TestTrue(TEXT("Gameplay Attribute member is added"), FBlueprintEditorUtils::AddMemberVariable(
+        Blueprint, TEXT("ObservedAttribute"), GameplayAttributeType, GameplayAttributeDefault));
+    for (FBPVariableDescription& Candidate : Blueprint->NewVariables)
+    {
+        if (Candidate.VarName == TEXT("ObservedAttribute")) Candidate.PropertyFlags |= CPF_Edit | CPF_BlueprintVisible;
+    }
     FCompilerResultsLog Log;
     FKismetEditorUtilities::CompileBlueprint(Blueprint, EBlueprintCompileOptions::None, &Log);
     TestEqual(TEXT("member-edited Blueprint compiles without errors"), Log.NumErrors, 0);
@@ -254,6 +312,33 @@ bool FUnrealMCPPhase5MemberVariableTest::RunTest(const FString& Parameters)
         TestEqual(TEXT("class-reference default reads back exactly"),
             Result->GetArrayField(TEXT("records"))[0]->AsObject()->GetObjectField(TEXT("default"))->GetStringField(TEXT("path")),
             AActor::StaticClass()->GetPathName());
+    }
+    const FString GameplayAttributeId = MemberIdByName(Inspector, AssetPath, TEXT("ObservedAttribute"));
+    TSharedRef<FJsonObject> GameplayAttributeInspect = InspectArguments(AssetPath);
+    GameplayAttributeInspect->SetArrayField(TEXT("sections"), {MakeShared<FJsonValueString>(TEXT("variables"))});
+    GameplayAttributeInspect->SetStringField(TEXT("member_id"), GameplayAttributeId);
+    if (TestTrue(TEXT("Gameplay Attribute member inspection succeeds"),
+        Inspector.Execute(GameplayAttributeInspect, Result, Error)))
+    {
+        const TSharedPtr<FJsonObject> Default = Result->GetArrayField(TEXT("records"))[0]->AsObject()->GetObjectField(TEXT("default"));
+        TestEqual(TEXT("Gameplay Attribute member uses its typed value"),
+            Default->GetStringField(TEXT("kind")), FString(TEXT("gameplay_attribute")));
+        TestEqual(TEXT("Gameplay Attribute member exposes its property"),
+            Default->GetStringField(TEXT("property_path")), HealthProperty->GetPathName());
+    }
+    TSharedRef<FJsonObject> GameplayAttributeClassDefault = InspectArguments(AssetPath);
+    GameplayAttributeClassDefault->SetArrayField(
+        TEXT("sections"), {MakeShared<FJsonValueString>(TEXT("class_defaults"))});
+    GameplayAttributeClassDefault->SetArrayField(
+        TEXT("property_names"), {MakeShared<FJsonValueString>(TEXT("ObservedAttribute"))});
+    if (TestTrue(TEXT("Gameplay Attribute class-default inspection succeeds"),
+        Inspector.Execute(GameplayAttributeClassDefault, Result, Error)))
+    {
+        const TSharedPtr<FJsonObject> Default = Result->GetArrayField(TEXT("records"))[0]->AsObject();
+        TestEqual(TEXT("Gameplay Attribute class default has a typed property kind"),
+            Default->GetStringField(TEXT("type")), FString(TEXT("gameplay_attribute")));
+        TestEqual(TEXT("Gameplay Attribute class default exposes its property"),
+            Default->GetObjectField(TEXT("value"))->GetStringField(TEXT("property_path")), HealthProperty->GetPathName());
     }
     TestTrue(TEXT("member-edited Blueprint saves"), SaveBlueprintFixture(Blueprint));
     return true;
