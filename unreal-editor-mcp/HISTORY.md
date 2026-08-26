@@ -4,6 +4,11 @@
 
 - Standardized Unreal Engine 5.8 development tooling on the `UE58` environment variable and moved the disposable integration project to `ue-test/ue58/`.
 
+## 0.35.0 — 2026-08-27
+
+- Added bounded read-only inspection of the exact reflected `Modifiers` class-default array on admitted Gameplay Effect Blueprints, including nested Gameplay Attributes, magnitude backing records, evaluation channels, and source/target tag requirements without adding a base-plugin GameplayAbilities dependency.
+- Kept the published general reflected-depth limit and all mutation contracts unchanged, added focused native coverage and a direct inspection example, and advanced the exact Python/base-plugin version pair to 0.35.0. Companion API v1 and companion versions are unchanged; macOS verification remains preferred follow-up work.
+
 ## 0.34.0 — 2026-08-27
 
 - Added bounded inspection-only `FGameplayAttribute` values to Blueprint variable/pin defaults and targeted component/class defaults, including live resolution, compatibility, attribute name, property path, and owner path without adding a base-plugin GameplayAbilities dependency.

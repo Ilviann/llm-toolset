@@ -15,6 +15,22 @@ namespace
 const TSet<FName> SafeStructs = {
     TEXT("Vector"), TEXT("Vector2D"), TEXT("Vector4"), TEXT("Rotator"), TEXT("Quat"), TEXT("Transform"),
     TEXT("Color"), TEXT("LinearColor"), TEXT("IntPoint"), TEXT("IntVector"), TEXT("IntVector4")};
+constexpr const TCHAR* GameplayModifierInfoPath = TEXT("/Script/GameplayAbilities.GameplayModifierInfo");
+constexpr int32 GameplayModifierReadableDepth = UnrealMCP::MaxGameDataDepth + 2;
+
+bool IsGameplayModifierArray(const FProperty* Property)
+{
+    const FArrayProperty* Array = CastField<FArrayProperty>(Property);
+    const FStructProperty* Inner = Array != nullptr ? CastField<FStructProperty>(Array->Inner) : nullptr;
+    return Inner != nullptr && Inner->Struct != nullptr
+        && Inner->Struct->GetPathName() == GameplayModifierInfoPath;
+}
+
+int32 ReadableDepthLimit(const FProperty* Property)
+{
+    return IsGameplayModifierArray(Property)
+        ? GameplayModifierReadableDepth : UnrealMCP::MaxGameDataDepth;
+}
 
 bool IsSafeReferencedObject(const UObject* Object)
 {
@@ -85,9 +101,14 @@ bool IsReadableStructType(const FStructProperty* Property, const TCHAR* Path)
     return Property != nullptr && Property->Struct != nullptr && Property->Struct->GetPathName() == Path;
 }
 
-bool IsReadable(const FProperty* Property, FString& OutKind, int32 Depth, bool bRequireEditable)
+bool IsReadable(
+    const FProperty* Property,
+    FString& OutKind,
+    int32 Depth,
+    int32 DepthLimit,
+    bool bRequireEditable)
 {
-    if (Property == nullptr || Depth > UnrealMCP::MaxGameDataDepth || Property->ArrayDim != 1
+    if (Property == nullptr || Depth > DepthLimit || Property->ArrayDim != 1
         || (bRequireEditable && !Property->HasAnyPropertyFlags(CPF_Edit))
         || Property->HasAnyPropertyFlags(CPF_Transient | CPF_DisableEditOnTemplate | CPF_Deprecated | CPF_EditorOnly
             | CPF_InstancedReference | CPF_ContainsInstancedReference | CPF_ExportObject)
@@ -116,7 +137,7 @@ bool IsReadable(const FProperty* Property, FString& OutKind, int32 Depth, bool b
                 if (It->HasAnyPropertyFlags(CPF_Transient | CPF_Deprecated | CPF_EditorOnly)) continue;
                 if (++Fields > UnrealMCP::MaxGameDataFields) return false;
                 FString ChildKind;
-                if (!IsReadable(*It, ChildKind, Depth + 1, false)) return false;
+                if (!IsReadable(*It, ChildKind, Depth + 1, DepthLimit, false)) return false;
             }
             OutKind = TEXT("struct");
         }
@@ -124,7 +145,7 @@ bool IsReadable(const FProperty* Property, FString& OutKind, int32 Depth, bool b
     else if (const FArrayProperty* Array = CastField<FArrayProperty>(Property))
     {
         FString ChildKind;
-        if (!IsReadable(Array->Inner, ChildKind, Depth + 1, false)) return false;
+        if (!IsReadable(Array->Inner, ChildKind, Depth + 1, DepthLimit, false)) return false;
         OutKind = TEXT("array");
     }
     else if (Property->IsA<FClassProperty>() || Property->IsA<FSoftClassProperty>()) OutKind = TEXT("class_reference");
@@ -142,9 +163,15 @@ bool EncodeReadableGameplayTag(const UScriptStruct* Struct, const void* Address,
     return Out.Len() <= 128;
 }
 
-bool EncodeValueAt(UObject* Object, FProperty* Property, const void* Address, int32 Depth, TSharedPtr<FJsonValue>& Out)
+bool EncodeValueAt(
+    UObject* Object,
+    FProperty* Property,
+    const void* Address,
+    int32 Depth,
+    int32 DepthLimit,
+    TSharedPtr<FJsonValue>& Out)
 {
-    if (Address == nullptr || Depth > UnrealMCP::MaxGameDataDepth) return false;
+    if (Address == nullptr || Depth > DepthLimit) return false;
     if (const FBoolProperty* Bool = CastField<FBoolProperty>(Property)) { Out = MakeShared<FJsonValueBoolean>(Bool->GetPropertyValue(Address)); return true; }
     if (const FNumericProperty* Numeric = CastField<FNumericProperty>(Property); Numeric != nullptr && PropertyEnum(Property) == nullptr)
     {
@@ -263,7 +290,9 @@ bool EncodeValueAt(UObject* Object, FProperty* Property, const void* Address, in
         {
             if (It->HasAnyPropertyFlags(CPF_Transient | CPF_Deprecated | CPF_EditorOnly)) continue;
             TSharedPtr<FJsonValue> Child;
-            if (!EncodeValueAt(Object, *It, It->ContainerPtrToValuePtr<void>(Address), Depth + 1, Child)) return false;
+            if (!EncodeValueAt(
+                    Object, *It, It->ContainerPtrToValuePtr<void>(Address),
+                    Depth + 1, DepthLimit, Child)) return false;
             Fields->SetField(Struct->Struct->GetAuthoredNameForField(*It), Child);
         }
         const TSharedRef<FJsonObject> Tagged = MakeShared<FJsonObject>();
@@ -280,7 +309,9 @@ bool EncodeValueAt(UObject* Object, FProperty* Property, const void* Address, in
         for (int32 Index = 0; Index < Helper.Num(); ++Index)
         {
             TSharedPtr<FJsonValue> Child;
-            if (!EncodeValueAt(Object, Array->Inner, Helper.GetRawPtr(Index), Depth + 1, Child)) return false;
+            if (!EncodeValueAt(
+                    Object, Array->Inner, Helper.GetRawPtr(Index),
+                    Depth + 1, DepthLimit, Child)) return false;
             Values.Add(Child);
         }
         Out = MakeShared<FJsonValueArray>(Values);
@@ -413,7 +444,7 @@ bool UnrealMCP::PropertyCodec::IsSupportedEditable(const FProperty* Property, FS
 
 bool UnrealMCP::PropertyCodec::IsSupportedReadable(const FProperty* Property, FString& OutKind)
 {
-    return IsReadable(Property, OutKind, 0, true);
+    return IsReadable(Property, OutKind, 0, ReadableDepthLimit(Property), true);
 }
 
 TSharedRef<FJsonObject> UnrealMCP::PropertyCodec::Encode(UObject* Object, FProperty* Property)
@@ -427,7 +458,9 @@ TSharedRef<FJsonObject> UnrealMCP::PropertyCodec::Encode(UObject* Object, FPrope
     if (bSupported)
     {
         TSharedPtr<FJsonValue> Value;
-        if (EncodeValueAt(Object, Property, Property->ContainerPtrToValuePtr<void>(Object), 0, Value))
+        if (EncodeValueAt(
+                Object, Property, Property->ContainerPtrToValuePtr<void>(Object),
+                0, ReadableDepthLimit(Property), Value))
             Result->SetField(TEXT("value"), Value);
         else
         {

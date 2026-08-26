@@ -55,7 +55,7 @@ class ReleaseContractTests(unittest.TestCase):
         native = re.search(r'Version\[\].*TEXT\("([^"]+)"\)', header)
         self.assertIsNotNone(native)
         versions = {project["project"]["version"], plugin["VersionName"], native.group(1), unreal_editor_mcp.__version__}
-        self.assertEqual(versions, {"0.34.0"})
+        self.assertEqual(versions, {"0.35.0"})
 
     def test_companion_api_and_companion_versions_are_internally_consistent(self):
         base = json.loads((ROOT / "plugin/UnrealMCP/UnrealMCP.uplugin").read_text(encoding="utf-8"))
@@ -119,6 +119,21 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertNotIn("EUnrealMCPExtensionAccess::Mutation", gas_source)
         self.assertIn('TEXT("gameplay_effect")', inspection_query)
         self.assertIn('TEXT("gameplay_effect")', inspection_support)
+
+    def test_gameplay_effect_modifier_reflection_is_exact_bounded_and_covered(self):
+        codec = (
+            ROOT
+            / "plugin/UnrealMCP/Source/UnrealMCP/Private/UnrealMCPPropertyCodec.cpp"
+        ).read_text(encoding="utf-8")
+        native_test = (
+            ROOT
+            / "plugin/UnrealMCP/Source/UnrealMCP/Private/Tests/UnrealMCPAutomationTestsPhase5.cpp"
+        ).read_text(encoding="utf-8")
+        self.assertIn("/Script/GameplayAbilities.GameplayModifierInfo", codec)
+        self.assertIn("MaxGameDataDepth + 2", codec)
+        self.assertIn("ReadableDepthLimit(Property)", codec)
+        self.assertNotIn('#include "GameplayEffect.h"', codec)
+        self.assertIn("UnrealMCP.Phase5.GameplayEffectModifiers", native_test)
 
     def test_public_companion_api_does_not_expose_bridge_or_credentials(self):
         public = "\n".join(

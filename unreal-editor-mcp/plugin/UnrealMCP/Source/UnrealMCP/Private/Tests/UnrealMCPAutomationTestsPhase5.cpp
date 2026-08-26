@@ -344,5 +344,68 @@ bool FUnrealMCPPhase5MemberVariableTest::RunTest(const FString& Parameters)
     return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FUnrealMCPPhase5GameplayEffectModifiersTest,
+    "UnrealMCP.Phase5.GameplayEffectModifiers",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FUnrealMCPPhase5GameplayEffectModifiersTest::RunTest(const FString& Parameters)
+{
+    UClass* GameplayEffectClass = LoadObject<UClass>(
+        nullptr, TEXT("/Script/GameplayAbilities.GameplayEffect"), nullptr, LOAD_NoWarn | LOAD_Quiet);
+    if (!TestNotNull(TEXT("Gameplay Effect class is available"), GameplayEffectClass)) return false;
+
+    UObject* Effect = NewObject<UObject>(GetTransientPackage(), GameplayEffectClass);
+    FArrayProperty* ModifiersProperty = CastField<FArrayProperty>(
+        GameplayEffectClass->FindPropertyByName(TEXT("Modifiers")));
+    FStructProperty* ModifierProperty = ModifiersProperty != nullptr
+        ? CastField<FStructProperty>(ModifiersProperty->Inner) : nullptr;
+    if (!TestNotNull(TEXT("Gameplay Effect Modifiers array is available"), ModifiersProperty)
+        || !TestNotNull(TEXT("Gameplay Effect modifier element is a struct"), ModifierProperty)) return false;
+
+    FScriptArrayHelper Modifiers(ModifiersProperty, ModifiersProperty->ContainerPtrToValuePtr<void>(Effect));
+    const int32 ModifierIndex = Modifiers.AddValue();
+    void* Modifier = Modifiers.GetRawPtr(ModifierIndex);
+    FStructProperty* AttributeProperty = CastField<FStructProperty>(
+        ModifierProperty->Struct->FindPropertyByName(TEXT("Attribute")));
+    UClass* AttributeSetClass = LoadObject<UClass>(
+        nullptr, TEXT("/Script/GameplayAbilities.AbilitySystemTestAttributeSet"), nullptr, LOAD_NoWarn | LOAD_Quiet);
+    FProperty* HealthProperty = AttributeSetClass != nullptr
+        ? AttributeSetClass->FindPropertyByName(TEXT("Health")) : nullptr;
+    if (!TestNotNull(TEXT("modifier Gameplay Attribute field is available"), AttributeProperty)
+        || !TestNotNull(TEXT("modifier Attribute Set fixture is available"), AttributeSetClass)
+        || !TestNotNull(TEXT("modifier attribute fixture is available"), HealthProperty)) return false;
+    const FString AttributeText = FString::Printf(TEXT("(Attribute=%s,AttributeOwner=%s)"),
+        *HealthProperty->GetPathName(), *AttributeSetClass->GetPathName());
+    TestNotNull(TEXT("modifier Gameplay Attribute value imports"), AttributeProperty->ImportText_Direct(
+        *AttributeText, AttributeProperty->ContainerPtrToValuePtr<void>(Modifier), Effect, PPF_None));
+
+    const TSharedRef<FJsonObject> Encoded = UnrealMCP::PropertyCodec::Encode(Effect, ModifiersProperty);
+    TestTrue(TEXT("Gameplay Effect Modifiers array is supported"), Encoded->GetBoolField(TEXT("supported")));
+    TestEqual(TEXT("Gameplay Effect Modifiers keeps the array type"),
+        Encoded->GetStringField(TEXT("type")), FString(TEXT("array")));
+    const TArray<TSharedPtr<FJsonValue>> Values = Encoded->GetArrayField(TEXT("value"));
+    TestEqual(TEXT("Gameplay Effect Modifiers returns every bounded element"), Values.Num(), 1);
+    if (Values.Num() == 1)
+    {
+        const TSharedPtr<FJsonObject> ModifierValue = Values[0]->AsObject();
+        TestEqual(TEXT("modifier uses the bounded struct encoding"),
+            ModifierValue->GetStringField(TEXT("kind")), FString(TEXT("struct")));
+        const TSharedPtr<FJsonObject> Fields = ModifierValue->GetObjectField(TEXT("fields"));
+        const TSharedPtr<FJsonObject> Attribute = Fields->GetObjectField(TEXT("Attribute"));
+        TestEqual(TEXT("modifier attribute keeps its typed encoding"),
+            Attribute->GetStringField(TEXT("kind")), FString(TEXT("gameplay_attribute")));
+        TestEqual(TEXT("modifier attribute resolves exactly"),
+            Attribute->GetStringField(TEXT("property_path")), HealthProperty->GetPathName());
+        const TSharedPtr<FJsonObject> Magnitude = Fields->GetObjectField(TEXT("ModifierMagnitude"));
+        TestTrue(TEXT("modifier magnitude fields are inspectable"),
+            Magnitude->GetObjectField(TEXT("fields"))->HasField(TEXT("ScalableFloatMagnitude")));
+        TestTrue(TEXT("modifier source requirements are inspectable"),
+            Fields->HasField(TEXT("SourceTags")));
+        TestTrue(TEXT("modifier target requirements are inspectable"),
+            Fields->HasField(TEXT("TargetTags")));
+    }
+    return true;
+}
+
 
 #endif

@@ -24,6 +24,20 @@ Inspect one exact data-only Gameplay Effect:
 
 The typed section returns fixed records for duration/period, modifiers and their four supported magnitude forms, executions, stacking/overflow, cues, tags, granted abilities, additional-effect chains, requirements, allowlisted Gameplay Effect Components, and cross-field relationships. Values distinguish local from inherited data. Class, attribute, tag, curve, ability, and effect references report resolution and compatibility; unsupported components or layouts are explicit rather than silently omitted.
 
+To inspect the exact reflected `Modifiers` class-default array, including every bounded `FGameplayModifierInfo` backing field, request it directly:
+
+```json
+{
+  "mode": "inspect",
+  "asset_path": "/Game/Effects/GE_Burning.GE_Burning",
+  "sections": ["class_defaults"],
+  "property_names": ["Modifiers"],
+  "page_size": 10
+}
+```
+
+The returned `class_default` record has `type: "array"`; each value is a bounded reflected struct containing its Attribute, operation, magnitude backing records, evaluation channel, and source/target tag requirements. This raw reflected view includes inactive magnitude backing fields. Use the `gameplay_effect_modifiers` typed record above for active magnitude selection, ownership, stable modifier identities, and duplicate reporting.
+
 All records share the standard Blueprint snapshot and cursor. Re-run inspection after any editor change. Cyclic, too-deep, or too-large effect chains are bounded and reported; no chained effect is applied or evaluated.
 
 Existing Gameplay Ability records link cost and cooldown fields back through `class_path` and `asset_path`. For example, inspect the ability with sections `summary` and `gameplay_ability`, then inspect the returned effect asset with `summary` and `gameplay_effect`.

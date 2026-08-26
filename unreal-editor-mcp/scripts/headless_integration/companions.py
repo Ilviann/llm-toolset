@@ -97,6 +97,36 @@ def verify_companion_scenario(bridge: UnrealBridge, capabilities: dict[str, obje
             or repeated_typed_records != typed_effect_records:
         raise AssertionError("Gameplay Effect inspection is not deterministic")
 
+    reflected = bridge.call("blueprint_inspect", {
+        "mode": "inspect",
+        "asset_path": effect_path,
+        "sections": ["class_defaults"],
+        "property_names": ["Modifiers"],
+        "page_size": 10,
+    })
+    reflected_records = reflected.get("records", [])
+    modifier_default = reflected_records[0] \
+        if isinstance(reflected_records, list) and len(reflected_records) == 1 \
+        else None
+    modifier_values = modifier_default.get("value") \
+        if isinstance(modifier_default, dict) else None
+    modifier_fields = modifier_values[0].get("fields") \
+        if isinstance(modifier_values, list) and modifier_values \
+        and isinstance(modifier_values[0], dict) else None
+    if not isinstance(modifier_default, dict) \
+            or modifier_default.get("section") != "class_default" \
+            or modifier_default.get("name") != "Modifiers" \
+            or modifier_default.get("supported") is not True \
+            or modifier_default.get("type") != "array" \
+            or not isinstance(modifier_fields, dict) \
+            or not all(name in modifier_fields for name in (
+                "Attribute", "ModifierOp", "ModifierMagnitude",
+                "EvaluationChannelSettings", "SourceTags", "TargetTags",
+            )):
+        raise AssertionError(
+            f"Gameplay Effect Modifiers reflected default is incomplete: {reflected!r}"
+        )
+
     ability = bridge.call("blueprint_inspect", {
         "mode": "inspect",
         "asset_path": "/Game/UnrealMCPGAS/GA_EffectReferenceFixture.GA_EffectReferenceFixture",

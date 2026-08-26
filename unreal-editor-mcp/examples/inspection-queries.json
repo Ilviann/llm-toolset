@@ -37,6 +37,13 @@
     "include_inherited": true,
     "page_size": 25
   },
+  "inspect_gameplay_effect_modifiers_default": {
+    "mode": "inspect",
+    "asset_path": "/Game/Effects/GE_Burning.GE_Burning",
+    "sections": ["class_defaults"],
+    "property_names": ["Modifiers"],
+    "page_size": 10
+  },
   "inspect_inherited_component_by_name": {
     "mode": "inspect",
     "asset_path": "/Game/Actors/BP_DoorChild.BP_DoorChild",
