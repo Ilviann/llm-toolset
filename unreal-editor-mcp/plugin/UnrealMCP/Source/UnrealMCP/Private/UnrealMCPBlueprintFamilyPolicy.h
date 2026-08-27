@@ -31,7 +31,10 @@ struct FFamilyInfo
 };
 
 FFamilyInfo Classify(const UClass* Class);
+FFamilyInfo ClassifyForInspection(const UBlueprint* Blueprint);
+FFamilyInfo ClassifyForInspection(const FString& RegistryBlueprintType, const UClass* NativeClass);
 bool Supports(const UClass* Class, EOperation Operation);
+bool Supports(const UBlueprint* Blueprint, EOperation Operation);
 bool SupportsActorReplication(const UClass* Class);
 bool SupportsComponentReplication(const UClass* Class);
 bool SupportsReplicatedVariables(const UClass* Class);

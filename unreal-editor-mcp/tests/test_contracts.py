@@ -55,7 +55,7 @@ class ReleaseContractTests(unittest.TestCase):
         native = re.search(r'Version\[\].*TEXT\("([^"]+)"\)', header)
         self.assertIsNotNone(native)
         versions = {project["project"]["version"], plugin["VersionName"], native.group(1), unreal_editor_mcp.__version__}
-        self.assertEqual(versions, {"0.36.0"})
+        self.assertEqual(versions, {"0.37.0"})
 
     def test_companion_api_and_companion_versions_are_internally_consistent(self):
         base = json.loads((ROOT / "plugin/UnrealMCP/UnrealMCP.uplugin").read_text(encoding="utf-8"))
@@ -329,6 +329,24 @@ class ReleaseContractTests(unittest.TestCase):
             self.assertIn(f'TEXT("{operation}")', service)
         self.assertIn('UnrealMCP.Phase17.GameDataAuthoring', test)
         self.assertIn('UnrealMCP.ReflectedInspection.GameDataAndDataAssets', test)
+
+    def test_blueprint_libraries_are_inspection_only_families(self):
+        root = ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private"
+        policy = (root / "UnrealMCPBlueprintFamilyPolicy.cpp").read_text(encoding="utf-8")
+        inspector = (root / "UnrealMCPBlueprintInspectionSupport.h").read_text(encoding="utf-8")
+        bridge = (root / "UnrealMCPBridge.cpp").read_text(encoding="utf-8")
+        native_test = (
+            root / "Tests/UnrealMCPAutomationTestsBlueprintLibraries.cpp"
+        ).read_text(encoding="utf-8")
+        for family in ["function_library", "macro_library"]:
+            self.assertIn(f'TEXT("{family}")', policy)
+            self.assertIn(f'TEXT("{family}")', native_test)
+        for blueprint_type in ["BPTYPE_FunctionLibrary", "BPTYPE_MacroLibrary"]:
+            self.assertIn(blueprint_type, policy)
+            self.assertIn(blueprint_type, native_test)
+        self.assertIn("FBlueprintTags::BlueprintType", inspector)
+        self.assertIn('TEXT("blueprint_library_inspection"), true', bridge)
+        self.assertIn("UnrealMCP.BlueprintLibraries.InspectionOnlyFamilies", native_test)
 
     def test_game_data_and_graph_editor_have_focused_native_boundaries(self):
         root = ROOT / "plugin/UnrealMCP/Source/UnrealMCP/Private"

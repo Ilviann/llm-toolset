@@ -415,7 +415,7 @@ bool FUnrealMCPBlueprintActionCatalog::Execute(
     UBlueprint* Blueprint = Cast<UBlueprint>(Asset.GetAsset());
     if (Blueprint == nullptr || Blueprint->GeneratedClass == nullptr
         || !UnrealMCP::BlueprintFamilyPolicy::Supports(
-            Blueprint->GeneratedClass, UnrealMCP::BlueprintFamilyPolicy::EOperation::ActionCatalog))
+            Blueprint, UnrealMCP::BlueprintFamilyPolicy::EOperation::ActionCatalog))
     {
         OutError = {TEXT("not_found"), TEXT("The requested Blueprint family is unavailable for action cataloging")};
         return false;

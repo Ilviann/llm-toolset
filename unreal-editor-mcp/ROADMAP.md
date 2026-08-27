@@ -30,6 +30,10 @@ Feature identifiers are stable names, not execution indexes. Unfinished features
   - Depends on:
     - `gas-gameplay-effects-inspect`
 - [x] [`function-replace` — Complete function replacement](docs/features/completed/function-replace.md) — Add transactional replacement of one complete user-owned function.
+- [x] [`blueprint-library-inspect` — Blueprint function and macro library inspection](docs/features/completed/blueprint-library-inspect.md) — Discover and inspect Blueprint Function Library functions and Blueprint Macro Library macros without enabling library mutation.
+  - Depends on:
+    - `phase-6`
+    - `phase-7`
 - [ ] [`event-macro-replace` — Event, custom-event, and macro replacement](docs/features/planned/event-macro-replace.md) — Extend bounded replacement to events, custom events, and macros.
   - Depends on:
     - `function-replace`
@@ -100,5 +104,6 @@ Feature checkboxes record implementation completion after mandatory Windows veri
   - `gameplay-attribute-inspect`
   - `gameplay-effect-modifiers-reflection`
   - `reflected-map-gameplay-attributes`
+  - `blueprint-library-inspect`
 - Windows:
   - None

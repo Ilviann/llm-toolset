@@ -28,6 +28,7 @@ Keep the authoritative checklist in [`ROADMAP.md`](../../ROADMAP.md) synchronize
 - [`phase-5` — Blueprint member variables](completed/phase-5.md) — Add typed Blueprint member-variable inspection and editing.
 - [`phase-6` — Function signatures and local variables](completed/phase-6.md) — Add function signatures, function shells, and local variables.
 - [`phase-7` — Macros and custom events](completed/phase-7.md) — Add macro and custom-event shells with matching inspection.
+- [`blueprint-library-inspect` — Blueprint function and macro library inspection](completed/blueprint-library-inspect.md) — Discover and inspect Blueprint Function Library functions and Blueprint Macro Library macros without enabling library mutation.
 - [`phase-8` — Action-catalog infrastructure and core actions](completed/phase-8.md) — Add the bounded action-catalog infrastructure and core actions.
 - [`phase-9` — C++ architecture and test decomposition](completed/phase-9.md) — Split oversized native components and Automation Tests along cohesive internal boundaries without changing behavior.
 - [`phase-10` — Expanded action-catalog families](completed/phase-10.md) — Expand the action catalog to the remaining supported action families.

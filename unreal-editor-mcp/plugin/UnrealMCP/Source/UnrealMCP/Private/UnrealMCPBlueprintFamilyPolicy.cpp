@@ -11,6 +11,7 @@
 #include "GameFramework/GameModeBase.h"
 #include "GameFramework/GameState.h"
 #include "GameFramework/GameStateBase.h"
+#include "Kismet/BlueprintFunctionLibrary.h"
 #include "Kismet2/BlueprintEditorUtils.h"
 #include "UnrealMCPPropertyCodec.h"
 #include "UObject/UnrealType.h"
@@ -25,6 +26,21 @@ FFamilyInfo MakeFamily(const TCHAR* Name, const UClass* NativeBase)
     return {Name, NativeBase != nullptr ? NativeBase->GetPathName() : FString(), true};
 }
 
+bool IsLibraryFamily(const FFamilyInfo& Family)
+{
+    return Family.Name == TEXT("function_library") || Family.Name == TEXT("macro_library");
+}
+
+FFamilyInfo FunctionLibraryFamily()
+{
+    return MakeFamily(TEXT("function_library"), UBlueprintFunctionLibrary::StaticClass());
+}
+
+FFamilyInfo MacroLibraryFamily()
+{
+    return MakeFamily(TEXT("macro_library"), UBlueprint::StaticClass());
+}
+
 TArray<TSharedPtr<FJsonValue>> StringValues(std::initializer_list<const TCHAR*> Values)
 {
     TArray<TSharedPtr<FJsonValue>> Result;
@@ -35,11 +51,13 @@ TArray<TSharedPtr<FJsonValue>> StringValues(std::initializer_list<const TCHAR*> 
 TSharedRef<FJsonObject> PublishedOperations(const FFamilyInfo& Family)
 {
     const TSharedRef<FJsonObject> Operations = MakeShared<FJsonObject>();
+    const bool bInspectionOnly = IsLibraryFamily(Family);
     for (const TCHAR* Name : {TEXT("discover"), TEXT("inspect"), TEXT("create"), TEXT("compile"), TEXT("save"),
         TEXT("class_defaults"), TEXT("member_variables"), TEXT("functions"),
         TEXT("local_variables"), TEXT("macros"), TEXT("custom_events"), TEXT("action_catalog"), TEXT("graph_edit")})
     {
-        Operations->SetBoolField(Name, true);
+        Operations->SetBoolField(Name, !bInspectionOnly || FCString::Strcmp(Name, TEXT("discover")) == 0
+            || FCString::Strcmp(Name, TEXT("inspect")) == 0);
     }
     const bool bActorFamily = Family.Name == TEXT("actor")
         || Family.Name == TEXT("game_mode_base") || Family.Name == TEXT("game_mode")
@@ -60,7 +78,9 @@ TSharedRef<FJsonObject> PublishedMultiplayer(const FFamilyInfo& Family)
     Result->SetBoolField(TEXT("actor_replication"), bActorReplication);
     Result->SetBoolField(TEXT("component_replication"), bActorReplication);
     Result->SetBoolField(TEXT("replicated_variables"), bActorReplication);
-    if (Family.Name == TEXT("actor"))
+    if (IsLibraryFamily(Family))
+        Result->SetArrayField(TEXT("rpc_modes"), TArray<TSharedPtr<FJsonValue>>());
+    else if (Family.Name == TEXT("actor"))
         Result->SetArrayField(TEXT("rpc_modes"), StringValues({TEXT("not_replicated"), TEXT("server"), TEXT("client"), TEXT("multicast")}));
     else if (Family.Name == TEXT("game_mode_base") || Family.Name == TEXT("game_mode"))
         Result->SetArrayField(TEXT("rpc_modes"), StringValues({TEXT("not_replicated"), TEXT("server")}));
@@ -107,6 +127,37 @@ FFamilyInfo Classify(const UClass* Class)
         return MakeFamily(TEXT("game_state_base"), AGameStateBase::StaticClass());
     }
     return MakeFamily(TEXT("actor"), AActor::StaticClass());
+}
+
+FFamilyInfo ClassifyForInspection(const UBlueprint* Blueprint)
+{
+    if (Blueprint == nullptr)
+    {
+        return {};
+    }
+    if (Blueprint->BlueprintType == BPTYPE_MacroLibrary)
+    {
+        return MacroLibraryFamily();
+    }
+    if (Blueprint->BlueprintType == BPTYPE_FunctionLibrary)
+    {
+        return FunctionLibraryFamily();
+    }
+    return Classify(Blueprint->ParentClass);
+}
+
+FFamilyInfo ClassifyForInspection(const FString& RegistryBlueprintType, const UClass* NativeClass)
+{
+    if (RegistryBlueprintType == TEXT("BPTYPE_MacroLibrary"))
+    {
+        return MacroLibraryFamily();
+    }
+    if (RegistryBlueprintType == TEXT("BPTYPE_FunctionLibrary")
+        || (NativeClass != nullptr && NativeClass->IsChildOf(UBlueprintFunctionLibrary::StaticClass())))
+    {
+        return FunctionLibraryFamily();
+    }
+    return Classify(NativeClass);
 }
 
 bool Supports(const UClass* Class, EOperation Operation)
@@ -169,7 +220,21 @@ TSharedRef<FJsonObject> BuildLiveCapabilities(const UBlueprint* Blueprint)
 {
     return BuildLiveCapabilities(
         Blueprint,
-        Classify(Blueprint != nullptr ? Blueprint->ParentClass : nullptr));
+        ClassifyForInspection(Blueprint));
+}
+
+bool Supports(const UBlueprint* Blueprint, EOperation Operation)
+{
+    const FFamilyInfo Family = ClassifyForInspection(Blueprint);
+    if (!Family.bSupported)
+    {
+        return false;
+    }
+    if (IsLibraryFamily(Family))
+    {
+        return Operation == EOperation::Discover || Operation == EOperation::Inspect;
+    }
+    return Supports(Blueprint->ParentClass, Operation);
 }
 
 TSharedRef<FJsonObject> BuildLiveCapabilities(
@@ -178,8 +243,11 @@ TSharedRef<FJsonObject> BuildLiveCapabilities(
 {
     const TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
     const UClass* ParentClass = Blueprint != nullptr ? Blueprint->ParentClass : nullptr;
-    const bool bNormalBlueprint = Blueprint != nullptr && Blueprint->BlueprintType == BPTYPE_Normal;
-    const bool bDefaults = Blueprint != nullptr && Blueprint->GeneratedClass != nullptr
+    const bool bFunctionLibrary = Family.Name == TEXT("function_library");
+    const bool bMacroLibrary = Family.Name == TEXT("macro_library");
+    const bool bLibrary = bFunctionLibrary || bMacroLibrary;
+    const bool bNormalBlueprint = Blueprint != nullptr && Blueprint->BlueprintType == BPTYPE_Normal && !bLibrary;
+    const bool bDefaults = !bLibrary && Blueprint != nullptr && Blueprint->GeneratedClass != nullptr
         && Blueprint->GeneratedClass->GetDefaultObject(false) != nullptr;
     const bool bComponents = Blueprint != nullptr && Blueprint->SimpleConstructionScript != nullptr;
     bool bEventGraph = false;
@@ -196,7 +264,7 @@ TSharedRef<FJsonObject> BuildLiveCapabilities(
         }
     }
     bool bOverrides = false;
-    if (ParentClass != nullptr)
+    if (!bLibrary && ParentClass != nullptr)
     {
         for (TFieldIterator<UFunction> It(ParentClass, EFieldIterationFlags::IncludeSuper); It; ++It)
         {
@@ -209,19 +277,19 @@ TSharedRef<FJsonObject> BuildLiveCapabilities(
     }
 
     Result->SetBoolField(TEXT("class_defaults"), Family.bSupported && bDefaults);
-    Result->SetBoolField(TEXT("components"), Supports(ParentClass, EOperation::Components) && bComponents);
-    Result->SetBoolField(TEXT("widget_tree"), Supports(ParentClass, EOperation::WidgetTree)
+    Result->SetBoolField(TEXT("components"), !bLibrary && Supports(ParentClass, EOperation::Components) && bComponents);
+    Result->SetBoolField(TEXT("widget_tree"), !bLibrary && Supports(ParentClass, EOperation::WidgetTree)
         && Cast<UWidgetBlueprint>(Blueprint) != nullptr);
-    Result->SetBoolField(TEXT("umg_authoring"), Supports(ParentClass, EOperation::WidgetTree)
+    Result->SetBoolField(TEXT("umg_authoring"), !bLibrary && Supports(ParentClass, EOperation::WidgetTree)
         && Cast<UWidgetBlueprint>(Blueprint) != nullptr);
-    Result->SetBoolField(TEXT("event_graphs"), Family.bSupported && bEventGraph);
-    Result->SetBoolField(TEXT("local_variables"), Family.bSupported && bNormalBlueprint);
+    Result->SetBoolField(TEXT("event_graphs"), Family.bSupported && !bLibrary && bEventGraph);
+    Result->SetBoolField(TEXT("local_variables"), Family.bSupported && (bNormalBlueprint || bFunctionLibrary));
     Result->SetBoolField(TEXT("overrides"), Family.bSupported && bOverrides);
     const TSharedRef<FJsonObject> Multiplayer = PublishedMultiplayer(Family);
     TArray<TSharedPtr<FJsonValue>> Settings;
     UObject* Defaults = Blueprint != nullptr && Blueprint->GeneratedClass != nullptr
         ? Blueprint->GeneratedClass->GetDefaultObject(false) : nullptr;
-    if (Defaults != nullptr && SupportsActorReplication(ParentClass))
+    if (!bLibrary && Defaults != nullptr && SupportsActorReplication(ParentClass))
     {
         for (const TPair<const TCHAR*, const TCHAR*>& Entry : {
             TPair<const TCHAR*, const TCHAR*>(TEXT("replicates"), TEXT("bReplicates")),
@@ -238,9 +306,9 @@ TSharedRef<FJsonObject> BuildLiveCapabilities(
     Multiplayer->SetArrayField(TEXT("actor_replication_settings"), Settings);
     Result->SetObjectField(TEXT("multiplayer"), Multiplayer);
     const TSharedRef<FJsonObject> GraphTypes = MakeShared<FJsonObject>();
-    GraphTypes->SetBoolField(TEXT("event"), Family.bSupported && bEventGraph);
-    GraphTypes->SetBoolField(TEXT("function"), Family.bSupported && bNormalBlueprint);
-    GraphTypes->SetBoolField(TEXT("macro"), Family.bSupported && bNormalBlueprint);
+    GraphTypes->SetBoolField(TEXT("event"), Family.bSupported && !bLibrary && bEventGraph);
+    GraphTypes->SetBoolField(TEXT("function"), Family.bSupported && (bNormalBlueprint || bFunctionLibrary));
+    GraphTypes->SetBoolField(TEXT("macro"), Family.bSupported && (bNormalBlueprint || bMacroLibrary));
     Result->SetObjectField(TEXT("graph_types"), GraphTypes);
     return Result;
 }
@@ -254,7 +322,9 @@ TArray<TSharedPtr<FJsonValue>> BuildPublishedMatrix()
         MakeFamily(TEXT("game_state_base"), AGameStateBase::StaticClass()),
         MakeFamily(TEXT("game_state"), AGameState::StaticClass()),
         MakeFamily(TEXT("game_instance"), UGameInstance::StaticClass()),
-        MakeFamily(TEXT("widget"), UUserWidget::StaticClass())};
+        MakeFamily(TEXT("widget"), UUserWidget::StaticClass()),
+        FunctionLibraryFamily(),
+        MacroLibraryFamily()};
     TArray<TSharedPtr<FJsonValue>> Result;
     for (const FFamilyInfo& Family : Families)
     {
@@ -262,7 +332,8 @@ TArray<TSharedPtr<FJsonValue>> BuildPublishedMatrix()
         Record->SetStringField(TEXT("family"), Family.Name);
         Record->SetStringField(TEXT("native_base_class"), Family.NativeBaseClass);
         Record->SetStringField(TEXT("inheritance_category"),
-            Family.Name == TEXT("widget") ? TEXT("widget_derived")
+            IsLibraryFamily(Family) ? TEXT("blueprint_library")
+            : Family.Name == TEXT("widget") ? TEXT("widget_derived")
             : Family.Name == TEXT("game_instance") ? TEXT("uobject_derived") : TEXT("actor_derived"));
         Record->SetObjectField(TEXT("operations"), PublishedOperations(Family));
         Record->SetObjectField(TEXT("multiplayer"), PublishedMultiplayer(Family));

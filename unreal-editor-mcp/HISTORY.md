@@ -4,6 +4,11 @@
 
 - Standardized Unreal Engine 5.8 development tooling on the `UE58` environment variable and moved the disposable integration project to `ue-test/ue58/`.
 
+## 0.37.0 — 2026-08-27
+
+- Added bounded discovery and exact inspection of Blueprint Function Library functions and Blueprint Macro Library macros, including signatures, locals, graph structure, stable identities, snapshots, and cursors. Macro Libraries classify from their Blueprint type rather than their scope parent, preventing Actor-scoped libraries from reporting as Actor Blueprints.
+- Published `function_library` and `macro_library` as base inspection-only families, marked their declarations non-editable, rejected every library authoring path, added native/Python capability coverage and focused query examples, and advanced the exact Python/base-plugin version pair to 0.37.0. Companion API v1 and companion versions are unchanged; macOS verification remains preferred follow-up work.
+
 ## 0.36.0 — 2026-08-27
 
 - Added bounded deterministic map values to targeted Blueprint component/class-default inspection and typed `FGameplayAttribute` values to the game-data codec, including map keys.

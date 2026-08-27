@@ -699,15 +699,17 @@ static UnrealMCP::BlueprintFamilyPolicy::FFamilyInfo AssetBlueprintFamily(
     const FAssetData& Asset,
     const FUnrealMCPExtensionRegistry* ExtensionRegistry)
 {
+    FString RegistryBlueprintType;
+    Asset.GetTagValue(FBlueprintTags::BlueprintType, RegistryBlueprintType);
     FString NativeParent;
-    if (!Asset.GetTagValue(FBlueprintTags::NativeParentClassPath, NativeParent))
+    UClass* NativeClass = nullptr;
+    if (Asset.GetTagValue(FBlueprintTags::NativeParentClassPath, NativeParent))
     {
-        return {};
+        const FString ObjectPath = FPackageName::ExportTextPathToObjectPath(NativeParent);
+        NativeClass = FindObject<UClass>(nullptr, *ObjectPath);
     }
-    const FString ObjectPath = FPackageName::ExportTextPathToObjectPath(NativeParent);
-    UClass* NativeClass = FindObject<UClass>(nullptr, *ObjectPath);
     UnrealMCP::BlueprintFamilyPolicy::FFamilyInfo Family =
-        UnrealMCP::BlueprintFamilyPolicy::Classify(NativeClass);
+        UnrealMCP::BlueprintFamilyPolicy::ClassifyForInspection(RegistryBlueprintType, NativeClass);
     if (!Family.bSupported && ExtensionRegistry != nullptr
         && ExtensionRegistry->ClassifyBlueprintClass(
             NativeClass, Family.Name, Family.NativeBaseClass))

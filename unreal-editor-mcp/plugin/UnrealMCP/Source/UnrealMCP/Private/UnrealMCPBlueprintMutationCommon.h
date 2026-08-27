@@ -353,13 +353,13 @@ static bool ResolveMutableBlueprint(
         return false;
     }
     const UnrealMCP::BlueprintFamilyPolicy::FFamilyInfo Family =
-        UnrealMCP::BlueprintFamilyPolicy::Classify(OutBlueprint->ParentClass);
+        UnrealMCP::BlueprintFamilyPolicy::ClassifyForInspection(OutBlueprint);
     if (!Family.bSupported)
     {
         OutError = {TEXT("wrong_type"), TEXT("The requested Blueprint does not belong to a published authoring family")};
         return false;
     }
-    if (!UnrealMCP::BlueprintFamilyPolicy::Supports(OutBlueprint->ParentClass, FamilyOperation))
+    if (!UnrealMCP::BlueprintFamilyPolicy::Supports(OutBlueprint, FamilyOperation))
     {
         if (FamilyOperation == UnrealMCP::BlueprintFamilyPolicy::EOperation::Components)
         {

@@ -494,7 +494,7 @@ bool FUnrealMCPBlueprintBlockReplacementService::Execute(
     UBlueprint* Blueprint = Cast<UBlueprint>(Asset.GetAsset());
     if (Blueprint == nullptr || Blueprint->GeneratedClass == nullptr
         || !UnrealMCP::BlueprintFamilyPolicy::Supports(
-            Blueprint->GeneratedClass, UnrealMCP::BlueprintFamilyPolicy::EOperation::GraphEdit))
+            Blueprint, UnrealMCP::BlueprintFamilyPolicy::EOperation::GraphEdit))
     {
         OutError = {TEXT("not_found"),
             TEXT("The requested Blueprint family is unavailable for function replacement")};

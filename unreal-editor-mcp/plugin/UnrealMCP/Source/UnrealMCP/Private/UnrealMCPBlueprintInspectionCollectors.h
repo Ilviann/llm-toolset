@@ -35,7 +35,9 @@ for (const TPair<UBlueprint*, FString>& Owner : Owners)
             bCustomEventFound = true;
             const bool bLocalOwner = Owner.Key == Blueprint;
             const bool bOverride = Event->IsOverride();
-            const bool bEditable = bLocalOwner && !bOverride && Event->IsEditable() && EventId.Len() == 32;
+            const bool bEditable = bLocalOwner && !bOverride && Event->IsEditable() && EventId.Len() == 32
+                && UnrealMCP::BlueprintFamilyPolicy::Supports(Blueprint,
+                    UnrealMCP::BlueprintFamilyPolicy::EOperation::Members);
             const TSharedRef<FJsonObject> Signature = CustomEventSignature(Event);
             const TSharedRef<FJsonObject> References = CustomEventReferences(Blueprint, Event);
             if (Sections.Contains(TEXT("custom_events")))

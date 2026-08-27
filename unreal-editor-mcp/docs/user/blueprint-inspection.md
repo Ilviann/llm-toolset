@@ -2,6 +2,10 @@
 
 ## Blueprint-family inspection
 
+`blueprint_inspect` discovers and inspects the seven authoring families plus read-only `function_library` and `macro_library` assets. Function libraries expose their functions, parameters, local variables, graphs, nodes, pins, and connections. Macro Libraries expose their macros, parameters, graphs, nodes, pins, and connections. Use the same stable `function_id`, `local_id`, `macro_id`, and `graph_id` filters described below.
+
+Library records are always non-editable. Their capability rows enable only `discover` and `inspect`; creation, compilation, saving, member edits, action cataloging, graph editing, and function replacement remain unsupported. A Macro Library is classified from its Blueprint asset type rather than its scope parent, so an Actor-scoped library reports `macro_library`, not `actor`.
+
 Read-only discovery covers every mounted content namespace visible to the project: project content under `/Game`, engine content under `/Engine`, and enabled plugin content under each plugin's virtual mount. Omitting `package_path` searches across all of them within the published scan ceiling. Prefer an exact, narrow mount/package filter when known:
 
 ```json

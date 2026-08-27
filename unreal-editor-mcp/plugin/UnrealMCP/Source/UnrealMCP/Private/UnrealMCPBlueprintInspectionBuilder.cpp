@@ -50,7 +50,7 @@ bool BuildInspection(
         return false;
     }
     UnrealMCP::BlueprintFamilyPolicy::FFamilyInfo Family =
-        UnrealMCP::BlueprintFamilyPolicy::Classify(Blueprint->ParentClass);
+        UnrealMCP::BlueprintFamilyPolicy::ClassifyForInspection(Blueprint);
     const UClass* ClassifiedClass = Blueprint->GeneratedClass != nullptr
         ? Blueprint->GeneratedClass : Blueprint->ParentClass;
     if (!Family.bSupported && ExtensionRegistry != nullptr
@@ -70,10 +70,13 @@ bool BuildInspection(
     const bool bDirtyBefore = Package->IsDirty();
     const EBlueprintStatus StatusBefore = Blueprint->Status;
     FInspectionSink Sink(OutRecords);
-    AddClassDefaultFingerprint(Blueprint, Sink.Fingerprint);
+    if (Family.Name != TEXT("function_library") && Family.Name != TEXT("macro_library"))
+    {
+        AddClassDefaultFingerprint(Blueprint, Sink.Fingerprint);
+    }
 
     TArray<TPair<UBlueprint*, FString>> Owners;
-    if (!CollectOverviewAndComponents(Blueprint, AssetPath, bWasLoaded, bDirtyBefore, bIncludeInherited,
+    if (!CollectOverviewAndComponents(Blueprint, Family, AssetPath, bWasLoaded, bDirtyBefore, bIncludeInherited,
         ComponentFilter, ComponentNameFilter, PropertyNames, Sections, Sink, Owners, OutError)) return false;
     if (!CollectMembers(Blueprint, Owners, Sections, MemberFilter, Sink, OutError)) return false;
     if (!CollectFunctionsAndLocals(Blueprint, Owners, Sections, FunctionFilter, LocalFilter,

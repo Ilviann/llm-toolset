@@ -9,6 +9,7 @@
 - [`phase-5` — Blueprint member variables](phase-5.md).
 - [`phase-6` — Function signatures and local variables](phase-6.md).
 - [`phase-7` — Macros and custom events](phase-7.md).
+- [`blueprint-library-inspect` — Blueprint function and macro library inspection](blueprint-library-inspect.md).
 - [`phase-8` — Action-catalog infrastructure and core actions](phase-8.md).
 - [`phase-9` — C++ architecture and test decomposition](phase-9.md).
 - [`phase-10` — Expanded action-catalog families](phase-10.md).

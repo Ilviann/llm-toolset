@@ -7,6 +7,7 @@ namespace UnrealMCP::BlueprintInspectionPrivate
 {
 static bool CollectOverviewAndComponents(
     UBlueprint* Blueprint,
+    const UnrealMCP::BlueprintFamilyPolicy::FFamilyInfo& Family,
     const FString& AssetPath,
     bool bWasLoaded,
     bool bDirtyBefore,
@@ -19,6 +20,7 @@ static bool CollectOverviewAndComponents(
     TArray<TPair<UBlueprint*, FString>>& Owners,
     FUnrealMCPError& OutError)
 {
+const bool bLibrary = Family.Name == TEXT("function_library") || Family.Name == TEXT("macro_library");
 if (Sections.Contains(TEXT("summary")))
 {
     const TSharedRef<FJsonObject> Value = Record(TEXT("summary"));
@@ -26,10 +28,13 @@ if (Sections.Contains(TEXT("summary")))
     Value->SetStringField(TEXT("asset_name"), Blueprint->GetName());
     Value->SetBoolField(TEXT("was_loaded"), bWasLoaded);
     Value->SetBoolField(TEXT("package_dirty"), bDirtyBefore);
-    Value->SetBoolField(TEXT("actor_blueprint"),
-        Blueprint->ParentClass != nullptr && Blueprint->ParentClass->IsChildOf(AActor::StaticClass()));
-    Value->SetStringField(TEXT("blueprint_family"), UnrealMCP::BlueprintFamilyPolicy::Classify(Blueprint->ParentClass).Name);
-    Value->SetObjectField(TEXT("family_capabilities"), UnrealMCP::BlueprintFamilyPolicy::BuildLiveCapabilities(Blueprint));
+    const bool bActorFamily = Family.Name == TEXT("actor") || Family.Name == TEXT("game_mode_base")
+        || Family.Name == TEXT("game_mode") || Family.Name == TEXT("game_state_base")
+        || Family.Name == TEXT("game_state");
+    Value->SetBoolField(TEXT("actor_blueprint"), bActorFamily);
+    Value->SetStringField(TEXT("blueprint_family"), Family.Name);
+    Value->SetObjectField(TEXT("family_capabilities"),
+        UnrealMCP::BlueprintFamilyPolicy::BuildLiveCapabilities(Blueprint, Family));
     AddRecord(Sink.Records, Value);
 }
 if (Sections.Contains(TEXT("parent_class")))
@@ -48,7 +53,7 @@ if (Sections.Contains(TEXT("compile_state")))
 }
 
 Owners.Emplace(Blueprint, AssetPath);
-if (bIncludeInherited || !ComponentFilter.IsEmpty() || !ComponentNameFilter.IsEmpty())
+if (!bLibrary && (bIncludeInherited || !ComponentFilter.IsEmpty() || !ComponentNameFilter.IsEmpty()))
 {
     for (UClass* Class = Blueprint->ParentClass; Class != nullptr; Class = Class->GetSuperClass())
     {
@@ -61,6 +66,8 @@ if (bIncludeInherited || !ComponentFilter.IsEmpty() || !ComponentNameFilter.IsEm
 }
 
 bool bComponentFound = ComponentFilter.IsEmpty() && ComponentNameFilter.IsEmpty();
+if (!bLibrary)
+{
 for (const TPair<UBlueprint*, FString>& Owner : Owners)
 {
     if (Owner.Key->SimpleConstructionScript == nullptr) continue;
@@ -98,7 +105,9 @@ for (const TPair<UBlueprint*, FString>& Owner : Owners)
             Value->SetStringField(TEXT("ownership"), Owner.Key == Blueprint ? TEXT("local") : TEXT("inherited"));
             Value->SetBoolField(TEXT("native"), false);
             Value->SetBoolField(TEXT("instanced"), false);
-            Value->SetBoolField(TEXT("editable"), Owner.Key == Blueprint && !Id.IsEmpty());
+            Value->SetBoolField(TEXT("editable"), Owner.Key == Blueprint && !Id.IsEmpty()
+                && UnrealMCP::BlueprintFamilyPolicy::Supports(Blueprint,
+                    UnrealMCP::BlueprintFamilyPolicy::EOperation::Components));
             Value->SetBoolField(TEXT("scene_component"), Node->ComponentClass != nullptr && Node->ComponentClass->IsChildOf(USceneComponent::StaticClass()));
             Value->SetBoolField(TEXT("root"), Owner.Key->SimpleConstructionScript->GetRootNodes().Contains(Node));
             Value->SetStringField(TEXT("parent_id"), Parent != nullptr && *Parent != nullptr ? GuidString((*Parent)->VariableGuid) : FString());
@@ -108,7 +117,8 @@ for (const TPair<UBlueprint*, FString>& Owner : Owners)
             + TEXT("|") + (Parent != nullptr && *Parent != nullptr ? GuidString((*Parent)->VariableGuid) : FString()) + TEXT("|") + DefaultsFingerprint);
     }
 }
-if ((bIncludeInherited || !ComponentNameFilter.IsEmpty()) && Blueprint->GeneratedClass != nullptr)
+}
+if (!bLibrary && (bIncludeInherited || !ComponentNameFilter.IsEmpty()) && Blueprint->GeneratedClass != nullptr)
 {
     if (AActor* DefaultsActor = Cast<AActor>(Blueprint->GeneratedClass->GetDefaultObject(false)))
     {
@@ -155,7 +165,7 @@ if (!bComponentFound)
     return false;
 }
 
-if (Sections.Contains(TEXT("class_defaults")))
+if (!bLibrary && Sections.Contains(TEXT("class_defaults")))
 {
     UObject* Defaults = Blueprint->GeneratedClass != nullptr ? Blueprint->GeneratedClass->GetDefaultObject(false) : nullptr;
     if (Defaults == nullptr)
@@ -203,11 +213,14 @@ for (const TPair<UBlueprint*, FString>& Owner : Owners)
             Value->SetStringField(TEXT("owner_blueprint"), Owner.Value);
             Value->SetBoolField(TEXT("inherited"), Owner.Key != Blueprint);
             Value->SetStringField(TEXT("ownership"), Owner.Key == Blueprint ? TEXT("local") : TEXT("inherited"));
-            Value->SetBoolField(TEXT("editable"), Owner.Key == Blueprint && !Id.IsEmpty());
+            const bool bEditable = Owner.Key == Blueprint && !Id.IsEmpty()
+                && UnrealMCP::BlueprintFamilyPolicy::Supports(Blueprint,
+                    UnrealMCP::BlueprintFamilyPolicy::EOperation::Members);
+            Value->SetBoolField(TEXT("editable"), bEditable);
             Value->SetObjectField(TEXT("type"), UnrealMCP::K2TypeCodec::EncodeType(Variable.VarType));
             Value->SetObjectField(TEXT("default"), UnrealMCP::K2TypeCodec::EncodeDefault(Variable.VarType, EffectiveDefault));
             Value->SetObjectField(TEXT("metadata"), VariableMetadata(Variable));
-            Value->SetObjectField(TEXT("replication"), VariableReplication(Owner.Key, Variable, Owner.Key == Blueprint && !Id.IsEmpty()));
+            Value->SetObjectField(TEXT("replication"), VariableReplication(Owner.Key, Variable, bEditable));
             Value->SetObjectField(TEXT("reference_summary"), VariableReferences(Blueprint, Variable.VarName));
             AddRecord(Sink.Records, Value);
         }
@@ -262,7 +275,9 @@ for (const TPair<UBlueprint*, FString>& Owner : Owners)
         });
         const FString DeclarationKind = FunctionOwnership(Owner.Key, FunctionGraph);
         const bool bLocalOwner = Owner.Key == Blueprint;
-        const bool bEditable = bLocalOwner && DeclarationKind == TEXT("user_owned") && Entry != nullptr && FunctionId.Len() == 32;
+        const bool bEditable = bLocalOwner && DeclarationKind == TEXT("user_owned") && Entry != nullptr
+            && FunctionId.Len() == 32 && UnrealMCP::BlueprintFamilyPolicy::Supports(Blueprint,
+                UnrealMCP::BlueprintFamilyPolicy::EOperation::Members);
         UnrealMCP::BlueprintFunctionFingerprint::FBoundary ReplacementBoundary;
         const bool bReplaceableBoundary =
             UnrealMCP::BlueprintFunctionFingerprint::Describe(FunctionGraph, ReplacementBoundary);
@@ -432,7 +447,9 @@ for (const TPair<UBlueprint*, FString>& Owner : Owners)
         bool bPure = false;
         FKismetEditorUtilities::GetInformationOnMacro(MacroGraph, Entry, Exit, bPure);
         const bool bLocalOwner = Owner.Key == Blueprint;
-        const bool bEditable = bLocalOwner && MacroId.Len() == 32 && Entry != nullptr && Exit != nullptr;
+        const bool bEditable = bLocalOwner && MacroId.Len() == 32 && Entry != nullptr && Exit != nullptr
+            && UnrealMCP::BlueprintFamilyPolicy::Supports(Blueprint,
+                UnrealMCP::BlueprintFamilyPolicy::EOperation::Members);
         const TSharedRef<FJsonObject> Signature = MacroSignature(Entry, Exit, bPure);
         const TSharedRef<FJsonObject> References = MacroReferences(Blueprint, MacroGraph);
         if (Sections.Contains(TEXT("macros")))

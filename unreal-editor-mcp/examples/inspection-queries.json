@@ -76,6 +76,14 @@
     "include_inherited": true,
     "page_size": 25
   },
+  "inspect_function_library_graph": {
+    "mode": "inspect",
+    "asset_path": "/Game/Libraries/BFL_Gameplay.BFL_Gameplay",
+    "sections": ["functions", "parameters", "local_variables", "graphs", "nodes", "pins", "connections"],
+    "function_id": "11111111111111111111111111111111",
+    "graph_id": "11111111111111111111111111111111",
+    "page_size": 50
+  },
   "inspect_one_local": {
     "mode": "inspect",
     "asset_path": "/Game/Actors/BP_Door.BP_Door",
@@ -90,6 +98,14 @@
     "macro_id": "33333333333333333333333333333333",
     "include_inherited": true,
     "page_size": 25
+  },
+  "inspect_macro_library_graph": {
+    "mode": "inspect",
+    "asset_path": "/Game/Libraries/BML_Flow.BML_Flow",
+    "sections": ["macros", "parameters", "graphs", "nodes", "pins", "connections"],
+    "macro_id": "33333333333333333333333333333333",
+    "graph_id": "33333333333333333333333333333333",
+    "page_size": 50
   },
   "inspect_one_custom_event_signature": {
     "mode": "inspect",

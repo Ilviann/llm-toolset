@@ -41,6 +41,7 @@ Keep responsibilities narrow and interfaces explicit. Do not include unrelated r
 - After completing a task, update only documentation and examples affected by changed behavior, contracts, flows, types, dependencies, or validation requirements.
 - Keep durable knowledge concise, searchable, linked to authoritative sources, and organized with stable IDs where reliable cross-references are useful. Follow each project's existing ID conventions.
 - When durable knowledge does not fit the existing architecture, type, roadmap, or history structure, propose an additional indexed documentation set rather than forcing it into an unrelated section.
+- For `unreal-editor-mcp` UE 5.7 native validation, use `-ForceUnity -DisableAdaptiveUnity` for the supported forced-unity build. Do not treat `-StressTestUnity` as a release gate until the pre-existing anonymous `CanonicalJson` helper collision between `UnrealMCPPropertyCodec.cpp` and `UnrealMCPGameDataValueCodec.cpp` is resolved.
 
 ## Security and MCP contracts
 

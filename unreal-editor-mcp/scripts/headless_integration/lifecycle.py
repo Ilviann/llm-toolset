@@ -310,6 +310,7 @@ def run_automation(executable: Path, project: Path, environment: dict[str, str],
         "MemberVariables",
         "FunctionsAndLocals",
         "MacrosAndCustomEvents",
+        "InspectionOnlyFamilies",
         "ActionCatalog",
         "ExpandedActionCatalog",
         "GraphNodeLifecycle",
@@ -556,6 +557,8 @@ def main() -> int:
                     raise AssertionError(f"Phase 14 family capability is unavailable: {feature}")
             if capabilities.get("features", {}).get("game_instance_family") is not True:
                 raise AssertionError("Phase 15 GameInstance capability is unavailable")
+            if capabilities.get("features", {}).get("blueprint_library_inspection") is not True:
+                raise AssertionError("Blueprint library inspection capability is unavailable")
             if capabilities.get("features", {}).get("widget_blueprint_family") is not True \
                     or capabilities.get("features", {}).get("widget_tree_authoring") is not True:
                 raise AssertionError("Widget Blueprint capability is unavailable")
@@ -605,15 +608,17 @@ def main() -> int:
                     or capabilities.get("features", {}).get("asset_delete_undo") is not False:
                 raise AssertionError("asset-delete capability contract mismatch")
             family_matrix = capabilities.get("blueprint_families", [])
-            base_families = [
+            authoring_families = [
                 "actor", "game_mode_base", "game_mode", "game_state_base", "game_state", "game_instance",
                 "widget",
             ]
+            library_families = ["function_library", "macro_library"]
+            base_families = authoring_families + library_families
             family_names = [record.get("family") for record in family_matrix]
             if family_names[:len(base_families)] != base_families \
                     or len(family_names) != len(set(family_names)):
                 raise AssertionError(f"Phase 15 family matrix mismatch: {family_matrix!r}")
-            for record in family_matrix[:len(base_families)]:
+            for record in family_matrix[:len(authoring_families)]:
                 operations = record.get("operations", {})
                 assignable = record.get("family") in {"game_mode_base", "game_mode", "game_instance"}
                 if operations.get("graph_edit") is not True or operations.get("parent_change") is not False \
@@ -625,6 +630,15 @@ def main() -> int:
                 if operations.get("components") != (family not in {"game_instance", "widget"}) \
                         or operations.get("widget_tree") != (family == "widget"):
                     raise AssertionError(f"Blueprint family operation matrix mismatch: {record!r}")
+            for record in family_matrix[len(authoring_families):len(base_families)]:
+                operations = record.get("operations", {})
+                if operations.get("discover") is not True or operations.get("inspect") is not True \
+                        or any(operations.get(name) is not False for name in (
+                            "create", "compile", "save", "class_defaults", "components", "widget_tree",
+                            "member_variables", "functions", "local_variables", "macros", "custom_events",
+                            "action_catalog", "graph_edit", "parent_change", "project_settings_assignment",
+                        )):
+                    raise AssertionError(f"Blueprint library family is not inspection-only: {record!r}")
             for record in family_matrix[len(base_families):]:
                 operations = record.get("operations", {})
                 if not isinstance(record.get("extension_id"), str) \

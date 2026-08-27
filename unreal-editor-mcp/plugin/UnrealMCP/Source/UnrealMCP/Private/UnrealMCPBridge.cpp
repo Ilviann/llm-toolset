@@ -573,6 +573,7 @@ TSharedPtr<FJsonObject> FUnrealMCPBridge::Capabilities() const
     Features->SetBoolField(TEXT("blueprint_function_replacement"), true);
     Features->SetBoolField(TEXT("blueprint_function_replacement_scratch_preflight"), true);
     Features->SetBoolField(TEXT("blueprint_family_policy"), true);
+    Features->SetBoolField(TEXT("blueprint_library_inspection"), true);
     Features->SetBoolField(TEXT("game_mode_families"), true);
     Features->SetBoolField(TEXT("game_state_families"), true);
     Features->SetBoolField(TEXT("game_instance_family"), true);
