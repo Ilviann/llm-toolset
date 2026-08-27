@@ -80,8 +80,9 @@ bool FUnrealMCPPhase5K2TypeCodecTest::RunTest(const FString& Parameters)
         FEdGraphPinType GameplayAttributeType;
         GameplayAttributeType.PinCategory = UEdGraphSchema_K2::PC_Struct;
         GameplayAttributeType.PinSubCategoryObject = GameplayAttributeStruct;
-        const FString AttributeText = FString::Printf(TEXT("(Attribute=%s,AttributeOwner=%s)"),
-            *HealthProperty->GetPathName(), *AttributeSetClass->GetPathName());
+        const FString AttributeText = FString::Printf(
+            TEXT("(AttributeName=\"%s\",Attribute=%s,AttributeOwner=\"/Script/CoreUObject.Class'%s'\")"),
+            *HealthProperty->GetName(), *HealthProperty->GetPathName(), *AttributeSetClass->GetPathName());
         const TSharedRef<FJsonObject> AttributeDefault = UnrealMCP::K2TypeCodec::EncodeDefault(
             GameplayAttributeType, AttributeText);
         TestEqual(TEXT("Gameplay Attribute default has a typed kind"),
@@ -92,8 +93,9 @@ bool FUnrealMCPPhase5K2TypeCodecTest::RunTest(const FString& Parameters)
             AttributeDefault->GetStringField(TEXT("name")), FString(TEXT("Health")));
         TestEqual(TEXT("Gameplay Attribute default exposes its property path"),
             AttributeDefault->GetStringField(TEXT("property_path")), HealthProperty->GetPathName());
-        const FString DataAttributeText = FString::Printf(TEXT("(Attribute=%s,AttributeOwner=%s)"),
-            *ManaProperty->GetPathName(), *AttributeSetClass->GetPathName());
+        const FString DataAttributeText = FString::Printf(
+            TEXT("(AttributeName=\"%s\",Attribute=%s,AttributeOwner=\"/Script/CoreUObject.Class'%s'\")"),
+            *ManaProperty->GetName(), *ManaProperty->GetPathName(), *AttributeSetClass->GetPathName());
         TestTrue(TEXT("Gameplay Attribute Data default is compatible"),
             UnrealMCP::K2TypeCodec::EncodeDefault(GameplayAttributeType, DataAttributeText)->GetBoolField(TEXT("compatible")));
         TestEqual(TEXT("malformed Gameplay Attribute defaults remain explicit"),
@@ -291,8 +293,9 @@ bool FUnrealMCPPhase5MemberVariableTest::RunTest(const FString& Parameters)
     FEdGraphPinType GameplayAttributeType;
     GameplayAttributeType.PinCategory = UEdGraphSchema_K2::PC_Struct;
     GameplayAttributeType.PinSubCategoryObject = GameplayAttributeStruct;
-    const FString GameplayAttributeDefault = FString::Printf(TEXT("(Attribute=%s,AttributeOwner=%s)"),
-        *HealthProperty->GetPathName(), *AttributeSetClass->GetPathName());
+    const FString GameplayAttributeDefault = FString::Printf(
+        TEXT("(AttributeName=\"%s\",Attribute=%s,AttributeOwner=\"/Script/CoreUObject.Class'%s'\")"),
+        *HealthProperty->GetName(), *HealthProperty->GetPathName(), *AttributeSetClass->GetPathName());
     TestTrue(TEXT("Gameplay Attribute member is added"), FBlueprintEditorUtils::AddMemberVariable(
         Blueprint, TEXT("ObservedAttribute"), GameplayAttributeType, GameplayAttributeDefault));
     for (FBPVariableDescription& Candidate : Blueprint->NewVariables)

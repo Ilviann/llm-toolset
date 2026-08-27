@@ -511,6 +511,28 @@ bool FUnrealMCPBlueprintReflectedValuesTest::RunTest(const FString& Parameters)
     CastFieldChecked<FIntProperty>(NestedProperty->Struct->FindPropertyByName(TEXT("Count")))->SetPropertyValue_InContainer(Nested, 23);
     CastFieldChecked<FTextProperty>(NestedProperty->Struct->FindPropertyByName(TEXT("Label")))->SetPropertyValue_InContainer(
         Nested, FText::FromString(TEXT("Nested Blueprint Text")));
+    FMapProperty* CapacitiesProperty = CastFieldChecked<FMapProperty>(Property(TEXT("Capacities")));
+    FScriptMapHelper Capacities(CapacitiesProperty, CapacitiesProperty->ContainerPtrToValuePtr<void>(Template));
+    for (const TPair<FString, int32>& Pair : {
+            TPair<FString, int32>(TEXT("Test.Second"), 2), TPair<FString, int32>(TEXT("Test.First"), 1)})
+    {
+        const int32 Index = Capacities.AddDefaultValue_Invalid_NeedsRehash();
+        SetTag(CastFieldChecked<FStructProperty>(CapacitiesProperty->KeyProp), Capacities.GetKeyPtr(Index), Pair.Key);
+        CastFieldChecked<FIntProperty>(CapacitiesProperty->ValueProp)->SetPropertyValue(Capacities.GetValuePtr(Index), Pair.Value);
+    }
+    Capacities.Rehash();
+    UClass* AttributeSetClass = LoadObject<UClass>(
+        nullptr, TEXT("/Script/GameplayAbilities.AbilitySystemTestAttributeSet"), nullptr, LOAD_NoWarn | LOAD_Quiet);
+    FProperty* HealthProperty = AttributeSetClass != nullptr
+        ? AttributeSetClass->FindPropertyByName(TEXT("Health")) : nullptr;
+    FStructProperty* ObservedAttribute = CastFieldChecked<FStructProperty>(Property(TEXT("ObservedAttribute")));
+    if (!TestNotNull(TEXT("real Gameplay Attribute owner is available"), AttributeSetClass)
+        || !TestNotNull(TEXT("real Gameplay Attribute target is available"), HealthProperty)) return false;
+    const FString AttributeText = FString::Printf(
+        TEXT("(AttributeName=\"%s\",Attribute=%s,AttributeOwner=\"/Script/CoreUObject.Class'%s'\")"),
+        *HealthProperty->GetName(), *HealthProperty->GetPathName(), *AttributeSetClass->GetPathName());
+    if (!TestNotNull(TEXT("real three-field Gameplay Attribute imports"), ObservedAttribute->ImportText_Direct(
+            *AttributeText, ObservedAttribute->ContainerPtrToValuePtr<void>(Template), Template, PPF_None))) return false;
     FKismetEditorUtilities::CompileBlueprint(Blueprint);
 
     FUnrealMCPBlueprintInspector Inspector;
@@ -521,7 +543,7 @@ bool FUnrealMCPBlueprintReflectedValuesTest::RunTest(const FString& Parameters)
     Arguments->SetStringField(TEXT("component_name"), TEXT("InspectionValues"));
     TArray<TSharedPtr<FJsonValue>> Requested;
     for (const TCHAR* Name : {TEXT("Tag"), TEXT("Tags"), TEXT("Id"), TEXT("Label"), TEXT("State"),
-        TEXT("Asset"), TEXT("Class"), TEXT("Assets"), TEXT("Nested")})
+        TEXT("Asset"), TEXT("Class"), TEXT("Assets"), TEXT("Nested"), TEXT("Capacities"), TEXT("ObservedAttribute")})
         Requested.Add(MakeShared<FJsonValueString>(Name));
     Arguments->SetArrayField(TEXT("property_names"), Requested);
     if (!TestTrue(TEXT("Blueprint reflected defaults inspect"), Inspector.Execute(Arguments, Result, Error)))
@@ -545,6 +567,17 @@ bool FUnrealMCPBlueprintReflectedValuesTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Blueprint soft-reference array reads"), Values[TEXT("Assets")]->GetArrayField(TEXT("value")).Num(), 1);
     TestEqual(TEXT("Blueprint nested reflected struct reads"),
         static_cast<int32>(Values[TEXT("Nested")]->GetObjectField(TEXT("value"))->GetObjectField(TEXT("fields"))->GetNumberField(TEXT("Count"))), 23);
+    const TSharedPtr<FJsonObject> CapacityMap = Values[TEXT("Capacities")]->GetObjectField(TEXT("value"));
+    TestEqual(TEXT("Blueprint reflected map uses a tagged value"), CapacityMap->GetStringField(TEXT("kind")), FString(TEXT("map")));
+    TestEqual(TEXT("Blueprint reflected map preserves every bounded entry"), CapacityMap->GetArrayField(TEXT("entries")).Num(), 2);
+    TestEqual(TEXT("Blueprint reflected map entries are canonical"),
+        CapacityMap->GetArrayField(TEXT("entries"))[0]->AsObject()->GetStringField(TEXT("key")),
+        FString(TEXT("Test.First")));
+    TestEqual(TEXT("real component Gameplay Attribute is typed"),
+        Values[TEXT("ObservedAttribute")]->GetStringField(TEXT("type")), FString(TEXT("gameplay_attribute")));
+    TestEqual(TEXT("real component Gameplay Attribute resolves"),
+        Values[TEXT("ObservedAttribute")]->GetObjectField(TEXT("value"))->GetStringField(TEXT("property_path")),
+        HealthProperty->GetPathName());
     return true;
 }
 

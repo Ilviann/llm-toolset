@@ -44,6 +44,14 @@
     "property_names": ["Modifiers"],
     "page_size": 10
   },
+  "inspect_component_gameplay_attributes_and_overrides": {
+    "mode": "inspect",
+    "asset_path": "/Game/Actors/BP_Carrier.BP_Carrier",
+    "sections": ["components"],
+    "component_name": "ProductCarry",
+    "property_names": ["CapacityAttribute", "CountAttribute", "CategoryCapacityOverrides"],
+    "page_size": 10
+  },
   "inspect_inherited_component_by_name": {
     "mode": "inspect",
     "asset_path": "/Game/Actors/BP_DoorChild.BP_DoorChild",

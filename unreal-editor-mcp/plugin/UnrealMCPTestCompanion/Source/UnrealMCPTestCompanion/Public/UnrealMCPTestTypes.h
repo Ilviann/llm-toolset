@@ -1,5 +1,6 @@
 #pragma once
 
+#include "AttributeSet.h"
 #include "Components/ActorComponent.h"
 #include "CoreMinimal.h"
 #include "Engine/DataAsset.h"
@@ -121,6 +122,12 @@ public:
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unreal MCP Test")
     FUnrealMCPNestedInspectionValue Nested;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unreal MCP Test")
+    TMap<FGameplayTag, int32> Capacities;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unreal MCP Test")
+    FGameplayAttribute ObservedAttribute;
 };
 
 UCLASS(BlueprintType)
@@ -143,6 +150,9 @@ public:
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unreal MCP Test")
     TArray<TSoftObjectPtr<UDataTable>> SoftTables;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unreal MCP Test")
+    TMap<FGameplayAttribute, float> GrantedAttributes;
 
     UPROPERTY(EditAnywhere, Instanced, Category = "Unreal MCP Test")
     TObjectPtr<UUnrealMCPInlineInspectionObject> UnsupportedObject;

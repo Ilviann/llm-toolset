@@ -55,6 +55,20 @@ FString NormalizePath(FString Value)
     return FPackageName::ExportTextPathToObjectPath(Value);
 }
 
+bool NormalizeName(FString Value, FString& Out)
+{
+    Value.TrimStartAndEndInline();
+    if (Value.Len() >= 2 && Value[0] == TCHAR('"') && Value[Value.Len() - 1] == TCHAR('"'))
+    {
+        Value = Value.Mid(1, Value.Len() - 2);
+        Value.ReplaceInline(TEXT("\\\""), TEXT("\""));
+        Value.ReplaceInline(TEXT("\\\\"), TEXT("\\"));
+    }
+    if (Value.Len() > 128) return false;
+    Out = Value;
+    return true;
+}
+
 bool IsCompatibleAttribute(const FProperty* Property)
 {
     if (const FNumericProperty* Numeric = CastField<FNumericProperty>(Property))
@@ -86,10 +100,12 @@ bool UnrealMCP::GameplayAttributeCodec::Encode(const FString& Text, TSharedPtr<F
 
     FString FieldPath;
     FString StoredOwnerPath;
+    FString StoredAttributeName;
     bool bHasAttribute = false;
     bool bHasOwner = false;
+    bool bHasAttributeName = false;
     TArray<FString> Fields;
-    if (!SplitFields(Interior, Fields) || Fields.Num() > 2) return false;
+    if (!SplitFields(Interior, Fields) || Fields.Num() > 3) return false;
     for (const FString& Field : Fields)
     {
         FString Name;
@@ -106,18 +122,24 @@ bool UnrealMCP::GameplayAttributeCodec::Encode(const FString& Text, TSharedPtr<F
             StoredOwnerPath = NormalizePath(Value);
             bHasOwner = true;
         }
+        else if (Name == TEXT("AttributeName") && !bHasAttributeName)
+        {
+            if (!NormalizeName(Value, StoredAttributeName)) return false;
+            bHasAttributeName = true;
+        }
         else return false;
     }
-    if (!bHasAttribute) return false;
+    if (!bHasAttribute && !(bHasAttributeName && bHasOwner)) return false;
 
     FString FieldOwnerPath;
-    FString AttributeName;
+    FString FieldAttributeName;
     if (!FieldPath.IsEmpty()
-        && !FieldPath.Split(TEXT(":"), &FieldOwnerPath, &AttributeName, ESearchCase::CaseSensitive, ESearchDir::FromEnd))
+        && !FieldPath.Split(TEXT(":"), &FieldOwnerPath, &FieldAttributeName, ESearchCase::CaseSensitive, ESearchDir::FromEnd))
     {
         return false;
     }
     FieldOwnerPath = NormalizePath(FieldOwnerPath);
+    const FString AttributeName = !FieldAttributeName.IsEmpty() ? FieldAttributeName : StoredAttributeName;
     const FString OwnerPath = !FieldOwnerPath.IsEmpty() ? FieldOwnerPath : StoredOwnerPath;
     UStruct* Owner = OwnerPath.IsEmpty() ? nullptr : FindObject<UStruct>(nullptr, *OwnerPath);
     if (Owner == nullptr && !OwnerPath.IsEmpty())

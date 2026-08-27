@@ -28,6 +28,7 @@ Every successful edit compiles when applicable, saves non-interactively, re-insp
 Top-level row `values` and Data Asset properties use the same bounded reflected inspection codec. Supported values are:
 
 - Boolean, finite numeric, name/string/`FText`, exact enum-name scalars, `FGameplayTag`, and 32-lowercase-hex `FGuid` strings;
+- `FGameplayAttribute` as `{kind:"gameplay_attribute",resolved,compatible,name,property_path,owner_path}`, including when used as a container key;
 - `FGameplayTagContainer` as a sorted array of explicit tag strings;
 - compatible hard/soft object or class references as `{kind:"reference",path:"/…"}`, with an empty path for null;
 - arrays as JSON arrays;

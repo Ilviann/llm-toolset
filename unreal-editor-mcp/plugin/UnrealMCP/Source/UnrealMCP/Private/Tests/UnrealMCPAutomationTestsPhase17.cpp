@@ -263,6 +263,26 @@ bool FUnrealMCPReflectedInspectionTest::RunTest(const FString& Parameters)
     const int32 SoftTableIndex = SoftTables.AddValue();
     CastFieldChecked<FSoftObjectProperty>(SoftTablesProperty->Inner)->SetPropertyValue(
         SoftTables.GetRawPtr(SoftTableIndex), FSoftObjectPtr(FSoftObjectPath(Table)));
+    UClass* AttributeSetClass = LoadObject<UClass>(
+        nullptr, TEXT("/Script/GameplayAbilities.AbilitySystemTestAttributeSet"), nullptr, LOAD_NoWarn | LOAD_Quiet);
+    FProperty* HealthProperty = AttributeSetClass != nullptr
+        ? AttributeSetClass->FindPropertyByName(TEXT("Health")) : nullptr;
+    if (!TestNotNull(TEXT("Data Asset Gameplay Attribute owner is available"), AttributeSetClass)
+        || !TestNotNull(TEXT("Data Asset Gameplay Attribute target is available"), HealthProperty)) return false;
+    FMapProperty* GrantedAttributesProperty = CastFieldChecked<FMapProperty>(
+        TestProperty(DataAssetClass, TEXT("GrantedAttributes")));
+    FScriptMapHelper GrantedAttributes(
+        GrantedAttributesProperty, GrantedAttributesProperty->ContainerPtrToValuePtr<void>(DataAsset));
+    const int32 GrantedIndex = GrantedAttributes.AddDefaultValue_Invalid_NeedsRehash();
+    const FString AttributeText = FString::Printf(
+        TEXT("(AttributeName=\"%s\",Attribute=%s,AttributeOwner=\"/Script/CoreUObject.Class'%s'\")"),
+        *HealthProperty->GetName(), *HealthProperty->GetPathName(), *AttributeSetClass->GetPathName());
+    if (!TestNotNull(TEXT("Data Asset map Gameplay Attribute imports"),
+            GrantedAttributesProperty->KeyProp->ImportText_Direct(
+                *AttributeText, GrantedAttributes.GetKeyPtr(GrantedIndex), DataAsset, PPF_None))) return false;
+    CastFieldChecked<FFloatProperty>(GrantedAttributesProperty->ValueProp)->SetPropertyValue(
+        GrantedAttributes.GetValuePtr(GrantedIndex), 7.5f);
+    GrantedAttributes.Rehash();
     FAssetRegistryModule::AssetCreated(DataAsset);
 
     if (!TestTrue(TEXT("generic Data Asset inspection succeeds"),
@@ -280,6 +300,14 @@ bool FUnrealMCPReflectedInspectionTest::RunTest(const FString& Parameters)
         RecordByName(Result, TEXT("ReferencedTable"))->GetObjectField(TEXT("value"))->GetStringField(TEXT("path")), Table->GetPathName());
     TestEqual(TEXT("Data Asset soft-reference array is visible"),
         RecordByName(Result, TEXT("SoftTables"))->GetArrayField(TEXT("value")).Num(), 1);
+    const TSharedPtr<FJsonObject> GrantedMap = RecordByName(Result, TEXT("GrantedAttributes"))->GetObjectField(TEXT("value"));
+    TestEqual(TEXT("Data Asset Gameplay Attribute map is tagged"),
+        GrantedMap->GetStringField(TEXT("kind")), FString(TEXT("map")));
+    const TSharedPtr<FJsonObject> GrantedKey = GrantedMap->GetArrayField(TEXT("entries"))[0]->AsObject()->GetObjectField(TEXT("key"));
+    TestEqual(TEXT("Data Asset Gameplay Attribute map key is typed"),
+        GrantedKey->GetStringField(TEXT("kind")), FString(TEXT("gameplay_attribute")));
+    TestEqual(TEXT("Data Asset Gameplay Attribute map key resolves"),
+        GrantedKey->GetStringField(TEXT("property_path")), HealthProperty->GetPathName());
     TestFalse(TEXT("unsupported Data Asset property is isolated"),
         RecordByName(Result, TEXT("UnsupportedObject"))->GetBoolField(TEXT("supported")));
     TestTrue(TEXT("supported Data Asset siblings remain available"),

@@ -22,6 +22,7 @@
 - [`reflected-inspection` — Reflected values, inherited components, and Data Assets](reflected-inspection.md).
 - [`gameplay-attribute-inspect` — Gameplay Attribute value inspection](gameplay-attribute-inspect.md).
 - [`gameplay-effect-modifiers-reflection` — Reflected Gameplay Effect modifiers](gameplay-effect-modifiers-reflection.md).
+- [`reflected-map-gameplay-attributes` — Reflected maps and Gameplay Attribute compatibility](reflected-map-gameplay-attributes.md).
 - [`editor-launch` — Optional configured editor launch](editor-launch.md).
 - [`editor-shutdown` — Optional graceful editor shutdown](editor-shutdown.md).
 - [`editor-restart` — Optional durable editor restart](editor-restart.md).

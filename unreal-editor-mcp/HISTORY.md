@@ -4,6 +4,11 @@
 
 - Standardized Unreal Engine 5.8 development tooling on the `UE58` environment variable and moved the disposable integration project to `ue-test/ue58/`.
 
+## 0.36.0 — 2026-08-27
+
+- Added bounded deterministic map values to targeted Blueprint component/class-default inspection and typed `FGameplayAttribute` values to the game-data codec, including map keys.
+- Accepted Unreal Engine 5.7's three-field Gameplay Attribute export containing `AttributeName`, `Attribute`, and `AttributeOwner`; added real reflected-value coverage, advanced the exact Python/base-plugin version pair to 0.36.0, and advanced the disposable test companion to 0.1.3 for its GameplayAbilities-backed fixtures. Companion API v1 and the GAS companion version are unchanged; macOS verification remains preferred follow-up work.
+
 ## 0.35.0 — 2026-08-27
 
 - Added bounded read-only inspection of the exact reflected `Modifiers` class-default array on admitted Gameplay Effect Blueprints, including nested Gameplay Attributes, magnitude backing records, evaluation channels, and source/target tag requirements without adding a base-plugin GameplayAbilities dependency.

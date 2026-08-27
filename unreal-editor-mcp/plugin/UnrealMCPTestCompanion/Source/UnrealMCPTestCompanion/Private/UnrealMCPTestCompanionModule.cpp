@@ -255,6 +255,8 @@ public:
         Registration.SemanticVersion = UnrealMCPTestCompanion::Version;
         Registration.CompanionApiVersion = UnrealMCPTestCompanion::CompanionApiVersion;
         Registration.ExtensionSchemaRevision = UnrealMCPTestCompanion::ExtensionSchemaRevision;
+        Registration.RequiredEnginePlugins = {TEXT("GameplayAbilities")};
+        Registration.RequiredEngineModules = {TEXT("GameplayAbilities")};
         Registration.Contributions = {
             Contribution(TEXT("test_asset_read"), EUnrealMCPExtensionCategory::AssetFamily,
                 EUnrealMCPExtensionAccess::Read, TEXT("blueprint_inspect"), TEXT("inspect_test_asset"),

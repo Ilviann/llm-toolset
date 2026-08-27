@@ -18,10 +18,10 @@ The HTTP bridge owns one lazily created service and admits `game_data_edit` thro
 - Data Asset inspection accepts only `UDataAsset`/`UPrimaryDataAsset`, enumerates at most 64 editable non-transient reflected properties, optionally selects exact property names, and includes the complete bounded property set in its snapshot. It never edits or saves the asset.
 - Add, replace, rename, remove, and mixed batch upsert/remove operations prevalidate complete staged rows before mutation. Batch names must be unique ignoring `FName` case semantics, and upserts cannot overlap removals.
 - `preserve_unspecified` is explicit and valid only when a row already exists. Otherwise omitted fields receive the live row-struct defaults.
-- Inspection values are bounded reflected values, never unrestricted Unreal serialization text. They include gameplay tags/containers, GUIDs, text, enum values, compatible hard/soft object and class references, arrays, and bounded nested structs. Arbitrary instanced object graphs, interfaces, delegates, transient/editor-only references, filesystem import/export, and code remain unsupported; inspection isolates an unsupported property instead of hiding supported siblings.
+- Inspection values are bounded reflected values, never unrestricted Unreal serialization text. They include gameplay tags/containers, GUIDs, typed Gameplay Attributes, text, enum values, compatible hard/soft object and class references, arrays, sets, maps including typed keys, and bounded nested structs. Arbitrary instanced object graphs, interfaces, delegates, transient/editor-only references, filesystem import/export, and code remain unsupported; inspection isolates an unsupported property instead of hiding supported siblings.
 - Accepted edits save before returning and report `saved: true`, `dirty: false`, the new snapshot, and bounded changed names. Unexpected read-back/save failure performs explicit transaction restoration and re-saves restored state.
 - Inspection cursors are single-use, retained for 30 seconds, and bound to the full asset snapshot even when the initial query selects named rows.
 
 ## Verification
 
-Run Python schema/release tests, normal and forced-unity Editor builds, `UnrealMCP.Phase17`, all `UnrealMCP` Automation Tests, and the cross-process restart/read-back workflow.
+Run Python schema/release tests, normal and forced-unity Editor builds, `UnrealMCP.Phase17` including typed Gameplay Attribute map keys, all `UnrealMCP` Automation Tests, and the cross-process restart/read-back workflow.

@@ -99,5 +99,6 @@ Feature checkboxes record implementation completion after mandatory Windows veri
   - `reflected-inspection`
   - `gameplay-attribute-inspect`
   - `gameplay-effect-modifiers-reflection`
+  - `reflected-map-gameplay-attributes`
 - Windows:
   - None

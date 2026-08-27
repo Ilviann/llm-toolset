@@ -1,5 +1,7 @@
 #include "UnrealMCPGameDataValueCodec.h"
 
+#include "UnrealMCPGameplayAttributeCodec.h"
+
 #include "Dom/JsonObject.h"
 #include "EdGraphSchema_K2.h"
 #include "Misc/PackageName.h"
@@ -291,6 +293,19 @@ bool UnrealMCP::GameDataValueCodec::Encode(
             if (!EncodeGameplayTagContainer(StructProperty->Struct, Value, Tags))
             { OutError = {TEXT("unsupported_type"), TEXT("The gameplay-tag container could not be encoded")}; return false; }
             OutValue = MakeShared<FJsonValueArray>(Tags);
+            return true;
+        }
+        if (UnrealMCP::GameplayAttributeCodec::IsType(StructProperty->Struct))
+        {
+            FString Exported;
+            TSharedPtr<FJsonObject> Attribute;
+            if (!Property->ExportText_Direct(Exported, Value, nullptr, nullptr, PPF_None)
+                || !UnrealMCP::GameplayAttributeCodec::Encode(Exported, Attribute) || !Attribute.IsValid())
+            {
+                OutError = {TEXT("unsupported_type"), TEXT("The Gameplay Attribute value could not be encoded")};
+                return false;
+            }
+            OutValue = MakeShared<FJsonValueObject>(Attribute.ToSharedRef());
             return true;
         }
         bool bSucceeded = false;

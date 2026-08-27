@@ -5,6 +5,8 @@
 #include "Dom/JsonObject.h"
 #include "Dom/JsonValue.h"
 #include "Misc/PackageName.h"
+#include "Serialization/JsonSerializer.h"
+#include "Serialization/JsonWriter.h"
 #include "UnrealMCPProtocol.h"
 #include "UnrealMCPVersion.h"
 #include "UObject/SoftObjectPath.h"
@@ -17,6 +19,14 @@ const TSet<FName> SafeStructs = {
     TEXT("Color"), TEXT("LinearColor"), TEXT("IntPoint"), TEXT("IntVector"), TEXT("IntVector4")};
 constexpr const TCHAR* GameplayModifierInfoPath = TEXT("/Script/GameplayAbilities.GameplayModifierInfo");
 constexpr int32 GameplayModifierReadableDepth = UnrealMCP::MaxGameDataDepth + 2;
+
+FString CanonicalJson(const TSharedPtr<FJsonValue>& Value)
+{
+    FString Result;
+    const TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Result);
+    FJsonSerializer::Serialize(Value, FString(), Writer);
+    return Result;
+}
 
 bool IsGameplayModifierArray(const FProperty* Property)
 {
@@ -112,7 +122,7 @@ bool IsReadable(
         || (bRequireEditable && !Property->HasAnyPropertyFlags(CPF_Edit))
         || Property->HasAnyPropertyFlags(CPF_Transient | CPF_DisableEditOnTemplate | CPF_Deprecated | CPF_EditorOnly
             | CPF_InstancedReference | CPF_ContainsInstancedReference | CPF_ExportObject)
-        || Property->IsA<FSetProperty>() || Property->IsA<FMapProperty>()
+        || Property->IsA<FSetProperty>()
         || Property->IsA<FDelegateProperty>() || Property->IsA<FMulticastDelegateProperty>() || Property->IsA<FInterfaceProperty>())
     {
         return false;
@@ -147,6 +157,14 @@ bool IsReadable(
         FString ChildKind;
         if (!IsReadable(Array->Inner, ChildKind, Depth + 1, DepthLimit, false)) return false;
         OutKind = TEXT("array");
+    }
+    else if (const FMapProperty* Map = CastField<FMapProperty>(Property))
+    {
+        FString KeyKind;
+        FString ValueKind;
+        if (!IsReadable(Map->KeyProp, KeyKind, Depth + 1, DepthLimit, false)
+            || !IsReadable(Map->ValueProp, ValueKind, Depth + 1, DepthLimit, false)) return false;
+        OutKind = TEXT("map");
     }
     else if (Property->IsA<FClassProperty>() || Property->IsA<FSoftClassProperty>()) OutKind = TEXT("class_reference");
     else if (Property->IsA<FObjectPropertyBase>() || Property->IsA<FSoftObjectProperty>()) OutKind = TEXT("object_reference");
@@ -315,6 +333,34 @@ bool EncodeValueAt(
             Values.Add(Child);
         }
         Out = MakeShared<FJsonValueArray>(Values);
+        return true;
+    }
+    if (const FMapProperty* Map = CastField<FMapProperty>(Property))
+    {
+        FScriptMapHelper Helper(Map, Address);
+        if (Helper.Num() > UnrealMCP::MaxGameDataCollectionItems) return false;
+        TArray<TSharedPtr<FJsonValue>> Entries;
+        Entries.Reserve(Helper.Num());
+        for (int32 Index = 0; Index < Helper.GetMaxIndex(); ++Index)
+        {
+            if (!Helper.IsValidIndex(Index)) continue;
+            TSharedPtr<FJsonValue> Key;
+            TSharedPtr<FJsonValue> Value;
+            if (!EncodeValueAt(Object, Map->KeyProp, Helper.GetKeyPtr(Index), Depth + 1, DepthLimit, Key)
+                || !EncodeValueAt(Object, Map->ValueProp, Helper.GetValuePtr(Index), Depth + 1, DepthLimit, Value)) return false;
+            const TSharedRef<FJsonObject> Entry = MakeShared<FJsonObject>();
+            Entry->SetField(TEXT("key"), Key);
+            Entry->SetField(TEXT("value"), Value);
+            Entries.Add(MakeShared<FJsonValueObject>(Entry));
+        }
+        Entries.Sort([](const TSharedPtr<FJsonValue>& Left, const TSharedPtr<FJsonValue>& Right)
+        {
+            return CanonicalJson(Left) < CanonicalJson(Right);
+        });
+        const TSharedRef<FJsonObject> Tagged = MakeShared<FJsonObject>();
+        Tagged->SetStringField(TEXT("kind"), TEXT("map"));
+        Tagged->SetArrayField(TEXT("entries"), Entries);
+        Out = MakeShared<FJsonValueObject>(Tagged);
         return true;
     }
     return false;
