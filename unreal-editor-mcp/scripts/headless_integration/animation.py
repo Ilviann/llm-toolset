@@ -22,6 +22,11 @@ def inspect_animation(bridge: UnrealBridge) -> dict[str, object]:
     capabilities = bridge.call("capabilities")
     if capabilities.get("features", {}).get("animation_blueprint_inspection") is not True:
         raise AssertionError("Animation inspection capability is missing")
+    limits = capabilities["limits"]
+    if (limits.get("inspect_records") != 4096
+            or limits.get("inspect_internal_work") != 262144
+            or limits.get("inspect_fingerprint_entries") != 262144):
+        raise AssertionError("Result and internal inspection budgets are not published separately")
     family = next(item for item in capabilities["blueprint_families"] if item["family"] == "animation")
     if any(value is not (name in {"discover", "inspect"}) for name, value in family["operations"].items()):
         raise AssertionError("Animation family must be inspection-only")

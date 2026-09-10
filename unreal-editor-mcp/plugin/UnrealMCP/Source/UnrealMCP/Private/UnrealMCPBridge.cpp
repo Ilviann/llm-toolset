@@ -665,6 +665,8 @@ TSharedPtr<FJsonObject> FUnrealMCPBridge::Capabilities() const
     Limits->SetNumberField(TEXT("inspect_page_size"), UnrealMCP::MaxInspectPageSize);
     Limits->SetNumberField(TEXT("discovery_scan"), UnrealMCP::MaxDiscoveryScan);
     Limits->SetNumberField(TEXT("inspect_records"), UnrealMCP::MaxInspectRecords);
+    Limits->SetNumberField(TEXT("inspect_internal_work"), UnrealMCP::MaxInspectInternalWork);
+    Limits->SetNumberField(TEXT("inspect_fingerprint_entries"), UnrealMCP::MaxInspectFingerprintEntries);
     Limits->SetNumberField(TEXT("retained_cursors"), UnrealMCP::MaxRetainedCursors);
     Limits->SetNumberField(TEXT("cursor_lifetime_ms"), static_cast<int32>(UnrealMCP::CursorLifetimeSeconds * 1000.0));
     Limits->SetNumberField(TEXT("compiler_diagnostics"), UnrealMCP::MaxCompilerDiagnostics);

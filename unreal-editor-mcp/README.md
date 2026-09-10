@@ -1,6 +1,6 @@
 # Unreal Editor MCP
 
-Unreal Editor MCP 0.39.0 is an offline-first MCP bridge for Unreal Engine 5.7.x. It pairs a dependency-free Python 3.10+ stdio server with an editor-only C++ plugin.
+Unreal Editor MCP 0.39.1 is an offline-first MCP bridge for Unreal Engine 5.7.x. It pairs a dependency-free Python 3.10+ stdio server with an editor-only C++ plugin.
 
 Readonly access is the released default. Project-content mutation requires the explicit `--writable` trust decision; optional editor lifecycle control remains independent.
 
@@ -28,7 +28,7 @@ Python 3.10 or newer with tkinter is required. The build and installation are of
 
 1. Copy [`plugin/UnrealMCP`](plugin/UnrealMCP) to `<YourProject>/Plugins/UnrealMCP`, or add this repository's `plugin/` directory to `AdditionalPluginDirectories` in a disposable development `.uproject`.
 2. Enable `UnrealMCP` and compile the project's Editor target with Unreal Engine 5.7.x.
-3. Open the project and wait for `Unreal MCP 0.39.0 ready on 127.0.0.1:15485` in the editor log.
+3. Open the project and wait for `Unreal MCP 0.39.1 ready on 127.0.0.1:15485` in the editor log.
 4. Create a virtual environment and install the Python package offline:
 
    ```sh
@@ -118,6 +118,6 @@ The executable schemas, runtime `capabilities` response, source, plugin metadata
 - Blueprint compilation and saving are explicit. A completed compile can return `compile_succeeded: false` with bounded diagnostics.
 - Maps use mounted World object paths, never `.umap` filenames. `level_manage` creates or configures exact maps with explicit current-map snapshots and setup bounds; safe map deletion remains in `asset_delete` and verifies the complete owned package closure.
 - `level_actor_edit` prevalidates one bounded stale-safe transaction and returns its exact dirty package set; `level_save` explicitly persists that set and verifies requested actor/component state by inspection or map reload.
-- Runtime-published limits override documentation. Current defaults include 64 KiB requests, 256 KiB responses, eight queued requests, JSON depth 16, a five-second Game-thread dispatch deadline, 100 inspection records per page, and 128 retained mutations for 15 minutes.
+- Runtime-published limits override documentation. Current defaults include 64 KiB requests, 256 KiB responses, eight queued requests, JSON depth 16, a five-second Game-thread dispatch deadline, 100 inspection records per page, 4,096 Blueprint inspection result records across pages, separate 262,144-unit internal traversal/work and fingerprint-entry budgets, and 128 retained mutations for 15 minutes.
 
 Detailed requests, workflows, safety conditions, and tool-specific limits are indexed under [`docs/user/`](docs/user/index.md). Implementation documentation starts at [`docs/index.md`](docs/index.md), and released changes are recorded in [`HISTORY.md`](HISTORY.md).

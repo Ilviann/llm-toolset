@@ -53,10 +53,19 @@ struct FInspectionSink
     {
     }
 
-    bool ExceedsStructuralLimit() const
+    bool CheckLimits(FUnrealMCPError& OutError) const
     {
-        return Records.Num() > UnrealMCP::MaxInspectRecords
-            || Fingerprint.Num() > UnrealMCP::MaxInspectRecords;
+        if (Records.Num() > UnrealMCP::MaxInspectRecords)
+        {
+            OutError = {TEXT("response_too_large"), TEXT("Inspection exceeds the configured result record limit")};
+            return false;
+        }
+        if (Fingerprint.Num() > UnrealMCP::MaxInspectFingerprintEntries)
+        {
+            OutError = {TEXT("response_too_large"), TEXT("Inspection exceeds the configured internal fingerprint limit")};
+            return false;
+        }
+        return true;
     }
 
     TArray<TSharedPtr<FJsonValue>>& Records;
@@ -525,10 +534,10 @@ static bool AddBlueprintGraphs(UBlueprint* Blueprint, const FString& OwnerPath, 
     {
         for (UEdGraph* Graph : Source)
         {
-            if (++Scanned > UnrealMCP::MaxInspectRecords) return false;
+            if (++Scanned > UnrealMCP::MaxInspectInternalWork) return false;
             if (Graph != nullptr && !Seen.Contains(Graph))
             {
-                if (OutGraphs.Num() >= UnrealMCP::MaxInspectRecords) return false;
+                if (OutGraphs.Num() >= UnrealMCP::MaxInspectInternalWork) return false;
                 Seen.Add(Graph);
                 OutGraphs.Emplace(Graph, OwnerPath);
             }

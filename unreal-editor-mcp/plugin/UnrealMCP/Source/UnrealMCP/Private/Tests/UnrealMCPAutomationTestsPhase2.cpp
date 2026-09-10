@@ -117,8 +117,14 @@ bool FUnrealMCPPhase2InspectionTest::RunTest(const FString& Parameters)
         Node->CreateNewGuid();
         LargeGraph->AddNode(Node, false, false);
     }
-    TestFalse(TEXT("oversized synthetic graph rejects"), Inspector.Execute(InspectArguments(LargeBlueprint->GetPathName()), Result, Error));
+    TestTrue(TEXT("large graph summary fits result budget"), Inspector.Execute(InspectArguments(LargeBlueprint->GetPathName()), Result, Error));
+    TSharedRef<FJsonObject> LargeDetails = InspectArguments(LargeBlueprint->GetPathName());
+    LargeDetails->SetStringField(TEXT("graph_id"), LargeGraph->GraphGuid.ToString(EGuidFormats::Digits).ToLower());
+    LargeDetails->SetArrayField(TEXT("sections"), {MakeShared<FJsonValueString>(TEXT("nodes"))});
+    TestFalse(TEXT("oversized synthetic graph result rejects"), Inspector.Execute(LargeDetails, Result, Error));
     TestEqual(TEXT("oversized graph error is stable"), Error.Code, FString(TEXT("response_too_large")));
+    TestEqual(TEXT("oversized graph identifies result budget"), Error.Message,
+        FString(TEXT("Inspection exceeds the configured result record limit")));
     FPackageName::UnRegisterMountPoint(TEXT("/UnrealMCPTestPlugin/"), PluginContentDirectory + TEXT("/"));
     return true;
 }

@@ -4,6 +4,12 @@
 
 - Standardized Unreal Engine 5.8 development tooling on the `UE58` environment variable and moved the disposable integration project to `ue-test/ue58/`.
 
+## 0.39.1 — 2026-09-10
+
+- Fixed small graph inspections failing on large Blueprints: retain 4,096 result records while allowing 262,144 internal traversal/work units and 262,144 snapshot fingerprint entries. Publish separate capability limits and identify the exceeded budget in errors. Preserve whole-asset graph snapshots and stale-safe cursors.
+- Added large Animation Blueprint, exact result/fingerprint boundary, internal-work rejection, and unselected-graph stale-cursor regressions. Companion API v1 and companion versions are unchanged.
+- Windows adaptive/forced-unity builds, 148 Python tests (one skipped), 46 native cases, full and animation restart integration, documentation lint, and binary packaging passed. A real project Animation Blueprint also passed default, graph-summary, and paged AnimGraph inspection with consistent snapshots and unchanged asset/descriptor bytes. macOS verification remains preferred follow-up work.
+
 ## 0.39.0 — 2026-09-10
 
 - Changed Blueprint graph inspection to compact listings of names, kinds, declared function/macro parameters, and identity/ownership metadata. Graph details, nodes, pins, and connections require one `graph_id` or exact `graph_name`; a selector with omitted sections returns that graph's contents. Unscoped content requests and ambiguous names reject explicitly.

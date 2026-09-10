@@ -172,7 +172,7 @@ for (const TPair<UEdGraph*, FString>& Entry : Graphs)
     const bool bAnimation = OwnerBlueprint != nullptr && OwnerBlueprint->IsA<UAnimBlueprint>();
     auto WithinAnimationLimit = [&AnimationWork, bAnimation, &OutError](int32 Count)
     {
-        if (bAnimation && (AnimationWork += Count) > UnrealMCP::MaxInspectRecords)
+        if (bAnimation && (AnimationWork += Count) > UnrealMCP::MaxInspectInternalWork)
         {
             OutError = {TEXT("response_too_large"), TEXT("Animation graph inspection exceeds the structural work limit")};
             return false;
@@ -182,7 +182,7 @@ for (const TPair<UEdGraph*, FString>& Entry : Graphs)
     if (!WithinAnimationLimit(Graph->Nodes.Num())) return false;
     const UEdGraph* ParentGraph = bAnimation ? Graph->GetTypedOuter<UEdGraph>() : nullptr;
     const UEdGraphNode* OwnerNode = bAnimation ? Cast<UEdGraphNode>(Graph->GetOuter()) : nullptr;
-    if (Graph->Nodes.Num() > UnrealMCP::MaxInspectRecords)
+    if (Graph->Nodes.Num() > UnrealMCP::MaxInspectInternalWork)
     {
         OutError = {TEXT("response_too_large"), TEXT("Inspection exceeds the configured node limit")};
         return false;
@@ -232,6 +232,7 @@ for (const TPair<UEdGraph*, FString>& Entry : Graphs)
             + (ParentGraph != nullptr ? GuidString(ParentGraph->GraphGuid) : FString()) + TEXT("|")
             + (OwnerNode != nullptr ? GuidString(OwnerNode->NodeGuid) : FString()) + TEXT("|")
             + (Graph->Schema != nullptr ? Graph->Schema->GetPathName() : FString()));
+    if (!Sink.CheckLimits(OutError)) return false;
     for (UEdGraphNode* Node : Graph->Nodes)
     {
         if (Node == nullptr) continue;
@@ -307,11 +308,7 @@ for (const TPair<UEdGraph*, FString>& Entry : Graphs)
                 }
             }
         }
-        if (Sink.ExceedsStructuralLimit())
-        {
-            OutError = {TEXT("response_too_large"), TEXT("Inspection exceeds the configured structural record limit")};
-            return false;
-        }
+        if (!Sink.CheckLimits(OutError)) return false;
     }
 }
     return true;

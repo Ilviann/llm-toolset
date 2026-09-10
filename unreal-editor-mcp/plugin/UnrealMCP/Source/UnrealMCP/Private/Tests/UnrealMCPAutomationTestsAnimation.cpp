@@ -250,8 +250,51 @@ bool FUnrealMCPAnimationInspectionTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("cycle does not duplicate graphs"), CyclicGraphs.Num(), Graphs.Num());
     Nested->SubGraphs.Pop();
     TArray<TPair<UEdGraph*, FString>> FullGraphs;
-    FullGraphs.SetNum(UnrealMCP::MaxInspectRecords);
+    FullGraphs.SetNum(UnrealMCP::MaxInspectInternalWork);
     TestFalse(TEXT("graph traversal enforces structural bound"), UnrealMCP::BlueprintInspectionPrivate::AddBlueprintGraphs(Blueprint, Blueprint->GetPathName(), FullGraphs));
+
+    // Large unrelated graphs still participate in snapshots without consuming the result budget.
+    UEdGraph* BudgetGraph = NewObject<UEdGraph>(Blueprint, TEXT("BudgetGraph"));
+    BudgetGraph->GraphGuid = FGuid::NewGuid();
+    Blueprint->FunctionGraphs.Add(BudgetGraph);
+    for (int32 Index = 0; Index < UnrealMCP::MaxInspectRecords; ++Index)
+    {
+        UEdGraphNode* Node = UnrealMCP::Tests::Animation::AddNode<UEdGraphNode>(BudgetGraph);
+        Node->CreatePin(EGPD_Input, UEdGraphSchema_K2::PC_Boolean, FName(TEXT("Value")));
+    }
+    TSharedRef<FJsonObject> BudgetArgs = InspectArguments(Blueprint->GetPathName());
+    BudgetArgs->SetStringField(TEXT("graph_name"), TEXT("BudgetGraph"));
+    BudgetArgs->SetArrayField(TEXT("sections"), {MakeShared<FJsonValueString>(TEXT("nodes"))});
+    if (!TestTrue(TEXT("4096 results with larger animation work and fingerprint succeed"), Inspector.Execute(BudgetArgs, Result, Error))) return false;
+    TestEqual(TEXT("result limit is inclusive"), Result->GetIntegerField(TEXT("record_count")), UnrealMCP::MaxInspectRecords);
+    UnrealMCP::Tests::Animation::AddNode<UEdGraphNode>(BudgetGraph);
+    TestFalse(TEXT("4097 animation results reject before paging"), Inspector.Execute(BudgetArgs, Result, Error));
+    TestEqual(TEXT("animation result budget error"), Error.Message, FString(TEXT("Inspection exceeds the configured result record limit")));
+    BudgetArgs->SetStringField(TEXT("graph_name"), TEXT("Idle"));
+    BudgetArgs->SetArrayField(TEXT("sections"), {
+        MakeShared<FJsonValueString>(TEXT("nodes")), MakeShared<FJsonValueString>(TEXT("pins"))});
+    BudgetArgs->SetNumberField(TEXT("page_size"), 1);
+    if (!TestTrue(TEXT("small selected graph in large animation blueprint succeeds"), Inspector.Execute(BudgetArgs, Result, Error))) return false;
+    Cursor->SetStringField(TEXT("cursor"), Result->GetStringField(TEXT("next_cursor")));
+    if (!TestTrue(TEXT("large snapshot cursor continues unchanged"), Inspector.Execute(Cursor, Result, Error))) return false;
+    if (!TestTrue(TEXT("fresh large snapshot page succeeds"), Inspector.Execute(BudgetArgs, Result, Error))) return false;
+    Cursor->SetStringField(TEXT("cursor"), Result->GetStringField(TEXT("next_cursor")));
+    ++BudgetGraph->Nodes[0]->NodePosX;
+    TestFalse(TEXT("unselected large graph change invalidates cursor"), Inspector.Execute(Cursor, Result, Error));
+    TestEqual(TEXT("large snapshot stale error"), Error.Code, FString(TEXT("stale_precondition")));
+    const int32 PinCount = BudgetGraph->Nodes[0]->Pins.Num();
+    BudgetGraph->Nodes[0]->Pins.SetNum(UnrealMCP::MaxInspectInternalWork);
+    TestFalse(TEXT("animation internal work remains bounded"), Inspector.Execute(BudgetArgs, Result, Error));
+    TestEqual(TEXT("animation internal work error"), Error.Message, FString(TEXT("Animation graph inspection exceeds the structural work limit")));
+    BudgetGraph->Nodes[0]->Pins.SetNum(PinCount);
+
+    TArray<TSharedPtr<FJsonValue>> BudgetRecords;
+    UnrealMCP::BlueprintInspectionPrivate::FInspectionSink BudgetSink(BudgetRecords);
+    BudgetSink.Fingerprint.SetNum(UnrealMCP::MaxInspectFingerprintEntries);
+    TestTrue(TEXT("internal fingerprint limit is inclusive"), BudgetSink.CheckLimits(Error));
+    BudgetSink.Fingerprint.Add(TEXT("overflow"));
+    TestFalse(TEXT("internal fingerprint remains bounded independently of results"), BudgetSink.CheckLimits(Error));
+    TestEqual(TEXT("internal fingerprint error"), Error.Message, FString(TEXT("Inspection exceeds the configured internal fingerprint limit")));
     return true;
 }
 

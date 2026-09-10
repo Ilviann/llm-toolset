@@ -104,11 +104,7 @@ bool BuildInspection(
         if (!ExtensionRegistry->AppendBlueprintInspection(
             *Blueprint, CompanionArguments, OutRecords, Sink.Fingerprint, OutFamilyCapabilities, OutError)) return false;
     }
-    if (Sink.ExceedsStructuralLimit())
-    {
-        OutError = {TEXT("response_too_large"), TEXT("Inspection exceeds the configured structural record limit")};
-        return false;
-    }
+    if (!Sink.CheckLimits(OutError)) return false;
     if (Package->IsDirty() != bDirtyBefore || Blueprint->Status != StatusBefore)
     {
         OutError = {TEXT("internal_error"), TEXT("Inspection unexpectedly changed Blueprint state")};
