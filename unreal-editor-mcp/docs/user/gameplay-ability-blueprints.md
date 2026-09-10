@@ -16,7 +16,7 @@ Inspect ordinary Blueprint structure plus the typed GAS section:
 {
   "mode": "inspect",
   "asset_path": "/Game/Abilities/GA_Dash.GA_Dash",
-  "sections": ["summary", "parent_class", "variables", "graphs", "nodes", "gameplay_ability"],
+  "sections": ["summary", "parent_class", "variables", "graphs", "gameplay_ability"],
   "include_inherited": true,
   "page_size": 100
 }

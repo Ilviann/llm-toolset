@@ -221,6 +221,14 @@ bool FUnrealMCPBlueprintLibrariesInspectionTest::RunTest(const FString& Paramete
         TestEqual(TEXT("inspection preserves compile status"), Fixture.Blueprint->Status, StatusBefore);
 
         const FString Snapshot = Result->GetStringField(TEXT("snapshot_id"));
+        const TSharedPtr<FJsonObject> ListedGraph = FindRecord(Result, TEXT("graph"), Fixture.DeclarationName);
+        TestTrue(TEXT("graph parameters match callable declaration"),
+            FJsonValue::CompareEqual(FJsonValueArray(ListedGraph->GetArrayField(TEXT("parameters"))),
+                FJsonValueArray(Declaration->GetObjectField(TEXT("signature"))->GetArrayField(TEXT("parameters")))));
+        TSharedRef<FJsonObject> GraphDetails = InspectArguments(Fixture.Blueprint->GetPathName());
+        GraphDetails->SetStringField(TEXT("graph_name"), Fixture.DeclarationName);
+        if (!TestTrue(TEXT("library graph name selects details"), Inspector.Execute(GraphDetails, Result, Error))) return false;
+        TestTrue(TEXT("library selected graph includes nodes"), ResultHasSection(Result, TEXT("node")));
         TestFalse(TEXT("library compilation remains excluded"), Mutator.Execute(
             TEXT("blueprint_compile"), AssetArguments(Fixture.Blueprint->GetPathName()), Result, Error));
         TestEqual(TEXT("library mutation rejection is stable"), Error.Code, FString(TEXT("wrong_type")));

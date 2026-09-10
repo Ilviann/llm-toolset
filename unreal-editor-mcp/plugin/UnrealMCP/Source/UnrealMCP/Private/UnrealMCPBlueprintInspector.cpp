@@ -108,6 +108,9 @@ bool FUnrealMCPBlueprintInspector::ExecuteInitial(
         : BuildInspection(*Arguments, ExtensionRegistry, Records, Snapshot, BlueprintFamily, FamilyCapabilities, bScanTruncated, OutError);
     if (!bBuilt)
     {
+        if (!ExpectedSnapshot.IsEmpty() && Arguments->HasField(TEXT("graph_name"))
+            && (OutError.Code == TEXT("not_found") || OutError.Code == TEXT("invalid_argument")))
+            OutError = {TEXT("stale_precondition"), TEXT("The named graph changed before the cursor was continued")};
         return false;
     }
     if (!ExpectedSnapshot.IsEmpty() && Snapshot != ExpectedSnapshot)

@@ -42,7 +42,7 @@ from .schemas import (
 BLUEPRINT_TOOLS: Final = (
     {
         "name": "blueprint_inspect",
-        "description": "Discover supported Blueprint families or inspect selected structure (including animation graphs), family capabilities, and readable defaults through bounded snapshot pages.",
+        "description": "Discover Blueprint assets or inspect bounded snapshot pages. Graph listings contain names, kinds, identities, and input/output parameters. Select one graph_id or exact graph_name to inspect its details, nodes, pins, and connections; without sections a graph selector returns those details. Unscoped graph contents are rejected.",
         "inputSchema": {
             "oneOf": [
                 {
@@ -82,6 +82,7 @@ BLUEPRINT_TOOLS: Final = (
                             },
                         },
                         "graph_id": _COMPONENT_ID,
+                        "graph_name": {"type": "string", "minLength": 1, "maxLength": 128},
                         "component_id": _COMPONENT_ID,
                         "component_name": {"type": "string", "minLength": 1, "maxLength": 128},
                         "member_id": _MEMBER_ID,
@@ -101,6 +102,18 @@ BLUEPRINT_TOOLS: Final = (
                     },
                     "required": ["mode", "asset_path"],
                     "not": {"required": ["component_id", "component_name"]},
+                    "oneOf": [
+                        {"required": ["graph_id"]},
+                        {"required": ["graph_name"]},
+                        {
+                            "not": {"oneOf": [
+                                {"required": ["graph_id"]}, {"required": ["graph_name"]},
+                            ]},
+                            "properties": {"sections": {"items": {
+                                "not": {"enum": ["nodes", "pins", "connections"]},
+                            }}},
+                        },
+                    ],
                     "additionalProperties": False,
                 },
                 {

@@ -45,6 +45,18 @@ bool FUnrealMCPPhase7MacroAndCustomEventTest::RunTest(const FString& Parameters)
         Result->GetObjectField(TEXT("macro"))->GetObjectField(TEXT("signature"))->GetArrayField(TEXT("parameters")).Num(), 2);
 
     Snapshot = Result->GetStringField(TEXT("snapshot_id"));
+    TSharedRef<FJsonObject> GraphList = InspectArguments(AssetPath);
+    GraphList->SetArrayField(TEXT("sections"), {MakeShared<FJsonValueString>(TEXT("graphs"))});
+    TSharedPtr<FJsonObject> Listed;
+    if (!TestTrue(TEXT("macro graph listing succeeds"), Inspector.Execute(GraphList, Listed, Error))) return false;
+    bool bParametersFound = false;
+    for (const TSharedPtr<FJsonValue>& Item : Listed->GetArrayField(TEXT("records")))
+    {
+        if (Item->AsObject()->GetStringField(TEXT("id")) != MacroId) continue;
+        bParametersFound = FJsonValue::CompareEqual(FJsonValueArray(Item->AsObject()->GetArrayField(TEXT("parameters"))),
+            FJsonValueArray(Result->GetObjectField(TEXT("macro"))->GetObjectField(TEXT("signature"))->GetArrayField(TEXT("parameters"))));
+    }
+    TestTrue(TEXT("macro listing preserves input/output parameters without body nodes"), bParametersFound);
     TSharedRef<FJsonObject> CollidingEvent = ScopedMemberEditArguments(AssetPath, Snapshot, TEXT("custom_event"), TEXT("add"));
     CollidingEvent->SetStringField(TEXT("graph_id"), EventGraphId);
     CollidingEvent->SetStringField(TEXT("name"), TEXT("ComputeFlow"));

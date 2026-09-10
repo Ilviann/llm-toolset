@@ -425,7 +425,9 @@ class ServerStdioTests(unittest.TestCase):
         valid = (
             {"mode": "discover", "package_path": "/Game/Actors", "asset_name": "BP_Light", "page_size": 10},
             {"mode": "discover", "package_path": "/Engine", "asset_name": "BP_Light"},
-            {"mode": "inspect", "asset_path": "/Game/Actors/BP_Light.BP_Light", "sections": ["summary", "nodes"], "include_inherited": True},
+            {"mode": "inspect", "asset_path": "/Game/Actors/BP_Light.BP_Light", "sections": ["summary", "nodes"], "graph_id": "a" * 32, "include_inherited": True},
+            {"mode": "inspect", "asset_path": "/Game/Actors/BP_Light.BP_Light", "graph_name": "EventGraph"},
+            {"mode": "inspect", "asset_path": "/Game/Actors/BP_Light.BP_Light", "graph_name": "EventGraph", "sections": ["pins", "connections"]},
             {"mode": "inspect", "asset_path": "/Game/Actors/BP_Light.BP_Light", "sections": ["variables"], "member_id": "e" * 32},
             {"mode": "inspect", "asset_path": "/Game/Actors/BP_Light.BP_Light", "sections": ["components"],
              "component_name": "InheritedMesh", "property_names": ["StaticMesh"]},
@@ -452,6 +454,11 @@ class ServerStdioTests(unittest.TestCase):
             {"cursor": "a" * 32, "mode": "discover"},
             {"mode": "inspect", "asset_path": "/Game/A.A", "page_size": 101},
             {"mode": "inspect", "asset_path": "/Game/A.A", "component_id": "a" * 32, "component_name": "Mesh"},
+            {"mode": "inspect", "asset_path": "/Game/A.A", "graph_id": "a" * 32, "graph_name": "EventGraph"},
+            {"mode": "inspect", "asset_path": "/Game/A.A", "graph_name": ""},
+            {"mode": "inspect", "asset_path": "/Game/A.A", "graph_name": "g" * 129},
+            *({"mode": "inspect", "asset_path": "/Game/A.A", "sections": [section]}
+              for section in ("nodes", "pins", "connections")),
         )
         for arguments in invalid:
             with self.subTest(arguments=arguments):

@@ -21,6 +21,8 @@ Keep the authoritative checklist in [`ROADMAP.md`](../../ROADMAP.md) synchronize
 
 ## Feature catalog
 
+- [`graph-scoped-inspect` — Graph summaries and explicit graph selection](completed/graph-scoped-inspect.md) — List graph signatures and require one graph name or ID for contents.
+
 - [`animation-blueprint-inspect` — Animation Blueprint graph inspection](completed/animation-blueprint-inspect.md) — Discover and inspect authored animation graphs, state machines, states, and transition rules without enabling mutation.
 
 - [`phase-4` — Reliable mutations, Actor components, and defaults](completed/phase-4.md) — Add reliable mutation delivery, Actor component editing, and Blueprint/component defaults.

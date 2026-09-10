@@ -39,11 +39,19 @@ bool FUnrealMCPPhase2InspectionTest::RunTest(const FString& Parameters)
     const int32 TransactionsBefore = GEditor != nullptr && GEditor->Trans != nullptr ? GEditor->Trans->GetQueueLength() : 0;
     TestTrue(TEXT("complete structure inspection succeeds"), Inspector.Execute(AllSectionArguments(ActorPath), Result, Error));
     for (const TCHAR* Section : {TEXT("summary"), TEXT("parent_class"), TEXT("compile_state"), TEXT("component"),
-        TEXT("variable"), TEXT("graph"), TEXT("node"), TEXT("pin")})
+        TEXT("variable"), TEXT("graph")})
     {
         TestTrue(FString::Printf(TEXT("inspection includes %s"), Section), ResultHasSection(Result, Section));
     }
     TestTrue(TEXT("unsupported K2 types are explicit"), ResultHasUnsupportedType(Result));
+    TestFalse(TEXT("asset listing omits nodes"), ResultHasSection(Result, TEXT("node")));
+    const FString ListingSnapshot = Result->GetStringField(TEXT("snapshot_id"));
+    TSharedRef<FJsonObject> GraphArguments = InspectArguments(ActorPath);
+    GraphArguments->SetStringField(TEXT("graph_name"), ActorBlueprint->UbergraphPages[0]->GetName());
+    TestTrue(TEXT("named graph defaults to details"), Inspector.Execute(GraphArguments, Result, Error));
+    TestTrue(TEXT("named graph includes nodes"), ResultHasSection(Result, TEXT("node")));
+    TestTrue(TEXT("named graph includes pins"), ResultHasSection(Result, TEXT("pin")));
+    TestEqual(TEXT("graph selection preserves asset snapshot"), Result->GetStringField(TEXT("snapshot_id")), ListingSnapshot);
     TestEqual(TEXT("inspection preserves package dirty state"), ActorBlueprint->GetOutermost()->IsDirty(), bDirtyBefore);
     TestEqual(TEXT("inspection preserves compile state"), ActorBlueprint->Status, StatusBefore);
     TestEqual(TEXT("inspection preserves selection"), GEditor != nullptr ? GEditor->GetSelectedObjects()->Num() : 0, SelectionBefore);
@@ -84,6 +92,14 @@ bool FUnrealMCPPhase2InspectionTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("inherited inspection succeeds"), Inspector.Execute(Inherited, Result, Error));
     TestTrue(TEXT("inherited component is reported"), ResultHasSection(Result, TEXT("component")));
     TestTrue(TEXT("inherited variable is reported"), ResultHasSection(Result, TEXT("variable")));
+    TSharedRef<FJsonObject> InheritedGraph = InspectArguments(ChildBlueprint->GetPathName());
+    InheritedGraph->SetBoolField(TEXT("include_inherited"), true);
+    InheritedGraph->SetStringField(TEXT("graph_name"), ActorBlueprint->UbergraphPages[0]->GetName());
+    TestFalse(TEXT("same graph name across inheritance is ambiguous"), Inspector.Execute(InheritedGraph, Result, Error));
+    TestEqual(TEXT("inherited ambiguity error"), Error.Code, FString(TEXT("invalid_argument")));
+    InheritedGraph->RemoveField(TEXT("graph_name"));
+    InheritedGraph->SetStringField(TEXT("graph_id"), ActorBlueprint->UbergraphPages[0]->GraphGuid.ToString(EGuidFormats::Digits).ToLower());
+    TestTrue(TEXT("inherited graph identity resolves"), Inspector.Execute(InheritedGraph, Result, Error));
 
     UBlueprint* EmptyGraphBlueprint = CreateBlueprintFixture(Base + TEXT("/BP_EmptyGraphs"), AActor::StaticClass(), false);
     EmptyGraphBlueprint->UbergraphPages.Empty();

@@ -1,5 +1,7 @@
 # Completed features
 
+- [`graph-scoped-inspect` — Graph summaries and explicit graph selection](graph-scoped-inspect.md).
+
 - [`animation-blueprint-inspect` — Animation Blueprint graph inspection](animation-blueprint-inspect.md).
 - [`companion-plugins` — Companion plugin extension foundation](companion-plugins.md).
 - [`gas-ability-blueprints-inspect` — Gameplay Ability Blueprint inspection](gas-ability-blueprints-inspect.md).

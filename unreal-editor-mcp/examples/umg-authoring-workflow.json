@@ -214,6 +214,7 @@
       "mode": "inspect",
       "asset_path": "/Game/UI/WBP_Status.WBP_Status",
       "sections": ["widget_tree", "widget_bindings", "graphs", "nodes"],
+      "graph_name": "EventGraph",
       "page_size": 100
     }
   },

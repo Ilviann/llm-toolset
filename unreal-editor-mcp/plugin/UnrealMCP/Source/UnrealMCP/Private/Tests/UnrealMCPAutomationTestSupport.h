@@ -133,7 +133,7 @@ inline TSharedRef<FJsonObject> AllSectionArguments(const FString& AssetPath, int
     TArray<TSharedPtr<FJsonValue>> Sections;
     for (const TCHAR* Name : {TEXT("summary"), TEXT("parent_class"), TEXT("compile_state"), TEXT("components"),
         TEXT("variables"), TEXT("functions"), TEXT("macros"), TEXT("custom_events"), TEXT("parameters"), TEXT("local_variables"),
-        TEXT("graphs"), TEXT("nodes"), TEXT("pins"), TEXT("connections")})
+        TEXT("graphs")})
     {
         Sections.Add(MakeShared<FJsonValueString>(Name));
     }

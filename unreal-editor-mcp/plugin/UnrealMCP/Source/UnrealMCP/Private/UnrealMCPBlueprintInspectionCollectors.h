@@ -118,6 +118,7 @@ static bool CollectGraphs(
     const TArray<TPair<UBlueprint*, FString>>& Owners,
     const TSet<FString>& Sections,
     const FString& GraphFilter,
+    const FString& GraphNameFilter,
     FInspectionSink& Sink,
     FUnrealMCPError& OutError)
 {
@@ -136,14 +137,36 @@ Graphs.Sort([](const TPair<UEdGraph*, FString>& Left, const TPair<UEdGraph*, FSt
     const FString B = Right.Value + TEXT("|") + GuidString(Right.Key->GraphGuid) + TEXT("|") + Right.Key->GetName();
     return A < B;
 });
-bool bGraphFound = GraphFilter.IsEmpty();
+const bool bGraphSelected = !GraphFilter.IsEmpty() || !GraphNameFilter.IsEmpty();
+UEdGraph* SelectedGraph = nullptr;
+if (bGraphSelected)
+{
+    for (const TPair<UEdGraph*, FString>& Entry : Graphs)
+    {
+        const bool bMatches = !GraphFilter.IsEmpty()
+            ? GuidString(Entry.Key->GraphGuid) == GraphFilter
+            : Entry.Key->GetName().Equals(GraphNameFilter, ESearchCase::CaseSensitive);
+        if (!bMatches) continue;
+        if (SelectedGraph != nullptr && SelectedGraph != Entry.Key)
+        {
+            OutError = {TEXT("invalid_argument"), TEXT("The graph selector is ambiguous; use a unique graph_id and inherited scope")};
+            return false;
+        }
+        SelectedGraph = Entry.Key;
+    }
+    if (SelectedGraph == nullptr)
+    {
+        OutError = {TEXT("not_found"), TEXT("The requested graph was not found")};
+        return false;
+    }
+}
 int64 AnimationWork = Graphs.Num();
 for (const TPair<UEdGraph*, FString>& Entry : Graphs)
 {
     UEdGraph* Graph = Entry.Key;
     const FString GraphId = GuidString(Graph->GraphGuid);
-    if (!GraphFilter.IsEmpty() && GraphId != GraphFilter) continue;
-    bGraphFound = true;
+    // Filtering changes emitted records, never the asset's structural snapshot.
+    const bool bEmitGraph = !bGraphSelected || Graph == SelectedGraph;
     UBlueprint* OwnerBlueprint = Graph->GetTypedOuter<UBlueprint>();
     const FString Kind = OwnerBlueprint != nullptr ? GraphKind(OwnerBlueprint, Graph) : TEXT("other");
     const bool bAnimation = OwnerBlueprint != nullptr && OwnerBlueprint->IsA<UAnimBlueprint>();
@@ -159,7 +182,12 @@ for (const TPair<UEdGraph*, FString>& Entry : Graphs)
     if (!WithinAnimationLimit(Graph->Nodes.Num())) return false;
     const UEdGraph* ParentGraph = bAnimation ? Graph->GetTypedOuter<UEdGraph>() : nullptr;
     const UEdGraphNode* OwnerNode = bAnimation ? Cast<UEdGraphNode>(Graph->GetOuter()) : nullptr;
-    if (Sections.Contains(TEXT("graphs")))
+    if (Graph->Nodes.Num() > UnrealMCP::MaxInspectRecords)
+    {
+        OutError = {TEXT("response_too_large"), TEXT("Inspection exceeds the configured node limit")};
+        return false;
+    }
+    if (bEmitGraph && Sections.Contains(TEXT("graphs")))
     {
         const TSharedRef<FJsonObject> Value = Record(TEXT("graph"));
         Value->SetStringField(TEXT("id"), GraphId);
@@ -168,8 +196,29 @@ for (const TPair<UEdGraph*, FString>& Entry : Graphs)
         Value->SetStringField(TEXT("kind"), Kind);
         Value->SetStringField(TEXT("owner_blueprint"), Entry.Value);
         Value->SetBoolField(TEXT("inherited"), OwnerBlueprint != Blueprint);
-        Value->SetNumberField(TEXT("node_count"), Graph->Nodes.Num());
-        if (bAnimation)
+        TArray<UK2Node_FunctionEntry*> Entries;
+        TArray<UK2Node_FunctionResult*> Results;
+        Graph->GetNodesOfClass(Entries);
+        Graph->GetNodesOfClass(Results);
+        TArray<TSharedPtr<FJsonValue>> Parameters;
+        if (!Entries.IsEmpty())
+            Parameters = FunctionSignature(Entries[0], Results)->GetArrayField(TEXT("parameters"));
+        else if (Kind == TEXT("macro"))
+        {
+            UK2Node_Tunnel* EntryTunnel = nullptr;
+            UK2Node_Tunnel* ExitTunnel = nullptr;
+            for (UEdGraphNode* Node : Graph->Nodes)
+            {
+                UK2Node_Tunnel* Tunnel = Cast<UK2Node_Tunnel>(Node);
+                if (Tunnel == nullptr || Tunnel->GetClass() != UK2Node_Tunnel::StaticClass()) continue;
+                if (Tunnel->bCanHaveOutputs) EntryTunnel = Tunnel;
+                if (Tunnel->bCanHaveInputs) ExitTunnel = Tunnel;
+            }
+            Parameters = MacroSignature(EntryTunnel, ExitTunnel, false)->GetArrayField(TEXT("parameters"));
+        }
+        Value->SetArrayField(TEXT("parameters"), Parameters);
+        if (bGraphSelected) Value->SetNumberField(TEXT("node_count"), Graph->Nodes.Num());
+        if (bAnimation && bGraphSelected)
         {
             Value->SetStringField(TEXT("schema_class"), Graph->Schema != nullptr ? Graph->Schema->GetPathName() : FString());
             Value->SetStringField(TEXT("parent_graph_id"), ParentGraph != nullptr ? GuidString(ParentGraph->GraphGuid) : FString());
@@ -193,7 +242,7 @@ for (const TPair<UEdGraph*, FString>& Entry : Graphs)
         for (const TPair<FString, TSharedPtr<FJsonValue>>& Field : Relationships->Values)
             Sink.Fingerprint.Add(TEXT("animation_node|") + GraphId + TEXT("|") + NodeId
                 + TEXT("|") + Field.Key + TEXT("|") + Field.Value->AsString());
-        if (Sections.Contains(TEXT("nodes")))
+        if (bEmitGraph && bGraphSelected && Sections.Contains(TEXT("nodes")))
         {
             const TSharedRef<FJsonObject> Value = Record(TEXT("node"));
             Value->SetStringField(TEXT("graph_id"), GraphId);
@@ -214,7 +263,7 @@ for (const TPair<UEdGraph*, FString>& Entry : Graphs)
             if (!IsStructuralGraphPin(Node, Pin)) continue;
             if (!WithinAnimationLimit(Pin->LinkedTo.Num())) return false;
             const FString PinId = GuidString(Pin->PinId);
-            if (Sections.Contains(TEXT("pins")))
+            if (bEmitGraph && bGraphSelected && Sections.Contains(TEXT("pins")))
             {
                 const TSharedRef<FJsonObject> Value = Record(TEXT("pin"));
                 Value->SetStringField(TEXT("graph_id"), GraphId);
@@ -244,7 +293,7 @@ for (const TPair<UEdGraph*, FString>& Entry : Graphs)
                 for (UEdGraphPin* Linked : Pin->LinkedTo)
                 {
                     if (Linked == nullptr || Linked->GetOwningNodeUnchecked() == nullptr) continue;
-                    if (Sections.Contains(TEXT("connections")))
+                    if (bEmitGraph && bGraphSelected && Sections.Contains(TEXT("connections")))
                     {
                         const TSharedRef<FJsonObject> Value = Record(TEXT("connection"));
                         Value->SetStringField(TEXT("graph_id"), GraphId);
@@ -264,11 +313,6 @@ for (const TPair<UEdGraph*, FString>& Entry : Graphs)
             return false;
         }
     }
-}
-if (!bGraphFound)
-{
-    OutError = {TEXT("not_found"), TEXT("The requested graph identity was not found")};
-    return false;
 }
     return true;
 }

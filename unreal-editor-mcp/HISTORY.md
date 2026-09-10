@@ -4,6 +4,12 @@
 
 - Standardized Unreal Engine 5.8 development tooling on the `UE58` environment variable and moved the disposable integration project to `ue-test/ue58/`.
 
+## 0.39.0 — 2026-09-10
+
+- Changed Blueprint graph inspection to compact listings of names, kinds, declared function/macro parameters, and identity/ownership metadata. Graph details, nodes, pins, and connections require one `graph_id` or exact `graph_name`; a selector with omitted sections returns that graph's contents. Unscoped content requests and ambiguous names reject explicitly.
+- Kept graph fingerprints consistent across summary/detail requests, retained stale-safe named cursors and inherited ownership, and published `graph_scoped_inspection`. Companion handlers reuse their existing section arguments; companion API v1 and companion versions are unchanged.
+- Updated examples and inspection callers. Windows adaptive/forced-unity builds, the full Python/native suites, full and Animation Blueprint restart integration, documentation lint, and binary packaging passed. macOS verification remains preferred follow-up work.
+
 ## 0.38.0 — 2026-09-10
 
 - Added inspection-only Animation Blueprint discovery and graph inspection, including nested state machines, states, transition/conduit rules, graph ownership, direct animation assets, bounded traversal, and stale-safe paging. Existing Event Graphs and callable/member inspection reuse their established forms; animation authoring and runtime evaluation remain excluded.

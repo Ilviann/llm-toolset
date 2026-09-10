@@ -52,6 +52,18 @@ bool FUnrealMCPPhase6FunctionAndLocalTest::RunTest(const FString& Parameters)
         Result->GetObjectField(TEXT("function"))->GetObjectField(TEXT("metadata"))->GetStringField(TEXT("category")), FString(TEXT("Unreal MCP")));
 
     Snapshot = Result->GetStringField(TEXT("snapshot_id"));
+    TSharedRef<FJsonObject> GraphList = InspectArguments(AssetPath);
+    GraphList->SetArrayField(TEXT("sections"), {MakeShared<FJsonValueString>(TEXT("graphs"))});
+    TSharedPtr<FJsonObject> Listed;
+    if (!TestTrue(TEXT("function graph listing succeeds"), Inspector.Execute(GraphList, Listed, Error))) return false;
+    bool bParametersFound = false;
+    for (const TSharedPtr<FJsonValue>& Item : Listed->GetArrayField(TEXT("records")))
+    {
+        if (Item->AsObject()->GetStringField(TEXT("id")) != FunctionId) continue;
+        bParametersFound = FJsonValue::CompareEqual(FJsonValueArray(Item->AsObject()->GetArrayField(TEXT("parameters"))),
+            FJsonValueArray(ReadParameters));
+    }
+    TestTrue(TEXT("function listing preserves typed inputs, outputs, qualifiers, and defaults"), bParametersFound);
     const bool bDirtyBeforeInvalidSignature = Blueprint->GetOutermost()->IsDirty();
     const EBlueprintStatus StatusBeforeInvalidSignature = Blueprint->Status;
     const int32 TransactionsBeforeInvalidSignature = GEditor != nullptr && GEditor->Trans != nullptr ? GEditor->Trans->GetQueueLength() : 0;

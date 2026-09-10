@@ -4,12 +4,13 @@
 
 Animation Blueprints report the inspection-only `animation` family. Check `capabilities.features.animation_blueprint_inspection`, then request `graphs` to list the Event Graph, AnimGraphs and animation layers, nested state machines, states, and transition/conduit rules. Use a returned `graph_id` with `sections: ["graphs", "nodes", "pins", "connections"]` to inspect one graph. Follow a node's `bound_graph_id` into its state-machine, state, or transition graph; `custom_transition_graph_id` identifies a custom blend graph when present.
 
-Animation graph records add `schema_class`, `parent_graph_id`, and `owner_node_id`; top-level or unavailable ownership identities are empty. Graph kinds are `animation`, `state_machine`, `animation_state`, and `transition`, alongside ordinary K2 kinds. Asset-player nodes expose `animation_asset` when Unreal supplies a direct animation asset. Pose and state-machine pins retain their native type identities, with unsupported default values explicitly unavailable. The tool inspects authored structure, not evaluated poses or runtime state. General animation-node settings, asset overrides, compilation, saving, and graph authoring are outside this feature.
+Selected animation graph records add `schema_class`, `parent_graph_id`, and `owner_node_id`; top-level or unavailable ownership identities are empty. Graph kinds are `animation`, `state_machine`, `animation_state`, and `transition`, alongside ordinary K2 kinds. Asset-player nodes expose `animation_asset` when Unreal supplies a direct animation asset. Pose and state-machine pins retain their native type identities, with unsupported default values explicitly unavailable. The tool inspects authored structure, not evaluated poses or runtime state. General animation-node settings, asset overrides, compilation, saving, and graph authoring are outside this feature.
 
 ```json
 {
   "mode": "inspect",
   "asset_path": "/Game/Animation/ABP_Character.ABP_Character",
+  "graph_name": "AnimGraph",
   "sections": ["graphs", "nodes", "pins", "connections"],
   "page_size": 50
 }
@@ -36,13 +37,18 @@ Mutation tools intentionally use a narrower policy: they may change only `/Game`
 
 The optional `UnrealMCPGAS` companion adds inspection-only `gameplay_ability` and `gameplay_effect` families to this same tool only while each exact native/Python capability is ready. The corresponding `gameplay_ability` and `gameplay_effect` sections return bounded typed records. See the [Gameplay Ability](gameplay-ability-blueprints.md) and [Gameplay Effect](gameplay-effects.md) guides.
 
-Inspect one exact asset after discovery. The shallow default returns summary, parent, compile state, components, variables, functions, macros, custom events, function-local variables, and graph summaries. Request parameter or graph details only when needed:
+Inspect one exact asset after discovery. The shallow default returns summary, parent, compile state, components, variables, functions, macros, custom events, function-local variables, and graph summaries. Graph summaries contain `id`, `identity_stable`, `name`, `kind`, `owner_blueprint`, `inherited`, and `parameters`. Parameters are declared function/macro inputs and outputs with names, types, direction, and supported defaults; graphs without declared callable parameters return an empty array. Node counts and animation ownership details require a selected graph.
+
+Select exactly one `graph_id` or case-sensitive `graph_name` to read graph contents. With a selector and no `sections`, the tool returns that graph's details, nodes, pins, and connections. Explicit `sections` can narrow this output. Requests for `nodes`, `pins`, or `connections` without a graph selector return `invalid_argument`. Missing graphs return `not_found`; ambiguous names return `invalid_argument` and require an ID, including when inherited graphs share a name. A selected graph does not implicitly include its nested child graphs.
+
+For example:
 
 ```json
 {
   "mode": "inspect",
   "asset_path": "/Game/Actors/BP_Door.BP_Door",
-  "sections": ["summary", "components", "variables", "graphs", "nodes", "pins", "connections"],
+  "graph_name": "EventGraph",
+  "sections": ["graphs", "nodes", "pins", "connections"],
   "page_size": 50
 }
 ```

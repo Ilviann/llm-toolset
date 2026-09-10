@@ -20,6 +20,11 @@
     "mode": "inspect",
     "asset_path": "/Game/Actors/BP_Door.BP_Door"
   },
+  "inspect_graph_by_name": {
+    "mode": "inspect",
+    "asset_path": "/Game/Actors/BP_Door.BP_Door",
+    "graph_name": "EventGraph"
+  },
   "inspect_one_graph": {
     "mode": "inspect",
     "asset_path": "/Game/Actors/BP_Door.BP_Door",

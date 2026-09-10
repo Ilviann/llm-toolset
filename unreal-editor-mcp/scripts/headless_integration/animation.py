@@ -13,6 +13,7 @@ from pathlib import Path
 from unreal_editor_mcp.bridge import UnrealBridge
 from unreal_editor_mcp.errors import BridgeError, ErrorCode
 from unreal_editor_mcp.project import ProjectLayout
+from .blueprint_restart_verification import collect_inspection
 
 ASSET = "/Game/UnrealMCPTests/ABP_AnimationFixture.ABP_AnimationFixture"
 
@@ -31,21 +32,34 @@ def inspect_animation(bridge: UnrealBridge) -> dict[str, object]:
     if not any(record.get("blueprint_family") == "animation" and record.get("asset_path") == ASSET
                for record in discovered["records"]):
         raise AssertionError("Unloaded animation fixture was not discovered")
-    page = bridge.call("blueprint_inspect", {
+    listing = collect_inspection(bridge, {
         "mode": "inspect", "asset_path": ASSET,
-        "sections": ["graphs", "nodes", "pins", "connections"], "page_size": 7,
+        "sections": ["graphs"], "page_size": 2,
     })
-    snapshot = page["snapshot_id"]
+    snapshot = listing["snapshot_id"]
     records = []
-    for _ in range(600):
+    for graph in listing["records"]:
+        if graph["section"] != "graph" or "parameters" not in graph or "node_count" in graph:
+            raise AssertionError("Animation listing is not a compact graph summary")
+        page = collect_inspection(bridge, {
+            "mode": "inspect", "asset_path": ASSET, "graph_id": graph["id"], "page_size": 2,
+        })
         if page["blueprint_family"] != "animation" or page["snapshot_id"] != snapshot:
-            raise AssertionError("Animation pagination changed family or snapshot")
+            raise AssertionError("Animation graph selection changed family or snapshot")
         records.extend(page["records"])
-        if not page["has_more"]:
-            break
-        page = bridge.call("blueprint_inspect", {"cursor": page["next_cursor"], "page_size": 7})
-    else:
-        raise AssertionError("Animation pagination did not terminate")
+    named = collect_inspection(bridge, {
+        "mode": "inspect", "asset_path": ASSET, "graph_name": "Idle", "page_size": 1,
+    })
+    if named["snapshot_id"] != snapshot or not any(item["section"] == "node" for item in named["records"]):
+        raise AssertionError("Named graph inspection did not return paginated details")
+    for section in ("nodes", "pins", "connections"):
+        try:
+            bridge.call("blueprint_inspect", {"mode": "inspect", "asset_path": ASSET, "sections": [section]})
+        except BridgeError as error:
+            if error.code != ErrorCode.INVALID_ARGUMENT:
+                raise
+        else:
+            raise AssertionError("Unscoped animation graph details were accepted")
     graphs = [item for item in records if item["section"] == "graph"]
     graph_ids = {item["id"] for item in graphs}
     for item in records:

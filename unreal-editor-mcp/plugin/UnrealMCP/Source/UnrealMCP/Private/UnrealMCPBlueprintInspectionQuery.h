@@ -10,6 +10,7 @@ struct FInspectionQuery
     bool bIncludeInherited = false;
     TSet<FString> Sections;
     FString GraphFilter;
+    FString GraphNameFilter;
     FString ComponentFilter;
     FString ComponentNameFilter;
     FString MemberFilter;
@@ -23,7 +24,7 @@ struct FInspectionQuery
 
 static bool DecodeInspectionQuery(const FJsonObject& Arguments, FInspectionQuery& Out, FUnrealMCPError& OutError)
 {
-    if (!HasOnlyFields(Arguments, {TEXT("mode"), TEXT("asset_path"), TEXT("sections"), TEXT("graph_id"), TEXT("component_id"), TEXT("component_name"), TEXT("member_id"),
+    if (!HasOnlyFields(Arguments, {TEXT("mode"), TEXT("asset_path"), TEXT("sections"), TEXT("graph_id"), TEXT("graph_name"), TEXT("component_id"), TEXT("component_name"), TEXT("member_id"),
         TEXT("function_id"), TEXT("local_id"), TEXT("macro_id"), TEXT("custom_event_id"), TEXT("widget_id"),
         TEXT("property_names"), TEXT("include_inherited"), TEXT("page_size")}))
     {
@@ -79,6 +80,27 @@ static bool DecodeInspectionQuery(const FJsonObject& Arguments, FInspectionQuery
             return false;
         }
     }
+    if (Arguments.HasField(TEXT("graph_name"))
+        && (!Arguments.TryGetStringField(TEXT("graph_name"), Out.GraphNameFilter)
+            || Out.GraphNameFilter.IsEmpty() || Out.GraphNameFilter.Len() > 128))
+    {
+        OutError = {TEXT("invalid_argument"), TEXT("graph_name must be one exact bounded graph name")};
+        return false;
+    }
+    if (!Out.GraphFilter.IsEmpty() && !Out.GraphNameFilter.IsEmpty())
+    {
+        OutError = {TEXT("invalid_argument"), TEXT("graph_id and graph_name are mutually exclusive")};
+        return false;
+    }
+    const bool bGraphSelected = !Out.GraphFilter.IsEmpty() || !Out.GraphNameFilter.IsEmpty();
+    if (!bGraphSelected && (Out.Sections.Contains(TEXT("nodes"))
+        || Out.Sections.Contains(TEXT("pins")) || Out.Sections.Contains(TEXT("connections"))))
+    {
+        OutError = {TEXT("invalid_argument"), TEXT("nodes, pins, and connections require graph_id or graph_name; request graphs first")};
+        return false;
+    }
+    if (bGraphSelected && !Arguments.HasField(TEXT("sections")))
+        Out.Sections = {TEXT("graphs"), TEXT("nodes"), TEXT("pins"), TEXT("connections")};
     if (!ReadPropertyNames(Arguments, Out.PropertyNames, OutError)) return false;
     if (Out.Sections.Contains(TEXT("class_defaults")) && Out.PropertyNames.IsEmpty())
     {

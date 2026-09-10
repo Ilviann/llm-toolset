@@ -204,7 +204,7 @@ bool FUnrealMCPPhase15GameInstanceFamilyTest::RunTest(const FString& Parameters)
     ReadBack->SetArrayField(TEXT("sections"), {
         MakeShared<FJsonValueString>(TEXT("components")), MakeShared<FJsonValueString>(TEXT("class_defaults")),
         MakeShared<FJsonValueString>(TEXT("functions")), MakeShared<FJsonValueString>(TEXT("local_variables")),
-        MakeShared<FJsonValueString>(TEXT("graphs")), MakeShared<FJsonValueString>(TEXT("nodes"))});
+        MakeShared<FJsonValueString>(TEXT("graphs"))});
     ReadBack->SetArrayField(TEXT("property_names"), {MakeShared<FJsonValueString>(TEXT("SessionRegion"))});
     if (!TestTrue(TEXT("GameInstance read-back succeeds"), Inspector.Execute(ReadBack, Result, Error))) return false;
     bool bFoundDefault = false;

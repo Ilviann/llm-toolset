@@ -10,6 +10,7 @@ from .blueprint_declarations import (
     author_phase_fifteen_game_instance,
     author_phase_fourteen_families,
 )
+from .blueprint_restart_verification import collect_inspection
 
 
 def prepare_blueprint_scenario(bridge: UnrealBridge) -> dict[str, object]:
@@ -21,7 +22,7 @@ def prepare_blueprint_scenario(bridge: UnrealBridge) -> dict[str, object]:
     })
     if not any(record.get("section") == "asset" for record in discovery.get("records", [])):
         raise AssertionError("saved Actor Blueprint was not discoverable after editor restart")
-    inspection = bridge.call("blueprint_inspect", {
+    inspection = collect_inspection(bridge, {
         "mode": "inspect",
         "asset_path": "/Game/UnrealMCPPhase2/BP_InspectionFixture.BP_InspectionFixture",
         "sections": [

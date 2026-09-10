@@ -126,6 +126,30 @@ bool FUnrealMCPAnimationInspectionTest::RunTest(const FString& Parameters)
         TestTrue(TEXT("animation graph kind is published"), Types->GetBoolField(Kind));
         TestTrue(*FString::Printf(TEXT("%s graph is inspected"), Kind), Find(Result, TEXT("graph"), TEXT("kind"), Kind).IsValid());
     }
+    TestFalse(TEXT("listing excludes graph contents"), Find(Result, TEXT("node")).IsValid());
+    const TArray<TSharedPtr<FJsonValue>> Listing = Result->GetArrayField(TEXT("records"));
+    TArray<TSharedPtr<FJsonValue>> DetailedRecords;
+    for (const TSharedPtr<FJsonValue>& Item : Listing)
+    {
+        const TSharedPtr<FJsonObject> Graph = Item->AsObject();
+        if (Graph->GetStringField(TEXT("section")) != TEXT("graph")) continue;
+        TestTrue(TEXT("graph listing includes parameters"), Graph->HasField(TEXT("parameters")));
+        TestFalse(TEXT("graph listing excludes detailed ownership"), Graph->HasField(TEXT("parent_graph_id")));
+        TestFalse(TEXT("graph listing excludes node counts"), Graph->HasField(TEXT("node_count")));
+        TSharedRef<FJsonObject> Detail = InspectArguments(Blueprint->GetPathName());
+        Detail->SetStringField(TEXT("graph_id"), Graph->GetStringField(TEXT("id")));
+        if (!Execute(Detail)) return false;
+        TestEqual(TEXT("selected graph shares asset snapshot"), Result->GetStringField(TEXT("snapshot_id")), Snapshot);
+        for (const TSharedPtr<FJsonValue>& Record : Result->GetArrayField(TEXT("records")))
+        {
+            const TSharedPtr<FJsonObject> Value = Record->AsObject();
+            const FString Id = Value->GetStringField(Value->GetStringField(TEXT("section")) == TEXT("graph")
+                ? TEXT("id") : TEXT("graph_id"));
+            TestEqual(TEXT("details belong only to selected graph"), Id, Graph->GetStringField(TEXT("id")));
+            DetailedRecords.Add(Record);
+        }
+    }
+    Result->SetArrayField(TEXT("records"), DetailedRecords);
     TestTrue(TEXT("pose and state links are inspected"), Find(Result, TEXT("connection")).IsValid());
     const TSharedPtr<FJsonObject> State = Find(Result, TEXT("graph"), TEXT("name"), TEXT("Idle"));
     if (!TestTrue(TEXT("nested Idle graph exists"), State.IsValid())) return false;
@@ -135,6 +159,35 @@ bool FUnrealMCPAnimationInspectionTest::RunTest(const FString& Parameters)
     if (!TestTrue(TEXT("state node links to bound graph"), StateNode.IsValid())) return false;
     TestTrue(TEXT("relationship identity has canonical case"),
         StateNode->GetStringField(TEXT("bound_graph_id")).Equals(StateId, ESearchCase::CaseSensitive));
+    TSharedRef<FJsonObject> Named = InspectArguments(Blueprint->GetPathName(), 1);
+    Named->SetStringField(TEXT("graph_name"), TEXT("Idle"));
+    if (!Execute(Named)) return false;
+    TestEqual(TEXT("name resolves exact nested identity"), Find(Result, TEXT("graph"))->GetStringField(TEXT("id")), StateId);
+    TSharedRef<FJsonObject> NamedCursor = MakeShared<FJsonObject>();
+    NamedCursor->SetStringField(TEXT("cursor"), Result->GetStringField(TEXT("next_cursor")));
+    if (!Execute(NamedCursor)) return false;
+    TestTrue(TEXT("named cursor continues details"), Find(Result, TEXT("node")).IsValid());
+    Named->SetStringField(TEXT("graph_name"), TEXT("idle"));
+    TestFalse(TEXT("graph names are exact case"), Inspector.Execute(Named, Result, Error));
+    TestEqual(TEXT("missing name error"), Error.Code, FString(TEXT("not_found")));
+    Named->SetStringField(TEXT("graph_name"), TEXT("Idle"));
+    Named->SetStringField(TEXT("graph_id"), StateId);
+    TestFalse(TEXT("mixed graph selectors reject"), Inspector.Execute(Named, Result, Error));
+    TestEqual(TEXT("mixed selector error"), Error.Code, FString(TEXT("invalid_argument")));
+    Named->RemoveField(TEXT("graph_id"));
+    for (const FString& InvalidName : {FString(), FString::ChrN(129, TCHAR('g'))})
+    {
+        Named->SetStringField(TEXT("graph_name"), InvalidName);
+        TestFalse(TEXT("invalid graph name rejects"), Inspector.Execute(Named, Result, Error));
+        TestEqual(TEXT("invalid name error"), Error.Code, FString(TEXT("invalid_argument")));
+    }
+    for (const TCHAR* Section : {TEXT("nodes"), TEXT("pins"), TEXT("connections")})
+    {
+        TSharedRef<FJsonObject> Unscoped = InspectArguments(Blueprint->GetPathName());
+        Unscoped->SetArrayField(TEXT("sections"), {MakeShared<FJsonValueString>(Section)});
+        TestFalse(TEXT("unscoped details reject"), Inspector.Execute(Unscoped, Result, Error));
+        TestEqual(TEXT("unscoped details error"), Error.Code, FString(TEXT("invalid_argument")));
+    }
     Args->SetStringField(TEXT("graph_id"), StateId);
     if (!Execute(Args)) return false;
     for (const TSharedPtr<FJsonValue>& Item : Result->GetArrayField(TEXT("records")))
@@ -173,6 +226,23 @@ bool FUnrealMCPAnimationInspectionTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("inspection and rejection preserve snapshot"), InspectSnapshot(Inspector, Blueprint->GetPathName()), Snapshot);
     TestEqual(TEXT("inspection preserves dirty state"), Blueprint->GetOutermost()->IsDirty(), bDirty);
     TestEqual(TEXT("inspection preserves compile status"), Blueprint->Status, Status);
+    Named->SetStringField(TEXT("graph_name"), TEXT("Idle"));
+    if (!Execute(Named)) return false;
+    NamedCursor->SetStringField(TEXT("cursor"), Result->GetStringField(TEXT("next_cursor")));
+    Nested->Rename(TEXT("RenamedIdle"), nullptr, REN_DontCreateRedirectors | REN_DoNotDirty);
+    TestFalse(TEXT("renaming named graph invalidates cursor"), Inspector.Execute(NamedCursor, Result, Error));
+    TestEqual(TEXT("renamed graph cursor error"), Error.Code, FString(TEXT("stale_precondition")));
+    Nested->Rename(TEXT("Idle"), nullptr, REN_DontCreateRedirectors | REN_DoNotDirty);
+    UEdGraph* DuplicateName = NewObject<UEdGraph>(Blueprint, TEXT("Idle"));
+    DuplicateName->GraphGuid = FGuid::NewGuid();
+    Blueprint->FunctionGraphs.Add(DuplicateName);
+    Named->SetStringField(TEXT("graph_name"), TEXT("Idle"));
+    TestFalse(TEXT("duplicate nested name rejects"), Inspector.Execute(Named, Result, Error));
+    TestEqual(TEXT("ambiguous name error"), Error.Code, FString(TEXT("invalid_argument")));
+    Named->RemoveField(TEXT("graph_name"));
+    Named->SetStringField(TEXT("graph_id"), StateId);
+    TestTrue(TEXT("identity disambiguates nested names"), Inspector.Execute(Named, Result, Error));
+    Blueprint->FunctionGraphs.Remove(DuplicateName);
     // Malformed repeated/cyclic child edges must remain bounded and deduplicated.
     Nested->SubGraphs.Add(Nested);
     TArray<TPair<UEdGraph*, FString>> CyclicGraphs;

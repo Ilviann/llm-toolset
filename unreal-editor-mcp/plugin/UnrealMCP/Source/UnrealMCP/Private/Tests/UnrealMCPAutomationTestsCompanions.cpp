@@ -15,6 +15,7 @@ using namespace UnrealMCP::Tests;
 class FSyntheticCompanionHandler final : public IUnrealMCPExtensionHandler
 {
 public:
+    TSharedPtr<FJsonObject> LastInspectionArguments;
     virtual bool IsReady(FString& OutUnavailableReason) const override
     {
         OutUnavailableReason.Reset();
@@ -23,9 +24,10 @@ public:
     virtual bool SupportsTarget(const UObject& Target) const override { return true; }
     virtual bool ValidateArguments(const FString&, const TSharedPtr<FJsonObject>&,
         FUnrealMCPExtensionError&) const override { return true; }
-    virtual bool Inspect(const UObject&, const FString&, const TSharedPtr<FJsonObject>&,
+    virtual bool Inspect(const UObject&, const FString&, const TSharedPtr<FJsonObject>& Arguments,
         TSharedPtr<FJsonObject>& OutResult, FUnrealMCPExtensionError&) override
     {
+        LastInspectionArguments = Arguments;
         OutResult = MakeShared<FJsonObject>();
         const TSharedRef<FJsonObject> Record = MakeShared<FJsonObject>();
         Record->SetStringField(TEXT("section"), TEXT("synthetic_family"));
@@ -431,6 +433,18 @@ bool FUnrealMCPCompanionBlueprintFamilyInspectionTest::RunTest(const FString& Pa
         Package->IsDirty(), bDirtyBefore);
     TestEqual(TEXT("published extension family matrix has one record"),
         Registry.BuildBlueprintFamilyCapabilities().Num(), 1);
+    UEdGraph* Graph = NewObject<UEdGraph>(Blueprint, TEXT("Named Graph"));
+    Graph->GraphGuid = FGuid::NewGuid();
+    Blueprint->FunctionGraphs.Add(Graph);
+    Arguments->RemoveField(TEXT("sections"));
+    Arguments->SetStringField(TEXT("graph_name"), Graph->GetName());
+    TestTrue(TEXT("named graph inspection admits an existing companion family"), Inspector.Execute(Arguments, Result, Error));
+    const TSharedPtr<FSyntheticCompanionHandler> Handler =
+        StaticCastSharedPtr<FSyntheticCompanionHandler>(Registration.Contributions[0].Handler);
+    TestFalse(TEXT("base-only graph name is not added to companion arguments"),
+        Handler->LastInspectionArguments->HasField(TEXT("graph_name")));
+    TestEqual(TEXT("selected graph defaults use existing explicit companion sections"),
+        Handler->LastInspectionArguments->GetArrayField(TEXT("sections")).Num(), 4);
     return true;
 }
 

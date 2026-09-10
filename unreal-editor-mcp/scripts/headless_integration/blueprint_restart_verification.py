@@ -342,7 +342,28 @@ def verify_restarted_blueprints(
 
 
 def collect_inspection(bridge: UnrealBridge, arguments: dict[str, object]) -> dict[str, object]:
-    """Consume one bounded inspection cursor chain without treating prose as a fixture."""
+    """Collect bounded pages, explicitly selecting each graph when a test needs all bodies."""
+    sections = arguments.get("sections", [])
+    details = [section for section in sections if section in {"nodes", "pins", "connections"}]
+    if details and not (arguments.get("graph_id") or arguments.get("graph_name")):
+        summary_sections = [section for section in sections if section not in details]
+        if "graphs" not in summary_sections:
+            summary_sections.append("graphs")
+        listing = collect_inspection(bridge, {**arguments, "sections": summary_sections})
+        records = [record for record in listing["records"] if record["section"] != "graph"]
+        for graph in (record for record in listing["records"] if record["section"] == "graph"):
+            page = collect_inspection(bridge, {
+                "mode": "inspect", "asset_path": arguments["asset_path"],
+                "include_inherited": arguments.get("include_inherited", False),
+                "graph_id": graph["id"], "sections": ["graphs", *details], "page_size": 100,
+            })
+            if page["snapshot_id"] != listing["snapshot_id"]:
+                raise AssertionError("Graph detail inspection changed the asset snapshot")
+            records.extend(record for record in page["records"]
+                           if record["section"] != "graph" or "graphs" in sections)
+            if len(records) > 4096:
+                raise AssertionError("Combined test inspection exceeded the structural record bound")
+        return {**listing, "records": records, "record_count": len(records), "has_more": False}
     result = bridge.call("blueprint_inspect", arguments)
     records = list(result.get("records", []))
     cursor = result.get("next_cursor")

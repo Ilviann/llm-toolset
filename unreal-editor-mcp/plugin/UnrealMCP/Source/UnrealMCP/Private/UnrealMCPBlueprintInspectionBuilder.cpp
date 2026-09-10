@@ -87,14 +87,22 @@ bool BuildInspection(
     if (!CollectCustomEvents(Blueprint, Owners, Sections, FunctionFilter, LocalFilter, MacroFilter,
         CustomEventFilter, Sink, OutError)) return false;
 
-    if (!CollectGraphs(Blueprint, Owners, Sections, GraphFilter, Sink, OutError)) return false;
+    if (!CollectGraphs(Blueprint, Owners, Sections, GraphFilter, Query.GraphNameFilter, Sink, OutError)) return false;
     if (!CollectWidgetTree(Blueprint, WidgetFilter, PropertyNames, Sections, Sink, OutError)) return false;
-    if (ExtensionRegistry != nullptr
-        && !ExtensionRegistry->AppendBlueprintInspection(
-            *Blueprint, MakeShared<FJsonObject>(Arguments), OutRecords, Sink.Fingerprint,
-            OutFamilyCapabilities, OutError))
+    if (ExtensionRegistry != nullptr)
     {
-        return false;
+        // Graph names are resolved by the base collector. Companions receive only
+        // their existing arguments, with the selected graph's sections explicit.
+        const TSharedRef<FJsonObject> CompanionArguments = MakeShared<FJsonObject>(Arguments);
+        CompanionArguments->RemoveField(TEXT("graph_name"));
+        if ((!GraphFilter.IsEmpty() || !Query.GraphNameFilter.IsEmpty()) && !Arguments.HasField(TEXT("sections")))
+        {
+            TArray<TSharedPtr<FJsonValue>> ExplicitSections;
+            for (const FString& Section : Sections) ExplicitSections.Add(MakeShared<FJsonValueString>(Section));
+            CompanionArguments->SetArrayField(TEXT("sections"), ExplicitSections);
+        }
+        if (!ExtensionRegistry->AppendBlueprintInspection(
+            *Blueprint, CompanionArguments, OutRecords, Sink.Fingerprint, OutFamilyCapabilities, OutError)) return false;
     }
     if (Sink.ExceedsStructuralLimit())
     {
