@@ -4,6 +4,11 @@
 
 - Standardized Unreal Engine 5.8 development tooling on the `UE58` environment variable and moved the disposable integration project to `ue-test/ue58/`.
 
+## 0.38.0 — 2026-09-10
+
+- Added inspection-only Animation Blueprint discovery and graph inspection, including nested state machines, states, transition/conduit rules, graph ownership, direct animation assets, bounded traversal, and stale-safe paging. Existing Event Graphs and callable/member inspection reuse their established forms; animation authoring and runtime evaluation remain excluded.
+- Added native graph/paging/preservation coverage and a production-client restart scenario. Windows adaptive and forced-unity builds, native/Python suites, restart acceptance, and binary packaging passed. Advanced the exact base/Python version pair to 0.38.0; companion API v1 and companion versions are unchanged. macOS verification remains preferred follow-up work.
+
 ## 0.37.0 — 2026-08-27
 
 - Added bounded discovery and exact inspection of Blueprint Function Library functions and Blueprint Macro Library macros, including signatures, locals, graph structure, stable identities, snapshots, and cursors. Macro Libraries classify from their Blueprint type rather than their scope parent, preventing Actor-scoped libraries from reporting as Actor Blueprints.

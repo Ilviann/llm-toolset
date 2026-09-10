@@ -21,6 +21,8 @@ Keep the authoritative checklist in [`ROADMAP.md`](../../ROADMAP.md) synchronize
 
 ## Feature catalog
 
+- [`animation-blueprint-inspect` — Animation Blueprint graph inspection](completed/animation-blueprint-inspect.md) — Discover and inspect authored animation graphs, state machines, states, and transition rules without enabling mutation.
+
 - [`phase-4` — Reliable mutations, Actor components, and defaults](completed/phase-4.md) — Add reliable mutation delivery, Actor component editing, and Blueprint/component defaults.
 - [`gameplay-attribute-inspect` — Gameplay Attribute value inspection](completed/gameplay-attribute-inspect.md) — Inspect bounded Gameplay Attribute identities in K2 and reflected defaults.
 - [`gameplay-effect-modifiers-reflection` — Reflected Gameplay Effect modifiers](completed/gameplay-effect-modifiers-reflection.md) — Inspect the exact bounded `Modifiers` class-default array on admitted Gameplay Effect Blueprints.

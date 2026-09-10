@@ -12,14 +12,15 @@ bool FUnrealMCPPhase14GameplayFrameworkFamiliesTest::RunTest(const FString& Para
     using namespace UnrealMCP::BlueprintFamilyPolicy;
 
     const TArray<TSharedPtr<FJsonValue>> Matrix = BuildPublishedMatrix();
-    TestEqual(TEXT("family matrix retains released Blueprint families"), Matrix.Num(), 9);
+    TestEqual(TEXT("family matrix retains released Blueprint families"), Matrix.Num(), 10);
     for (const TSharedPtr<FJsonValue>& Value : Matrix)
     {
         const TSharedPtr<FJsonObject> Record = Value->AsObject();
         if (!TestTrue(TEXT("family matrix records are objects"), Record.IsValid())) return false;
         const TSharedPtr<FJsonObject> Operations = Record->GetObjectField(TEXT("operations"));
         const FString Family = Record->GetStringField(TEXT("family"));
-        const bool bInspectionOnly = Family == TEXT("function_library") || Family == TEXT("macro_library");
+        const bool bInspectionOnly = Family == TEXT("function_library") || Family == TEXT("macro_library")
+            || Family == TEXT("animation");
         TestEqual(TEXT("only authoring families publish graph editing"),
             Operations->GetBoolField(TEXT("graph_edit")), !bInspectionOnly);
         TestFalse(TEXT("Blueprint parent changes stay excluded"), Operations->GetBoolField(TEXT("parent_change")));

@@ -1,5 +1,8 @@
 #pragma once
 
+#include "Animation/AnimBlueprint.h"
+#include "UnrealMCPAnimationInspection.h"
+
 #include "UnrealMCPBlueprintInspector.h"
 
 #include "UnrealMCPBlueprintReferenceScanner.h"
@@ -501,6 +504,11 @@ static FString VariableDefaultText(UBlueprint* Blueprint, const FBPVariableDescr
 
 static FString GraphKind(const UBlueprint* Blueprint, const UEdGraph* Graph)
 {
+    if (Blueprint->IsA<UAnimBlueprint>())
+    {
+        const FString AnimationKind = UnrealMCP::AnimationInspection::GraphKind(Graph);
+        if (!AnimationKind.IsEmpty()) return AnimationKind;
+    }
     if (Blueprint->UbergraphPages.Contains(Graph)) return TEXT("event");
     if (Blueprint->FunctionGraphs.Contains(Graph)) return TEXT("function");
     if (Blueprint->MacroGraphs.Contains(Graph)) return TEXT("macro");
@@ -508,22 +516,36 @@ static FString GraphKind(const UBlueprint* Blueprint, const UEdGraph* Graph)
     return TEXT("other");
 }
 
-static void AddBlueprintGraphs(UBlueprint* Blueprint, const FString& OwnerPath, TArray<TPair<UEdGraph*, FString>>& OutGraphs)
+static bool AddBlueprintGraphs(UBlueprint* Blueprint, const FString& OwnerPath, TArray<TPair<UEdGraph*, FString>>& OutGraphs)
 {
-    auto Append = [&OutGraphs, &OwnerPath](const TArray<TObjectPtr<UEdGraph>>& Source)
+    TSet<UEdGraph*> Seen;
+    int32 Scanned = 0;
+    const int32 First = OutGraphs.Num();
+    auto Append = [&OutGraphs, &OwnerPath, &Seen, &Scanned](const TArray<TObjectPtr<UEdGraph>>& Source)
     {
         for (UEdGraph* Graph : Source)
         {
-            if (Graph != nullptr)
+            if (++Scanned > UnrealMCP::MaxInspectRecords) return false;
+            if (Graph != nullptr && !Seen.Contains(Graph))
             {
+                if (OutGraphs.Num() >= UnrealMCP::MaxInspectRecords) return false;
+                Seen.Add(Graph);
                 OutGraphs.Emplace(Graph, OwnerPath);
             }
         }
+        return true;
     };
-    Append(Blueprint->UbergraphPages);
-    Append(Blueprint->FunctionGraphs);
-    Append(Blueprint->MacroGraphs);
-    Append(Blueprint->DelegateSignatureGraphs);
+    if (!Append(Blueprint->UbergraphPages) || !Append(Blueprint->FunctionGraphs)
+        || !Append(Blueprint->MacroGraphs) || !Append(Blueprint->DelegateSignatureGraphs)) return false;
+    if (Blueprint->IsA<UAnimBlueprint>())
+    {
+        for (const FBPInterfaceDescription& Interface : Blueprint->ImplementedInterfaces)
+            if (!Append(Interface.Graphs)) return false;
+        // Iterative traversal handles nested and shared graphs without recursion or duplicate records.
+        for (int32 Index = First; Index < OutGraphs.Num(); ++Index)
+            if (!Append(OutGraphs[Index].Key->SubGraphs)) return false;
+    }
+    return true;
 }
 
 static bool ReadPropertyNames(const FJsonObject& Arguments, TSet<FString>& OutNames, FUnrealMCPError& OutError)

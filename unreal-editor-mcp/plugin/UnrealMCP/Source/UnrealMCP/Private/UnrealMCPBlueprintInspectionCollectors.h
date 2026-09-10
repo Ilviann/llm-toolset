@@ -122,7 +122,14 @@ static bool CollectGraphs(
     FUnrealMCPError& OutError)
 {
 TArray<TPair<UEdGraph*, FString>> Graphs;
-for (const TPair<UBlueprint*, FString>& Owner : Owners) AddBlueprintGraphs(Owner.Key, Owner.Value, Graphs);
+for (const TPair<UBlueprint*, FString>& Owner : Owners)
+{
+    if (!AddBlueprintGraphs(Owner.Key, Owner.Value, Graphs))
+    {
+        OutError = {TEXT("response_too_large"), TEXT("Inspection exceeds the configured graph traversal limit")};
+        return false;
+    }
+}
 Graphs.Sort([](const TPair<UEdGraph*, FString>& Left, const TPair<UEdGraph*, FString>& Right)
 {
     const FString A = Left.Value + TEXT("|") + GuidString(Left.Key->GraphGuid) + TEXT("|") + Left.Key->GetName();
@@ -130,6 +137,7 @@ Graphs.Sort([](const TPair<UEdGraph*, FString>& Left, const TPair<UEdGraph*, FSt
     return A < B;
 });
 bool bGraphFound = GraphFilter.IsEmpty();
+int64 AnimationWork = Graphs.Num();
 for (const TPair<UEdGraph*, FString>& Entry : Graphs)
 {
     UEdGraph* Graph = Entry.Key;
@@ -138,6 +146,19 @@ for (const TPair<UEdGraph*, FString>& Entry : Graphs)
     bGraphFound = true;
     UBlueprint* OwnerBlueprint = Graph->GetTypedOuter<UBlueprint>();
     const FString Kind = OwnerBlueprint != nullptr ? GraphKind(OwnerBlueprint, Graph) : TEXT("other");
+    const bool bAnimation = OwnerBlueprint != nullptr && OwnerBlueprint->IsA<UAnimBlueprint>();
+    auto WithinAnimationLimit = [&AnimationWork, bAnimation, &OutError](int32 Count)
+    {
+        if (bAnimation && (AnimationWork += Count) > UnrealMCP::MaxInspectRecords)
+        {
+            OutError = {TEXT("response_too_large"), TEXT("Animation graph inspection exceeds the structural work limit")};
+            return false;
+        }
+        return true;
+    };
+    if (!WithinAnimationLimit(Graph->Nodes.Num())) return false;
+    const UEdGraph* ParentGraph = bAnimation ? Graph->GetTypedOuter<UEdGraph>() : nullptr;
+    const UEdGraphNode* OwnerNode = bAnimation ? Cast<UEdGraphNode>(Graph->GetOuter()) : nullptr;
     if (Sections.Contains(TEXT("graphs")))
     {
         const TSharedRef<FJsonObject> Value = Record(TEXT("graph"));
@@ -148,13 +169,30 @@ for (const TPair<UEdGraph*, FString>& Entry : Graphs)
         Value->SetStringField(TEXT("owner_blueprint"), Entry.Value);
         Value->SetBoolField(TEXT("inherited"), OwnerBlueprint != Blueprint);
         Value->SetNumberField(TEXT("node_count"), Graph->Nodes.Num());
+        if (bAnimation)
+        {
+            Value->SetStringField(TEXT("schema_class"), Graph->Schema != nullptr ? Graph->Schema->GetPathName() : FString());
+            Value->SetStringField(TEXT("parent_graph_id"), ParentGraph != nullptr ? GuidString(ParentGraph->GraphGuid) : FString());
+            Value->SetStringField(TEXT("owner_node_id"), OwnerNode != nullptr ? GuidString(OwnerNode->NodeGuid) : FString());
+        }
         AddRecord(Sink.Records, Value);
     }
     Sink.Fingerprint.Add(TEXT("graph|") + Entry.Value + TEXT("|") + GraphId + TEXT("|") + Graph->GetName() + TEXT("|") + Kind);
+    if (bAnimation)
+        Sink.Fingerprint.Add(TEXT("animation_graph|") + GraphId + TEXT("|")
+            + (ParentGraph != nullptr ? GuidString(ParentGraph->GraphGuid) : FString()) + TEXT("|")
+            + (OwnerNode != nullptr ? GuidString(OwnerNode->NodeGuid) : FString()) + TEXT("|")
+            + (Graph->Schema != nullptr ? Graph->Schema->GetPathName() : FString()));
     for (UEdGraphNode* Node : Graph->Nodes)
     {
         if (Node == nullptr) continue;
+        if (!WithinAnimationLimit(Node->Pins.Num())) return false;
         const FString NodeId = GuidString(Node->NodeGuid);
+        const TSharedRef<FJsonObject> Relationships = bAnimation
+            ? UnrealMCP::AnimationInspection::NodeRelationships(Node) : MakeShared<FJsonObject>();
+        for (const TPair<FString, TSharedPtr<FJsonValue>>& Field : Relationships->Values)
+            Sink.Fingerprint.Add(TEXT("animation_node|") + GraphId + TEXT("|") + NodeId
+                + TEXT("|") + Field.Key + TEXT("|") + Field.Value->AsString());
         if (Sections.Contains(TEXT("nodes")))
         {
             const TSharedRef<FJsonObject> Value = Record(TEXT("node"));
@@ -165,6 +203,8 @@ for (const TPair<UEdGraph*, FString>& Entry : Graphs)
             Value->SetStringField(TEXT("title"), Node->GetNodeTitle(ENodeTitleType::ListView).ToString().Left(256));
             Value->SetNumberField(TEXT("x"), Node->NodePosX);
             Value->SetNumberField(TEXT("y"), Node->NodePosY);
+            for (const TPair<FString, TSharedPtr<FJsonValue>>& Field : Relationships->Values)
+                Value->SetField(Field.Key, Field.Value);
             AddRecord(Sink.Records, Value);
         }
         Sink.Fingerprint.Add(TEXT("node|") + GraphId + TEXT("|") + NodeId + TEXT("|") + Node->GetClass()->GetPathName()
@@ -172,6 +212,7 @@ for (const TPair<UEdGraph*, FString>& Entry : Graphs)
         for (UEdGraphPin* Pin : Node->Pins)
         {
             if (!IsStructuralGraphPin(Node, Pin)) continue;
+            if (!WithinAnimationLimit(Pin->LinkedTo.Num())) return false;
             const FString PinId = GuidString(Pin->PinId);
             if (Sections.Contains(TEXT("pins")))
             {
@@ -195,6 +236,9 @@ for (const TPair<UEdGraph*, FString>& Entry : Graphs)
             Sink.Fingerprint.Add(TEXT("pin|") + GraphId + TEXT("|") + NodeId + TEXT("|") + PinId + TEXT("|")
                 + Pin->PinName.ToString() + TEXT("|") + Pin->PinType.PinCategory.ToString() + TEXT("|") + Pin->DefaultValue
                 + TEXT("|") + DefaultObjectPath + TEXT("|") + Pin->DefaultTextValue.ToString());
+            if (bAnimation)
+                Sink.Fingerprint.Add(TEXT("animation_pin|") + PinId + TEXT("|")
+                    + VariableTypeFingerprint(Pin->PinType) + TEXT("|") + LexToString(Pin->Direction));
             if (Pin->Direction == EGPD_Output)
             {
                 for (UEdGraphPin* Linked : Pin->LinkedTo)
@@ -213,6 +257,11 @@ for (const TPair<UEdGraph*, FString>& Entry : Graphs)
                     Sink.Fingerprint.Add(TEXT("link|") + PinId + TEXT("|") + GuidString(Linked->PinId));
                 }
             }
+        }
+        if (Sink.ExceedsStructuralLimit())
+        {
+            OutError = {TEXT("response_too_large"), TEXT("Inspection exceeds the configured structural record limit")};
+            return false;
         }
     }
 }

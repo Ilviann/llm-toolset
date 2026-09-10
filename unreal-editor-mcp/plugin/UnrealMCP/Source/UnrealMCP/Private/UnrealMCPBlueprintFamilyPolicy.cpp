@@ -1,6 +1,8 @@
 #include "UnrealMCPBlueprintFamilyPolicy.h"
 
 #include "EdGraph/EdGraph.h"
+#include "Animation/AnimBlueprint.h"
+#include "Animation/AnimInstance.h"
 #include "EdGraphSchema_K2.h"
 #include "Blueprint/UserWidget.h"
 #include "Engine/Blueprint.h"
@@ -31,6 +33,16 @@ bool IsLibraryFamily(const FFamilyInfo& Family)
     return Family.Name == TEXT("function_library") || Family.Name == TEXT("macro_library");
 }
 
+bool IsInspectionOnlyFamily(const FFamilyInfo& Family)
+{
+    return IsLibraryFamily(Family) || Family.Name == TEXT("animation");
+}
+
+FFamilyInfo AnimationFamily()
+{
+    return MakeFamily(TEXT("animation"), UAnimInstance::StaticClass());
+}
+
 FFamilyInfo FunctionLibraryFamily()
 {
     return MakeFamily(TEXT("function_library"), UBlueprintFunctionLibrary::StaticClass());
@@ -51,7 +63,7 @@ TArray<TSharedPtr<FJsonValue>> StringValues(std::initializer_list<const TCHAR*> 
 TSharedRef<FJsonObject> PublishedOperations(const FFamilyInfo& Family)
 {
     const TSharedRef<FJsonObject> Operations = MakeShared<FJsonObject>();
-    const bool bInspectionOnly = IsLibraryFamily(Family);
+    const bool bInspectionOnly = IsInspectionOnlyFamily(Family);
     for (const TCHAR* Name : {TEXT("discover"), TEXT("inspect"), TEXT("create"), TEXT("compile"), TEXT("save"),
         TEXT("class_defaults"), TEXT("member_variables"), TEXT("functions"),
         TEXT("local_variables"), TEXT("macros"), TEXT("custom_events"), TEXT("action_catalog"), TEXT("graph_edit")})
@@ -78,7 +90,7 @@ TSharedRef<FJsonObject> PublishedMultiplayer(const FFamilyInfo& Family)
     Result->SetBoolField(TEXT("actor_replication"), bActorReplication);
     Result->SetBoolField(TEXT("component_replication"), bActorReplication);
     Result->SetBoolField(TEXT("replicated_variables"), bActorReplication);
-    if (IsLibraryFamily(Family))
+    if (IsInspectionOnlyFamily(Family))
         Result->SetArrayField(TEXT("rpc_modes"), TArray<TSharedPtr<FJsonValue>>());
     else if (Family.Name == TEXT("actor"))
         Result->SetArrayField(TEXT("rpc_modes"), StringValues({TEXT("not_replicated"), TEXT("server"), TEXT("client"), TEXT("multicast")}));
@@ -135,6 +147,10 @@ FFamilyInfo ClassifyForInspection(const UBlueprint* Blueprint)
     {
         return {};
     }
+    if (Blueprint->IsA<UAnimBlueprint>())
+    {
+        return AnimationFamily();
+    }
     if (Blueprint->BlueprintType == BPTYPE_MacroLibrary)
     {
         return MacroLibraryFamily();
@@ -156,6 +172,10 @@ FFamilyInfo ClassifyForInspection(const FString& RegistryBlueprintType, const UC
         || (NativeClass != nullptr && NativeClass->IsChildOf(UBlueprintFunctionLibrary::StaticClass())))
     {
         return FunctionLibraryFamily();
+    }
+    if (NativeClass != nullptr && NativeClass->IsChildOf(UAnimInstance::StaticClass()))
+    {
+        return AnimationFamily();
     }
     return Classify(NativeClass);
 }
@@ -230,7 +250,7 @@ bool Supports(const UBlueprint* Blueprint, EOperation Operation)
     {
         return false;
     }
-    if (IsLibraryFamily(Family))
+    if (IsInspectionOnlyFamily(Family))
     {
         return Operation == EOperation::Discover || Operation == EOperation::Inspect;
     }
@@ -309,6 +329,10 @@ TSharedRef<FJsonObject> BuildLiveCapabilities(
     GraphTypes->SetBoolField(TEXT("event"), Family.bSupported && !bLibrary && bEventGraph);
     GraphTypes->SetBoolField(TEXT("function"), Family.bSupported && (bNormalBlueprint || bFunctionLibrary));
     GraphTypes->SetBoolField(TEXT("macro"), Family.bSupported && (bNormalBlueprint || bMacroLibrary));
+    for (const TCHAR* Kind : {TEXT("animation"), TEXT("state_machine"), TEXT("animation_state"), TEXT("transition")})
+    {
+        GraphTypes->SetBoolField(Kind, Family.Name == TEXT("animation"));
+    }
     Result->SetObjectField(TEXT("graph_types"), GraphTypes);
     return Result;
 }
@@ -324,7 +348,8 @@ TArray<TSharedPtr<FJsonValue>> BuildPublishedMatrix()
         MakeFamily(TEXT("game_instance"), UGameInstance::StaticClass()),
         MakeFamily(TEXT("widget"), UUserWidget::StaticClass()),
         FunctionLibraryFamily(),
-        MacroLibraryFamily()};
+        MacroLibraryFamily(),
+        AnimationFamily()};
     TArray<TSharedPtr<FJsonValue>> Result;
     for (const FFamilyInfo& Family : Families)
     {
@@ -334,6 +359,7 @@ TArray<TSharedPtr<FJsonValue>> BuildPublishedMatrix()
         Record->SetStringField(TEXT("inheritance_category"),
             IsLibraryFamily(Family) ? TEXT("blueprint_library")
             : Family.Name == TEXT("widget") ? TEXT("widget_derived")
+            : Family.Name == TEXT("animation") ? TEXT("uobject_derived")
             : Family.Name == TEXT("game_instance") ? TEXT("uobject_derived") : TEXT("actor_derived"));
         Record->SetObjectField(TEXT("operations"), PublishedOperations(Family));
         Record->SetObjectField(TEXT("multiplayer"), PublishedMultiplayer(Family));

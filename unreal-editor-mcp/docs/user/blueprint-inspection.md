@@ -2,7 +2,20 @@
 
 ## Blueprint-family inspection
 
-`blueprint_inspect` discovers and inspects the seven authoring families plus read-only `function_library` and `macro_library` assets. Function libraries expose their functions, parameters, local variables, graphs, nodes, pins, and connections. Macro Libraries expose their macros, parameters, graphs, nodes, pins, and connections. Use the same stable `function_id`, `local_id`, `macro_id`, and `graph_id` filters described below.
+Animation Blueprints report the inspection-only `animation` family. Check `capabilities.features.animation_blueprint_inspection`, then request `graphs` to list the Event Graph, AnimGraphs and animation layers, nested state machines, states, and transition/conduit rules. Use a returned `graph_id` with `sections: ["graphs", "nodes", "pins", "connections"]` to inspect one graph. Follow a node's `bound_graph_id` into its state-machine, state, or transition graph; `custom_transition_graph_id` identifies a custom blend graph when present.
+
+Animation graph records add `schema_class`, `parent_graph_id`, and `owner_node_id`; top-level or unavailable ownership identities are empty. Graph kinds are `animation`, `state_machine`, `animation_state`, and `transition`, alongside ordinary K2 kinds. Asset-player nodes expose `animation_asset` when Unreal supplies a direct animation asset. Pose and state-machine pins retain their native type identities, with unsupported default values explicitly unavailable. The tool inspects authored structure, not evaluated poses or runtime state. General animation-node settings, asset overrides, compilation, saving, and graph authoring are outside this feature.
+
+```json
+{
+  "mode": "inspect",
+  "asset_path": "/Game/Animation/ABP_Character.ABP_Character",
+  "sections": ["graphs", "nodes", "pins", "connections"],
+  "page_size": 50
+}
+```
+
+`blueprint_inspect` discovers and inspects the seven authoring families plus read-only `animation`, `function_library`, and `macro_library` assets. Function libraries expose their functions, parameters, local variables, graphs, nodes, pins, and connections. Macro Libraries expose their macros, parameters, graphs, nodes, pins, and connections. Use the same stable `function_id`, `local_id`, `macro_id`, and `graph_id` filters described below.
 
 Library records are always non-editable. Their capability rows enable only `discover` and `inspect`; creation, compilation, saving, member edits, action cataloging, graph editing, and function replacement remain unsupported. A Macro Library is classified from its Blueprint asset type rather than its scope parent, so an Actor-scoped library reports `macro_library`, not `actor`.
 

@@ -1,5 +1,6 @@
 # Completed features
 
+- [`animation-blueprint-inspect` — Animation Blueprint graph inspection](animation-blueprint-inspect.md).
 - [`companion-plugins` — Companion plugin extension foundation](companion-plugins.md).
 - [`gas-ability-blueprints-inspect` — Gameplay Ability Blueprint inspection](gas-ability-blueprints-inspect.md).
 - [`gas-gameplay-effects-inspect` — Gameplay Effect inspection](gas-gameplay-effects-inspect.md).

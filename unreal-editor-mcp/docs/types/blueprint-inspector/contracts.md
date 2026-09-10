@@ -22,6 +22,8 @@ A cursor is single-use, expires after 30 seconds, and occupies one of 32 retaine
 
 ## Identities and value encodings
 
+Animation Blueprints use the inspection-only `animation` family and the existing query, section, identity, page, and cursor forms. Their graph records add `schema_class`, `parent_graph_id`, and `owner_node_id` (empty when absent). The additional kinds are `animation` (including animation layers and custom blend graphs), `state_machine`, `animation_state`, and `transition` (including conduit rules). State-machine/state/transition nodes add `bound_graph_id`; transitions may add `custom_transition_graph_id`; asset players may add `animation_asset`. These relationships and asset references, graph ownership/schema, full pin types/directions, nested nodes, defaults, and connections join the snapshot. Iterative child-graph traversal deduplicates shared graphs and stops at the existing structural limit. General node configuration and runtime animation evaluation are excluded.
+
 The inspector uses Unreal-provided persistent GUIDs where available:
 
 - SCS component `VariableGuid`

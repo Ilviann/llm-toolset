@@ -118,5 +118,25 @@
   "continue_page": {
     "cursor": "0123456789abcdef0123456789abcdef",
     "page_size": 50
+  },
+  "inspect_animation_graphs": {
+    "mode": "inspect",
+    "asset_path": "/Game/Animation/ABP_Character.ABP_Character",
+    "sections": [
+      "graphs"
+    ],
+    "page_size": 50
+  },
+  "inspect_animation_state": {
+    "mode": "inspect",
+    "asset_path": "/Game/Animation/ABP_Character.ABP_Character",
+    "sections": [
+      "graphs",
+      "nodes",
+      "pins",
+      "connections"
+    ],
+    "graph_id": "0123456789abcdef0123456789abcdef",
+    "page_size": 50
   }
 }

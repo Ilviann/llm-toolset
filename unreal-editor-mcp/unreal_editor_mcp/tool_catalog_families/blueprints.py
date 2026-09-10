@@ -42,7 +42,7 @@ from .schemas import (
 BLUEPRINT_TOOLS: Final = (
     {
         "name": "blueprint_inspect",
-        "description": "Discover supported Blueprint families or inspect selected structure, family capabilities, and editable defaults through bounded snapshot pages.",
+        "description": "Discover supported Blueprint families or inspect selected structure (including animation graphs), family capabilities, and readable defaults through bounded snapshot pages.",
         "inputSchema": {
             "oneOf": [
                 {

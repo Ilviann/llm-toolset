@@ -10,6 +10,7 @@ public class UnrealMCP : ModuleRules
         {
             "AssetRegistry",
             "AssetTools",
+            "AnimGraph",
             "BlueprintGraph",
             "CoreUObject",
             "DataLayerEditor",

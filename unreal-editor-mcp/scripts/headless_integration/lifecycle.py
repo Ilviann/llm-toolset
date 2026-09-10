@@ -44,6 +44,7 @@ from .game_data_levels import (
 from .readonly_mode import verify_readonly_mode, verify_windows_readonly_lifecycle
 from .widgets import author_widget_scenario, verify_restarted_widgets
 from .companions import verify_companion_scenario
+from .animation import run_animation_restart_integration
 
 
 ENGINE_ROOT_ENV = "UE57"
@@ -311,6 +312,8 @@ def run_automation(executable: Path, project: Path, environment: dict[str, str],
         "FunctionsAndLocals",
         "MacrosAndCustomEvents",
         "InspectionOnlyFamilies",
+        "GraphInspection",
+        "AnimationLiveFixture",
         "ActionCatalog",
         "ExpandedActionCatalog",
         "GraphNodeLifecycle",
@@ -337,6 +340,8 @@ def run_automation(executable: Path, project: Path, environment: dict[str, str],
     )
     if test_filter == "UnrealMCP":
         expected = all_expected
+    elif test_filter == "UnrealMCP.Animation":
+        expected = ("GraphInspection", "AnimationLiveFixture")
     elif test_filter == "UnrealMCP.Phase4":
         expected = tuple(name for name in all_expected if name in {
             "ComponentAndDefaultEdits", "OperationLedger", "PropertyCodec",
@@ -461,6 +466,7 @@ def main() -> int:
         )
         return 0
     phase_two_fixture = layout.root / "Content" / "UnrealMCPPhase2" / "BP_InspectionFixture.uasset"
+    (layout.root / "Content" / "UnrealMCPTests" / "ABP_AnimationFixture.uasset").unlink(missing_ok=True)
     phase_two_fixture.unlink(missing_ok=True)
     phase_four_fixture = layout.root / "Content" / "UnrealMCPPhase4" / "BP_ComponentFixture.uasset"
     phase_four_fixture.unlink(missing_ok=True)
@@ -487,10 +493,12 @@ def main() -> int:
         return run_automation(executable, layout.descriptor, environment, sys.argv[2])
     if sys.argv[1:] == ["--widget-only"]:
         return run_widget_restart_integration(executable, layout, environment)
+    if sys.argv[1:] == ["--animation-only"]:
+        return run_animation_restart_integration(executable, layout, environment)
     if sys.argv[1:]:
         raise SystemExit(
             "usage: run_headless_integration.py "
-            "[--automation-only | --automation-filter PREFIX | --widget-only | "
+            "[--automation-only | --automation-filter PREFIX | --widget-only | --animation-only | "
             "--readonly-lifecycle-only]"
         )
     saved_fixture_snapshot = prepare_phase_two_fixture(executable, layout.descriptor, environment)
@@ -613,7 +621,7 @@ def main() -> int:
                 "widget",
             ]
             library_families = ["function_library", "macro_library"]
-            base_families = authoring_families + library_families
+            base_families = authoring_families + library_families + ["animation"]
             family_names = [record.get("family") for record in family_matrix]
             if family_names[:len(base_families)] != base_families \
                     or len(family_names) != len(set(family_names)):

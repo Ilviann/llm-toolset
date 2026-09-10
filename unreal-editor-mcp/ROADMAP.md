@@ -94,6 +94,7 @@ Feature identifiers are stable names, not execution indexes. Unfinished features
 Feature checkboxes record implementation completion after mandatory Windows verification. This section separately tracks preferred macOS verification that may occur after a feature is completed and released. Linux is outside the current support and verification scope and is not tracked.
 
 - macOS:
+  - `animation-blueprint-inspect`
   - `level-management`
   - `level-edit`
   - `readonly-mode`

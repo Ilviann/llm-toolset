@@ -10,6 +10,8 @@ The HTTP bridge owns one inspector and supplies already-authenticated JSON argum
 
 ## Invariants
 
+- `UnrealMCPAnimationInspection` supplies native animation graph kinds and bounded node-to-graph/animation-asset relationships within this component. Animation Blueprint inspection follows top-level and interface graphs plus nested `SubGraphs` using a deduplicated iterative traversal bounded by `MaxInspectRecords`. Graph ownership/schema, relationships, asset references, and full animation pin type/direction join the existing snapshot. The base module depends on the engine's editor-only `AnimGraph` module; no companion API changes or runtime evaluation are involved.
+
 - Omitting `package_path` discovers across every content mount visible to the project. Supplying it restricts discovery recursively below that normalized mount/package path. Exact optional asset-name matching, a 2,048-candidate ceiling, and no asset loading apply in either form.
 - Deep inspection resolves one exact object or package path in any visible mount, rejects missing, non-Blueprint, and unpublished-family assets, and loads only that target. Summary output reports `actor_blueprint: false` for GameInstance, Widget, Function Library, and Macro Library Blueprints.
 - Discovery records identify the resolved published family without loading candidates. Exact inspection pages and summary records report the family plus live defaults/components/event-graph/local/override/graph-type capabilities.
