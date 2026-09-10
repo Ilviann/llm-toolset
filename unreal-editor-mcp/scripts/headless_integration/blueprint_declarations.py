@@ -309,7 +309,7 @@ def author_phase_fourteen_families(bridge: UnrealBridge) -> dict[str, dict[str, 
                         and record.get("inherited") is False]
         if inspection.get("blueprint_family") != family or not event_graphs:
             raise AssertionError(f"{family} inspection contract mismatch: {inspection!r}")
-        catalog = bridge.call("blueprint_action_catalog", {
+        catalog_arguments = {
             "asset_path": asset_path,
             "graph_id": event_graphs[0]["id"],
             "expected_snapshot": inspection["snapshot_id"],
@@ -317,7 +317,13 @@ def author_phase_fourteen_families(bridge: UnrealBridge) -> dict[str, dict[str, 
             "owner_class": callable_owner,
             "function": callable_name,
             "limit": 5,
-        })
+        }
+        catalog = bridge.call("blueprint_action_catalog", catalog_arguments)
+        if catalog.get("timed_out") is True and not catalog.get("actions"):
+            # The first scan can spend its budget initializing Unreal's action database.
+            # Partial catalogs are cached; a different bounded limit requests a fresh scan.
+            catalog_arguments["limit"] = 6
+            catalog = bridge.call("blueprint_action_catalog", catalog_arguments)
         if catalog.get("blueprint_family") != family or not catalog.get("actions"):
             raise AssertionError(f"{family} framework action is unavailable: {catalog!r}")
         compiled = bridge.call("blueprint_compile", {

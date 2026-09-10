@@ -322,6 +322,7 @@ static UK2Node_FunctionEntry* FunctionEntry(UEdGraph* Graph)
 
 static FString FunctionOwnership(const UBlueprint* Blueprint, const UEdGraph* Graph)
 {
+    if (Blueprint->BlueprintType == BPTYPE_Interface) return TEXT("interface");
     for (const FBPInterfaceDescription& Interface : Blueprint->ImplementedInterfaces)
     {
         if (Interface.Graphs.Contains(Graph)) return TEXT("interface");

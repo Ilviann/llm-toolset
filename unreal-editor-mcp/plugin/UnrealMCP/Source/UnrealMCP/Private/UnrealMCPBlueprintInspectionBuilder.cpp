@@ -70,7 +70,8 @@ bool BuildInspection(
     const bool bDirtyBefore = Package->IsDirty();
     const EBlueprintStatus StatusBefore = Blueprint->Status;
     FInspectionSink Sink(OutRecords);
-    if (Family.Name != TEXT("function_library") && Family.Name != TEXT("macro_library"))
+    if (Family.Name != TEXT("function_library") && Family.Name != TEXT("macro_library")
+        && Family.Name != TEXT("interface"))
     {
         AddClassDefaultFingerprint(Blueprint, Sink.Fingerprint);
     }

@@ -30,6 +30,9 @@ Feature identifiers are stable names, not execution indexes. Unfinished features
   - Depends on:
     - `gas-gameplay-effects-inspect`
 - [x] [`function-replace` — Complete function replacement](docs/features/completed/function-replace.md) — Add transactional replacement of one complete user-owned function.
+- [ ] [`blueprint-interface-inspect` — Blueprint Interface asset inspection](docs/features/active/blueprint-interface-inspect.md) — Inspect interface declarations and selected graphs.
+  - Depends on:
+    - `blueprint-library-inspect`
 - [x] [`blueprint-library-inspect` — Blueprint function and macro library inspection](docs/features/completed/blueprint-library-inspect.md) — Discover and inspect Blueprint Function Library functions and Blueprint Macro Library macros without enabling library mutation.
   - Depends on:
     - `phase-6`

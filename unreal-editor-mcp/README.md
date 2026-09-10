@@ -1,6 +1,6 @@
 # Unreal Editor MCP
 
-Unreal Editor MCP 0.39.1 is an offline-first MCP bridge for Unreal Engine 5.7.x. It pairs a dependency-free Python 3.10+ stdio server with an editor-only C++ plugin.
+Unreal Editor MCP 0.40.0 is an offline-first MCP bridge for Unreal Engine 5.7.x. It pairs a dependency-free Python 3.10+ stdio server with an editor-only C++ plugin.
 
 Readonly access is the released default. Project-content mutation requires the explicit `--writable` trust decision; optional editor lifecycle control remains independent.
 
@@ -9,6 +9,8 @@ Optional independently versioned companion plugins can add bounded typed branche
 The optional `UnrealMCPGAS` 0.2.1 companion adds bounded read-only discovery and typed inspection of Gameplay Ability and data-only Gameplay Effect Blueprints without adding GAS dependencies to the base plugin. The Windows graphical deployment helper can build and install it alongside the base plugin. See the [Gameplay Ability](docs/user/gameplay-ability-blueprints.md) and [Gameplay Effect](docs/user/gameplay-effects.md) guides.
 
 Graph inspection lists names, kinds, identities, and declared input/output parameters. Pass one `graph_name` or `graph_id` to `blueprint_inspect` for graph details and nodes; unscoped node/pin/connection requests are rejected. See the [inspection guide](docs/user/blueprint-inspection.md).
+
+Blueprint Interface assets support read-only discovery, function signatures, and selected graph inspection through `blueprint_inspect`; see the [inspection guide](docs/user/blueprint-inspection.md).
 
 ## Installation
 
@@ -28,7 +30,7 @@ Python 3.10 or newer with tkinter is required. The build and installation are of
 
 1. Copy [`plugin/UnrealMCP`](plugin/UnrealMCP) to `<YourProject>/Plugins/UnrealMCP`, or add this repository's `plugin/` directory to `AdditionalPluginDirectories` in a disposable development `.uproject`.
 2. Enable `UnrealMCP` and compile the project's Editor target with Unreal Engine 5.7.x.
-3. Open the project and wait for `Unreal MCP 0.39.1 ready on 127.0.0.1:15485` in the editor log.
+3. Open the project and wait for `Unreal MCP 0.40.0 ready on 127.0.0.1:15485` in the editor log.
 4. Create a virtual environment and install the Python package offline:
 
    ```sh
@@ -101,7 +103,7 @@ Readonly mode is the default and exposes exactly nine tools:
 
 - Core and lifecycle state: `capabilities`, `editor_state`, and `operation_status`.
 - Levels and assets: `asset_references`, `level_inspect`, and `level_open`.
-- Blueprint and game-data inspection: `blueprint_inspect`, `blueprint_action_catalog`, and `game_data_inspect`, including read-only Animation Blueprint and Blueprint Function/Macro Library graphs, effective inherited component defaults, and bounded Data Asset properties.
+- Blueprint and game-data inspection: `blueprint_inspect`, `blueprint_action_catalog`, and `game_data_inspect`, including read-only Blueprint Interface declarations, Animation Blueprint graphs, and Blueprint Function/Macro Library graphs, effective inherited component defaults, and bounded Data Asset properties.
 
 `level_open` may change the active editor map, but it refuses dirty work and never saves, discards, overwrites, compiles, or dirties project content. Readonly operation may still maintain bounded generated discovery, cursor, lifecycle, and retained-operation records under `Saved/UnrealMCP/`; that generated state is not project-content write authority.
 

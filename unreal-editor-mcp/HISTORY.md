@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Added Blueprint Interface asset discovery and inspection through the existing `blueprint_inspect` tool: typed declarations, parameters, metadata, selected graphs, stable identities, and paging. The new `interface` family is inspection-only; Animation Layer Interfaces retain the `animation` family. Base/Python metadata is staged at 0.40.0 with companion API v1 unchanged. The feature remains active pending its full headless release gate.
+- Qualified Widget-tree field validation helpers to keep the updated source grouping valid in forced-unity builds.
+
 - Standardized Unreal Engine 5.8 development tooling on the `UE58` environment variable and moved the disposable integration project to `ue-test/ue58/`.
 
 ## 0.39.1 — 2026-09-10

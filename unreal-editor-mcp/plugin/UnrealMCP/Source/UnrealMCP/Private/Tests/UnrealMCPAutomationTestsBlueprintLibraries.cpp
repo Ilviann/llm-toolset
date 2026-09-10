@@ -119,7 +119,7 @@ bool FUnrealMCPBlueprintLibrariesInspectionTest::RunTest(const FString& Paramete
         Supports(MacroLibrary, EOperation::GraphEdit));
 
     const TArray<TSharedPtr<FJsonValue>> Matrix = BuildPublishedMatrix();
-    TestEqual(TEXT("family matrix includes libraries and animation"), Matrix.Num(), 10);
+    TestEqual(TEXT("family matrix includes libraries and animation"), Matrix.Num(), 11);
     for (const TCHAR* FamilyName : {TEXT("function_library"), TEXT("macro_library")})
     {
         const TSharedPtr<FJsonObject> Family = FindFamily(Matrix, FamilyName);

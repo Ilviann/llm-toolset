@@ -1,4 +1,15 @@
 {
+  "inspect_blueprint_interface": {
+    "mode": "inspect",
+    "asset_path": "/Game/Interfaces/BPI_Interactable.BPI_Interactable",
+    "sections": ["summary", "functions", "parameters", "graphs"],
+    "page_size": 50
+  },
+  "inspect_interface_function_graph": {
+    "mode": "inspect",
+    "asset_path": "/Game/Interfaces/BPI_Interactable.BPI_Interactable",
+    "graph_name": "Interact"
+  },
   "discover_exact": {
     "mode": "discover",
     "package_path": "/Game/Actors",

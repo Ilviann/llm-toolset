@@ -42,7 +42,7 @@ bool FUnrealMCPPhase16MultiplayerAuthoringTest::RunTest(const FString& Parameter
     using namespace UnrealMCP::BlueprintFamilyPolicy;
 
     const TArray<TSharedPtr<FJsonValue>> Matrix = BuildPublishedMatrix();
-    TestEqual(TEXT("family matrix remains bounded"), Matrix.Num(), 10);
+    TestEqual(TEXT("family matrix remains bounded"), Matrix.Num(), 11);
     for (const TSharedPtr<FJsonValue>& Value : Matrix)
     {
         const TSharedPtr<FJsonObject> Record = Value->AsObject();

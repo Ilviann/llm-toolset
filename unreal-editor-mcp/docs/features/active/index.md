@@ -1,3 +1,3 @@
 # Active features
 
-None.
+- [Blueprint Interface asset inspection](blueprint-interface-inspect.md).

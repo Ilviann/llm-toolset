@@ -21,6 +21,8 @@ Keep the authoritative checklist in [`ROADMAP.md`](../../ROADMAP.md) synchronize
 
 ## Feature catalog
 
+- [`blueprint-interface-inspect` — Blueprint Interface asset inspection](active/blueprint-interface-inspect.md) — Discover and inspect interface declarations and selected graphs.
+
 - [`graph-scoped-inspect` — Graph summaries and explicit graph selection](completed/graph-scoped-inspect.md) — List graph signatures and require one graph name or ID for contents.
 
 - [`animation-blueprint-inspect` — Animation Blueprint graph inspection](completed/animation-blueprint-inspect.md) — Discover and inspect authored animation graphs, state machines, states, and transition rules without enabling mutation.

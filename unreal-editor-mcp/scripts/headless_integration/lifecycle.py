@@ -45,6 +45,7 @@ from .readonly_mode import verify_readonly_mode, verify_windows_readonly_lifecyc
 from .widgets import author_widget_scenario, verify_restarted_widgets
 from .companions import verify_companion_scenario
 from .animation import run_animation_restart_integration
+from .interfaces import run_interface_restart_integration
 
 
 ENGINE_ROOT_ENV = "UE57"
@@ -312,6 +313,8 @@ def run_automation(executable: Path, project: Path, environment: dict[str, str],
         "FunctionsAndLocals",
         "MacrosAndCustomEvents",
         "InspectionOnlyFamilies",
+        "InterfaceInspection",
+        "InterfaceLiveFixture",
         "GraphInspection",
         "AnimationLiveFixture",
         "ActionCatalog",
@@ -484,6 +487,7 @@ def main() -> int:
     (layout.root / "Content" / "UnrealMCPWidgetTree" / "WBP_WidgetTree.uasset").unlink(
         missing_ok=True
     )
+    (layout.root / "Content/UnrealMCPTests/BPI_InterfaceFixture.uasset").unlink(missing_ok=True)
     gas_fixture_dir = layout.root / "Content" / "UnrealMCPGAS"
     for name in ("GE_InspectionFixture", "GA_EffectReferenceFixture"):
         (gas_fixture_dir / f"{name}.uasset").unlink(missing_ok=True)
@@ -493,12 +497,14 @@ def main() -> int:
         return run_automation(executable, layout.descriptor, environment, sys.argv[2])
     if sys.argv[1:] == ["--widget-only"]:
         return run_widget_restart_integration(executable, layout, environment)
+    if sys.argv[1:] == ["--interface-only"]:
+        return run_interface_restart_integration(executable, layout, environment)
     if sys.argv[1:] == ["--animation-only"]:
         return run_animation_restart_integration(executable, layout, environment)
     if sys.argv[1:]:
         raise SystemExit(
             "usage: run_headless_integration.py "
-            "[--automation-only | --automation-filter PREFIX | --widget-only | --animation-only | "
+            "[--automation-only | --automation-filter PREFIX | --widget-only | --animation-only | --interface-only | "
             "--readonly-lifecycle-only]"
         )
     saved_fixture_snapshot = prepare_phase_two_fixture(executable, layout.descriptor, environment)
@@ -621,7 +627,7 @@ def main() -> int:
                 "widget",
             ]
             library_families = ["function_library", "macro_library"]
-            base_families = authoring_families + library_families + ["animation"]
+            base_families = authoring_families + library_families + ["animation", "interface"]
             family_names = [record.get("family") for record in family_matrix]
             if family_names[:len(base_families)] != base_families \
                     or len(family_names) != len(set(family_names)):

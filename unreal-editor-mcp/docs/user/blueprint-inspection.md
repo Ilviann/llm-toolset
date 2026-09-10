@@ -2,6 +2,8 @@
 
 ## Blueprint-family inspection
 
+Blueprint Interface assets report the inspection-only `interface` family. Check `capabilities.features.blueprint_interface_inspection`, then request `functions`, `parameters`, and `graphs` for declarations, typed input/output signatures, metadata, and graph identities. Select one `graph_id` or exact `graph_name` to inspect its nodes, pins, and connections; `function_id` selects one declaration and its parameters. Interface declarations report `ownership: "interface"`, `editable: false`, and a non-replaceable boundary. Void declarations may have no result node and still report valid required nodes. Class defaults, components, event graphs, locals, and all authoring operations remain unavailable. Animation Layer Interfaces retain the specialized `animation` family.
+
 Inspection permits 4,096 result records across all pages. Internal graph traversal and animation structural work use a separate 262,144-unit limit, and snapshots permit 262,144 fingerprint entries. These are published as `capabilities.limits.inspect_records`, `inspect_internal_work`, and `inspect_fingerprint_entries`. A small selected graph can therefore be inspected inside a much larger Blueprint. Selecting fewer sections or another graph reduces results, but the graph fingerprint still covers the asset in the requested inheritance scope; reducing `page_size` does not reduce either total. Exceeding a budget returns `response_too_large` with a message identifying the result, fingerprint, or traversal/work limit.
 
 Animation Blueprints report the inspection-only `animation` family. Check `capabilities.features.animation_blueprint_inspection`, then request `graphs` to list the Event Graph, AnimGraphs and animation layers, nested state machines, states, and transition/conduit rules. Use a returned `graph_id` with `sections: ["graphs", "nodes", "pins", "connections"]` to inspect one graph. Follow a node's `bound_graph_id` into its state-machine, state, or transition graph; `custom_transition_graph_id` identifies a custom blend graph when present.
@@ -18,7 +20,7 @@ Selected animation graph records add `schema_class`, `parent_graph_id`, and `own
 }
 ```
 
-`blueprint_inspect` discovers and inspects the seven authoring families plus read-only `animation`, `function_library`, and `macro_library` assets. Function libraries expose their functions, parameters, local variables, graphs, nodes, pins, and connections. Macro Libraries expose their macros, parameters, graphs, nodes, pins, and connections. Use the same stable `function_id`, `local_id`, `macro_id`, and `graph_id` filters described below.
+`blueprint_inspect` discovers and inspects the seven authoring families plus read-only `animation`, `function_library`, `macro_library`, and `interface` assets. Function libraries expose their functions, parameters, local variables, graphs, nodes, pins, and connections. Macro Libraries expose their macros, parameters, graphs, nodes, pins, and connections. Use the same stable `function_id`, `local_id`, `macro_id`, and `graph_id` filters described below.
 
 Library records are always non-editable. Their capability rows enable only `discover` and `inspect`; creation, compilation, saving, member edits, action cataloging, graph editing, and function replacement remain unsupported. A Macro Library is classified from its Blueprint asset type rather than its scope parent, so an Actor-scoped library reports `macro_library`, not `actor`.
 

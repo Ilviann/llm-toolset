@@ -20,7 +20,8 @@ static bool CollectOverviewAndComponents(
     TArray<TPair<UBlueprint*, FString>>& Owners,
     FUnrealMCPError& OutError)
 {
-const bool bLibrary = Family.Name == TEXT("function_library") || Family.Name == TEXT("macro_library");
+const bool bDeclarationOnly = Family.Name == TEXT("function_library") || Family.Name == TEXT("macro_library")
+    || Family.Name == TEXT("interface");
 if (Sections.Contains(TEXT("summary")))
 {
     const TSharedRef<FJsonObject> Value = Record(TEXT("summary"));
@@ -53,7 +54,7 @@ if (Sections.Contains(TEXT("compile_state")))
 }
 
 Owners.Emplace(Blueprint, AssetPath);
-if (!bLibrary && (bIncludeInherited || !ComponentFilter.IsEmpty() || !ComponentNameFilter.IsEmpty()))
+if (!bDeclarationOnly && (bIncludeInherited || !ComponentFilter.IsEmpty() || !ComponentNameFilter.IsEmpty()))
 {
     for (UClass* Class = Blueprint->ParentClass; Class != nullptr; Class = Class->GetSuperClass())
     {
@@ -66,7 +67,7 @@ if (!bLibrary && (bIncludeInherited || !ComponentFilter.IsEmpty() || !ComponentN
 }
 
 bool bComponentFound = ComponentFilter.IsEmpty() && ComponentNameFilter.IsEmpty();
-if (!bLibrary)
+if (!bDeclarationOnly)
 {
 for (const TPair<UBlueprint*, FString>& Owner : Owners)
 {
@@ -118,7 +119,7 @@ for (const TPair<UBlueprint*, FString>& Owner : Owners)
     }
 }
 }
-if (!bLibrary && (bIncludeInherited || !ComponentNameFilter.IsEmpty()) && Blueprint->GeneratedClass != nullptr)
+if (!bDeclarationOnly && (bIncludeInherited || !ComponentNameFilter.IsEmpty()) && Blueprint->GeneratedClass != nullptr)
 {
     if (AActor* DefaultsActor = Cast<AActor>(Blueprint->GeneratedClass->GetDefaultObject(false)))
     {
@@ -165,7 +166,7 @@ if (!bComponentFound)
     return false;
 }
 
-if (!bLibrary && Sections.Contains(TEXT("class_defaults")))
+if (!bDeclarationOnly && Sections.Contains(TEXT("class_defaults")))
 {
     UObject* Defaults = Blueprint->GeneratedClass != nullptr ? Blueprint->GeneratedClass->GetDefaultObject(false) : nullptr;
     if (Defaults == nullptr)
@@ -315,7 +316,7 @@ for (const TPair<UBlueprint*, FString>& Owner : Owners)
             Required->SetNumberField(TEXT("result_count"), Results.Num());
             Required->SetStringField(TEXT("result_node_id"), !Results.IsEmpty() ? GuidString(Results[0]->NodeGuid) : FString());
             Required->SetBoolField(TEXT("result_present"), !Results.IsEmpty());
-            Required->SetBoolField(TEXT("valid"), !Results.IsEmpty());
+            Required->SetBoolField(TEXT("valid"), Owner.Key->BlueprintType == BPTYPE_Interface || !Results.IsEmpty());
             Value->SetObjectField(TEXT("required_nodes"), Required);
             const TSharedRef<FJsonObject> Boundary = MakeShared<FJsonObject>();
             Boundary->SetBoolField(TEXT("replaceable"), bEditable && bReplaceableBoundary);
