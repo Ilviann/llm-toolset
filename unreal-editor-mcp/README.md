@@ -30,6 +30,16 @@ Select the folder containing the game's `.uproject` and the matching Unreal Engi
 
 Python 3.10 or newer with tkinter is required. The build and installation are offline.
 
+### Remove engine plugin copies on Windows
+
+Close Unreal Editor and builds using the engine, then run:
+
+```bat
+scripts\remove_engine_plugins.cmd
+```
+
+Set `UE58` to the engine installation root first. This CMD script immediately removes existing base and companion folders directly under `Engine\Plugins` and `Engine\Plugins\Marketplace`, then pauses so you can read the results. Use an Administrator Command Prompt if required by folder permissions.
+
 ### Manual/source installation
 
 1. Copy [`plugin/UnrealMCP`](plugin/UnrealMCP) to `<YourProject>/Plugins/UnrealMCP`, or add this repository's `plugin/` directory to `AdditionalPluginDirectories` in a disposable development `.uproject`.

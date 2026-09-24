@@ -131,6 +131,8 @@ Feature identifiers are stable names, not execution indexes. Unfinished features
 
 Support-tooling features change repository utilities without changing Unreal MCP runtime functionality or triggering plugin version changes.
 
+- [x] [`engine-plugin-removal` — Windows engine plugin removal](docs/features/completed/engine-plugin-removal.md) — Remove installed plugin folders from the `UE58` engine using CMD.
+
 - [x] [`asset-family-conformance` — Reusable asset-family verification](docs/features/completed/asset-family-conformance.md) — Parameterize common inspection, authoring, unavailable-state, persistence, and recovery checks.
   - Depends on:
     - `asset-inspection-adapters`

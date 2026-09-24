@@ -13,6 +13,10 @@ The workflow imports the `scripts/packaging/` service API, never the `package_pl
 - Deployment core, transaction, verification, discovery, configuration, and workflow modules have no Tkinter dependency. Only the view/controller boundary interacts with the GUI event loop.
 - One configuration definition supplies both sample host entries in the **MCP settings preview** tab, remains readonly by default, and never contains bridge credentials. **Build log output** is the only other tab.
 
+## Engine copy removal
+
+`scripts/remove_engine_plugins.cmd` uses only CMD builtins. It resolves `UE58`, checks the engine marker, and removes the fixed base and companion folders directly under `Engine/Plugins` and `Engine/Plugins/Marketplace` without prompting. Missing folders are skipped; invalid configuration or folders remaining after removal return exit code 1. `tests/test_remove_engine_plugins.py` exercises removal, repeat runs, unrelated-folder preservation, and invalid configuration using temporary trees.
+
 ## Verification
 
 `tests/test_deploy_plugin_windows.py` targets the owning discovery, workflow, transaction, verification, and configuration modules and checks the compatibility entrypoint. Coverage includes bounded parsing, Engine discovery/validation, fixed build commands, binary filtering, all install modes, four-plugin commit/rollback, descriptor drift, optional PDB enforcement, lifecycle validation, and exact LM Studio/Codex previews. `tests/test_package_plugin.py` covers the shared packaging boundary. This support-tool change does not require a native package build because package commands and package verification behavior are unchanged.
