@@ -1,5 +1,6 @@
 # Completed features
 
+- [`windows-deployment-ai` — AI companion deployment](windows-deployment-ai.md).
 - [`inspect-limits` — Independent inspection budgets](inspect-limits.md).
 - [`engine-plugin-removal` — Windows engine plugin removal](engine-plugin-removal.md).
 

@@ -57,6 +57,7 @@ class DeploymentController(DeploymentView):
             include_gas = bool(self.include_gas_value.get())
             include_commonui = bool(self.include_commonui_value.get())
             include_enhanced_input = bool(self.include_enhanced_input_value.get())
+            include_ai = bool(self.include_ai_value.get())
             install_method = validate_install_method(self.install_method_value.get())
             destinations = deployment_destinations(
                 project,
@@ -65,6 +66,7 @@ class DeploymentController(DeploymentView):
                 include_gas=include_gas,
                 include_commonui=include_commonui,
                 include_enhanced_input=include_enhanced_input,
+                include_ai=include_ai,
             )
         except DeploymentError as error:
             messagebox.showerror("Cannot install Unreal MCP", str(error))
@@ -93,6 +95,7 @@ class DeploymentController(DeploymentView):
                     include_gas=include_gas,
                     include_commonui=include_commonui,
                     include_enhanced_input=include_enhanced_input,
+                    include_ai=include_ai,
                     install_method=install_method,
                     log=lambda message: self.events.put(("log", message)),
                 )

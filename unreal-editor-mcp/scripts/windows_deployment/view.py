@@ -22,14 +22,15 @@ class DeploymentView:
         self.ttk = ttk
         self.root = tk.Tk()
         self.root.title("Unreal MCP — Windows Deployment")
-        self.root.geometry("820x860")
-        self.root.minsize(680, 760)
+        self.root.geometry("820x900")
+        self.root.minsize(680, 800)
         self.events: queue.Queue[tuple[str, object]] = queue.Queue()
         self.project_value = tk.StringVar()
         self.engine_value = tk.StringVar(value=default_engine_root())
         self.include_gas_value = tk.BooleanVar(value=False)
         self.include_commonui_value = tk.BooleanVar(value=False)
         self.include_enhanced_input_value = tk.BooleanVar(value=False)
+        self.include_ai_value = tk.BooleanVar(value=False)
         self.include_pdb_value = tk.BooleanVar(value=False)
         self.install_method_value = tk.StringVar(value=INSTALL_IN_PROJECT)
         self.writable_value = tk.BooleanVar(value=False)
@@ -46,7 +47,7 @@ class DeploymentView:
         frame = self.ttk.Frame(self.root, padding=14)
         frame.pack(fill="both", expand=True)
         frame.columnconfigure(1, weight=1)
-        frame.rowconfigure(12, weight=1)
+        frame.rowconfigure(13, weight=1)
         self.ttk.Label(frame, text="Unreal project folder").grid(row=0, column=0, sticky="w")
         self.project_entry = self.ttk.Entry(frame, textvariable=self.project_value)
         self.project_entry.grid(row=0, column=1, sticky="ew", padx=8)
@@ -64,10 +65,12 @@ class DeploymentView:
         self.include_commonui_checkbox.grid(row=4, column=0, columnspan=3, sticky="w", pady=(8, 0))
         self.include_enhanced_input_checkbox = self.ttk.Checkbutton(frame, text="Build and install Unreal MCP Enhanced Input companion plugin", variable=self.include_enhanced_input_value)
         self.include_enhanced_input_checkbox.grid(row=5, column=0, columnspan=3, sticky="w", pady=(8, 0))
+        self.include_ai_checkbox = self.ttk.Checkbutton(frame, text="Build and install Unreal MCP AI companion plugin", variable=self.include_ai_value)
+        self.include_ai_checkbox.grid(row=6, column=0, columnspan=3, sticky="w", pady=(8, 0))
         self.include_pdb_checkbox = self.ttk.Checkbutton(frame, text="Include matching PDB crash symbols (larger installation)", variable=self.include_pdb_value)
-        self.include_pdb_checkbox.grid(row=6, column=0, columnspan=3, sticky="w", pady=(8, 0))
+        self.include_pdb_checkbox.grid(row=7, column=0, columnspan=3, sticky="w", pady=(8, 0))
         methods = self.ttk.LabelFrame(frame, text="Install method", padding=8)
-        methods.grid(row=7, column=0, columnspan=3, sticky="ew", pady=(10, 0))
+        methods.grid(row=8, column=0, columnspan=3, sticky="ew", pady=(10, 0))
         from .models import INSTALL_IN_ENGINE_DISABLED, INSTALL_IN_ENGINE_ENABLED
         self.install_method_buttons = tuple(
             self.ttk.Radiobutton(methods, text=label, variable=self.install_method_value, value=value)
@@ -80,14 +83,14 @@ class DeploymentView:
         for row, button in enumerate(self.install_method_buttons):
             button.grid(row=row, column=0, sticky="w", pady=(0 if row == 0 else 4, 0))
         self.writable_checkbox = self.ttk.Checkbutton(frame, text="Enable writable MCP tools in the generated MCP entries", variable=self.writable_value)
-        self.writable_checkbox.grid(row=8, column=0, columnspan=3, sticky="w", pady=(8, 0))
+        self.writable_checkbox.grid(row=9, column=0, columnspan=3, sticky="w", pady=(8, 0))
         self.lifecycle_checkbox = self.ttk.Checkbutton(frame, text="Enable editor lifecycle control using the selected Engine", variable=self.lifecycle_value)
-        self.lifecycle_checkbox.grid(row=9, column=0, columnspan=3, sticky="w", pady=(8, 0))
+        self.lifecycle_checkbox.grid(row=10, column=0, columnspan=3, sticky="w", pady=(8, 0))
         self.install_button = self.ttk.Button(frame, text="Build and install selected plugins", command=self._install)
-        self.install_button.grid(row=10, column=0, columnspan=3, sticky="ew", pady=12)
-        self.ttk.Label(frame, textvariable=self.status_value, wraplength=760).grid(row=11, column=0, columnspan=3, sticky="w")
+        self.install_button.grid(row=11, column=0, columnspan=3, sticky="ew", pady=12)
+        self.ttk.Label(frame, textvariable=self.status_value, wraplength=760).grid(row=12, column=0, columnspan=3, sticky="w")
         previews = self.ttk.Notebook(frame)
-        previews.grid(row=12, column=0, columnspan=3, sticky="nsew", pady=(8, 0))
+        previews.grid(row=13, column=0, columnspan=3, sticky="nsew", pady=(8, 0))
         build_log = self.ttk.Frame(previews, padding=10)
         build_log.columnconfigure(0, weight=1)
         build_log.rowconfigure(0, weight=1)
@@ -121,7 +124,7 @@ class DeploymentView:
     def _set_busy(self, busy: bool) -> None:
         self.busy = busy
         state = "disabled" if busy else "normal"
-        for widget in (self.project_entry, self.project_button, self.engine_entry, self.engine_button, self.include_gas_checkbox, self.include_commonui_checkbox, self.include_enhanced_input_checkbox, self.include_pdb_checkbox, self.writable_checkbox, self.lifecycle_checkbox, self.install_button, *self.install_method_buttons):
+        for widget in (self.project_entry, self.project_button, self.engine_entry, self.engine_button, self.include_gas_checkbox, self.include_commonui_checkbox, self.include_enhanced_input_checkbox, self.include_ai_checkbox, self.include_pdb_checkbox, self.writable_checkbox, self.lifecycle_checkbox, self.install_button, *self.install_method_buttons):
             widget.configure(state=state)
 
     def _append_log(self, message: str) -> None:

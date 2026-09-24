@@ -8,7 +8,7 @@ For an independent Win64 package, run:
 python scripts\package_plugin.py --ai-companion --engine-root $env:UE58 --target-platforms Win64 --output ..\build\unreal-mcp-ai-ue58
 ```
 
-Install the packaged companion beside a compatible base plugin and enable `UnrealMCPAI`. The companion carries its AI module dependencies; it does not add them to the base plugin. The Windows graphical deployment helper does not yet offer an AI checkbox, so use the independent package command.
+Install the packaged companion beside a compatible base plugin and enable `UnrealMCPAI`. The companion carries its AI module dependencies; it does not add them to the base plugin. The Windows graphical deployment helper can build, install, and enable the base and AI companion together through its independent default-off AI checkbox.
 
 ## Requests and records
 

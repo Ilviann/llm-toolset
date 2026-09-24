@@ -138,6 +138,10 @@ Support-tooling features change repository utilities without changing Unreal MCP
     - `asset-inspection-adapters`
     - `asset-authoring-kernel`
     - `python-asset-family-catalog`
+- [x] [`windows-deployment-ai` — AI companion deployment](docs/features/completed/windows-deployment-ai.md) — Include AI in independent companion selection and the complete five-plugin installation transaction.
+  - Depends on:
+    - `windows-deployment-enhanced-input-preview`
+    - `ai-assets-inspect`
 - [x] [`windows-deployment-install-modes` — Windows deployment companion and install modes](docs/features/completed/windows-deployment-install-modes.md) — Build and install the base plugin alone or with `UnrealMCPGAS` into a selected project or Engine.
 - [x] [`windows-deployment-commonui` — CommonUI companion deployment option](docs/features/completed/windows-deployment-commonui.md) — Add an independent checkbox that builds and installs `UnrealMCPCommonUI` with the compatible base plugin.
   - Depends on:

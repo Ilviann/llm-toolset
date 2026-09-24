@@ -6,7 +6,7 @@ The workflow imports the `scripts/packaging/` service API, never the `package_pl
 
 ## Invariants
 
-- Packaging remains offline and fixed to the base descriptor plus independently selected GAS, CommonUI, and Enhanced Input production companions. The disposable test fixture is excluded, and all selected packages verify before installation.
+- Packaging remains offline and fixed to the base descriptor plus independently selected GAS, CommonUI, Enhanced Input, and AI production companions. The disposable test fixture is excluded, and all selected packages verify before installation.
 - Binary filtering admits a bounded, unique, path-safe module list from each restored installed descriptor. It strips implementation source and headers from declared module trees and generated package intermediates while retaining, configuring, and verifying every matching precompiled `Build.cs` rule.
 - Binary filtering, precompiled rules, descriptor default state, destination confinement, reparse checks, stale-state checks, selected-set commit, rollback, and cleanup retain the documented deployment contract.
 - Project and Engine destinations and `.uproject` updates are computed in a typed immutable plan before package builds. Execution rejects destination or descriptor drift before committing.
@@ -19,4 +19,4 @@ The workflow imports the `scripts/packaging/` service API, never the `package_pl
 
 ## Verification
 
-`tests/test_deploy_plugin_windows.py` targets the owning discovery, workflow, transaction, verification, and configuration modules and checks the compatibility entrypoint. Coverage includes bounded parsing, Engine discovery/validation, fixed build commands, binary filtering, all install modes, four-plugin commit/rollback, descriptor drift, optional PDB enforcement, lifecycle validation, and exact LM Studio/Codex previews. `tests/test_package_plugin.py` covers the shared packaging boundary. This support-tool change does not require a native package build because package commands and package verification behavior are unchanged.
+`tests/test_deploy_plugin_windows.py` targets the owning discovery, workflow, transaction, verification, and configuration modules and checks the compatibility entrypoint. Coverage includes bounded parsing, Engine discovery/validation, fixed build commands, binary filtering, all install modes, five-plugin commit/rollback and complete production-descriptor coverage, descriptor drift, optional PDB enforcement, lifecycle validation, and exact LM Studio/Codex previews. `tests/test_package_plugin.py` covers the shared packaging boundary. This support-tool change does not require a native package build because package commands and package verification behavior are unchanged.

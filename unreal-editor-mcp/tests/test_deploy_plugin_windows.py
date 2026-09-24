@@ -1,3 +1,4 @@
+import itertools
 import json
 import tempfile
 import unittest
@@ -10,6 +11,97 @@ from scripts.windows_deployment.view import OUTPUT_TAB_TITLES
 
 
 class WindowsDeploymentScriptTests(unittest.TestCase):
+    def test_every_production_descriptor_is_deployable(self):
+        plugin_root = Path(__file__).resolve().parents[1] / "plugin"
+        production_descriptors = set(plugin_root.glob("*/*.uplugin"))
+        production_descriptors.remove(
+            plugin_root / "UnrealMCPTestCompanion/UnrealMCPTestCompanion.uplugin"
+        )
+        plugins = deploy.selected_plugins(
+            include_gas=True, include_commonui=True,
+            include_enhanced_input=True, include_ai=True,
+        )
+        self.assertEqual({plugin.descriptor for plugin in plugins}, production_descriptors)
+        self.assertEqual(len(plugins), deploy.MAX_DEPLOYMENT_PLUGINS)
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            engine = root / "EngineRoot"
+            self.write_engine(engine)
+            for plugin in plugins[1:]:
+                with self.subTest(plugin=plugin.name):
+                    command = deploy.build_command(engine, root / plugin.name, plugin)
+                    self.assertIn(f"-Plugin={plugin.descriptor}", command)
+                    self.assertIn(f"-Dependencies={deploy.BASE_PLUGIN.descriptor}", command)
+
+    def test_all_companion_selection_combinations(self):
+        companions = (
+            deploy.GAS_PLUGIN, deploy.COMMONUI_PLUGIN,
+            deploy.ENHANCED_INPUT_PLUGIN, deploy.AI_PLUGIN,
+        )
+        for flags in itertools.product((False, True), repeat=4):
+            with self.subTest(flags=flags):
+                self.assertEqual(
+                    deploy.selected_plugins(
+                        include_gas=flags[0], include_commonui=flags[1],
+                        include_enhanced_input=flags[2], include_ai=flags[3],
+                    ),
+                    (deploy.BASE_PLUGIN,) + tuple(
+                        plugin for plugin, selected in zip(companions, flags) if selected
+                    ),
+                )
+
+    def test_ai_and_complete_companion_set_deploy_in_every_install_mode(self):
+        for all_companions, mode in itertools.product((False, True), sorted(deploy.INSTALL_METHODS)):
+            with self.subTest(all_companions=all_companions, mode=mode), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                project_root = root / "Game"
+                project_root.mkdir()
+                project = self.write_project(project_root)
+                original = project.descriptor.read_bytes()
+                engine = root / "UE_5.8"
+                self.write_engine(engine)
+                expected = ["UnrealMCP"]
+                if all_companions:
+                    expected.extend(["UnrealMCPGAS", "UnrealMCPCommonUI", "UnrealMCPEnhancedInput"])
+                expected.append("UnrealMCPAI")
+                built = []
+
+                def package(engine_root, package_root, log, plugin):
+                    built.append(plugin.name)
+                    package_root.mkdir()
+                    self.write_package(package_root, plugin.name)
+
+                with mock.patch.object(workflow, "run_packaging", side_effect=package):
+                    installed = deploy.deploy(
+                        project, engine, replace_existing=False,
+                        include_gas=all_companions, include_commonui=all_companions,
+                        include_enhanced_input=all_companions, include_ai=True,
+                        install_method=mode, log=lambda message: None,
+                    )
+                self.assertEqual(built, expected)
+                parent = project_root / "Plugins" if mode == deploy.INSTALL_IN_PROJECT else engine / "Engine/Plugins/Marketplace"
+                self.assertEqual(installed, tuple(parent / name for name in expected))
+                if mode == deploy.INSTALL_IN_PROJECT:
+                    self.assertEqual(
+                        json.loads(project.descriptor.read_bytes())["Plugins"],
+                        [{"Name": name, "Enabled": True} for name in expected],
+                    )
+                else:
+                    self.assertEqual(project.descriptor.read_bytes(), original)
+                    for name, destination in zip(expected, installed):
+                        descriptor = json.loads((destination / f"{name}.uplugin").read_bytes())
+                        self.assertIs(descriptor["EnabledByDefault"], mode == deploy.INSTALL_IN_ENGINE_ENABLED)
+
+    def test_ai_selection_requires_boolean_and_transaction_remains_bounded(self):
+        for invalid in (1, None, "true"):
+            with self.subTest(invalid=invalid), self.assertRaisesRegex(deploy.DeploymentError, "include_ai must be Boolean"):
+                deploy.selected_plugins(include_gas=False, include_commonui=False, include_ai=invalid)
+        with self.assertRaisesRegex(deploy.DeploymentError, "one to 5 plugins"):
+            deploy.install_binary_plugins(
+                [(deploy.BASE_PLUGIN, Path("unused"), Path("unused"))] * 6,
+                replace_existing=False,
+            )
+
     def test_window_has_only_requested_output_tabs(self):
         self.assertEqual(
             OUTPUT_TAB_TITLES,
@@ -523,12 +615,14 @@ class WindowsDeploymentScriptTests(unittest.TestCase):
                 include_gas=True,
                 include_commonui=True,
                 include_enhanced_input=True,
+                include_ai=True,
             ),
             (
                 deploy.BASE_PLUGIN,
                 deploy.GAS_PLUGIN,
                 deploy.COMMONUI_PLUGIN,
                 deploy.ENHANCED_INPUT_PLUGIN,
+                deploy.AI_PLUGIN,
             ),
         )
 
@@ -562,6 +656,7 @@ class WindowsDeploymentScriptTests(unittest.TestCase):
                 deploy.GAS_PLUGIN,
                 deploy.COMMONUI_PLUGIN,
                 deploy.ENHANCED_INPUT_PLUGIN,
+                deploy.AI_PLUGIN,
             )
             packages = []
             destinations = []
@@ -586,7 +681,7 @@ class WindowsDeploymentScriptTests(unittest.TestCase):
                 )
                 self.assertIs(descriptor["EnabledByDefault"], True)
 
-    def test_four_plugin_install_rolls_back_when_project_enable_fails(self):
+    def test_five_plugin_install_rolls_back_when_project_enable_fails(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             destination_root = root / "Plugins"
@@ -596,6 +691,7 @@ class WindowsDeploymentScriptTests(unittest.TestCase):
                 deploy.GAS_PLUGIN,
                 deploy.COMMONUI_PLUGIN,
                 deploy.ENHANCED_INPUT_PLUGIN,
+                deploy.AI_PLUGIN,
             )
             for plugin in plugins:
                 package = root / f"{plugin.name}Package"

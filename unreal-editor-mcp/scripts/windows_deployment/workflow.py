@@ -17,6 +17,7 @@ except ModuleNotFoundError:
 
 from .discovery import DeploymentError, validate_supported_engine_root
 from .models import (
+    AI_PLUGIN,
     BASE_PLUGIN,
     COMMONUI_PLUGIN,
     ENHANCED_INPUT_PLUGIN,
@@ -51,6 +52,7 @@ def selected_plugins(
     include_gas: bool,
     include_commonui: bool,
     include_enhanced_input: bool = False,
+    include_ai: bool = False,
 ) -> tuple[PluginBuild, ...]:
     if type(include_gas) is not bool:
         raise DeploymentError("include_gas must be Boolean")
@@ -58,6 +60,8 @@ def selected_plugins(
         raise DeploymentError("include_commonui must be Boolean")
     if type(include_enhanced_input) is not bool:
         raise DeploymentError("include_enhanced_input must be Boolean")
+    if type(include_ai) is not bool:
+        raise DeploymentError("include_ai must be Boolean")
     plugins = [BASE_PLUGIN]
     if include_gas:
         plugins.append(GAS_PLUGIN)
@@ -65,6 +69,8 @@ def selected_plugins(
         plugins.append(COMMONUI_PLUGIN)
     if include_enhanced_input:
         plugins.append(ENHANCED_INPUT_PLUGIN)
+    if include_ai:
+        plugins.append(AI_PLUGIN)
     return tuple(plugins)
 
 
@@ -76,12 +82,14 @@ def deployment_destinations(
     include_gas: bool,
     include_commonui: bool = False,
     include_enhanced_input: bool = False,
+    include_ai: bool = False,
 ) -> tuple[Path, ...]:
     validate_install_method(install_method)
     plugins = selected_plugins(
         include_gas=include_gas,
         include_commonui=include_commonui,
         include_enhanced_input=include_enhanced_input,
+        include_ai=include_ai,
     )
     if install_method == INSTALL_IN_PROJECT:
         return tuple(plugin_destination(project, plugin.name) for plugin in plugins)
@@ -143,6 +151,7 @@ def plan_deployment(request: DeploymentRequest) -> DeploymentPlan:
         include_gas=request.include_gas,
         include_commonui=request.include_commonui,
         include_enhanced_input=request.include_enhanced_input,
+        include_ai=request.include_ai,
     )
     destinations = deployment_destinations(
         request.project,
@@ -151,6 +160,7 @@ def plan_deployment(request: DeploymentRequest) -> DeploymentPlan:
         include_gas=request.include_gas,
         include_commonui=request.include_commonui,
         include_enhanced_input=request.include_enhanced_input,
+        include_ai=request.include_ai,
     )
     existing = tuple(destination for destination in destinations if destination.exists())
     if existing and not request.replace_existing:
@@ -193,6 +203,7 @@ def deploy(
     include_gas: bool = False,
     include_commonui: bool = False,
     include_enhanced_input: bool = False,
+    include_ai: bool = False,
     install_method: str = INSTALL_IN_PROJECT,
     log: Callable[[str], None],
 ) -> tuple[Path, ...]:
@@ -205,5 +216,6 @@ def deploy(
         include_commonui=include_commonui,
         install_method=install_method,
         include_enhanced_input=include_enhanced_input,
+        include_ai=include_ai,
     )
     return execute_deployment(plan_deployment(request), log).destinations
