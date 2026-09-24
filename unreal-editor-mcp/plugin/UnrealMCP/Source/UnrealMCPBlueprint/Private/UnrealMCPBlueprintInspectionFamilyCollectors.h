@@ -63,7 +63,14 @@ if (bIncludeInherited)
 }
 
 bool bComponentFound = ComponentFilter.IsEmpty();
-for (const TPair<UBlueprint*, FString>& Owner : Owners)
+TArray<TPair<UBlueprint*, FString>> ComponentOwners = Owners;
+for (USCS_Node* Node : InspectionComponentNodes(Blueprint))
+{
+    UBlueprint* Owner = Node->GetTypedOuter<USimpleConstructionScript>()->GetBlueprint();
+    if (Owner != nullptr && !ComponentOwners.ContainsByPredicate([Owner](const auto& Pair) { return Pair.Key == Owner; }))
+        ComponentOwners.Emplace(Owner, Owner->GetPathName());
+}
+for (const TPair<UBlueprint*, FString>& Owner : ComponentOwners)
 {
     if (Owner.Key->SimpleConstructionScript == nullptr) continue;
     TMap<const USCS_Node*, const USCS_Node*> Parents;
@@ -80,8 +87,11 @@ for (const TPair<UBlueprint*, FString>& Owner : Owners)
         if (Id == ComponentFilter) bComponentFound = true;
         const USCS_Node* const* Parent = Parents.Find(Node);
         FString DefaultsFingerprint;
-        if (Node->ComponentTemplate != nullptr) DefaultsFingerprint = AddComponentDefaults(Node->ComponentTemplate, PropertyNames, Value);
-        if (Sections.Contains(TEXT("components")) && (ComponentFilter.IsEmpty() || ComponentFilter == Id))
+        UActorComponent* Effective = EffectiveComponentTemplate(Blueprint, Node);
+        if (Effective != nullptr) DefaultsFingerprint = AddComponentDefaults(Effective, PropertyNames, Value);
+        Value->SetStringField(TEXT("template_path"), Effective != nullptr ? Effective->GetPathName() : FString());
+        Value->SetStringField(TEXT("template_origin"), Effective != nullptr ? Effective->GetOuter()->GetPathName() : FString());
+        if (Sections.Contains(TEXT("components")) && (ComponentFilter == Id || (ComponentFilter.IsEmpty() && (bIncludeInherited || Owner.Key == Blueprint))))
         {
             Value->SetStringField(TEXT("id"), Id);
             Value->SetBoolField(TEXT("identity_stable"), !Id.IsEmpty());

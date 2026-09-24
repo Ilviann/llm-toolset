@@ -155,7 +155,7 @@ bool FUnrealMCPBlueprintInspector::ExecuteInitial(
             Cursors.Remove(OldestKey);
         }
         const FString Cursor = FGuid::NewGuid().ToString(EGuidFormats::Digits).ToLower();
-        Cursors.Add(Cursor, FCursorState{Arguments, Snapshot, End, Now() + UnrealMCP::CursorLifetimeSeconds});
+        Cursors.Add(Cursor, FCursorState{MakeShared<FUnrealMCPRecord>(*Arguments), Snapshot, End, Now() + UnrealMCP::CursorLifetimeSeconds});
         Result->SetStringField(TEXT("next_cursor"), Cursor);
         Result->SetNumberField(TEXT("cursor_expires_in_ms"), static_cast<int32>(UnrealMCP::CursorLifetimeSeconds * 1000.0));
     }

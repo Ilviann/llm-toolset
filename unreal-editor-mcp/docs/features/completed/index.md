@@ -1,5 +1,13 @@
 # Completed features
 
+- [`reflected-inspect` — Expanded reflected inspection](reflected-inspect.md).
+- [`attribute-inspect` — Reflected Gameplay Attributes](attribute-inspect.md).
+- [`attribute-map-inspect` — Gameplay Attribute collection values](attribute-map-inspect.md).
+- [`inherited-inspect` — Effective inherited component inspection](inherited-inspect.md).
+- [`library-inspect` — Blueprint library inspection](library-inspect.md).
+- [`graph-scope-inspect` — Exact graph scope for inspection](graph-scope-inspect.md).
+- [`interface-inspect` — Interface discovery and authored graph inspection](interface-inspect.md).
+
 - [`windows-deployment-ai` — AI companion deployment](windows-deployment-ai.md).
 - [`inspect-limits` — Independent inspection budgets](inspect-limits.md).
 - [`engine-plugin-removal` — Windows engine plugin removal](engine-plugin-removal.md).

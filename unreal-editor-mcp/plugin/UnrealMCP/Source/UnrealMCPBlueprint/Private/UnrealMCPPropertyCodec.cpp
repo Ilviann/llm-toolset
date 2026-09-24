@@ -1,6 +1,7 @@
 #include "UnrealMCPPropertyCodec.h"
 
 #include "UnrealMCPGameplayTagValueCodec.h"
+#include "UnrealMCPGameDataValueCodec.h"
 #include "UnrealMCPWireTypes.h"
 #include "UnrealMCPVersion.h"
 #include "Misc/PackageName.h"
@@ -280,6 +281,20 @@ TSharedRef<FUnrealMCPRecord> UnrealMCP::PropertyCodec::Encode(UObject* Object, F
 {
     const TSharedRef<FUnrealMCPRecord> Result = MakeShared<FUnrealMCPRecord>();
     Result->SetStringField(TEXT("name"), Property != nullptr ? Property->GetName() : FString());
+    if (Object != nullptr && Property != nullptr)
+    {
+        const UObject* Origin = Object;
+        TSet<const UObject*> Seen;
+        while (Origin != nullptr && !Seen.Contains(Origin) && IsIdenticalToArchetype(Origin, Property))
+        {
+            Seen.Add(Origin);
+            const UObject* Parent = Origin->GetArchetype();
+            if (Parent == nullptr || Property->ContainerPtrToValuePtrForDefaults<void>(Parent->GetClass(), Parent) == nullptr) break;
+            Origin = Parent;
+        }
+        Result->SetStringField(TEXT("property_origin"), Origin != nullptr ? Origin->GetPathName() : FString());
+        Result->SetStringField(TEXT("declared_by"), Property->GetOwnerStruct()->GetPathName());
+    }
     FString Kind;
     const bool bSupported = Object != nullptr && IsSupportedEditable(Property, Kind);
     Result->SetBoolField(TEXT("supported"), bSupported);
@@ -295,6 +310,18 @@ TSharedRef<FUnrealMCPRecord> UnrealMCP::PropertyCodec::Encode(UObject* Object, F
         {
             Result->SetBoolField(TEXT("supported"), false);
             Result->SetStringField(TEXT("type"), TEXT("unsupported"));
+        }
+    }
+    else if (Object != nullptr && Property != nullptr)
+    {
+        TSharedPtr<FUnrealMCPValue> Value;
+        FUnrealMCPError Error;
+        if (UnrealMCP::GameDataValueCodec::Encode(Property, Property->ContainerPtrToValuePtr<void>(Object), 0, Value, Error))
+        {
+            Result->SetBoolField(TEXT("supported"), true);
+            Result->SetBoolField(TEXT("editable"), false);
+            Result->SetStringField(TEXT("type"), TEXT("reflected"));
+            Result->SetField(TEXT("value"), Value);
         }
     }
     return Result;

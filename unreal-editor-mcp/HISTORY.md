@@ -10,6 +10,35 @@
 - Added an independent CommonUI companion checkbox to the Windows deployment helper, including fixed base-dependent packaging, project/Engine installation, and transactional multi-plugin handling without changing runtime or plugin versions.
 - Decomposed Python packaging, Windows deployment, and headless integration support tools behind stable entrypoints, with shared Unreal-local primitives, typed deployment and Blueprint scenario state, focused domain modules, and unchanged runtime/plugin versions.
 
+## 0.60.0 — 2026-09-24
+
+- Added non-loading Blueprint Interface discovery, stable declaration identities and selected authored entry/result graph contents. Animation Layer Interfaces remain classified as animation; no new authoring capability is enabled.
+- Qualified the 0.54.0–0.60.0 inspection improvements on Windows with UE 5.8: 209 Python tests (one symlink-permission skip), all 71 expected native Automation cases, adaptive/forced-unity/non-unity builds, isolated base-plugin packaging, and the complete production-bridge restart workflow passed. The new library/property/component selectors and whole-asset snapshots passed before and after restart. macOS native qualification remains in the roadmap backlog; UE 5.7 three-field attribute exports are covered as a data-format compatibility case on UE 5.8.
+
+## 0.59.0 — 2026-09-24
+
+- Required an exact graph identity or unambiguous name for internal nodes/pins/connections; selectors without explicit sections request that graph's contents. Public `asset_inspect` retains its hierarchical schema and atomic graph behavior, with pageable `graphs` summaries and stable graph selectors. Whole-asset snapshots and independent inspection budgets remain intact.
+
+## 0.58.0 — 2026-09-24
+
+- Added read-only Function Library and Macro Library discovery/inspection, typed declarations, locals, stable graph identities and paging. Actor-scoped Macro Libraries classify as libraries and reject authoring operations.
+
+## 0.57.0 — 2026-09-24
+
+- Added ancestor-stable identity and exact-name component selection, effective child override values, template/property origins, and exact reflected property selectors. Inherited overrides participate in shallow inspection snapshots.
+
+## 0.56.0 — 2026-09-24
+
+- Extended typed Gameplay Attributes to game-data values and map keys with deterministic reflected map ordering and UE 5.7 three-field export compatibility.
+
+## 0.55.0 — 2026-09-24
+
+- Added reflection-only Gameplay Attribute inspection for Blueprint variable/pin defaults and targeted class/component values, including loaded resolution, compatibility, attribute name, property path and owner path. The base plugin has no GameplayAbilities dependency; companion API v2 and companion versions are unchanged.
+
+## 0.54.0 — 2026-09-24
+
+- Expanded read-only property encoding through the bounded Game Data codec for nested structs, GUID fields, tags, text, enums, soft references and arrays. Unsupported Data Table fields remain explicit without hiding supported siblings. Existing mutation admission and value decoding are preserved.
+
 ## 0.53.1 — 2026-09-24
 
 - Separated inclusive Blueprint inspection budgets: 4,096 emitted records across all pages, 262,144 internal work units, and 262,144 fingerprint entries, with independent runtime capability limits and distinct overflow errors.

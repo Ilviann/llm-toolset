@@ -11,6 +11,8 @@ from scripts.asset_family_conformance import (
     verify_cross_process_family,
 )
 
+from .inspection_expansion import verify_expanded_inspection
+
 from .blueprint_declarations import (
     author_phase_fifteen_game_instance,
     author_phase_fourteen_families,
@@ -29,6 +31,7 @@ def prepare_blueprint_scenario(bridge: UnrealBridge) -> dict[str, object]:
             (("asset", "type"), "actor_blueprint"),
         ),
     ))
+    inspection["inspection_expansion_snapshots"] = verify_expanded_inspection(bridge)
     loaded_snapshot = inspection.get("snapshot_id")
     if not isinstance(loaded_snapshot, str) or len(loaded_snapshot) != 40:
         raise AssertionError("reloaded Phase 2 fixture did not report a structural snapshot")

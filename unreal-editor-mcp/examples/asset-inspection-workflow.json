@@ -1,7 +1,9 @@
 [
   {
     "tool": "asset_inspect",
-    "arguments": {"asset_path": "/Game/Actors/BP_Door"}
+    "arguments": {
+      "asset_path": "/Game/Actors/BP_Door"
+    }
   },
   {
     "tool": "asset_inspect",
@@ -32,6 +34,36 @@
     "arguments": {
       "asset_path": "/Game/Characters/ABP_Player",
       "selector": "state_machines/AnimGraph/Locomotion"
+    }
+  },
+  {
+    "tool": "asset_inspect",
+    "arguments": {
+      "asset_path": "/Game/Libraries/BFL_Combat",
+      "selector": "graphs",
+      "page_size": 10,
+      "page_index": 0
+    }
+  },
+  {
+    "tool": "asset_inspect",
+    "arguments": {
+      "asset_path": "/Game/Libraries/BFL_Combat",
+      "selector": "functions/ComputeDamage"
+    }
+  },
+  {
+    "tool": "asset_inspect",
+    "arguments": {
+      "asset_path": "/Game/Actors/BP_Child",
+      "selector": "components/Trigger/properties/RelativeLocation"
+    }
+  },
+  {
+    "tool": "asset_inspect",
+    "arguments": {
+      "asset_path": "/Game/Effects/GE_Damage",
+      "selector": "class_defaults/Modifiers"
     }
   }
 ]

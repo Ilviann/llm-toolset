@@ -1,4 +1,5 @@
 #include "UnrealMCPK2TypeCodec.h"
+#include "UnrealMCPGameplayAttributeInspection.h"
 
 #include "EdGraphSchema_K2.h"
 #include "Misc/PackageName.h"
@@ -355,6 +356,8 @@ bool ReadAtom(
 
 TSharedRef<FUnrealMCPRecord> EncodeAtom(FName Category, const UObject* TypeObject, const FString& Text)
 {
+    if (Category == UEdGraphSchema_K2::PC_Struct && UnrealMCP::GameplayAttributeInspection::IsAttribute(TypeObject))
+        return UnrealMCP::GameplayAttributeInspection::EncodeText(Text);
     const TSharedRef<FUnrealMCPRecord> Result = MakeShared<FUnrealMCPRecord>();
     if (IsReferenceCategory(Category))
     {
@@ -470,6 +473,8 @@ TSharedRef<FUnrealMCPRecord> EncodeDefault(const FEdGraphPinType& Type, const FS
         Result->SetStringField(TEXT("kind"), TEXT("unavailable"));
         return Result;
     }
+    if (!Type.IsContainer() && GameplayAttributeInspection::IsAttribute(Type.PinSubCategoryObject.Get()))
+        return GameplayAttributeInspection::EncodeText(DefaultText);
     if (DefaultText.IsEmpty())
     {
         const TSharedRef<FUnrealMCPRecord> Result = MakeShared<FUnrealMCPRecord>();

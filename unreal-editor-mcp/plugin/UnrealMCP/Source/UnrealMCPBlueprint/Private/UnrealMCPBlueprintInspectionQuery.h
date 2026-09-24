@@ -10,6 +10,8 @@ struct FInspectionQuery
     bool bIncludeInherited = false;
     TSet<FString> Sections;
     FString GraphFilter;
+    FString GraphName;
+    FString ComponentName;
     FString ComponentFilter;
     FString MemberFilter;
     FString FunctionFilter;
@@ -22,7 +24,7 @@ struct FInspectionQuery
 
 static bool DecodeInspectionQuery(const FUnrealMCPRecord& Arguments, FInspectionQuery& Out, FUnrealMCPError& OutError)
 {
-    if (!HasOnlyFields(Arguments, {TEXT("mode"), TEXT("asset_path"), TEXT("sections"), TEXT("graph_id"), TEXT("component_id"), TEXT("member_id"),
+    if (!HasOnlyFields(Arguments, {TEXT("mode"), TEXT("asset_path"), TEXT("sections"), TEXT("graph_id"), TEXT("graph_name"), TEXT("component_name"), TEXT("component_id"), TEXT("member_id"),
         TEXT("function_id"), TEXT("local_id"), TEXT("macro_id"), TEXT("custom_event_id"), TEXT("widget_id"),
         TEXT("property_names"), TEXT("include_inherited"), TEXT("page_size")}))
     {
@@ -79,6 +81,22 @@ static bool DecodeInspectionQuery(const FUnrealMCPRecord& Arguments, FInspection
             return false;
         }
     }
+    for (const auto& Field : {TPair<const TCHAR*, FString*>(TEXT("graph_name"), &Out.GraphName),
+        TPair<const TCHAR*, FString*>(TEXT("component_name"), &Out.ComponentName)})
+    {
+        if (Arguments.HasField(Field.Key) && (!Arguments.TryGetStringField(Field.Key, *Field.Value)
+            || Field.Value->IsEmpty() || Field.Value->Len() > 128))
+        { OutError = {TEXT("invalid_argument"), TEXT("Exact names must be non-empty bounded strings")}; return false; }
+    }
+    if ((!Out.GraphName.IsEmpty() && !Out.GraphFilter.IsEmpty())
+        || (!Out.ComponentName.IsEmpty() && !Out.ComponentFilter.IsEmpty()))
+    { OutError = {TEXT("invalid_argument"), TEXT("Select by identity or exact name, not both")}; return false; }
+    const bool bGraphSelected = !Out.GraphFilter.IsEmpty() || !Out.GraphName.IsEmpty();
+    if (bGraphSelected && !Arguments.HasField(TEXT("sections")))
+        Out.Sections = {TEXT("graphs"), TEXT("nodes"), TEXT("pins"), TEXT("connections")};
+    if (!bGraphSelected && (Out.Sections.Contains(TEXT("nodes")) || Out.Sections.Contains(TEXT("pins"))
+        || Out.Sections.Contains(TEXT("connections"))))
+    { OutError = {TEXT("invalid_argument"), TEXT("Graph contents require graph_id or exact graph_name")}; return false; }
     if (!ReadPropertyNames(Arguments, Out.PropertyNames, OutError)) return false;
     if (Out.Sections.Contains(TEXT("class_defaults")) && Out.PropertyNames.IsEmpty())
     {

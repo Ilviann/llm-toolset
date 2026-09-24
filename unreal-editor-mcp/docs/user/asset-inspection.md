@@ -31,3 +31,11 @@ Animation Blueprint roots compose common Blueprint members and K2 declarations w
 Every success is deterministic safe YAML inside the ordinary MCP text-content result. Structured errors remain JSON-RPC/MCP errors. YAML output preserves JSON Boolean, null, finite number, string, sequence, and mapping types, sorts mapping keys, quotes strings, and never emits aliases or executable tags.
 
 See [`examples/asset-inspection-workflow.json`](../../examples/asset-inspection-workflow.json) for a compact multi-call sequence and the [asset inspection contracts](../types/asset-inspection/index.md) for exact family behavior.
+
+## Expanded Blueprint and reflected selectors
+
+Function Libraries and Macro Libraries are inspection-only, including Macro Libraries whose parent is Actor. `functions`, `macros`, and `graphs` return bounded declaration pages. `graphs/<stable-id>` or `graphs/<exact-name>` selects one complete authored graph; ambiguous names reject. Interface selection includes its signature and authored entry/result structure, without treating it as an executable implementation. Animation Layer Interfaces retain animation classification.
+
+Use `class_defaults/<exact-property>` for targeted reflected defaults and `components/<ancestor-id-or-exact-name>/properties/<exact-property>` for effective component values. The component detail exposes `template_path`, `template_origin`, and its declaring Blueprint; property records expose `declared_by` and `property_origin`. Referenced assets are represented by paths and are not recursively loaded.
+
+Gameplay Attributes use `{kind: gameplay_attribute, valid_export, resolved, compatible, attribute_name, property_path, owner_path}`. Resolution uses loaded reflection only; unresolved, empty, malformed and incompatible values stay distinguishable. The same encoding applies to variable/pin defaults, reflected fields and map keys. The base plugin has no GameplayAbilities dependency. Unsupported Data Table fields remain explicit while supported sibling fields are returned. These read extensions do not expand mutation decoding.

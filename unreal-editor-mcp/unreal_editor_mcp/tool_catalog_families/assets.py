@@ -13,6 +13,7 @@ _ASSET_INSPECT_PATH = {
     "pattern": r"^/Game/(?:[^\\/:.]+/)*[^\\/:.]+(?:\.[^\\/:.]+)?$",
 }
 _ASSET_SELECTOR = {
+    "description": "Exact child selector. graphs/<id-or-name> selects one graph; class_defaults/<property> and components/<id-or-name>/properties/<property> read reflected values.",
     "type": "string",
     "minLength": 1,
     "maxLength": 1024,

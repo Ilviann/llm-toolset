@@ -22,6 +22,8 @@ Normal/adaptive and forced-unity module builds are both required. Private implem
 
 ## Cross-process boundary
 
+`inspection_expansion.py` verifies Function Library and Actor-scoped Macro Library discovery, paged graph declarations, selected graph contents, and equal summary/detail snapshots across editor restart. It also checks exact class-default and stable component selectors and component provenance through the production bridge. Native `AssetInspect.LibrariesInheritedComponentsAndGraphScope` and `AssetInspect.GameplayAttributeReflection` cover inherited overrides, graph scope rejection and stale cursors, typed attribute exports and collection values; content fixtures cover supported siblings of unavailable fields.
+
 `scripts/asset_family_conformance.py` supplies common production-bridge identity,
 determinism, snapshot, selector/page, retained-result, and restart read-back
 checks. The Blueprint fixture preparation, Widget restart, Game Data lost-response

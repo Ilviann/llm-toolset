@@ -6,6 +6,7 @@ import json
 
 from unreal_editor_mcp.bridge import UnrealBridge
 from unreal_editor_mcp.project import ProjectLayout
+from .inspection_expansion import verify_expanded_inspection
 
 
 def _root(bridge: UnrealBridge, asset_path: str) -> dict[str, object]:
@@ -40,7 +41,9 @@ def verify_restarted_blueprints(
     scenario: dict[str, object],
 ) -> None:
     """Verify compact roots, exact graph selectors, snapshots, and catalogs after restart."""
-    del layout, phase_two_loaded_inspection
+    del layout
+    if verify_expanded_inspection(reloaded_bridge) != phase_two_loaded_inspection["inspection_expansion_snapshots"]:
+        raise AssertionError("library inspection snapshots changed after restart")
     phase_two = _root(
         reloaded_bridge,
         "/Game/UnrealMCPPhase2/BP_InspectionFixture.BP_InspectionFixture",

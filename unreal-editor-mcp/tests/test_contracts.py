@@ -90,7 +90,7 @@ class ReleaseContractTests(unittest.TestCase):
         native = re.search(r'Version\[\].*TEXT\("([^"]+)"\)', header)
         self.assertIsNotNone(native)
         versions = {project["project"]["version"], plugin["VersionName"], native.group(1), unreal_editor_mcp.__version__}
-        self.assertEqual(versions, {"0.53.1"})
+        self.assertEqual(versions, {"0.60.0"})
 
     def test_independent_inspection_limits(self):
         header = (ASSET_CORE_PUBLIC / "UnrealMCPVersion.h").read_text(encoding="utf-8")
@@ -103,7 +103,7 @@ class ReleaseContractTests(unittest.TestCase):
             self.assertRegex(header, rf"{constant}\s*=\s*{value};")
             self.assertIn(f'FixedLimit(TEXT("{wire_name}"), UnrealMCP::{constant})', catalog)
         plugin = json.loads((ROOT / "plugin/UnrealMCP/UnrealMCP.uplugin").read_text(encoding="utf-8"))
-        self.assertEqual(plugin["Version"], 530001)
+        self.assertEqual(plugin["Version"], 600000)
 
     def test_companion_api_and_companion_versions_are_internally_consistent(self):
         base = json.loads((ROOT / "plugin/UnrealMCP/UnrealMCP.uplugin").read_text(encoding="utf-8"))

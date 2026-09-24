@@ -49,7 +49,7 @@ bool BuildInspection(
         return false;
     }
     UnrealMCP::BlueprintFamilyPolicy::FFamilyInfo Family =
-        UnrealMCP::BlueprintFamilyPolicy::Classify(Blueprint->ParentClass);
+        InspectionFamily(Blueprint);
     const UClass* ClassifiedClass = Blueprint->GeneratedClass != nullptr
         ? Blueprint->GeneratedClass : Blueprint->ParentClass;
     if (!Family.bSupported && ExtensionRegistry != nullptr
@@ -65,6 +65,14 @@ bool BuildInspection(
     }
     OutBlueprintFamily = Family.Name;
     OutFamilyCapabilities = UnrealMCP::BlueprintFamilyPolicy::BuildLiveCapabilities(Blueprint, Family);
+    if (Family.Name == TEXT("animation") || Family.Name == TEXT("interface")
+        || Family.Name == TEXT("function_library") || Family.Name == TEXT("macro_library"))
+    {
+        OutFamilyCapabilities = MakeShared<FUnrealMCPRecord>();
+        OutFamilyCapabilities->SetBoolField(TEXT("inspection_only"), true);
+        OutFamilyCapabilities->SetBoolField(TEXT("inspect"), true);
+        OutFamilyCapabilities->SetBoolField(TEXT("authoring"), false);
+    }
     UPackage* Package = Blueprint->GetOutermost();
     const bool bDirtyBefore = Package->IsDirty();
     const EBlueprintStatus StatusBefore = Blueprint->Status;
@@ -79,6 +87,29 @@ bool BuildInspection(
         TArray<UEdGraph*> Graphs;
         if (!UnrealMCP::InspectionBudget::CollectGraphs(Owner, Graphs, InternalWork, OutError)) return false;
         Owner = bIncludeInherited ? UBlueprint::GetBlueprintFromClass(Owner->ParentClass) : nullptr;
+    }
+    if (!Query.GraphName.IsEmpty())
+    {
+        int32 Matches = 0;
+        for (UBlueprint* Owner : VisitedOwners)
+        {
+            TArray<UEdGraph*> Graphs;
+            int32 Work = 0;
+            if (!UnrealMCP::InspectionBudget::CollectGraphs(Owner, Graphs, Work, OutError)) return false;
+            for (UEdGraph* Graph : Graphs) if (Graph->GetName() == Query.GraphName)
+            { Query.GraphFilter = GuidString(Graph->GraphGuid); ++Matches; }
+        }
+        if (Matches != 1 || Query.GraphFilter.IsEmpty())
+        { OutError = {TEXT("invalid_argument"), TEXT("graph_name must resolve exactly one stable graph")}; return false; }
+    }
+    if (!Query.ComponentName.IsEmpty())
+    {
+        int32 Matches = 0;
+        for (USCS_Node* Node : InspectionComponentNodes(Blueprint))
+            if (Node->GetVariableName().ToString() == Query.ComponentName)
+            { Query.ComponentFilter = GuidString(Node->VariableGuid); ++Matches; }
+        if (Matches != 1 || Query.ComponentFilter.IsEmpty())
+        { OutError = {TEXT("invalid_argument"), TEXT("component_name must resolve exactly one stable component")}; return false; }
     }
     AddClassDefaultFingerprint(Blueprint, Sink.Fingerprint);
     if (!Sink.CheckLimits(OutError)) return false;
@@ -103,6 +134,22 @@ bool BuildInspection(
             OutFamilyCapabilities, OutError))
     {
         return false;
+    }
+    if (!Sink.CheckLimits(OutError)) return false;
+    for (const auto& RecordValue : OutRecords)
+    {
+        if (!RecordValue.IsValid()) continue;
+        const auto Record = RecordValue->AsObject();
+        if (Record.IsValid() && OutFamilyCapabilities->HasField(TEXT("inspection_only")))
+        {
+            if (Record->HasField(TEXT("editable"))) Record->SetBoolField(TEXT("editable"), false);
+            Record->RemoveField(TEXT("replacement_boundary"));
+        }
+        if (Record.IsValid() && Record->GetStringField(TEXT("section")) == TEXT("summary"))
+        {
+            Record->SetStringField(TEXT("blueprint_family"), OutBlueprintFamily);
+            Record->SetObjectField(TEXT("family_capabilities"), OutFamilyCapabilities.ToSharedRef());
+        }
     }
     if (!Sink.CheckLimits(OutError)) return false;
     if (Package->IsDirty() != bDirtyBefore || Blueprint->Status != StatusBefore)

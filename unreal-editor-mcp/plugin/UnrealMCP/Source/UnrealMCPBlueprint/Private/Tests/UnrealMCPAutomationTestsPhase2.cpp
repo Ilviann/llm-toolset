@@ -1,4 +1,5 @@
 #if WITH_DEV_AUTOMATION_TESTS
+#include "Kismet/BlueprintFunctionLibrary.h"
 
 #include "UnrealMCPBlueprintAutomationTestSupport.h"
 #include "UnrealMCPInspectionBudget.h"
@@ -91,7 +92,7 @@ bool FUnrealMCPPhase2InspectionTest::RunTest(const FString& Parameters)
     EmptyGraphBlueprint->FunctionGraphs.Empty();
     EmptyGraphBlueprint->MacroGraphs.Empty();
     EmptyGraphBlueprint->DelegateSignatureGraphs.Empty();
-    TestTrue(TEXT("empty graph inspection succeeds"), Inspector.Execute(AllSectionArguments(EmptyGraphBlueprint->GetPathName()), Result, Error));
+    TestTrue(TEXT("empty graph inspection succeeds"), Inspector.Execute(InspectArguments(EmptyGraphBlueprint->GetPathName()), Result, Error));
     TestFalse(TEXT("empty graph inspection returns no graph record"), ResultHasSection(Result, TEXT("graph")));
 
     UBlueprint* LargeBlueprint = CreateBlueprintFixture(Base + TEXT("/BP_Large"), AActor::StaticClass(), false);
@@ -278,6 +279,26 @@ bool FUnrealMCPPhase2LiveFixtureTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("fixture inspects after save"), Inspector.Execute(AllSectionArguments(Blueprint->GetPathName()), AfterSave, Error));
     const FString SnapshotAfter = AfterSave.IsValid() ? AfterSave->GetStringField(TEXT("snapshot_id")) : FString();
     TestEqual(TEXT("save preserves structural snapshot"), SnapshotAfter, SnapshotBefore);
+    for (const EBlueprintType Type : {BPTYPE_FunctionLibrary, BPTYPE_MacroLibrary})
+    {
+        const FString Name = Type == BPTYPE_FunctionLibrary ? TEXT("BFL_InspectionFixture") : TEXT("BML_InspectionFixture");
+        const FString Path = TEXT("/Game/UnrealMCPPhase2/") + Name;
+        UBlueprint* Library = FindObject<UBlueprint>(nullptr, *(Path + TEXT(".") + Name));
+        if (Library == nullptr) Library = FKismetEditorUtilities::CreateBlueprint(
+            Type == BPTYPE_FunctionLibrary ? UBlueprintFunctionLibrary::StaticClass() : AActor::StaticClass(),
+            CreatePackage(*Path), FName(*Name), Type, TEXT("UnrealMCP.Tests"));
+        if (!TestNotNull(TEXT("persistent library fixture"), Library)) return false;
+        FAssetRegistryModule::AssetCreated(Library);
+        const auto& Existing = Type == BPTYPE_FunctionLibrary ? Library->FunctionGraphs : Library->MacroGraphs;
+        if (Existing.IsEmpty())
+        {
+            UEdGraph* Graph = FBlueprintEditorUtils::CreateNewGraph(Library, TEXT("Compute"), UEdGraph::StaticClass(), UEdGraphSchema_K2::StaticClass());
+            if (Type == BPTYPE_FunctionLibrary) FBlueprintEditorUtils::AddFunctionGraph<UFunction>(Library, Graph, true, nullptr);
+            else FBlueprintEditorUtils::AddMacroGraph(Library, Graph, true, nullptr);
+        }
+        FKismetEditorUtilities::CompileBlueprint(Library);
+        TestTrue(TEXT("library saves"), SaveBlueprintFixture(Library));
+    }
     UE_LOG(LogTemp, Display, TEXT("UNREAL_MCP_PHASE2_SNAPSHOT=%s"), *SnapshotAfter);
     return true;
 }

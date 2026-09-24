@@ -175,7 +175,9 @@ public:
             TEXT("blueprint_logic_unit_external_connections"), TEXT("blueprint_node_layout"), TEXT("blueprint_family_policy"),
             TEXT("game_mode_families"), TEXT("game_state_families"), TEXT("game_instance_family"),
             TEXT("widget_blueprint_family"), TEXT("multiplayer_blueprint_authoring"), TEXT("custom_event_rpcs"),
-            TEXT("typed_replication_settings"), TEXT("gameplay_framework_assignment"), TEXT("gameplay_tag_properties")})
+            TEXT("typed_replication_settings"), TEXT("gameplay_framework_assignment"), TEXT("gameplay_tag_properties"), TEXT("reflected_property_inspection"),
+            TEXT("gameplay_attribute_inspection"), TEXT("inherited_component_inspection"),
+            TEXT("blueprint_library_inspection"), TEXT("graph_scoped_inspection")})
         {
             if (!Registrar.RegisterFeature({Feature, [] { return true; }}, OutError)) return false;
         }

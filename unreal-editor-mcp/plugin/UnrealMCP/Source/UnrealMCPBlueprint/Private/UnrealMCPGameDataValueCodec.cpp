@@ -1,6 +1,7 @@
 #include "UnrealMCPGameDataValueCodec.h"
 
 #include "UnrealMCPGameplayTagValueCodec.h"
+#include "UnrealMCPGameplayAttributeInspection.h"
 #include "UnrealMCPWireTypes.h"
 #include "EdGraphSchema_K2.h"
 #include "Misc/PackageName.h"
@@ -204,6 +205,11 @@ bool UnrealMCP::GameDataValueCodec::Encode(
     }
     if (const FStructProperty* StructProperty = CastField<FStructProperty>(Property))
     {
+        if (GameplayAttributeInspection::IsAttribute(StructProperty->Struct))
+        {
+            OutValue = MakeShared<FUnrealMCPValueObject>(GameplayAttributeInspection::Encode(StructProperty, Value));
+            return true;
+        }
         bool bSucceeded = false;
         const TSharedRef<FUnrealMCPRecord> Fields = EncodeFields(StructProperty->Struct, Value, Depth + 1, OutError, bSucceeded);
         if (!bSucceeded) return false;
@@ -438,7 +444,15 @@ TSharedRef<FUnrealMCPRecord> UnrealMCP::GameDataValueCodec::EncodeFields(
     {
         if (++Count > UnrealMCP::MaxGameDataFields) { OutError = {TEXT("data_limit_exceeded"), TEXT("The live row schema exceeds the field limit")}; return Result; }
         TSharedPtr<FUnrealMCPValue> Value;
-        if (!Encode(*It, It->ContainerPtrToValuePtr<void>(Data), Depth, Value, OutError)) return Result;
+        FUnrealMCPError FieldError;
+        if (!Encode(*It, It->ContainerPtrToValuePtr<void>(Data), Depth, Value, FieldError))
+        {
+            if (FieldError.Code == TEXT("data_limit_exceeded")) { OutError = FieldError; return Result; }
+            const TSharedRef<FUnrealMCPRecord> Limitation = MakeShared<FUnrealMCPRecord>();
+            Limitation->SetStringField(TEXT("kind"), TEXT("unavailable"));
+            Limitation->SetStringField(TEXT("code"), FieldError.Code);
+            Value = MakeShared<FUnrealMCPValueObject>(Limitation);
+        }
         Result->SetField(Struct->GetAuthoredNameForField(*It), Value);
     }
     bSucceeded = true;

@@ -41,6 +41,18 @@ struct FUnrealMCPAssetInspectDataRow : public FTableRowBase
 
     UPROPERTY(EditAnywhere, Category = "Asset Inspect Data Fixture")
     TMap<FName, float> Multipliers;
+
+    UPROPERTY(EditAnywhere, Category = "Asset Inspect Data Fixture")
+    FGuid Identity;
+
+    UPROPERTY(EditAnywhere, Category = "Asset Inspect Data Fixture")
+    FText Label;
+
+    UPROPERTY(EditAnywhere, Category = "Asset Inspect Data Fixture")
+    TArray<TSoftObjectPtr<UObject>> References;
+
+    UPROPERTY(Transient)
+    int32 UnsupportedTransient = 7;
 };
 
 USTRUCT()

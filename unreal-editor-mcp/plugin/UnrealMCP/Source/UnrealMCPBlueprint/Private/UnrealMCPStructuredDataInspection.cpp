@@ -2,7 +2,9 @@
 
 #include "Misc/SecureHash.h"
 #include "UnrealMCPGameDataValueCodec.h"
+#include "UnrealMCPPropertyCodec.h"
 #include "UnrealMCPGameplayTagValueCodec.h"
+#include "UnrealMCPGameplayAttributeInspection.h"
 #include "UnrealMCPJsonCodec.h"
 #include "UnrealMCPVersion.h"
 #include "UObject/Class.h"
@@ -178,6 +180,8 @@ bool SemanticValue(
     }
     if (const FStructProperty* Struct = CastField<FStructProperty>(Property))
     {
+        if (GameplayAttributeInspection::IsAttribute(Struct->Struct))
+            return GameDataValueCodec::Encode(Property, Address, Depth, OutValue, OutError);
         const TSharedRef<FUnrealMCPRecord> Fields = MakeShared<FUnrealMCPRecord>();
         int32 FieldCount = 0;
         for (TFieldIterator<FProperty> It(Struct->Struct, EFieldIterationFlags::IncludeSuper); It; ++It)
@@ -228,6 +232,12 @@ TSharedRef<FUnrealMCPRecord> PropertyRecord(
         Value = MakeShared<FUnrealMCPValueObject>(Limitation(Property, Error));
     }
     Result->SetField(TEXT("value"), Value);
+    if (Source.Owner != nullptr && Source.Data == Source.Owner)
+    {
+        const auto Encoded = PropertyCodec::Encode(Source.Owner, Property);
+        FString Origin;
+        if (Encoded->TryGetStringField(TEXT("property_origin"), Origin)) Result->SetStringField(TEXT("property_origin"), Origin);
+    }
     return Result;
 }
 
@@ -597,6 +607,13 @@ bool UnrealMCP::StructuredDataInspection::InspectField(
         Value = MakeShared<FUnrealMCPValueObject>(Private::Limitation(Resolved.Property, Error));
     const TSharedRef<FUnrealMCPRecord> Result = MakeShared<FUnrealMCPRecord>();
     Result->SetField(TEXT("value"), Value);
+    Result->SetStringField(TEXT("declared_by"), Private::DeclaredBy(Resolved.Property));
+    if (Source.Owner != nullptr && Source.Data == Source.Owner && FieldSegments.Num() == 1)
+    {
+        const auto Encoded = PropertyCodec::Encode(Source.Owner, Resolved.Property);
+        FString Origin;
+        if (Encoded->TryGetStringField(TEXT("property_origin"), Origin)) Result->SetStringField(TEXT("property_origin"), Origin);
+    }
     OutInspection = Result;
     return true;
 }

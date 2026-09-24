@@ -100,3 +100,7 @@ When another inspected Blueprint implements this interface, its root `implemente
 ## Design status
 
 The asset-family shape is accepted. The shared decision to list function input/output types in the root function index also applies to interface declarations.
+
+## Authored graph selection
+
+Declarations expose their persistent graph `id`. The `functions` collection pages declaration signatures, and `graphs` pages graph identities. Exact function or graph selection includes authored entry/result graph structure plus the `interface_function` signature record. This structure represents declaration authoring, not a default executable implementation. Animation Layer Interfaces continue to use the animation family.

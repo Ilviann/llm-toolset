@@ -15,6 +15,8 @@
 #include "EdGraph/EdGraphPin.h"
 #include "EdGraphSchema_K2.h"
 #include "Engine/Blueprint.h"
+#include "Engine/BlueprintGeneratedClass.h"
+#include "Animation/AnimBlueprint.h"
 #include "Engine/SCS_Node.h"
 #include "Engine/SimpleConstructionScript.h"
 #include "GameFramework/Actor.h"
@@ -572,6 +574,28 @@ static bool ReadPropertyNames(const FUnrealMCPRecord& Arguments, TSet<FString>& 
     return true;
 }
 
+static TArray<USCS_Node*> InspectionComponentNodes(UBlueprint* Blueprint)
+{
+    TArray<USCS_Node*> Nodes;
+    TSet<UBlueprint*> Seen;
+    for (UBlueprint* Owner = Blueprint; Owner != nullptr && !Seen.Contains(Owner);
+        Owner = UBlueprint::GetBlueprintFromClass(Owner->ParentClass))
+    {
+        Seen.Add(Owner);
+        if (Owner->SimpleConstructionScript != nullptr)
+            for (USCS_Node* Node : Owner->SimpleConstructionScript->GetAllNodes())
+                if (Node != nullptr) Nodes.AddUnique(Node);
+        if (Nodes.Num() > UnrealMCP::MaxInspectRecords) break;
+    }
+    return Nodes;
+}
+
+static UActorComponent* EffectiveComponentTemplate(UBlueprint* Blueprint, USCS_Node* Node)
+{
+    UBlueprintGeneratedClass* Class = Cast<UBlueprintGeneratedClass>(Blueprint->GeneratedClass);
+    return Class != nullptr ? Node->GetActualComponentTemplate(Class) : Node->ComponentTemplate.Get();
+}
+
 static FString AddComponentDefaults(UActorComponent* Template, const TSet<FString>& RequestedProperties, const TSharedRef<FUnrealMCPRecord>& Component)
 {
     TArray<FProperty*> Changed;
@@ -624,21 +648,39 @@ static void AddClassDefaultFingerprint(UBlueprint* Blueprint, TArray<FString>& F
     {
         FProperty* Property = *It;
         FString Kind;
-        if (UnrealMCP::PropertyCodec::IsSupportedEditable(Property, Kind)
+        if (Property->HasAnyPropertyFlags(CPF_Edit | CPF_BlueprintVisible)
+            && !Property->HasAnyPropertyFlags(CPF_Transient | CPF_Deprecated | CPF_EditorOnly)
             && !UnrealMCP::PropertyCodec::IsIdenticalToArchetype(Defaults, Property))
         {
             FString Encoded;
             UnrealMCP::PropertyCodec::ExportValueText(Defaults, Property, Encoded);
+            UnrealMCP::PropertyCodec::IsSupportedEditable(Property, Kind);
             Fingerprint.Add(TEXT("class_default|") + Property->GetName() + TEXT("|") + Kind + TEXT("|") + Encoded);
             if (Fingerprint.Num() > UnrealMCP::MaxInspectFingerprintEntries) return;
         }
     }
 }
 
+static UnrealMCP::BlueprintFamilyPolicy::FFamilyInfo InspectionFamily(UBlueprint* Blueprint)
+{
+    const FString Base = Blueprint->ParentClass != nullptr ? Blueprint->ParentClass->GetPathName() : FString();
+    if (Blueprint->IsA<UAnimBlueprint>()) return {TEXT("animation"), Base, true};
+    if (Blueprint->BlueprintType == BPTYPE_Interface) return {TEXT("interface"), Base, true};
+    if (Blueprint->BlueprintType == BPTYPE_FunctionLibrary) return {TEXT("function_library"), Base, true};
+    if (Blueprint->BlueprintType == BPTYPE_MacroLibrary) return {TEXT("macro_library"), Base, true};
+    return UnrealMCP::BlueprintFamilyPolicy::Classify(Blueprint->ParentClass);
+}
+
 static UnrealMCP::BlueprintFamilyPolicy::FFamilyInfo AssetBlueprintFamily(
     const FAssetData& Asset,
     const IUnrealMCPBlueprintExtensionProvider* ExtensionRegistry)
 {
+    FString Type;
+    Asset.GetTagValue(FBlueprintTags::BlueprintType, Type);
+    if (Asset.AssetClassPath == UAnimBlueprint::StaticClass()->GetClassPathName()) return {TEXT("animation"), TEXT("/Script/Engine.AnimInstance"), true};
+    if (Type == TEXT("BPTYPE_Interface")) return {TEXT("interface"), TEXT("/Script/CoreUObject.Interface"), true};
+    if (Type == TEXT("BPTYPE_FunctionLibrary")) return {TEXT("function_library"), TEXT("/Script/Engine.BlueprintFunctionLibrary"), true};
+    if (Type == TEXT("BPTYPE_MacroLibrary")) return {TEXT("macro_library"), FString(), true};
     FString NativeParent;
     if (!Asset.GetTagValue(FBlueprintTags::NativeParentClassPath, NativeParent))
     {

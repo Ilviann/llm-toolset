@@ -24,3 +24,9 @@ The built-in domains register neutral, Blueprint, Data Asset, and Data Table des
 ## Verification
 
 `UnrealMCP.AssetInspect.CoreFamiliesSelectorsPagingAndLimits` covers canonical paths, every core classification including Widget and Data Asset Blueprints, neutral/media behavior, selectors, UTF-8 encoding, paging, Interface declarations, snapshots, invalid/security cases, non-mutation, and complete/partial graph limits through registry-backed dispatch. `UnrealMCP.AssetInspect.DataAssetsTablesSelectorsAndSnapshots`, `UnrealMCP.AssetInspect.UMGHierarchyLayoutBindingsAndExclusions`, and `UnrealMCP.AssetInspect.AnimationBlueprintGraphsStatesAndExclusions` cover the focused built-in overlays. Companion Automation covers overlay admission, route collisions, exact blocks, cumulative snapshots, repeatability, and unchanged state. Python tests cover exact family-set policy, schemas, deterministic YAML, strict types/escaping, and UTF-8 stdio. Lifecycle acceptance exercises built-in and companion root/selector reads through MCP YAML framing across restart.
+
+## Additional Blueprint selectors
+
+The core Blueprint adapter admits Function and Macro Libraries before Actor ancestry. `graphs` pages compact stable identities/owners/counts; `graphs/<id-or-exact-name>` selects one graph and rejects ambiguity. Existing semantic graph selectors remain compatible and atomic. Function/Macro declaration collections are pageable. Interfaces include selected authored entry/result graph structure alongside their declaration signature.
+
+`class_defaults` and its exact nested property selectors use the shared reflected view. `components` includes ancestral SCS nodes and accepts stable ancestor IDs or exact names. Component property selection reads the effective child template and retains origin metadata. These selectors do not grant mutation authority.

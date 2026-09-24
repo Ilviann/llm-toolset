@@ -2,6 +2,7 @@
 
 Feature identifiers are stable names, not execution indexes. Unfinished features may be implemented and completed in any order once every direct dependency in their description is complete. The checklist retains a completed feature only while an unfinished feature directly depends on it; completed feature documents and historical `phase-*` identifiers remain available under [`docs/features/`](docs/features/index.md).
 
+
 - [x] [`phase-13` — Wildcards, conversions, and complete atomic graph editing](docs/features/completed/phase-13.md) — Add wildcard specialization, explicit conversion insertion, and complete atomic graph editing.
 - [x] [`umg-authoring` — UMG layout, styling, bindings, and UI logic](docs/features/completed/umg-authoring.md) — Complete practical HUD and menu authoring on the Widget Blueprint family.
   - Depends on:
@@ -177,6 +178,13 @@ Support-tooling features change repository utilities without changing Unreal MCP
 Feature checkboxes record implementation completion after mandatory Windows verification. This section separately tracks preferred macOS verification that may occur after a feature is completed and released. Linux is outside the current support and verification scope and is not tracked.
 
 - macOS:
+  - [`reflected-inspect`](docs/features/completed/reflected-inspect.md) — repeat native, restart, three-mode build, and base packaging checks.
+  - [`attribute-inspect`](docs/features/completed/attribute-inspect.md) — repeat native, restart, three-mode build, and base packaging checks.
+  - [`attribute-map-inspect`](docs/features/completed/attribute-map-inspect.md) — repeat native, restart, three-mode build, and base packaging checks.
+  - [`inherited-inspect`](docs/features/completed/inherited-inspect.md) — repeat native, restart, three-mode build, and base packaging checks.
+  - [`library-inspect`](docs/features/completed/library-inspect.md) — repeat native, restart, three-mode build, and base packaging checks.
+  - [`graph-scope-inspect`](docs/features/completed/graph-scope-inspect.md) — repeat native, restart, three-mode build, and base packaging checks.
+  - [`interface-inspect`](docs/features/completed/interface-inspect.md) — repeat native, restart, three-mode build, and base packaging checks.
   - [`inspect-limits`](docs/features/completed/inspect-limits.md) — native Automation, restart, three-mode build, and base packaging verification.
   - `readonly-mode` — lifecycle-only acceptance is blocked by [`issue-4`](docs/issues/issue-4.md).
   - `ai-assets-inspect` — repeat native, production-socket restart, three-mode build, and isolated universal base/AI package gates.

@@ -21,6 +21,14 @@ Keep the authoritative checklist in [`ROADMAP.md`](../../ROADMAP.md) synchronize
 
 ## Feature catalog
 
+- [`reflected-inspect` — Expanded reflected inspection](completed/reflected-inspect.md).
+- [`attribute-inspect` — Reflected Gameplay Attributes](completed/attribute-inspect.md).
+- [`attribute-map-inspect` — Gameplay Attribute collection values](completed/attribute-map-inspect.md).
+- [`inherited-inspect` — Effective inherited component inspection](completed/inherited-inspect.md).
+- [`library-inspect` — Blueprint library inspection](completed/library-inspect.md).
+- [`graph-scope-inspect` — Exact graph scope for inspection](completed/graph-scope-inspect.md).
+- [`interface-inspect` — Interface discovery and authored graph inspection](completed/interface-inspect.md).
+
 - [`phase-4` — Reliable mutations, Actor components, and defaults](completed/phase-4.md) — Add reliable mutation delivery, Actor component editing, and Blueprint/component defaults.
 - [`phase-5` — Blueprint member variables](completed/phase-5.md) — Add typed Blueprint member-variable inspection and editing.
 - [`phase-6` — Function signatures and local variables](completed/phase-6.md) — Add function signatures, function shells, and local variables.

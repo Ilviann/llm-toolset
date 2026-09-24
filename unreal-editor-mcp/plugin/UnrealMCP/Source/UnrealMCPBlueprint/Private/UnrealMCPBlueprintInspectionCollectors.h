@@ -151,6 +151,11 @@ Graphs.Sort([](const TPair<UEdGraph*, FString>& Left, const TPair<UEdGraph*, FSt
     const FString B = Right.Value + TEXT("|") + GuidString(Right.Key->GraphGuid) + TEXT("|") + Right.Key->GetName();
     return A < B;
 });
+if (!GraphFilter.IsEmpty())
+{
+    const int32 Matches = Graphs.FilterByPredicate([&](const auto& Entry) { return GuidString(Entry.Key->GraphGuid) == GraphFilter; }).Num();
+    if (Matches > 1) { OutError = {TEXT("invalid_argument"), TEXT("The graph identity is ambiguous")}; return false; }
+}
 bool bGraphFound = GraphFilter.IsEmpty();
 for (const TPair<UEdGraph*, FString>& Entry : Graphs)
 {

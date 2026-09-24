@@ -25,6 +25,10 @@ def verify_capability_contract(capabilities: dict[str, object], state: dict[str,
         raise AssertionError("asset inspection core capability is unavailable")
     if capabilities.get("features", {}).get("asset_inspect_data") is not True:
         raise AssertionError("asset-inspect-data capability is unavailable")
+    for feature in ("reflected_property_inspection", "gameplay_attribute_inspection",
+                    "inherited_component_inspection", "blueprint_library_inspection", "graph_scoped_inspection"):
+        if capabilities.get("features", {}).get(feature) is not True:
+            raise AssertionError(f"inspection capability missing: {feature}")
     expected_asset_inspect_limits = {
         "asset_inspect_page_size": 100,
         "asset_inspect_selector_bytes": 1024,

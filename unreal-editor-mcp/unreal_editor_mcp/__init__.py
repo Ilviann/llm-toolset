@@ -1,3 +1,3 @@
 """Unreal Editor MCP package."""
 
-__version__ = "0.53.1"
+__version__ = "0.60.0"

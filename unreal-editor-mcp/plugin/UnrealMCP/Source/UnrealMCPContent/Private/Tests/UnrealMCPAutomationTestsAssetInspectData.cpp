@@ -11,6 +11,8 @@
 #include "UnrealMCPDataInspectionAdapters.h"
 #include "UnrealMCPNeutralAssetInspectionAdapter.h"
 #include "UnrealMCPWireTypes.h"
+#include "UnrealMCPGameDataValueCodec.h"
+#include "UnrealMCPJsonCodec.h"
 
 namespace
 {
@@ -95,6 +97,26 @@ bool FUnrealMCPAssetInspectDataFamiliesTest::RunTest(const FString& Parameters)
     FUnrealMCPAssetInspectDataRow Bow;
     Bow.Damage = 22; Bow.Tags = {TEXT("bow"), TEXT("ranged")}; Bow.Multipliers.Add(TEXT("wood"), 0.75f);
     Table->AddRow(TEXT("Axe"), Axe); Table->AddRow(TEXT("Bow"), Bow);
+    Axe.Identity = FGuid::NewGuid();
+    Axe.Label = FText::FromString(TEXT("Weapon"));
+    Axe.References.Add(TSoftObjectPtr<UObject>(FSoftObjectPath(TEXT("/Game/Missing.Missing"))));
+    Axe.Multipliers.Add(TEXT("stone"), 0.5f);
+    bool bEncoded = false;
+    FUnrealMCPError ValueError;
+    const auto Fields = UnrealMCP::GameDataValueCodec::EncodeFields(
+        FUnrealMCPAssetInspectDataRow::StaticStruct(), &Axe, 0, ValueError, bEncoded);
+    TestTrue(TEXT("unsupported sibling does not hide supported fields"), bEncoded);
+    TestEqual(TEXT("supported damage retained"), Fields->GetIntegerField(TEXT("Damage")), 35);
+    TestEqual(TEXT("unsupported field explicit"), Fields->GetObjectField(TEXT("UnsupportedTransient"))->GetStringField(TEXT("kind")), FString(TEXT("unavailable")));
+    TestEqual(TEXT("text is inspectable"), Fields->GetStringField(TEXT("Label")), FString(TEXT("Weapon")));
+    TestEqual(TEXT("soft reference array is inspectable without load"), Fields->GetArrayField(TEXT("References")).Num(), 1);
+    TestTrue(TEXT("GUID fields are inspectable"), Fields->GetObjectField(TEXT("Identity"))->HasField(TEXT("fields")));
+    FString First, Second;
+    UnrealMCP::JsonCodec::Serialize(Fields, First);
+    Axe.Multipliers.Reset(); Axe.Multipliers.Add(TEXT("stone"), 0.5f); Axe.Multipliers.Add(TEXT("wood"), 1.5f);
+    UnrealMCP::JsonCodec::Serialize(UnrealMCP::GameDataValueCodec::EncodeFields(
+        FUnrealMCPAssetInspectDataRow::StaticStruct(), &Axe, 0, ValueError, bEncoded), Second);
+    TestEqual(TEXT("map order independent of insertion"), First, Second);
     FAssetRegistryModule::AssetCreated(Table);
     const bool bTableDirtyBefore = TableOuter->IsDirty();
 

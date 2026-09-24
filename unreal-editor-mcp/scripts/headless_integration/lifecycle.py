@@ -320,8 +320,9 @@ def main() -> int:
             "real launch/restart/shutdown, bridge replacement, and content preservation"
         )
         return 0
-    phase_two_fixture = layout.root / "Content" / "UnrealMCPPhase2" / "BP_InspectionFixture.uasset"
-    phase_two_fixture.unlink(missing_ok=True)
+    phase_two_dir = layout.root / "Content" / "UnrealMCPPhase2"
+    for name in ("BP_InspectionFixture", "BFL_InspectionFixture", "BML_InspectionFixture"):
+        (phase_two_dir / f"{name}.uasset").unlink(missing_ok=True)
     phase_four_fixture = layout.root / "Content" / "UnrealMCPPhase4" / "BP_ComponentFixture.uasset"
     phase_four_fixture.unlink(missing_ok=True)
     phase_fourteen_dir = layout.root / "Content" / "UnrealMCPPhase14"

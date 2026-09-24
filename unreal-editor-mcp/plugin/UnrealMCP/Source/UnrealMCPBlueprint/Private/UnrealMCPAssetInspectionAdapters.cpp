@@ -279,6 +279,10 @@ FClassification Classify(UObject* AssetObject, UBlueprint* Blueprint)
             Result.Type = TEXT("animation_blueprint");
         }
     }
+    else if (Blueprint->BlueprintType == BPTYPE_FunctionLibrary)
+    { Result.Type = TEXT("function_library_blueprint"); Result.bDeepBlueprint = true; }
+    else if (Blueprint->BlueprintType == BPTYPE_MacroLibrary)
+    { Result.Type = TEXT("macro_library_blueprint"); Result.bDeepBlueprint = true; }
     else if (Blueprint->BlueprintType == BPTYPE_Interface)
     {
         Result.Type = TEXT("interface_blueprint");
@@ -763,6 +767,7 @@ void AddRootDeclarations(UBlueprint* Blueprint, const FClassification& Classific
         if (Graph == nullptr || FunctionValues.Num() >= MaximumRootEntries
             || Graph->GetClass()->GetPathName().StartsWith(TEXT("/Script/AnimGraph.Animation"))) continue;
         const TSharedRef<FUnrealMCPRecord> Function = MakeShared<FUnrealMCPRecord>();
+        Function->SetStringField(TEXT("id"), GuidString(Graph->GraphGuid));
         Function->SetStringField(TEXT("name"), Graph->GetName());
         Function->SetObjectField(TEXT("signature"), SignatureFromGraph(Graph));
         Function->SetStringField(TEXT("selector"), TEXT("functions/") + EncodeSegment(Graph->GetName()));
@@ -784,6 +789,7 @@ void AddRootDeclarations(UBlueprint* Blueprint, const FClassification& Classific
         {
             if (Graph == nullptr || MacroValues.Num() >= MaximumRootEntries) continue;
             const TSharedRef<FUnrealMCPRecord> Macro = MakeShared<FUnrealMCPRecord>();
+            Macro->SetStringField(TEXT("id"), GuidString(Graph->GraphGuid));
             Macro->SetStringField(TEXT("name"), Graph->GetName());
             Macro->SetObjectField(TEXT("signature"), MacroSignature(Graph));
             Macro->SetStringField(TEXT("selector"), TEXT("macros/") + EncodeSegment(Graph->GetName()));
@@ -805,7 +811,7 @@ void AddRootDeclarations(UBlueprint* Blueprint, const FClassification& Classific
 
     if (!Classification.bInterface && Blueprint->SimpleConstructionScript != nullptr)
     {
-        const int32 Count = Blueprint->SimpleConstructionScript->GetAllNodes().Num();
+        const int32 Count = UnrealMCP::BlueprintInspectionPrivate::InspectionComponentNodes(Blueprint).Num();
         if (Count > 0)
         {
             Result->SetObjectField(TEXT("components"), CollectionSummary(TEXT("array"), TEXT("actor_component"),
@@ -843,6 +849,19 @@ bool FindGraphSelection(UBlueprint* Blueprint, const FRequest& Request, const FC
             for (UEdGraphNode* Node : Out.Graph->Nodes)
                 if (EventName(Node) == Out.Name) { Out.EventRoot = Node; break; }
         }
+    }
+    else if (Namespace == TEXT("graphs") && Request.Segments.Num() == 2)
+    {
+        TArray<UEdGraph*> Graphs;
+        int32 Work = 0;
+        if (!UnrealMCP::InspectionBudget::CollectGraphs(Blueprint, Graphs, Work, OutError)) return false;
+        int32 Matches = 0;
+        for (UEdGraph* Graph : Graphs)
+            if (Graph->GetName() == Request.Segments[1] || GuidString(Graph->GraphGuid) == Request.Segments[1])
+            { Out.Graph = Graph; ++Matches; }
+        if (Matches > 1) { OutError = {TEXT("invalid_argument"), TEXT("The graph name is ambiguous; use its stable identity")}; return false; }
+        Out.Kind = Classification.bInterface ? TEXT("interface_function") : TEXT("graph");
+        Out.Name = Out.Graph != nullptr ? Out.Graph->GetName() : Request.Segments[1];
     }
     else if (Namespace == TEXT("functions") && Request.Segments.Num() == 2)
     {
@@ -1296,7 +1315,14 @@ bool BuildSelectedGraph(const FRequest& Request, const FString& AssetPath, const
         Function->SetStringField(TEXT("owner_type"), Classification.RepresentedClass);
         Function->SetStringField(TEXT("dispatch"), TEXT("interface_message"));
         Function->SetObjectField(TEXT("signature"), SignatureFromGraph(Selection.Graph));
+        Function->SetStringField(TEXT("id"), GuidString(Selection.Graph->GraphGuid));
         Result->SetObjectField(TEXT("interface_function"), Function);
+        TSet<UEdGraphNode*> Nodes;
+        for (UEdGraphNode* Node : Selection.Graph->Nodes) if (Node != nullptr) Nodes.Add(Node);
+        const auto GraphResult = BuildGraphResult(AssetPath, Snapshot, Classification, Selection, Nodes, Nodes, Request.bVerbose, false);
+        Result->SetObjectField(TEXT("graph"), GraphResult->GetObjectField(TEXT("graph")).ToSharedRef());
+        if (SerializedBytes(Result) > CompleteGraphBytes)
+        { OutError = {TEXT("data_limit_exceeded"), TEXT("The selected interface graph exceeds the complete graph response limit")}; return false; }
         OutResult = Result;
         return true;
     }
@@ -1458,6 +1484,38 @@ bool BuildCollectionSelection(UBlueprint* Blueprint, const FClassification& Clas
     TArray<TSharedPtr<FUnrealMCPValue>> Items;
     FString Kind;
     int32 Count = 0;
+    if (Request.Segments.Num() == 1 && (Request.Segments[0] == TEXT("functions")
+        || Request.Segments[0] == TEXT("macros") || Request.Segments[0] == TEXT("graphs")))
+    {
+        TArray<UEdGraph*> Graphs;
+        const bool bAllGraphs = Request.Segments[0] == TEXT("graphs");
+        if (bAllGraphs)
+        {
+            int32 Work = 0;
+            if (!UnrealMCP::InspectionBudget::CollectGraphs(Blueprint, Graphs, Work, OutError)) return false;
+        }
+        else Graphs = Request.Segments[0] == TEXT("functions") ? Blueprint->FunctionGraphs : Blueprint->MacroGraphs;
+        if (Graphs.Num() > UnrealMCP::MaxInspectRecords)
+        { OutError = {TEXT("response_too_large"), TEXT("Graph declaration result record budget exceeded")}; return false; }
+        Graphs.Remove(nullptr);
+        Graphs.Sort([](const UEdGraph& A, const UEdGraph& B) { return A.GetPathName() < B.GetPathName(); });
+        const int64 Start = static_cast<int64>(Request.PageIndex) * Request.PageSize;
+        for (int32 Index = static_cast<int32>(FMath::Min<int64>(Start, Graphs.Num()));
+            Index < Graphs.Num() && Index < Start + Request.PageSize; ++Index)
+        {
+            UEdGraph* Graph = Graphs[Index];
+            const auto Item = MakeShared<FUnrealMCPRecord>();
+            Item->SetStringField(TEXT("id"), GuidString(Graph->GraphGuid));
+            Item->SetStringField(TEXT("name"), Graph->GetName());
+            Item->SetStringField(TEXT("owner_path"), Graph->GetOuter()->GetPathName());
+            Item->SetStringField(TEXT("selector"), TEXT("graphs/") + GuidString(Graph->GraphGuid));
+            Item->SetNumberField(TEXT("node_count"), Graph->Nodes.Num());
+            if (!bAllGraphs) Item->SetObjectField(TEXT("signature"), Request.Segments[0] == TEXT("macros") ? MacroSignature(Graph) : SignatureFromGraph(Graph));
+            Items.Add(MakeShared<FUnrealMCPValueObject>(Item));
+        }
+        OutResult = PageResult(AssetPath, Snapshot, Classification, Request, TEXT("array"), Graphs.Num(), Items);
+        return true;
+    }
     if (Request.Segments == TArray<FString>{TEXT("properties"), TEXT("actor"), TEXT("tags")})
     {
         if (!PageReflectedCollection(Defaults, TEXT("Tags"), Request, Items, Kind, Count)) goto NotFound;
@@ -1517,8 +1575,8 @@ bool BuildComponentSelection(UBlueprint* Blueprint, const FClassification& Class
         OutError = {TEXT("invalid_argument"), TEXT("allow_partial_graph applies only to graph selectors")};
         return false;
     }
-    if (Blueprint->SimpleConstructionScript == nullptr) return false;
-    TArray<USCS_Node*> Nodes = Blueprint->SimpleConstructionScript->GetAllNodes();
+    TArray<USCS_Node*> Nodes = UnrealMCP::BlueprintInspectionPrivate::InspectionComponentNodes(Blueprint);
+    if (Nodes.Num() > UnrealMCP::MaxInspectRecords) { OutError = {TEXT("response_too_large"), TEXT("Component result record budget exceeded")}; return false; }
     Nodes.Sort([](const USCS_Node& Left, const USCS_Node& Right)
         { return Left.GetVariableName().LexicalLess(Right.GetVariableName()); });
     if (Request.Segments.Num() == 1)
@@ -1530,6 +1588,8 @@ bool BuildComponentSelection(UBlueprint* Blueprint, const FClassification& Class
         {
             USCS_Node* Node = Nodes[Index];
             const TSharedRef<FUnrealMCPRecord> Item = MakeShared<FUnrealMCPRecord>();
+            Item->SetStringField(TEXT("id"), GuidString(Node->VariableGuid));
+            Item->SetStringField(TEXT("owner_blueprint"), Node->GetTypedOuter<USimpleConstructionScript>()->GetBlueprint()->GetPathName());
             Item->SetStringField(TEXT("name"), Node->GetVariableName().ToString());
             Item->SetStringField(TEXT("class"), Node->ComponentClass != nullptr ? Node->ComponentClass->GetPathName() : FString());
             Item->SetBoolField(TEXT("scene_component"), Node->ComponentClass != nullptr && Node->ComponentClass->IsChildOf(USceneComponent::StaticClass()));
@@ -1539,19 +1599,44 @@ bool BuildComponentSelection(UBlueprint* Blueprint, const FClassification& Class
         OutResult = PageResult(AssetPath, Snapshot, Classification, Request, TEXT("array"), Nodes.Num(), Items);
         return true;
     }
-    if (Request.bHasPaging)
-    {
-        OutError = {TEXT("invalid_argument"), TEXT("Paging parameters apply to the components collection, not one component")};
-        return false;
-    }
     USCS_Node** Found = Nodes.FindByPredicate([&Request](USCS_Node* Node)
-        { return Node != nullptr && Node->GetVariableName().ToString() == Request.Segments[1]; });
+        { return Node != nullptr && (Node->GetVariableName().ToString() == Request.Segments[1] || GuidString(Node->VariableGuid) == Request.Segments[1]); });
     if (Found == nullptr)
     {
         OutError = {TEXT("not_found"), TEXT("The selected component was not found")};
         return false;
     }
     USCS_Node* Node = *Found;
+    int32 Matches = 0;
+    for (USCS_Node* Candidate : Nodes)
+        if (Candidate->GetVariableName().ToString() == Request.Segments[1] || GuidString(Candidate->VariableGuid) == Request.Segments[1]) ++Matches;
+    if (Matches != 1) { OutError = {TEXT("invalid_argument"), TEXT("The component selector is ambiguous; use its stable identity")}; return false; }
+    UActorComponent* Effective = UnrealMCP::BlueprintInspectionPrivate::EffectiveComponentTemplate(Blueprint, Node);
+    if (Request.Segments.Num() > 2)
+    {
+        if (Request.Segments[2] != TEXT("properties") || Effective == nullptr) return false;
+        FUnrealMCPStructuredDataSource Source{Effective->GetClass(), Effective, Effective, true};
+        const FString Prefix = TEXT("components/") + EncodeSegment(Request.Segments[1]) + TEXT("/properties");
+        TSharedPtr<FUnrealMCPRecord> Inspection;
+        if (Request.Segments.Num() == 3)
+        {
+            if (!UnrealMCP::StructuredDataInspection::BuildPropertyPage(Source, Prefix, Request.PageIndex,
+                Request.PageSize, Snapshot, Inspection, OutError)) return false;
+        }
+        else
+        {
+            TArray<FString> Segments = Request.Segments;
+            Segments.RemoveAt(0, 3);
+            if (!UnrealMCP::StructuredDataInspection::InspectField(Source, Prefix, Segments, Request.Selector,
+                Request.PageIndex, Request.PageSize, Request.bHasPaging, Snapshot, Inspection, OutError)) return false;
+        }
+        const TSharedRef<FUnrealMCPRecord> Detail = BaseResult(AssetPath, Snapshot, Classification);
+        Detail->SetObjectField(TEXT("properties"), Inspection.ToSharedRef());
+        Detail->SetStringField(TEXT("template_path"), Effective->GetPathName());
+        OutResult = Detail;
+        return true;
+    }
+    if (Request.bHasPaging) { OutError = {TEXT("invalid_argument"), TEXT("Paging requires a component property collection")}; return false; }
     const TSharedRef<FUnrealMCPRecord> Result = BaseResult(AssetPath, Snapshot, Classification);
     const TSharedRef<FUnrealMCPRecord> Selection = MakeShared<FUnrealMCPRecord>();
     Selection->SetStringField(TEXT("selector"), Request.Selector);
@@ -1560,27 +1645,14 @@ bool BuildComponentSelection(UBlueprint* Blueprint, const FClassification& Class
     Component->SetStringField(TEXT("name"), Node->GetVariableName().ToString());
     Component->SetStringField(TEXT("class"), Node->ComponentClass != nullptr ? Node->ComponentClass->GetPathName() : FString());
     Component->SetBoolField(TEXT("scene_component"), Node->ComponentClass != nullptr && Node->ComponentClass->IsChildOf(USceneComponent::StaticClass()));
-    Component->SetBoolField(TEXT("root"), Blueprint->SimpleConstructionScript->GetRootNodes().Contains(Node));
-    if (Node->ComponentTemplate != nullptr)
-    {
-        TArray<TSharedPtr<FUnrealMCPValue>> Defaults;
-        for (TFieldIterator<FProperty> It(Node->ComponentTemplate->GetClass(), EFieldIterationFlags::IncludeSuper); It; ++It)
-        {
-            FProperty* Property = *It;
-            if (Property->HasAnyPropertyFlags(CPF_Edit) && !Property->HasAnyPropertyFlags(CPF_Transient | CPF_Deprecated)
-                && !UnrealMCP::PropertyCodec::IsIdenticalToArchetype(Node->ComponentTemplate, Property)
-                && Defaults.Num() < 32)
-            {
-                const TSharedRef<FUnrealMCPRecord> Default = MakeShared<FUnrealMCPRecord>();
-                Default->SetStringField(TEXT("name"), Property->GetName());
-                FString Exported;
-                UnrealMCP::PropertyCodec::ExportValueText(Node->ComponentTemplate, Property, Exported);
-                Default->SetStringField(TEXT("value"), Exported.Left(4096));
-                Defaults.Add(MakeShared<FUnrealMCPValueObject>(Default));
-            }
-        }
-        Component->SetArrayField(TEXT("changed_defaults"), Defaults);
-    }
+    Component->SetBoolField(TEXT("root"), Node->GetTypedOuter<USimpleConstructionScript>()->GetRootNodes().Contains(Node));
+    Component->SetStringField(TEXT("id"), GuidString(Node->VariableGuid));
+    Component->SetStringField(TEXT("owner_blueprint"), Node->GetTypedOuter<USimpleConstructionScript>()->GetBlueprint()->GetPathName());
+    Component->SetBoolField(TEXT("inherited"), Node->GetTypedOuter<USimpleConstructionScript>()->GetBlueprint() != Blueprint);
+    Component->SetStringField(TEXT("template_path"), Effective != nullptr ? Effective->GetPathName() : FString());
+    Component->SetStringField(TEXT("template_origin"), Effective != nullptr ? Effective->GetOuter()->GetPathName() : FString());
+    Component->SetStringField(TEXT("properties_selector"), Request.Selector + TEXT("/properties"));
+    if (Effective != nullptr) UnrealMCP::BlueprintInspectionPrivate::AddComponentDefaults(Effective, {}, Component);
     Result->SetObjectField(TEXT("component"), Component);
     OutResult = Result;
     return true;
@@ -1689,8 +1761,8 @@ public:
         TSharedPtr<FUnrealMCPRecord>& OutResult,
         FUnrealMCPError& OutError)
     {
-        if (Classification.bDataAsset && !Request.Segments.IsEmpty()
-            && Request.Segments[0] == TEXT("properties"))
+        if (!Request.Segments.IsEmpty() && ((Classification.bDataAsset
+            && Request.Segments[0] == TEXT("properties")) || Request.Segments[0] == TEXT("class_defaults")))
         {
             if (Request.bHasPartialFlag)
             {
@@ -1714,7 +1786,7 @@ public:
             if (Request.Segments.Num() == 1)
             {
                 TSharedPtr<FUnrealMCPRecord> Properties;
-                if (!UnrealMCP::StructuredDataInspection::BuildPropertyPage(Source, TEXT("properties"),
+                if (!UnrealMCP::StructuredDataInspection::BuildPropertyPage(Source, Request.Segments[0],
                     Request.PageIndex, Request.PageSize, Snapshot, Properties, OutError)) return false;
                 DataResult->SetObjectField(TEXT("properties"), Properties.ToSharedRef());
             }
@@ -1723,7 +1795,7 @@ public:
                 TArray<FString> Segments = Request.Segments;
                 Segments.RemoveAt(0);
                 TSharedPtr<FUnrealMCPRecord> Inspection;
-                if (!UnrealMCP::StructuredDataInspection::InspectField(Source, TEXT("properties"), Segments,
+                if (!UnrealMCP::StructuredDataInspection::InspectField(Source, Request.Segments[0], Segments,
                     Request.Selector, Request.PageIndex, Request.PageSize, Request.bHasPaging,
                     Snapshot, Inspection, OutError)) return false;
                 for (const TPair<FString, TSharedPtr<FUnrealMCPValue>>& Field : Inspection->Values)
@@ -1733,7 +1805,7 @@ public:
             return true;
         }
         if (Request.Segments[0] == TEXT("components")
-            && (Request.Segments.Num() == 1 || Request.Segments.Num() == 2))
+            && Request.Segments.Num() >= 1)
         {
             if (!BuildComponentSelection(
                 Blueprint, Classification, Request, Request.AssetPath, Snapshot, OutResult, OutError))
@@ -1772,6 +1844,8 @@ public:
         TArray<TSharedPtr<FUnrealMCPValue>> Selectors;
         AddFamilySemantics(Blueprint, Classification, Result, Selectors);
         AddRootDeclarations(Blueprint, Classification, Result, Selectors);
+        AddSelector(Selectors, TEXT("graphs"));
+        if (!Classification.bInterface) AddSelector(Selectors, TEXT("class_defaults"));
         if (!Selectors.IsEmpty()) Result->SetArrayField(TEXT("selectors"), Selectors);
         return Result;
     }
@@ -1859,7 +1933,7 @@ bool InspectClassifiedBlueprint(
     }
     else
     {
-        if (!Classification.bDeepBlueprint)
+        if (!Classification.bDeepBlueprint && Request.Segments[0] != TEXT("class_defaults"))
         {
             OutError = {TEXT("unsupported_type"), TEXT("This asset family supports identity inspection only")};
             return false;

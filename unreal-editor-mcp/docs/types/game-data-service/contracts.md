@@ -39,3 +39,7 @@ Exact `FGameplayTag` fields are canonical strings and exact `FGameplayTagContain
 Containers hold at most 64 items. Nested values have a maximum depth of four, each nested struct has at most 64 fields, one operation touches at most 64 rows, and inspection refuses tables above the 2,048-row scan ceiling. Numeric writes must be finite, integral for integer properties, within the reflected property's range, and exactly representable in JSON's safe integer range.
 
 Every field is resolved against the live `FProperty`. References must resolve to a compatible visible packageable object/class and must not be transient or editor-only. Instanced references, delegates, interfaces, arbitrary UObject graphs, raw import text, and properties outside the codec reject explicitly. `preserve_unspecified: true` begins from the existing row; otherwise staging begins from the row struct's live defaults.
+
+## Partial reflected rows and Gameplay Attributes
+
+An unsupported field is encoded as `{kind: unavailable, code: <stable-error>}` instead of hiding supported sibling fields. Limit errors still reject the request. Safe nested structs, GUID fields, text, enums, tags, references and bounded collections retain their existing representations. Exact Gameplay Attribute structs use typed identity/resolution records, including when nested or used as map keys. Map output remains canonical and insertion-order independent; reading does not add attribute authoring support.

@@ -52,3 +52,11 @@ Function records use the function graph GUID, distinguish user-owned functions f
 `FInspectionQuery` is the validated internal form of one initial inspection request. It contains the canonical object path, inherited-content flag, deduplicated section set, stable identity filters, and targeted property-name set. Cursor requests remain owned and validated by the inspector facade and replay the retained normalized arguments against an expected snapshot.
 
 The builder resolves and loads only the requested asset, captures dirty/compile state once, and passes one record array plus one fingerprint array through overview/component/default, member, function/local, macro, custom-event, graph, and admitted companion-family collectors. Each collector owns its family encoding and exact not-found behavior. The builder enforces the shared structural bound, verifies non-mutation, and hashes the complete base-plus-companion fingerprint once after all requested sections have observed the same structure.
+
+## Read-only expansion contracts
+
+Internal requests accept `graph_name` instead of `graph_id`, and `component_name` instead of `component_id`; names are exact, non-empty and at most 128 characters. Supplying both identity and name rejects. Nodes/pins/connections require a graph selector. With a graph selector and omitted sections, only that graph's contents are emitted, under the same whole-asset snapshot.
+
+`function_library`, `macro_library`, `interface`, and `animation` are read classifications. Animation Layer Interfaces are `animation`. Their capability record states `inspection_only: true`, `inspect: true`, `authoring: false`. Declarations cannot expose mutable replacement boundaries. Inherited component lookup does not require `include_inherited`; that flag still controls broad inherited declaration output.
+
+Safe reflected properties beyond the mutation allowlist return `supported: true`, `editable: false`, `type: reflected`, and a typed value. Their support is inspection support only. Gameplay Attributes use the record described in the [user guide](../../user/asset-inspection.md#expanded-blueprint-and-reflected-selectors). Property records add declaring and archetype origin paths.

@@ -96,6 +96,8 @@ bool FUnrealMCPBlueprintGraphEditor::Execute(
     const FAssetData Asset = FAssetRegistryModule::GetRegistry().GetAssetByObjectPath(FSoftObjectPath(Request.AssetPath));
     UBlueprint* Blueprint = Cast<UBlueprint>(Asset.GetAsset());
     if (Blueprint == nullptr || Blueprint->GeneratedClass == nullptr
+        || Blueprint->BlueprintType == BPTYPE_MacroLibrary || Blueprint->BlueprintType == BPTYPE_FunctionLibrary
+        || Blueprint->BlueprintType == BPTYPE_Interface
         || !UnrealMCP::BlueprintFamilyPolicy::Supports(
             Blueprint->GeneratedClass, UnrealMCP::BlueprintFamilyPolicy::EOperation::GraphEdit))
     {

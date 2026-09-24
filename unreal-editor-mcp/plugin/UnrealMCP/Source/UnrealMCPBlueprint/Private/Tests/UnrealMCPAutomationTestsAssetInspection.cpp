@@ -238,7 +238,7 @@ bool FUnrealMCPAssetInspectionCoreTest::RunTest(const FString& Parameters)
     if (!TestTrue(TEXT("interface declaration selects"),
         Service.Execute(Request(InterfacePackage, TEXT("functions/CanInteract")), Result, Error))) return false;
     TestTrue(TEXT("interface selector returns declaration"), Result->HasTypedField<EUnrealMCPValueType::Record>(TEXT("interface_function")));
-    TestFalse(TEXT("interface selector fabricates no graph"), Result->HasField(TEXT("graph")));
+    TestTrue(TEXT("interface selector exposes authored declaration graph"), Result->HasField(TEXT("graph")));
 
     const FString TexturePackage = Root + TEXT("/T_Media");
     UPackage* TextureOuter = CreatePackage(*TexturePackage);

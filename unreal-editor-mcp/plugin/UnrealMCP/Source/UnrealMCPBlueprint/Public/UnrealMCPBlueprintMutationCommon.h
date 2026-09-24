@@ -354,7 +354,8 @@ static bool ResolveMutableBlueprint(
     }
     const UnrealMCP::BlueprintFamilyPolicy::FFamilyInfo Family =
         UnrealMCP::BlueprintFamilyPolicy::Classify(OutBlueprint->ParentClass);
-    if (!Family.bSupported)
+    if (!Family.bSupported || OutBlueprint->BlueprintType == BPTYPE_MacroLibrary
+        || OutBlueprint->BlueprintType == BPTYPE_FunctionLibrary || OutBlueprint->BlueprintType == BPTYPE_Interface)
     {
         OutError = {TEXT("wrong_type"), TEXT("The requested Blueprint does not belong to a published authoring family")};
         return false;

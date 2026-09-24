@@ -19,3 +19,9 @@ The helper depends on typed wire records and the existing Blueprint-owned game-d
 ## Verification
 
 `UnrealMCP.AssetInspect.DataAssetsTablesSelectorsAndSnapshots` covers property indexes, array pages, row values, nested selectors, snapshots, unsupported instanced values, and unchanged package dirtiness. Python contracts verify the shared helper continues to call `UnrealMCPGameDataValueCodec` and remains behind family adapters.
+
+## Expanded read codecs
+
+`UnrealMCPGameplayAttributeInspection.h` is a private reflection-only reader shared by the Game Data and K2 codecs. Exact `/Script/GameplayAbilities.GameplayAttribute` identity selects it; it parses bounded exported identity fields and resolves only already-loaded `UStruct`/`FProperty` metadata. Compatibility mirrors floating-point or GameplayAttributeData-backed properties and verifies retained name/owner metadata. UE 5.7 three-field exports and unresolved values use the same record. No GAS header, module dependency, reference load, or mutation decoder is introduced.
+
+The property codec retains its editable allowlist; its read-only fallback uses the Game Data encoder for safe reflected structures and collections. Unsupported row fields become individual unavailable values, while depth and collection-limit failures remain hard errors. Public class-default/component selectors reuse this structured view, including declaring-property and archetype provenance.

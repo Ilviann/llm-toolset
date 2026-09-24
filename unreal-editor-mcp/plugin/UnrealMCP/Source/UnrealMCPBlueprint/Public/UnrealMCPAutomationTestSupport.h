@@ -72,6 +72,11 @@ inline TSharedRef<FUnrealMCPRecord> AllSectionArguments(const FString& AssetPath
         Sections.Add(MakeShared<FUnrealMCPValueString>(Name));
     }
     Arguments->SetArrayField(TEXT("sections"), Sections);
+    if (UBlueprint* Blueprint = FindObject<UBlueprint>(nullptr, *AssetPath))
+    {
+        if (!Blueprint->UbergraphPages.IsEmpty())
+            Arguments->SetStringField(TEXT("graph_id"), Blueprint->UbergraphPages[0]->GraphGuid.ToString(EGuidFormats::Digits).ToLower());
+    }
     return Arguments;
 }
 
