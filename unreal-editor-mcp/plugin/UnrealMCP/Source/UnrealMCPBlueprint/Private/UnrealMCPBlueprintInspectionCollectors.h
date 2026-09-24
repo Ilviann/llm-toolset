@@ -69,6 +69,7 @@ for (const TPair<UBlueprint*, FString>& Owner : Owners)
                 Value->SetObjectField(TEXT("replacement_boundary"), ReplacementBoundaryRecord(
                     ReplacementBoundary, bEditable && bReplaceableBoundary));
                 AddRecord(Sink.Records, Value);
+                if (!Sink.CheckLimits(OutError)) return false;
             }
             int32 ParameterIndex = 0;
             for (const TSharedPtr<FUserPinInfo>& Pin : Event->UserDefinedPins)
@@ -94,10 +95,12 @@ for (const TPair<UBlueprint*, FString>& Owner : Owners)
                         Value->SetObjectField(TEXT("default"), UnrealMCP::K2TypeCodec::EncodeDefault(Pin->PinType, Pin->PinDefaultValue));
                     }
                     AddRecord(Sink.Records, Value);
+                    if (!Sink.CheckLimits(OutError)) return false;
                 }
                 Sink.Fingerprint.Add(TEXT("custom_event_parameter|") + EventId + TEXT("|") + LexToString(ParameterIndex)
                     + TEXT("|") + Pin->PinName.ToString() + TEXT("|") + VariableTypeFingerprint(Pin->PinType)
                     + TEXT("|") + Pin->PinDefaultValue);
+                if (!Sink.CheckLimits(OutError)) return false;
                 ++ParameterIndex;
             }
             const FKismetUserDeclaredFunctionMetadata& Metadata = Event->GetUserDefinedMetaData();
@@ -105,8 +108,10 @@ for (const TPair<UBlueprint*, FString>& Owner : Owners)
                 + EventId + TEXT("|") + Event->CustomFunctionName.ToString() + TEXT("|") + LexToString(bOverride)
                 + TEXT("|") + Metadata.Category.ToString() + TEXT("|") + Metadata.ToolTip.ToString()
                 + TEXT("|") + Metadata.Keywords.ToString() + TEXT("|") + LexToString(Event->bCallInEditor));
+            if (!Sink.CheckLimits(OutError)) return false;
             Sink.Fingerprint.Add(TEXT("custom_event_rpc|") + EventId + TEXT("|")
                 + LexToString(Event->FunctionFlags & (FUNC_Net | FUNC_NetReliable | FUNC_NetServer | FUNC_NetClient | FUNC_NetMulticast)));
+            if (!Sink.CheckLimits(OutError)) return false;
         }
     }
 }
@@ -127,7 +132,19 @@ static bool CollectGraphs(
     FUnrealMCPError& OutError)
 {
 TArray<TPair<UEdGraph*, FString>> Graphs;
-for (const TPair<UBlueprint*, FString>& Owner : Owners) AddBlueprintGraphs(Owner.Key, Owner.Value, Graphs);
+int32 InternalWork = 0;
+TSet<UEdGraph*> SeenGraphs;
+for (const TPair<UBlueprint*, FString>& Owner : Owners)
+{
+    TArray<UEdGraph*> OwnerGraphs;
+    if (!UnrealMCP::InspectionBudget::CollectGraphs(Owner.Key, OwnerGraphs, InternalWork, OutError)) return false;
+    for (UEdGraph* Graph : OwnerGraphs)
+    {
+        if (SeenGraphs.Contains(Graph)) continue;
+        SeenGraphs.Add(Graph);
+        Graphs.Emplace(Graph, Owner.Value);
+    }
+}
 Graphs.Sort([](const TPair<UEdGraph*, FString>& Left, const TPair<UEdGraph*, FString>& Right)
 {
     const FString A = Left.Value + TEXT("|") + GuidString(Left.Key->GraphGuid) + TEXT("|") + Left.Key->GetName();
@@ -139,11 +156,11 @@ for (const TPair<UEdGraph*, FString>& Entry : Graphs)
 {
     UEdGraph* Graph = Entry.Key;
     const FString GraphId = GuidString(Graph->GraphGuid);
-    if (!GraphFilter.IsEmpty() && GraphId != GraphFilter) continue;
-    bGraphFound = true;
+    const bool bSelected = GraphFilter.IsEmpty() || GraphId == GraphFilter;
+    bGraphFound |= bSelected;
     UBlueprint* OwnerBlueprint = Graph->GetTypedOuter<UBlueprint>();
     const FString Kind = OwnerBlueprint != nullptr ? GraphKind(OwnerBlueprint, Graph) : TEXT("other");
-    if (Sections.Contains(TEXT("graphs")))
+    if (bSelected && Sections.Contains(TEXT("graphs")))
     {
         const TSharedRef<FUnrealMCPRecord> Value = Record(TEXT("graph"));
         Value->SetStringField(TEXT("id"), GraphId);
@@ -154,13 +171,15 @@ for (const TPair<UEdGraph*, FString>& Entry : Graphs)
         Value->SetBoolField(TEXT("inherited"), OwnerBlueprint != Blueprint);
         Value->SetNumberField(TEXT("node_count"), Graph->Nodes.Num());
         AddRecord(Sink.Records, Value);
+        if (!Sink.CheckLimits(OutError)) return false;
     }
     Sink.Fingerprint.Add(TEXT("graph|") + Entry.Value + TEXT("|") + GraphId + TEXT("|") + Graph->GetName() + TEXT("|") + Kind);
+    if (!Sink.CheckLimits(OutError)) return false;
     for (UEdGraphNode* Node : Graph->Nodes)
     {
         if (Node == nullptr) continue;
         const FString NodeId = GuidString(Node->NodeGuid);
-        if (Sections.Contains(TEXT("nodes")))
+        if (bSelected && Sections.Contains(TEXT("nodes")))
         {
             const TSharedRef<FUnrealMCPRecord> Value = Record(TEXT("node"));
             Value->SetStringField(TEXT("graph_id"), GraphId);
@@ -182,17 +201,20 @@ for (const TPair<UEdGraph*, FString>& Entry : Graphs)
                     ReplacementBoundary, bReplaceableBoundary && NodeId.Len() == 32));
             }
             AddRecord(Sink.Records, Value);
+            if (!Sink.CheckLimits(OutError)) return false;
         }
         Sink.Fingerprint.Add(TEXT("node|") + GraphId + TEXT("|") + NodeId + TEXT("|") + Node->GetClass()->GetPathName()
             + FString::Printf(TEXT("|%d|%d"), Node->NodePosX, Node->NodePosY));
+        if (!Sink.CheckLimits(OutError)) return false;
         if (const UEdGraphNode_Comment* Comment = Cast<UEdGraphNode_Comment>(Node))
             Sink.Fingerprint.Add(FString::Printf(TEXT("comment|%s|%s|%d|%d|%d"), *GraphId, *NodeId,
                 Comment->NodeWidth, Comment->NodeHeight, static_cast<int32>(Comment->MoveMode.GetValue())));
+        if (!Sink.CheckLimits(OutError)) return false;
         for (UEdGraphPin* Pin : Node->Pins)
         {
             if (!IsStructuralGraphPin(Node, Pin)) continue;
             const FString PinId = GuidString(Pin->PinId);
-            if (Sections.Contains(TEXT("pins")))
+            if (bSelected && Sections.Contains(TEXT("pins")))
             {
                 const TSharedRef<FUnrealMCPRecord> Value = Record(TEXT("pin"));
                 Value->SetStringField(TEXT("graph_id"), GraphId);
@@ -209,17 +231,19 @@ for (const TPair<UEdGraph*, FString>& Entry : Graphs)
                     : Pin->PinType.PinCategory == UEdGraphSchema_K2::PC_Text ? Pin->DefaultTextValue.ToString() : Pin->DefaultValue;
                 Value->SetObjectField(TEXT("default"), UnrealMCP::K2TypeCodec::EncodeDefault(Pin->PinType, TypedDefault));
                 AddRecord(Sink.Records, Value);
+                if (!Sink.CheckLimits(OutError)) return false;
             }
             const FString DefaultObjectPath = Pin->DefaultObject != nullptr ? Pin->DefaultObject->GetPathName() : FString();
             Sink.Fingerprint.Add(TEXT("pin|") + GraphId + TEXT("|") + NodeId + TEXT("|") + PinId + TEXT("|")
                 + Pin->PinName.ToString() + TEXT("|") + Pin->PinType.PinCategory.ToString() + TEXT("|") + Pin->DefaultValue
                 + TEXT("|") + DefaultObjectPath + TEXT("|") + Pin->DefaultTextValue.ToString());
+            if (!Sink.CheckLimits(OutError)) return false;
             if (Pin->Direction == EGPD_Output)
             {
                 for (UEdGraphPin* Linked : Pin->LinkedTo)
                 {
                     if (Linked == nullptr || Linked->GetOwningNodeUnchecked() == nullptr) continue;
-                    if (Sections.Contains(TEXT("connections")))
+                    if (bSelected && Sections.Contains(TEXT("connections")))
                     {
                         const TSharedRef<FUnrealMCPRecord> Value = Record(TEXT("connection"));
                         Value->SetStringField(TEXT("graph_id"), GraphId);
@@ -228,8 +252,10 @@ for (const TPair<UEdGraph*, FString>& Entry : Graphs)
                         Value->SetStringField(TEXT("to_node_id"), GuidString(Linked->GetOwningNodeUnchecked()->NodeGuid));
                         Value->SetStringField(TEXT("to_pin_id"), GuidString(Linked->PinId));
                         AddRecord(Sink.Records, Value);
+                        if (!Sink.CheckLimits(OutError)) return false;
                     }
                     Sink.Fingerprint.Add(TEXT("link|") + PinId + TEXT("|") + GuidString(Linked->PinId));
+                    if (!Sink.CheckLimits(OutError)) return false;
                 }
             }
         }

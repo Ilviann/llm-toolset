@@ -69,7 +69,19 @@ bool BuildInspection(
     const bool bDirtyBefore = Package->IsDirty();
     const EBlueprintStatus StatusBefore = Blueprint->Status;
     FInspectionSink Sink(OutRecords);
+    // Bound the entire requested scope before declaration collectors scan graph nodes.
+    int32 InternalWork = 0;
+    TSet<UBlueprint*> VisitedOwners;
+    for (UBlueprint* Owner = Blueprint; Owner != nullptr; )
+    {
+        if (VisitedOwners.Contains(Owner)) break;
+        VisitedOwners.Add(Owner);
+        TArray<UEdGraph*> Graphs;
+        if (!UnrealMCP::InspectionBudget::CollectGraphs(Owner, Graphs, InternalWork, OutError)) return false;
+        Owner = bIncludeInherited ? UBlueprint::GetBlueprintFromClass(Owner->ParentClass) : nullptr;
+    }
     AddClassDefaultFingerprint(Blueprint, Sink.Fingerprint);
+    if (!Sink.CheckLimits(OutError)) return false;
 
     TArray<TPair<UBlueprint*, FString>> Owners;
     if (!CollectOverviewAndComponents(Blueprint, AssetPath, bWasLoaded, bDirtyBefore, bIncludeInherited,
@@ -92,11 +104,7 @@ bool BuildInspection(
     {
         return false;
     }
-    if (Sink.ExceedsStructuralLimit())
-    {
-        OutError = {TEXT("response_too_large"), TEXT("Inspection exceeds the configured structural record limit")};
-        return false;
-    }
+    if (!Sink.CheckLimits(OutError)) return false;
     if (Package->IsDirty() != bDirtyBefore || Blueprint->Status != StatusBefore)
     {
         OutError = {TEXT("internal_error"), TEXT("Inspection unexpectedly changed Blueprint state")};

@@ -1,4 +1,5 @@
 #include "UnrealMCPExtensionRegistry.h"
+#include "UnrealMCPInspectionBudget.h"
 
 #include "Editor.h"
 #include "FileHelpers.h"
@@ -857,13 +858,14 @@ bool FUnrealMCPExtensionRegistry::AppendBlueprintInspection(
     const TArray<TSharedPtr<FUnrealMCPValue>>* Records = nullptr;
     const int32* RecordLimit = Contribution->StableLimits.Find(TEXT("records"));
     if (!ExtensionResult->TryGetArrayField(TEXT("records"), Records) || Records == nullptr
-        || Records->Num() > (RecordLimit != nullptr ? *RecordLimit : 32)
-        || OutRecords.Num() + Records->Num() > UnrealMCP::MaxInspectRecords)
+        || Records->Num() > (RecordLimit != nullptr ? *RecordLimit : 32))
     {
         OutError = {TEXT("response_too_large"),
             TEXT("The companion Blueprint inspection records exceed their stable bound")};
         return false;
     }
+    if (!UnrealMCP::InspectionBudget::Check(
+        OutRecords.Num() + Records->Num(), OutFingerprint.Num() + 1, OutError)) return false;
     for (const TSharedPtr<FUnrealMCPValue>& Value : *Records)
     {
         const TSharedPtr<FUnrealMCPRecord>* RecordObject = nullptr;

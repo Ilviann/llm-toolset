@@ -23,6 +23,8 @@
 #include "Misc/PackageName.h"
 #include "Misc/Paths.h"
 #include "UnrealMCPAnimationInspectionAdapter.h"
+#include "UnrealMCPInspectionBudget.h"
+#include "UnrealMCPVersion.h"
 #include "UnrealMCPAssetFamilyRegistry.h"
 #include "UObject/SavePackage.h"
 
@@ -206,6 +208,54 @@ bool FUnrealMCPAssetInspectAnimationTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("interface mode is explicit"), ObjectAt(Interface, TEXT("animation_blueprint"))
         ->GetStringField(TEXT("mode")), FString(TEXT("interface")));
     TestEqual(TEXT("inspection preserves dirty state"), Package->IsDirty(), bDirtyBefore);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FUnrealMCPAnimationInspectionBudgetsTest,
+    "UnrealMCP.AssetInspect.AnimationInspectionBudgets",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FUnrealMCPAnimationInspectionBudgetsTest::RunTest(const FString& Parameters)
+{
+    UPackage* Package = CreatePackage(*(TEXT("/Game/UnrealMCPTests/")
+        + FGuid::NewGuid().ToString(EGuidFormats::Digits) + TEXT("/ABP_Budgets")));
+    UAnimBlueprint* Blueprint = NewObject<UAnimBlueprint>(Package, TEXT("ABP_Budgets"), RF_Public | RF_Standalone);
+    Blueprint->ParentClass = UAnimInstance::StaticClass();
+    UAnimationGraph* Small = AddAnimGraph(Blueprint, TEXT("Small"));
+    UAnimationGraph* Large = AddAnimGraph(Blueprint, TEXT("Large"));
+    for (int32 Index = 0; Index <= UnrealMCP::MaxInspectRecords; ++Index)
+    {
+        UEdGraphNode* Node = NewObject<UEdGraphNode>(Large);
+        Node->CreateNewGuid();
+        Large->AddNode(Node, false, false);
+    }
+    FUnrealMCPAssetFamilyRegistry Registry;
+    FUnrealMCPError Error;
+    if (!UnrealMCP::AnimationInspection::RegisterAdapter(Registry, Error) || !Registry.Freeze(Error)) return false;
+    const FUnrealMCPAssetFamilyDescriptor& Descriptor = Registry.GetDescriptors()[0];
+    FUnrealMCPAssetFamilyDocumentBuilder Selected(Descriptor.Bounds);
+    const bool bDirty = Package->IsDirty();
+    const EBlueprintStatus Status = Blueprint->Status;
+    const FString Snapshot = Descriptor.SnapshotBuilder(Blueprint);
+    TestFalse(TEXT("large animation fingerprint available"), Snapshot.IsEmpty());
+    TestTrue(TEXT("small animation graph in large asset inspects"), Inspect(Descriptor, Blueprint, {TEXT("animation_graphs"), TEXT("Small")}, Selected, Error));
+    TestEqual(TEXT("unchanged animation snapshot repeats"), Descriptor.SnapshotBuilder(Blueprint), Snapshot);
+    Large->Nodes.Last()->CreateNewGuid();
+    TestNotEqual(TEXT("unselected animation graph changes snapshot"), Descriptor.SnapshotBuilder(Blueprint), Snapshot);
+    TestEqual(TEXT("large animation inspection preserves dirty state"), Package->IsDirty(), bDirty);
+    TestEqual(TEXT("large animation inspection preserves compile status"), Blueprint->Status, Status);
+
+    // Null slots still consume structural work, without allocating hundreds of thousands of UObjects.
+    const int32 SmallCount = Small->Nodes.Num();
+    const int32 LargeCount = Large->Nodes.Num();
+    Small->Nodes.SetNum(UnrealMCP::MaxInspectInternalWork / 2);
+    Large->Nodes.SetNum(UnrealMCP::MaxInspectInternalWork / 2);
+    FUnrealMCPAssetFamilyDocumentBuilder Overflow(Descriptor.Bounds);
+    Error = {};
+    TestFalse(TEXT("accumulated animation work rejects"), Inspect(Descriptor, Blueprint, {TEXT("animation_graphs"), TEXT("Small")}, Overflow, Error));
+    TestEqual(TEXT("animation work error code"), Error.Code, FString(TEXT("response_too_large")));
+    TestEqual(TEXT("animation work error message"), Error.Message, FString(TEXT("Animation graph inspection exceeds the structural work limit")));
+    Small->Nodes.SetNum(SmallCount);
+    Large->Nodes.SetNum(LargeCount);
     return true;
 }
 

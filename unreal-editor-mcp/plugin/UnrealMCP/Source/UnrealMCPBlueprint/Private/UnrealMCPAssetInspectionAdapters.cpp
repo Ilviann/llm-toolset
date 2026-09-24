@@ -138,34 +138,38 @@ FString HashLines(TArray<FString> Lines)
     return BytesToHex(Digest, FSHA1::DigestSize).ToLower();
 }
 
-void AddBlueprintFingerprint(UBlueprint* Blueprint, TArray<FString>& Lines)
+bool AddBlueprintFingerprint(UBlueprint* Blueprint, TArray<FString>& Lines)
 {
     using namespace UnrealMCP::BlueprintInspectionPrivate;
-    if (Blueprint == nullptr) return;
+    if (Blueprint == nullptr) return true;
     Lines.Add(TEXT("blueprint|") + Blueprint->GetPathName() + TEXT("|")
         + (Blueprint->ParentClass != nullptr ? Blueprint->ParentClass->GetPathName() : FString())
         + TEXT("|") + LexToString(static_cast<int32>(Blueprint->BlueprintType)));
+    if (Lines.Num() > UnrealMCP::MaxInspectFingerprintEntries) return false;
     AddClassDefaultFingerprint(Blueprint, Lines);
+    if (Lines.Num() > UnrealMCP::MaxInspectFingerprintEntries) return false;
     for (const FBPVariableDescription& Variable : Blueprint->NewVariables)
     {
         Lines.Add(TEXT("variable|") + GuidString(Variable.VarGuid) + TEXT("|") + Variable.VarName.ToString()
             + TEXT("|") + Variable.VarType.PinCategory.ToString() + TEXT("|") + Variable.DefaultValue);
+        if (Lines.Num() > UnrealMCP::MaxInspectFingerprintEntries) return false;
     }
     TArray<UEdGraph*> Graphs;
-    Graphs.Append(Blueprint->UbergraphPages);
-    Graphs.Append(Blueprint->FunctionGraphs);
-    Graphs.Append(Blueprint->MacroGraphs);
-    for (const FBPInterfaceDescription& Interface : Blueprint->ImplementedInterfaces) Graphs.Append(Interface.Graphs);
+    int32 Work = 0;
+    FUnrealMCPError Error;
+    if (!UnrealMCP::InspectionBudget::CollectGraphs(Blueprint, Graphs, Work, Error)) return false;
     for (UEdGraph* Graph : Graphs)
     {
         if (Graph == nullptr) continue;
         Lines.Add(TEXT("graph|") + GuidString(Graph->GraphGuid) + TEXT("|") + Graph->GetName());
+        if (Lines.Num() > UnrealMCP::MaxInspectFingerprintEntries) return false;
         for (UEdGraphNode* Node : Graph->Nodes)
         {
             if (Node == nullptr) continue;
             const FString NodeId = GuidString(Node->NodeGuid);
             Lines.Add(TEXT("node|") + NodeId + TEXT("|") + Node->GetClass()->GetPathName()
                 + TEXT("|") + LexToString(Node->NodePosX) + TEXT("|") + LexToString(Node->NodePosY));
+            if (Lines.Num() > UnrealMCP::MaxInspectFingerprintEntries) return false;
             for (UEdGraphPin* Pin : Node->Pins)
             {
                 if (!IsStructuralGraphPin(Node, Pin)) continue;
@@ -174,23 +178,29 @@ void AddBlueprintFingerprint(UBlueprint* Blueprint, TArray<FString>& Lines)
                     + TEXT("|") + Pin->PinType.PinCategory.ToString() + TEXT("|") + Pin->DefaultValue
                     + TEXT("|") + (Pin->DefaultObject != nullptr ? Pin->DefaultObject->GetPathName() : FString())
                     + TEXT("|") + Pin->DefaultTextValue.ToString());
+                if (Lines.Num() > UnrealMCP::MaxInspectFingerprintEntries) return false;
                 if (Pin->Direction == EGPD_Output)
                 {
                     for (UEdGraphPin* Linked : Pin->LinkedTo)
                     {
                         if (Linked != nullptr) Lines.Add(TEXT("link|") + PinId + TEXT("|") + GuidString(Linked->PinId));
+                        if (Lines.Num() > UnrealMCP::MaxInspectFingerprintEntries) return false;
                     }
                 }
             }
         }
     }
+    return true;
 }
 
 FString BuildSnapshot(UObject* AssetObject, UBlueprint* Blueprint)
 {
     TArray<FString> Lines;
     Lines.Add(TEXT("asset|") + AssetObject->GetPathName() + TEXT("|") + AssetObject->GetClass()->GetPathName());
-    if (Blueprint != nullptr) AddBlueprintFingerprint(Blueprint, Lines);
+    if (Blueprint != nullptr)
+    {
+        if (!AddBlueprintFingerprint(Blueprint, Lines)) return FString();
+    }
     else if (UPackage* Package = AssetObject->GetOutermost())
     {
         Lines.Add(TEXT("package|") + Package->GetName() + TEXT("|") + LexToString(Package->IsDirty()));
@@ -210,6 +220,7 @@ FString BuildStableSnapshot(UObject* AssetObject, UBlueprint* Blueprint)
         Arguments->SetStringField(TEXT("mode"), TEXT("inspect"));
         Arguments->SetStringField(TEXT("asset_path"), AssetObject->GetPathName());
         Arguments->SetNumberField(TEXT("page_size"), 1);
+        Arguments->SetArrayField(TEXT("sections"), {MakeShared<FUnrealMCPValueString>(TEXT("summary"))});
         TSharedPtr<FUnrealMCPRecord> Result;
         FUnrealMCPError Error;
         if (Inspector.Execute(Arguments, Result, Error) && Result.IsValid())
@@ -220,6 +231,7 @@ FString BuildStableSnapshot(UObject* AssetObject, UBlueprint* Blueprint)
                 return Snapshot;
             }
         }
+        if (Error.Code == TEXT("response_too_large")) return FString();
     }
     return BuildSnapshot(AssetObject, Blueprint);
 }

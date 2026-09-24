@@ -1,6 +1,8 @@
 # Unreal Editor MCP
 
-Unreal Editor MCP 0.53.0 is an offline-first MCP bridge for Unreal Engine 5.8+. It pairs a dependency-free Python 3.10+ stdio server with an editor-only C++ plugin.
+Unreal Editor MCP 0.53.1 is an offline-first MCP bridge for Unreal Engine 5.8+. It pairs a dependency-free Python 3.10+ stdio server with an editor-only C++ plugin.
+
+Internal Blueprint inspection separates its 4,096 emitted-record budget from 262,144 internal work units and 262,144 fingerprint entries. Small selections in large assets retain whole-asset snapshots; public semantic paging and graph output limits are unchanged.
 
 Readonly access is the released default. Project-content mutation requires the explicit `--writable` trust decision; optional editor lifecycle control remains independent.
 
@@ -44,7 +46,7 @@ Set `UE58` to the engine installation root first. This CMD script immediately re
 
 1. Copy [`plugin/UnrealMCP`](plugin/UnrealMCP) to `<YourProject>/Plugins/UnrealMCP`, or add this repository's `plugin/` directory to `AdditionalPluginDirectories` in a disposable development `.uproject`.
 2. Enable `UnrealMCP` and compile the project's Editor target with Unreal Engine 5.8 or newer.
-3. Open the project and wait for `Unreal MCP 0.53.0 ready on 127.0.0.1:15485` in the editor log.
+3. Open the project and wait for `Unreal MCP 0.53.1 ready on 127.0.0.1:15485` in the editor log.
 4. Create a virtual environment and install the Python package offline:
 
    ```sh

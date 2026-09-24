@@ -1,6 +1,7 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 #include "UnrealMCPBlueprintAutomationTestSupport.h"
+#include "UnrealMCPInspectionBudget.h"
 
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FUnrealMCPPhase2InspectionTest, "UnrealMCP.Phase2.InspectionContracts", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -101,9 +102,110 @@ bool FUnrealMCPPhase2InspectionTest::RunTest(const FString& Parameters)
         Node->CreateNewGuid();
         LargeGraph->AddNode(Node, false, false);
     }
-    TestFalse(TEXT("oversized synthetic graph rejects"), Inspector.Execute(InspectArguments(LargeBlueprint->GetPathName()), Result, Error));
-    TestEqual(TEXT("oversized graph error is stable"), Error.Code, FString(TEXT("response_too_large")));
+    TestTrue(TEXT("large graph summary fits emitted record budget"), Inspector.Execute(InspectArguments(LargeBlueprint->GetPathName()), Result, Error));
     FPackageName::UnRegisterMountPoint(TEXT("/UnrealMCPTestPlugin/"), PluginContentDirectory + TEXT("/"));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FUnrealMCPInspectionBudgetsTest, "UnrealMCP.Phase2.IndependentInspectionBudgets", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FUnrealMCPInspectionBudgetsTest::RunTest(const FString& Parameters)
+{
+    using namespace UnrealMCP::Tests;
+    UBlueprint* Blueprint = CreateBlueprintFixture(TEXT("/Game/UnrealMCPTests/")
+        + FGuid::NewGuid().ToString(EGuidFormats::Digits) + TEXT("/BP_Budgets"), AActor::StaticClass(), false);
+    if (!TestNotNull(TEXT("budget fixture"), Blueprint)) return false;
+    UEdGraph* Graph = Blueprint->UbergraphPages[0];
+    Graph->Nodes.Empty();
+    for (int32 Index = 0; Index < UnrealMCP::MaxInspectRecords; ++Index)
+    {
+        UEdGraphNode* Node = NewObject<UEdGraphNode>(Graph);
+        Node->CreateNewGuid();
+        Graph->AddNode(Node, false, false);
+    }
+    FUnrealMCPBlueprintInspector Inspector;
+    TSharedPtr<FUnrealMCPRecord> Result;
+    FUnrealMCPError Error;
+    const auto Arguments = InspectArguments(Blueprint->GetPathName());
+    Arguments->SetArrayField(TEXT("sections"), {MakeShared<FUnrealMCPValueString>(TEXT("nodes"))});
+    Arguments->SetNumberField(TEXT("page_size"), 1);
+    Arguments->SetStringField(TEXT("graph_id"), Graph->GraphGuid.ToString(EGuidFormats::Digits).ToLower());
+    TestTrue(TEXT("exactly 4096 emitted records succeed before paging"), Inspector.Execute(Arguments, Result, Error));
+    if (Result.IsValid()) TestEqual(TEXT("total is independent of one-record page"), Result->GetNumberField(TEXT("record_count")), 4096.0);
+    UEdGraphNode* Extra = NewObject<UEdGraphNode>(Graph);
+    Extra->CreateNewGuid();
+    Graph->AddNode(Extra, false, false);
+    TestFalse(TEXT("4097 rejects despite one-record page"), Inspector.Execute(Arguments, Result, Error));
+    TestEqual(TEXT("result overflow code"), Error.Code, FString(TEXT("response_too_large")));
+    TestEqual(TEXT("result overflow message"), Error.Message, FString(TEXT("Inspection exceeds the configured result record limit")));
+
+    UEdGraph* Small = NewObject<UEdGraph>(Blueprint);
+    Small->GraphGuid = FGuid::NewGuid();
+    Blueprint->UbergraphPages.Add(Small);
+    for (int32 Index = 0; Index < 3; ++Index)
+    {
+        UEdGraphNode* Node = NewObject<UEdGraphNode>(Small);
+        Node->CreateNewGuid();
+        Small->AddNode(Node, false, false);
+    }
+    Arguments->SetStringField(TEXT("graph_id"), Small->GraphGuid.ToString(EGuidFormats::Digits).ToLower());
+    const bool bDirty = Blueprint->GetOutermost()->IsDirty();
+    const EBlueprintStatus Status = Blueprint->Status;
+    TestTrue(TEXT("small selection ignores unrelated emitted records"), Inspector.Execute(Arguments, Result, Error));
+    if (!Result.IsValid()) return false;
+    const FString Snapshot = Result->GetStringField(TEXT("snapshot_id"));
+    const auto Continue = MakeShared<FUnrealMCPRecord>();
+    Continue->SetNumberField(TEXT("page_size"), 1);
+    Continue->SetStringField(TEXT("cursor"), Result->GetStringField(TEXT("next_cursor")));
+    TestTrue(TEXT("unchanged selected cursor continues"), Inspector.Execute(Continue, Result, Error));
+    TestEqual(TEXT("continuation keeps snapshot"), Result->GetStringField(TEXT("snapshot_id")), Snapshot);
+    Continue->SetStringField(TEXT("cursor"), Result->GetStringField(TEXT("next_cursor")));
+    Extra->NodePosX += 1;
+    TestFalse(TEXT("unselected graph invalidates cursor"), Inspector.Execute(Continue, Result, Error));
+    TestEqual(TEXT("unselected edit is stale"), Error.Code, FString(TEXT("stale_precondition")));
+    TestEqual(TEXT("inspection preserves dirty state"), Blueprint->GetOutermost()->IsDirty(), bDirty);
+    TestEqual(TEXT("inspection preserves compile status"), Blueprint->Status, Status);
+
+    class FBudgetContribution final : public IUnrealMCPBlueprintExtensionProvider
+    {
+    public:
+        bool bFingerprintOverflow = false;
+        bool ClassifyBlueprintClass(const UClass*, FString&, FString&) const override { return false; }
+        bool AppendBlueprintInspection(const UBlueprint&, const TSharedPtr<FUnrealMCPRecord>&,
+            TArray<TSharedPtr<FUnrealMCPValue>>& Records, TArray<FString>& Fingerprint,
+            TSharedPtr<FUnrealMCPRecord>&, FUnrealMCPError&) const override
+        {
+            if (bFingerprintOverflow) Fingerprint.SetNum(UnrealMCP::MaxInspectFingerprintEntries + 1);
+            else Records.SetNum(UnrealMCP::MaxInspectRecords + 1);
+            return true;
+        }
+    } Contribution;
+    FUnrealMCPBlueprintInspector WithCompanion(Contribution);
+    TestFalse(TEXT("companion result overflow rejects before paging"), WithCompanion.Execute(Arguments, Result, Error));
+    TestEqual(TEXT("companion result message"), Error.Message, FString(TEXT("Inspection exceeds the configured result record limit")));
+    Contribution.bFingerprintOverflow = true;
+    TestFalse(TEXT("companion fingerprint overflow rejects"), WithCompanion.Execute(Arguments, Result, Error));
+    TestEqual(TEXT("companion fingerprint message"), Error.Message, FString(TEXT("Inspection exceeds the configured internal fingerprint limit")));
+
+    TestTrue(TEXT("inclusive fingerprint boundary"), UnrealMCP::InspectionBudget::Check(4096, 262144, Error));
+    TestFalse(TEXT("fingerprint overflow independent of results"), UnrealMCP::InspectionBudget::Check(1, 262145, Error));
+    TestEqual(TEXT("fingerprint overflow code"), Error.Code, FString(TEXT("response_too_large")));
+    TestEqual(TEXT("fingerprint overflow message"), Error.Message, FString(TEXT("Inspection exceeds the configured internal fingerprint limit")));
+    Blueprint->UbergraphPages.Add(Small);
+    Graph->SubGraphs.Add(Small);
+    TArray<UEdGraph*> Graphs;
+    int32 Work = 0;
+    TestTrue(TEXT("duplicate graph references are safe"), UnrealMCP::InspectionBudget::CollectGraphs(Blueprint, Graphs, Work, Error));
+    TestEqual(TEXT("duplicate graphs collected once"), Graphs.FilterByPredicate([Small](UEdGraph* Item) { return Item == Small; }).Num(), 1);
+    Small->SubGraphs.Add(Graph);
+    Graphs.Reset(); Work = 0;
+    TestFalse(TEXT("graph cycle rejects without recursion"), UnrealMCP::InspectionBudget::CollectGraphs(Blueprint, Graphs, Work, Error));
+    Small->SubGraphs.Reset();
+    const int32 NodeCount = Graph->Nodes.Num();
+    Graph->Nodes.SetNum(UnrealMCP::MaxInspectInternalWork + 1);
+    Graphs.Reset(); Work = 0;
+    TestFalse(TEXT("per-graph internal work is bounded"), UnrealMCP::InspectionBudget::CollectGraphs(Blueprint, Graphs, Work, Error));
+    TestEqual(TEXT("internal overflow code"), Error.Code, FString(TEXT("response_too_large")));
+    Graph->Nodes.SetNum(NodeCount);
     return true;
 }
 

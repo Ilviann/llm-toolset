@@ -18,6 +18,7 @@ The built-in domains register neutral, Blueprint, Data Asset, and Data Table des
 - Root records are compact and advertise exact percent-encoded selectors. Non-graph collections page deterministically from zero with default 10 and maximum 100 records.
 - Selected graphs traverse live `UEdGraph` objects. Response-local semantic node IDs are query-local; edges appear once from source output pins. Verbose mode adds native graph/node/pin identities and coordinates without changing semantics.
 - Graphs are atomic. Complete output is bounded to 64 KiB; oversized graphs return `data_limit_exceeded` unless the caller explicitly permits one coherent marked slice.
+- `UnrealMCPInspectionBudget.h/.cpp` in Asset Core owns the shared internal budget checks and iterative Blueprint graph preflight. The service validates graph work before invoking snapshot callbacks; Blueprint and Animation collectors also enforce these bounds directly. Public semantic paging and atomic graph limits remain unchanged. Built-in Blueprint/Animation snapshot callbacks return empty on fingerprint overflow, which the coordinator maps to `response_too_large`; companion callback contracts are unchanged.
 - Inspection never returns media, retrieval paths, runtime state, discovery results, or reconstruction boundaries, and it verifies package dirtiness, Blueprint status, and snapshot stability before returning.
 
 ## Verification

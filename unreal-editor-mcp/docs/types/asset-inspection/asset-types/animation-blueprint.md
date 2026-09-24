@@ -151,3 +151,7 @@ Do not return the current skeletal mesh component, owning Actor, active state, s
 ## Open questions
 
 - None at the current requirements layer. Regular, template, and Animation Layer Interface assets use distinct `asset.type` values.
+
+## Internal inspection budgets
+
+Animation graph traversal and structural collection share an inclusive 262,144-unit internal-work ceiling, separate from result records and the 262,144-entry fingerprint ceiling. Work overflow returns `response_too_large` with `Animation graph inspection exceeds the structural work limit`. Selecting a small graph does not emit unrelated graphs, but snapshots still cover their structure. Existing atomic graph output and semantic family limits remain unchanged.

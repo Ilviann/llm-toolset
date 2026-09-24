@@ -1,4 +1,5 @@
 #include "UnrealMCPAnimationInspectionAdapter.h"
+#include "UnrealMCPInspectionBudget.h"
 
 #include "Animation/AnimBlueprint.h"
 #include "Animation/AnimInstance.h"
@@ -456,24 +457,36 @@ FString BuildSnapshot(UObject* Asset)
             + TEXT("|") + GetPathNameSafe(Blueprint->TargetSkeleton)
             + TEXT("|") + LexToString(Blueprint->bUseMultiThreadedAnimationUpdate)
             + TEXT("|") + LexToString(Blueprint->bWarnAboutBlueprintUsage));
-        for (const FAnimGroupInfo& Group : Blueprint->Groups) Lines.Add(TEXT("group|") + Group.Name.ToString());
+        for (const FAnimGroupInfo& Group : Blueprint->Groups)
+        {
+            Lines.Add(TEXT("group|") + Group.Name.ToString());
+            if (Lines.Num() > UnrealMCP::MaxInspectFingerprintEntries) return FString();
+        }
         for (const FAnimParentNodeAssetOverride& Override : Blueprint->ParentAssetOverrides)
+        {
             Lines.Add(TEXT("override|") + GuidKey(Override.ParentNodeGuid) + TEXT("|") + GetPathNameSafe(Override.NewAsset));
+            if (Lines.Num() > UnrealMCP::MaxInspectFingerprintEntries) return FString();
+        }
         TArray<UEdGraph*> Graphs;
-        Blueprint->GetAllGraphs(Graphs);
+        int32 Work = 0;
+        FUnrealMCPError Error;
+        if (!UnrealMCP::InspectionBudget::CollectGraphs(Blueprint, Graphs, Work, Error)) return FString();
         for (UEdGraph* Graph : Graphs)
         {
             if (Graph == nullptr) continue;
             Lines.Add(TEXT("graph|") + GuidKey(Graph->GraphGuid) + TEXT("|") + Graph->GetName());
+            if (Lines.Num() > UnrealMCP::MaxInspectFingerprintEntries) return FString();
             for (UEdGraphNode* Node : Graph->Nodes)
             {
                 if (Node == nullptr) continue;
                 Lines.Add(TEXT("node|") + GuidKey(Node->NodeGuid) + TEXT("|") + Node->GetClass()->GetPathName());
+                if (Lines.Num() > UnrealMCP::MaxInspectFingerprintEntries) return FString();
                 for (UEdGraphPin* Pin : Node->Pins)
                 {
                     if (Pin == nullptr || Pin->bOrphanedPin) continue;
                     Lines.Add(TEXT("pin|") + GuidKey(Pin->PinId) + TEXT("|") + Pin->PinName.ToString()
                         + TEXT("|") + Pin->DefaultValue + TEXT("|") + GetPathNameSafe(Pin->DefaultObject));
+                    if (Lines.Num() > UnrealMCP::MaxInspectFingerprintEntries) return FString();
                 }
             }
         }
@@ -501,6 +514,9 @@ public:
             OutError = {TEXT("unsupported_type"), TEXT("The animation inspection overlay requires an Animation Blueprint")};
             return false;
         }
+        TArray<UEdGraph*> BoundedGraphs;
+        int32 StructuralWork = 0;
+        if (!UnrealMCP::InspectionBudget::CollectGraphs(Blueprint, BoundedGraphs, StructuralWork, OutError)) return false;
         if (AnimationGraphs(Blueprint).Num() > MaxAnimationGraphs || Blueprint->ParentAssetOverrides.Num() > MaxParentOverrides)
         {
             OutError = {TEXT("data_limit_exceeded"), TEXT("The Animation Blueprint exceeds its semantic safety limit")};
@@ -528,7 +544,13 @@ public:
             if (!BuildRoot(Blueprint, MachineModels, Document, OutError)) return false;
         }
         else if (!BuildSelection(Context, Blueprint, MachineModels, Document, OutError)) return false;
-        return Snapshot.Add(TEXT("animation_snapshot"), BuildSnapshot(Blueprint), OutError)
+        const FString Fingerprint = BuildSnapshot(Blueprint);
+        if (Fingerprint.IsEmpty())
+        {
+            OutError = {TEXT("response_too_large"), TEXT("Inspection exceeds the configured internal fingerprint limit")};
+            return false;
+        }
+        return Snapshot.Add(TEXT("animation_snapshot"), Fingerprint, OutError)
             && RegisterRoutes(Selectors, OutError);
     }
 
@@ -879,7 +901,8 @@ private:
         TArray<TSharedPtr<FUnrealMCPValue>> Values;
         UAnimBlueprint* Parent = UAnimBlueprint::GetParentAnimBlueprint(Blueprint);
         TArray<UEdGraph*> ParentGraphs;
-        if (Parent != nullptr) Parent->GetAllGraphs(ParentGraphs);
+        int32 ParentWork = 0;
+        if (!UnrealMCP::InspectionBudget::CollectGraphs(Parent, ParentGraphs, ParentWork, OutError)) return false;
         for (int32 Index = Start; Index < End; ++Index)
         {
             const FAnimParentNodeAssetOverride& Override = *Overrides[Index];

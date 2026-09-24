@@ -165,6 +165,7 @@ inline bool CollectWidgetTree(
             Value->SetArrayField(
                 TEXT("supported_style_properties"), StyleProperties);
             AddRecord(Sink.Records, Value);
+            if (!Sink.CheckLimits(OutError)) return false;
         }
         if (Sections.Contains(TEXT("widget_defaults")) && bSelected)
         {
@@ -181,6 +182,7 @@ inline bool CollectWidgetTree(
                     Default->SetField(Pair.Key, Pair.Value);
                 }
                 AddRecord(Sink.Records, Default);
+                if (!Sink.CheckLimits(OutError)) return false;
             }
         }
         Sink.Fingerprint.Add(TEXT("widget|") + Id + TEXT("|") + Widget->GetName()
@@ -188,6 +190,7 @@ inline bool CollectWidgetTree(
             + TEXT("|") + SlotId + TEXT("|") + LexToString(ChildIndex)
             + TEXT("|") + (Widget->bIsVariable ? TEXT("1") : TEXT("0"))
             + TEXT("|") + DefaultsFingerprint);
+        if (!Sink.CheckLimits(OutError)) return false;
     }
     if (!bWidgetFound)
     {
@@ -237,11 +240,13 @@ inline bool CollectWidgetTree(
                     UnrealMCP::WidgetInspection::EncodeLayout(
                         Child != nullptr ? Child->Slot : nullptr));
                 AddRecord(Sink.Records, Slot);
+                if (!Sink.CheckLimits(OutError)) return false;
             }
             Sink.Fingerprint.Add(TEXT("widget_slot|panel|") + Id + TEXT("|")
                 + ParentId + TEXT("|") + ChildId + TEXT("|") + LexToString(Index)
                 + TEXT("|") + UnrealMCP::WidgetInspection::FingerprintLayout(
                     Child != nullptr ? Child->Slot : nullptr));
+            if (!Sink.CheckLimits(OutError)) return false;
         }
     }
     for (const UnrealMCP::WidgetTreePrivate::FNamedSlotRef& Ref : NamedSlots)
@@ -259,9 +264,11 @@ inline bool CollectWidgetTree(
             Slot->SetStringField(TEXT("name"), Ref.Name.ToString());
             Slot->SetBoolField(TEXT("inherited"), Ref.bTreeHost);
             AddRecord(Sink.Records, Slot);
+            if (!Sink.CheckLimits(OutError)) return false;
         }
         Sink.Fingerprint.Add(TEXT("widget_slot|named|") + Ref.Id + TEXT("|")
             + Ref.HostId + TEXT("|") + Ref.Name.ToString() + TEXT("|") + ChildId);
+        if (!Sink.CheckLimits(OutError)) return false;
     }
     TArray<UnrealMCP::WidgetInspection::FBindingRecord> Bindings;
     if (!UnrealMCP::WidgetInspection::CollectBindings(
@@ -272,6 +279,7 @@ inline bool CollectWidgetTree(
     for (const UnrealMCP::WidgetInspection::FBindingRecord& Binding : Bindings)
     {
         Sink.Fingerprint.Add(TEXT("widget_binding|") + Binding.Fingerprint);
+        if (!Sink.CheckLimits(OutError)) return false;
         if (Sections.Contains(TEXT("widget_bindings"))
             && (WidgetFilter.IsEmpty() || Binding.WidgetId == WidgetFilter)
             && Binding.Record.IsValid())
@@ -279,9 +287,11 @@ inline bool CollectWidgetTree(
             AddRecord(
                 Sink.Records,
                 Binding.Record.ToSharedRef());
+            if (!Sink.CheckLimits(OutError)) return false;
         }
     }
     Sink.Fingerprint.Add(TEXT("widget_tree_depth|") + LexToString(TreeDepth));
+    if (!Sink.CheckLimits(OutError)) return false;
     return true;
 }
 }

@@ -32,6 +32,7 @@
 #include "Misc/PackageName.h"
 #include "Misc/SecureHash.h"
 #include "UnrealMCPVersion.h"
+#include "UnrealMCPInspectionBudget.h"
 #include "UnrealMCPBlueprintFamilyPolicy.h"
 #include "UnrealMCPDomainModule.h"
 #include "UnrealMCPK2TypeCodec.h"
@@ -49,10 +50,9 @@ struct FInspectionSink
     {
     }
 
-    bool ExceedsStructuralLimit() const
+    bool CheckLimits(FUnrealMCPError& OutError) const
     {
-        return Records.Num() > UnrealMCP::MaxInspectRecords
-            || Fingerprint.Num() > UnrealMCP::MaxInspectRecords;
+        return UnrealMCP::InspectionBudget::Check(Records.Num(), Fingerprint.Num(), OutError);
     }
 
     TArray<TSharedPtr<FUnrealMCPValue>>& Records;
@@ -549,24 +549,6 @@ static FString GraphKind(const UBlueprint* Blueprint, const UEdGraph* Graph)
     return TEXT("other");
 }
 
-static void AddBlueprintGraphs(UBlueprint* Blueprint, const FString& OwnerPath, TArray<TPair<UEdGraph*, FString>>& OutGraphs)
-{
-    auto Append = [&OutGraphs, &OwnerPath](const TArray<TObjectPtr<UEdGraph>>& Source)
-    {
-        for (UEdGraph* Graph : Source)
-        {
-            if (Graph != nullptr)
-            {
-                OutGraphs.Emplace(Graph, OwnerPath);
-            }
-        }
-    };
-    Append(Blueprint->UbergraphPages);
-    Append(Blueprint->FunctionGraphs);
-    Append(Blueprint->MacroGraphs);
-    Append(Blueprint->DelegateSignatureGraphs);
-}
-
 static bool ReadPropertyNames(const FUnrealMCPRecord& Arguments, TSet<FString>& OutNames, FUnrealMCPError& OutError)
 {
     if (!Arguments.HasField(TEXT("property_names"))) return true;
@@ -648,6 +630,7 @@ static void AddClassDefaultFingerprint(UBlueprint* Blueprint, TArray<FString>& F
             FString Encoded;
             UnrealMCP::PropertyCodec::ExportValueText(Defaults, Property, Encoded);
             Fingerprint.Add(TEXT("class_default|") + Property->GetName() + TEXT("|") + Kind + TEXT("|") + Encoded);
+            if (Fingerprint.Num() > UnrealMCP::MaxInspectFingerprintEntries) return;
         }
     }
 }

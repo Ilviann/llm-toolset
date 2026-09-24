@@ -272,6 +272,10 @@ private:
             Test.TestEqual(TEXT("native companion API version"),
                 static_cast<int32>((*Object)->GetNumberField(TEXT("companion_api_version"))),
                 UnrealMCP::CompanionApiVersion);
+            const TSharedPtr<FJsonObject> Limits = (*Object)->GetObjectField(TEXT("limits"));
+            Test.TestEqual(TEXT("result limit published"), Limits->GetNumberField(TEXT("inspect_records")), 4096.0);
+            Test.TestEqual(TEXT("internal work limit published"), Limits->GetNumberField(TEXT("inspect_internal_work")), 262144.0);
+            Test.TestEqual(TEXT("fingerprint limit published"), Limits->GetNumberField(TEXT("inspect_fingerprint_entries")), 262144.0);
             const TArray<TSharedPtr<FJsonValue>>* Companions = nullptr;
             Test.TestTrue(TEXT("capabilities publish the test companion"),
                 (*Object)->TryGetArrayField(TEXT("companions"), Companions)

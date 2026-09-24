@@ -1,5 +1,6 @@
 # Completed features
 
+- [`inspect-limits` — Independent inspection budgets](inspect-limits.md).
 - [`engine-plugin-removal` — Windows engine plugin removal](engine-plugin-removal.md).
 
 - [`ai-assets-inspect` — Unreal AI asset inspection](ai-assets-inspect.md).

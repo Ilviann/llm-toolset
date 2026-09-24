@@ -232,6 +232,16 @@ def verify_capability_contract(capabilities: dict[str, object], state: dict[str,
            for name, value in expected_level_edit_limits.items()):
         raise AssertionError(
             f"level-edit limits mismatch: {capabilities.get('limits')!r}")
+    expected_inspection_limits = {
+        "inspect_records": 4096,
+        "inspect_internal_work": 262144,
+        "inspect_fingerprint_entries": 262144,
+        "inspect_page_size": 100,
+        "retained_cursors": 32,
+    }
+    if any(capabilities.get("limits", {}).get(name) != value
+           for name, value in expected_inspection_limits.items()):
+        raise AssertionError(f"inspection limits mismatch: {capabilities.get('limits')!r}")
     expected_asset_reference_limits = {
         "asset_reference_registry_candidates": 4096,
         "asset_reference_live_objects": 8192,

@@ -1,4 +1,5 @@
 #include "UnrealMCPAssetInspectionService.h"
+#include "UnrealMCPInspectionBudget.h"
 
 #include "UnrealMCPVersion.h"
 
@@ -117,7 +118,9 @@ bool BuildComposedSnapshot(
         ? Primary.SnapshotBuilder(AssetObject) : BuildGenericSnapshot(AssetObject);
     if (PrimarySnapshot.IsEmpty())
     {
-        OutError = {TEXT("internal_error"), TEXT("The primary asset-family snapshot is unavailable")};
+        OutError = Primary.FamilyId == TEXT("core_blueprint")
+            ? FUnrealMCPError{TEXT("response_too_large"), TEXT("Inspection exceeds the configured internal fingerprint limit")}
+            : FUnrealMCPError{TEXT("internal_error"), TEXT("The primary asset-family snapshot is unavailable")};
         return false;
     }
     if (Overlays.IsEmpty())
@@ -136,8 +139,9 @@ bool BuildComposedSnapshot(
             ? Overlay->SnapshotBuilder(AssetObject) : FString();
         if (Value.IsEmpty())
         {
-            OutError = {TEXT("extension_contract_violation"),
-                TEXT("A companion inspection snapshot is unavailable")};
+            OutError = Overlay != nullptr && Overlay->FamilyId == TEXT("animation_blueprint")
+                ? FUnrealMCPError{TEXT("response_too_large"), TEXT("Inspection exceeds the configured internal fingerprint limit")}
+                : FUnrealMCPError{TEXT("extension_contract_violation"), TEXT("A companion inspection snapshot is unavailable")};
             return false;
         }
         if (!Snapshot.Add(Overlay->FamilyId, Value, OutError))
@@ -466,6 +470,9 @@ bool FUnrealMCPAssetInspectionService::Execute(
     }
 
     UBlueprint* Blueprint = Cast<UBlueprint>(AssetObject);
+    TArray<UEdGraph*> InspectionGraphs;
+    int32 InspectionWork = 0;
+    if (!UnrealMCP::InspectionBudget::CollectGraphs(Blueprint, InspectionGraphs, InspectionWork, OutError)) return false;
     const UPackage* Package = AssetObject->GetOutermost();
     const bool bDirtyBefore = Package != nullptr && Package->IsDirty();
     const TEnumAsByte<EBlueprintStatus> StatusBefore = Blueprint != nullptr

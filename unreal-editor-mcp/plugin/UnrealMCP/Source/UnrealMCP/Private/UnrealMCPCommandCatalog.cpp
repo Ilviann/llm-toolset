@@ -271,6 +271,8 @@ void FUnrealMCPCommandCatalog::Build(
         FixedLimit(TEXT("command_deadline_ms"), UnrealMCP::CommandDeadlineSeconds * 1000.0), FixedLimit(TEXT("inspect_page_size"), UnrealMCP::MaxInspectPageSize),
         FixedLimit(TEXT("discovery_scan"), UnrealMCP::MaxDiscoveryScan),
         FixedLimit(TEXT("inspect_records"), UnrealMCP::MaxInspectRecords), FixedLimit(TEXT("retained_cursors"), UnrealMCP::MaxRetainedCursors),
+        FixedLimit(TEXT("inspect_internal_work"), UnrealMCP::MaxInspectInternalWork),
+        FixedLimit(TEXT("inspect_fingerprint_entries"), UnrealMCP::MaxInspectFingerprintEntries),
         FixedLimit(TEXT("cursor_lifetime_ms"), UnrealMCP::CursorLifetimeSeconds * 1000.0),
         FixedLimit(TEXT("retained_operations"), UnrealMCP::MaxRetainedOperations),
         FixedLimit(TEXT("operation_lifetime_ms"), UnrealMCP::OperationLifetimeSeconds * 1000.0)};

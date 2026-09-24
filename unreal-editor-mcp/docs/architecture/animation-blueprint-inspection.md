@@ -18,6 +18,7 @@ The common Blueprint module recognizes Animation Blueprint modes and supplies sh
 ## Boundaries and invariants
 
 - The overlay matches exact and derived `UAnimInstance` classes after core Blueprint classification; it does not add model-facing commands or schemas.
+- Animation structural work has an inclusive 262,144-unit budget independent of emitted records; it covers graph references, nodes, pins, links, sync groups, and parent overrides. Shared iterative graph traversal rejects cycles and deduplicates graphs before snapshot and semantic collection. Fingerprints accept at most 262,144 entries.
 - All inspection is read-only and bounded. Snapshot input is independent of selector, verbosity, and page choices.
 - Persisted semantic assets may be named, but animation payloads and referenced assets are never loaded or reconstructed.
 - Compiler-generated properties, runtime proxies, skeletal components, debug poses, active states, montage playback, weights, thumbnails, and media are outside the contract.

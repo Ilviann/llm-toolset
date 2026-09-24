@@ -7,7 +7,7 @@ namespace UnrealMCP
 inline constexpr int32 MaxAssetInspectPageSize = 100;
 inline constexpr int32 MaxAssetInspectSelectorBytes = 1024;
 inline constexpr int32 MaxAssetInspectCompleteGraphBytes = 64 * 1024;
-inline constexpr TCHAR Version[] = TEXT("0.53.0");
+inline constexpr TCHAR Version[] = TEXT("0.53.1");
 inline constexpr int32 CompanionApiVersion = 2;
 inline constexpr int32 ExtensionSchemaRevision = 2;
 inline constexpr int32 MaxDiscoveredCompanions = 64;
@@ -31,6 +31,8 @@ inline constexpr int32 DefaultInspectPageSize = 25;
 inline constexpr int32 MaxInspectPageSize = 100;
 inline constexpr int32 MaxDiscoveryScan = 2048;
 inline constexpr int32 MaxInspectRecords = 4096;
+inline constexpr int32 MaxInspectInternalWork = 262144;
+inline constexpr int32 MaxInspectFingerprintEntries = 262144;
 inline constexpr int32 MaxRetainedCursors = 32;
 inline constexpr int32 MaxComponentDefaults = 16;
 inline constexpr double CursorLifetimeSeconds = 30.0;

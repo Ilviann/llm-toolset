@@ -30,6 +30,7 @@ if (Sections.Contains(TEXT("summary")))
     Value->SetStringField(TEXT("blueprint_family"), UnrealMCP::BlueprintFamilyPolicy::Classify(Blueprint->ParentClass).Name);
     Value->SetObjectField(TEXT("family_capabilities"), UnrealMCP::BlueprintFamilyPolicy::BuildLiveCapabilities(Blueprint));
     AddRecord(Sink.Records, Value);
+    if (!Sink.CheckLimits(OutError)) return false;
 }
 if (Sections.Contains(TEXT("parent_class")))
 {
@@ -37,6 +38,7 @@ if (Sections.Contains(TEXT("parent_class")))
     Value->SetStringField(TEXT("class_path"), Blueprint->ParentClass->GetPathName());
     Value->SetBoolField(TEXT("blueprint_generated"), UBlueprint::GetBlueprintFromClass(Blueprint->ParentClass) != nullptr);
     AddRecord(Sink.Records, Value);
+    if (!Sink.CheckLimits(OutError)) return false;
 }
 if (Sections.Contains(TEXT("compile_state")))
 {
@@ -44,6 +46,7 @@ if (Sections.Contains(TEXT("compile_state")))
     Value->SetStringField(TEXT("state"), CompileState(Blueprint->Status));
     Value->SetBoolField(TEXT("being_compiled"), Blueprint->bBeingCompiled != 0);
     AddRecord(Sink.Records, Value);
+    if (!Sink.CheckLimits(OutError)) return false;
 }
 
 Owners.Emplace(Blueprint, AssetPath);
@@ -94,9 +97,11 @@ for (const TPair<UBlueprint*, FString>& Owner : Owners)
             Value->SetBoolField(TEXT("root"), Owner.Key->SimpleConstructionScript->GetRootNodes().Contains(Node));
             Value->SetStringField(TEXT("parent_id"), Parent != nullptr && *Parent != nullptr ? GuidString((*Parent)->VariableGuid) : FString());
             AddRecord(Sink.Records, Value);
+            if (!Sink.CheckLimits(OutError)) return false;
         }
         Sink.Fingerprint.Add(TEXT("component|") + Owner.Value + TEXT("|") + Id + TEXT("|") + Node->GetVariableName().ToString()
             + TEXT("|") + (Parent != nullptr && *Parent != nullptr ? GuidString((*Parent)->VariableGuid) : FString()) + TEXT("|") + DefaultsFingerprint);
+        if (!Sink.CheckLimits(OutError)) return false;
     }
 }
 if (!bComponentFound)
@@ -136,9 +141,11 @@ if (bIncludeInherited && Blueprint->GeneratedClass != nullptr)
                 Value->SetBoolField(TEXT("root"), DefaultsActor->GetRootComponent() == Component);
                 Value->SetStringField(TEXT("parent_id"), FString());
                 AddRecord(Sink.Records, Value);
+                if (!Sink.CheckLimits(OutError)) return false;
             }
             Sink.Fingerprint.Add(TEXT("native_component|") + Component->GetName() + TEXT("|")
                 + Component->GetClass()->GetPathName() + TEXT("|") + DefaultsFingerprint);
+            if (!Sink.CheckLimits(OutError)) return false;
         }
     }
 }
@@ -160,6 +167,7 @@ if (Sections.Contains(TEXT("class_defaults")))
             Defaults, Defaults->GetClass()->FindPropertyByName(FName(*Name)));
         for (const TPair<FString, TSharedPtr<FUnrealMCPValue>>& Pair : Encoded->Values) Value->SetField(Pair.Key, Pair.Value);
         AddRecord(Sink.Records, Value);
+        if (!Sink.CheckLimits(OutError)) return false;
     }
 }
     return true;
@@ -198,6 +206,7 @@ for (const TPair<UBlueprint*, FString>& Owner : Owners)
             Value->SetObjectField(TEXT("replication"), VariableReplication(Owner.Key, Variable, Owner.Key == Blueprint && !Id.IsEmpty()));
             Value->SetObjectField(TEXT("reference_summary"), VariableReferences(Blueprint, Variable.VarName));
             AddRecord(Sink.Records, Value);
+            if (!Sink.CheckLimits(OutError)) return false;
         }
         TArray<FString> MetadataFingerprint;
         for (const FBPVariableMetaDataEntry& Entry : Variable.MetaDataArray)
@@ -210,6 +219,7 @@ for (const TPair<UBlueprint*, FString>& Owner : Owners)
             + TEXT("|") + Variable.Category.ToString() + TEXT("|") + LexToString(Variable.PropertyFlags)
             + TEXT("|") + Variable.RepNotifyFunc.ToString() + TEXT("|") + LexToString(static_cast<int32>(Variable.ReplicationCondition))
             + TEXT("|") + FString::Join(MetadataFingerprint, TEXT(";")));
+        if (!Sink.CheckLimits(OutError)) return false;
     }
 }
 if (!bMemberFound)
@@ -257,6 +267,7 @@ for (const TPair<UBlueprint*, FString>& Owner : Owners)
         if (Entry == nullptr)
         {
             Sink.Fingerprint.Add(TEXT("function|missing_entry|") + Owner.Value + TEXT("|") + FunctionId + TEXT("|") + FunctionGraph->GetName());
+            if (!Sink.CheckLimits(OutError)) return false;
             continue;
         }
         const TSharedRef<FUnrealMCPRecord> Signature = FunctionSignature(Entry, Results);
@@ -298,12 +309,13 @@ for (const TPair<UBlueprint*, FString>& Owner : Owners)
             Value->SetArrayField(TEXT("rep_notify_member_ids"), RepNotifyMembers);
             Value->SetNumberField(TEXT("local_variable_count"), Entry->LocalVariables.Num());
             AddRecord(Sink.Records, Value);
+            if (!Sink.CheckLimits(OutError)) return false;
         }
 
         int32 ParameterIndex = 0;
         auto AppendParameters = [&](UK2Node_EditablePinBase* Node, const TCHAR* Direction)
         {
-            if (Node == nullptr) return;
+            if (Node == nullptr) return true;
             for (const TSharedPtr<FUserPinInfo>& Pin : Node->UserDefinedPins)
             {
                 if (!Pin.IsValid()) continue;
@@ -324,16 +336,19 @@ for (const TPair<UBlueprint*, FString>& Owner : Owners)
                         Value->SetObjectField(TEXT("default"), UnrealMCP::K2TypeCodec::EncodeDefault(Pin->PinType, Pin->PinDefaultValue));
                     }
                     AddRecord(Sink.Records, Value);
+                    if (!Sink.CheckLimits(OutError)) return false;
                 }
                 Sink.Fingerprint.Add(TEXT("parameter|") + FunctionId + TEXT("|") + LexToString(ParameterIndex) + TEXT("|")
                     + Direction + TEXT("|") + Pin->PinName.ToString() + TEXT("|") + VariableTypeFingerprint(Pin->PinType)
                     + TEXT("|") + LexToString(Pin->PinType.bIsReference) + TEXT("|") + LexToString(Pin->PinType.bIsConst)
                     + TEXT("|") + Pin->PinDefaultValue);
+                if (!Sink.CheckLimits(OutError)) return false;
                 ++ParameterIndex;
             }
+            return true;
         };
-        AppendParameters(Entry, TEXT("input"));
-        if (!Results.IsEmpty()) AppendParameters(Results[0], TEXT("output"));
+        if (!AppendParameters(Entry, TEXT("input"))) return false;
+        if (!Results.IsEmpty() && !AppendParameters(Results[0], TEXT("output"))) return false;
 
         for (const FBPVariableDescription& Local : Entry->LocalVariables)
         {
@@ -359,15 +374,18 @@ for (const TPair<UBlueprint*, FString>& Owner : Owners)
                 Value->SetObjectField(TEXT("default"), UnrealMCP::K2TypeCodec::EncodeDefault(Local.VarType, Local.DefaultValue));
                 Value->SetObjectField(TEXT("reference_summary"), LocalReferenceSummary);
                 AddRecord(Sink.Records, Value);
+                if (!Sink.CheckLimits(OutError)) return false;
             }
             Sink.Fingerprint.Add(TEXT("local|") + FunctionId + TEXT("|") + LocalId + TEXT("|") + Local.VarName.ToString()
                 + TEXT("|") + VariableTypeFingerprint(Local.VarType) + TEXT("|") + Local.DefaultValue);
+            if (!Sink.CheckLimits(OutError)) return false;
         }
         Sink.Fingerprint.Add(TEXT("function|") + Owner.Value + TEXT("|") + FunctionId + TEXT("|") + FunctionGraph->GetName()
             + TEXT("|") + DeclarationKind + TEXT("|") + LexToString(Entry->GetFunctionFlags())
             + TEXT("|") + Entry->MetaData.Category.ToString() + TEXT("|") + Entry->MetaData.ToolTip.ToString()
             + TEXT("|") + Entry->MetaData.Keywords.ToString() + TEXT("|") + LexToString(Entry->MetaData.bCallInEditor)
             + TEXT("|") + LexToString(Results.Num()));
+        if (!Sink.CheckLimits(OutError)) return false;
     }
 }
 if (!bFunctionFound)
@@ -442,11 +460,12 @@ for (const TPair<UBlueprint*, FString>& Owner : Owners)
             Value->SetObjectField(TEXT("replacement_boundary"), ReplacementBoundaryRecord(
                 ReplacementBoundary, bEditable && bReplaceableBoundary));
             AddRecord(Sink.Records, Value);
+            if (!Sink.CheckLimits(OutError)) return false;
         }
         int32 ParameterIndex = 0;
         auto AppendMacroParameters = [&](UK2Node_Tunnel* Node, const TCHAR* Direction)
         {
-            if (Node == nullptr) return;
+            if (Node == nullptr) return true;
             for (const TSharedPtr<FUserPinInfo>& Pin : Node->UserDefinedPins)
             {
                 if (!Pin.IsValid() || Pin->PinType.PinCategory == UEdGraphSchema_K2::PC_Exec) continue;
@@ -470,15 +489,18 @@ for (const TPair<UBlueprint*, FString>& Owner : Owners)
                         Value->SetObjectField(TEXT("default"), UnrealMCP::K2TypeCodec::EncodeDefault(Pin->PinType, Pin->PinDefaultValue));
                     }
                     AddRecord(Sink.Records, Value);
+                    if (!Sink.CheckLimits(OutError)) return false;
                 }
                 Sink.Fingerprint.Add(TEXT("macro_parameter|") + MacroId + TEXT("|") + LexToString(ParameterIndex) + TEXT("|")
                     + Direction + TEXT("|") + Pin->PinName.ToString() + TEXT("|") + VariableTypeFingerprint(Pin->PinType)
                     + TEXT("|") + Pin->PinDefaultValue);
+                if (!Sink.CheckLimits(OutError)) return false;
                 ++ParameterIndex;
             }
+            return true;
         };
-        AppendMacroParameters(Entry, TEXT("input"));
-        AppendMacroParameters(Exit, TEXT("output"));
+        if (!AppendMacroParameters(Entry, TEXT("input"))) return false;
+        if (!AppendMacroParameters(Exit, TEXT("output"))) return false;
         const FKismetUserDeclaredFunctionMetadata* Metadata = Entry != nullptr ? &Entry->MetaData : nullptr;
         Sink.Fingerprint.Add(TEXT("macro|") + Owner.Value + TEXT("|") + MacroId + TEXT("|") + MacroGraph->GetName()
             + TEXT("|") + LexToString(bPure) + TEXT("|") + (Metadata != nullptr ? Metadata->Category.ToString() : FString())
@@ -486,6 +508,7 @@ for (const TPair<UBlueprint*, FString>& Owner : Owners)
             + TEXT("|") + (Metadata != nullptr ? Metadata->Keywords.ToString() : FString())
             + TEXT("|") + (Entry != nullptr ? GuidString(Entry->NodeGuid) : FString())
             + TEXT("|") + (Exit != nullptr ? GuidString(Exit->NodeGuid) : FString()));
+        if (!Sink.CheckLimits(OutError)) return false;
     }
 }
 if (!bMacroFound)

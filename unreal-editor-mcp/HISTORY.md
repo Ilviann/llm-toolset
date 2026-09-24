@@ -10,6 +10,13 @@
 - Added an independent CommonUI companion checkbox to the Windows deployment helper, including fixed base-dependent packaging, project/Engine installation, and transactional multi-plugin handling without changing runtime or plugin versions.
 - Decomposed Python packaging, Windows deployment, and headless integration support tools behind stable entrypoints, with shared Unreal-local primitives, typed deployment and Blueprint scenario state, focused domain modules, and unchanged runtime/plugin versions.
 
+## 0.53.1 — 2026-09-24
+
+- Separated inclusive Blueprint inspection budgets: 4,096 emitted records across all pages, 262,144 internal work units, and 262,144 fingerprint entries, with independent runtime capability limits and distinct overflow errors.
+- Kept graph selection local to emitted records while fingerprinting the complete requested inherited graph scope. Added bounded iterative graph discovery, cycle rejection, deduplication, and Animation Blueprint structural preflight.
+- Preserved public `asset_inspect` paging/atomic graph behavior, internal 25/100-record pages, 32 cursors with 30-second lifetimes, the 256 KiB transport bound, companion API v2, and all companion versions.
+- Verified this branch with 205 Python tests (one Windows symlink-permission skip), 74 successful Unreal Automation test executions, adaptive/forced-unity/non-unity UE 5.8 Win64 builds, full headless integration, dedicated animation save/inspection/restart, SDK verification, base packaging, and documentation lint. macOS verification remains follow-up work.
+
 ## 0.53.0 — 2026-08-17
 
 - Added the independent `UnrealMCPAI` 0.1.0 companion with eight read-only `asset_inspect` families for Behavior Trees, Blackboards, Environment Queries, and custom task, decorator, service, EQS generator, and EQS context Blueprints while keeping AI dependencies outside the base plugin.
