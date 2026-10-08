@@ -2,6 +2,8 @@
 
 ## Python boundary
 
+Argument-validation regressions cover bounded closest-shape failures, discriminator ordering, nested local references and array paths, ambiguous multiple matches, expected limits, Unicode/escaped keys, and delivery beyond the normal 512-character protocol-error cap without editor dispatch. See `test_schema_validation.py` and `test_server_stdio.py`.
+
 `tests/` uses `unittest` and injected bridge/platform collaborators. It covers immutable asset-family catalog validation and composition, duplicate/conflicting entries, unavailable native commands, MCP initialization/list/call, exact readonly/writable and lifecycle combinations, access rejection before bridge dispatch, exact schemas, result policy, stdout purity, discovery and token validation, stale/dead process rejection, loopback targeting, authentication headers, response bounds, timeout/cancellation, stable errors, platform branches, release consistency, fixed checkout-relative disposable-project resolution, host-specific headless editor selection, macOS-only `XCODE26_1_1` application-path derivation and developer-directory configuration, and the Windows binary deployment helper's project/Engine discovery, base/GAS/CommonUI/Enhanced Input packaging commands, project/Engine install modes, bounded multi-module source filtering and rule configuration, transactional replacement, enablement, and LM Studio/Codex settings previews. It does not require Unreal or a network.
 
 ## Native boundary

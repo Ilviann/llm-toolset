@@ -1,5 +1,7 @@
 # Completed features
 
+- [`argument-errors` — Detailed tool argument validation errors](argument-errors.md).
+
 - [`reflected-inspect` — Expanded reflected inspection](reflected-inspect.md).
 - [`attribute-inspect` — Reflected Gameplay Attributes](attribute-inspect.md).
 - [`attribute-map-inspect` — Gameplay Attribute collection values](attribute-map-inspect.md).

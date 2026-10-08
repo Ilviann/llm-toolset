@@ -10,6 +10,12 @@
 - Added an independent CommonUI companion checkbox to the Windows deployment helper, including fixed base-dependent packaging, project/Engine installation, and transactional multi-plugin handling without changing runtime or plugin versions.
 - Decomposed Python packaging, Windows deployment, and headless integration support tools behind stable entrypoints, with shared Unreal-local primitives, typed deployment and Blueprint scenario state, focused domain modules, and unchanged runtime/plugin versions.
 
+## 0.61.0 — 2026-10-09
+
+- Improved Python argument-validation errors with nested field paths, expected types/patterns/limits, and the first failure for up to four closest request shapes, prioritizing matching constant discriminators. Multiple matching shapes report ambiguity separately. Diagnostics are bounded to 4,096 UTF-8 bytes plus the fixed MCP error prefix, with at most 768 bytes per branch reason, and survive the normal 512-character protocol-error cap without echoing supplied field values.
+- Preserved accepted schemas, JSON-RPC `-32602` rejection before editor dispatch, domain error bounds, companion API v2, and companion versions. Synchronized Python/base-plugin version metadata.
+- Verified on Windows with 216 Python tests (one symlink-permission skip), 71 native Automation cases, adaptive/forced-unity editor builds, isolated Win64 base packaging, the complete production-bridge save/restart workflow, and documentation lint. Preferred macOS verification remains in the roadmap backlog.
+
 ## 0.60.0 — 2026-09-24
 
 - Added non-loading Blueprint Interface discovery, stable declaration identities and selected authored entry/result graph contents. Animation Layer Interfaces remain classified as animation; no new authoring capability is enabled.

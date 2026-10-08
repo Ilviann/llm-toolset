@@ -26,8 +26,11 @@ def result(request_id: Any, value: dict[str, Any]) -> dict[str, Any]:
     return {"jsonrpc": "2.0", "id": request_id, "result": value}
 
 
-def error(request_id: Any, code: int, message: str) -> dict[str, Any]:
-    return {"jsonrpc": "2.0", "id": request_id, "error": {"code": code, "message": message[:512]}}
+def error(
+    request_id: Any, code: int, message: str, *, max_message_chars: int = 512,
+) -> dict[str, Any]:
+    return {"jsonrpc": "2.0", "id": request_id,
+            "error": {"code": code, "message": message[:max_message_chars]}}
 
 
 def tool_result(value: Any, *, is_error: bool = False) -> dict[str, Any]:

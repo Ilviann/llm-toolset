@@ -178,6 +178,7 @@ Support-tooling features change repository utilities without changing Unreal MCP
 Feature checkboxes record implementation completion after mandatory Windows verification. This section separately tracks preferred macOS verification that may occur after a feature is completed and released. Linux is outside the current support and verification scope and is not tracked.
 
 - macOS:
+  - [`argument-errors`](docs/features/completed/argument-errors.md) — repeat Python/stdio diagnostics and synchronized base-version build/packaging verification.
   - [`reflected-inspect`](docs/features/completed/reflected-inspect.md) — repeat native, restart, three-mode build, and base packaging checks.
   - [`attribute-inspect`](docs/features/completed/attribute-inspect.md) — repeat native, restart, three-mode build, and base packaging checks.
   - [`attribute-map-inspect`](docs/features/completed/attribute-map-inspect.md) — repeat native, restart, three-mode build, and base packaging checks.

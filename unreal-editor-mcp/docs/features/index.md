@@ -21,6 +21,8 @@ Keep the authoritative checklist in [`ROADMAP.md`](../../ROADMAP.md) synchronize
 
 ## Feature catalog
 
+- [`argument-errors` — Detailed tool argument validation errors](completed/argument-errors.md).
+
 - [`reflected-inspect` — Expanded reflected inspection](completed/reflected-inspect.md).
 - [`attribute-inspect` — Reflected Gameplay Attributes](completed/attribute-inspect.md).
 - [`attribute-map-inspect` — Gameplay Attribute collection values](completed/attribute-map-inspect.md).

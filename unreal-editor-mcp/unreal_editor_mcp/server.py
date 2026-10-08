@@ -14,7 +14,7 @@ from .asset_family_catalog import (
     compose_companion_capabilities,
 )
 from .project import ProjectIdentity
-from .schema_validation import SchemaValidationError, validate_tool_arguments
+from .schema_validation import MAX_SCHEMA_ERROR_BYTES, SchemaValidationError, validate_tool_arguments
 from .stdio import error, result, tool_result
 from .tool_catalog import LATEST_PROTOCOL, SUPPORTED_PROTOCOLS
 from .yaml_renderer import render_safe_yaml
@@ -99,7 +99,9 @@ class MCPServer:
         try:
             validate_tool_arguments(arguments, self.tool_by_name[name]["inputSchema"])
         except SchemaValidationError as exc:
-            return error(request_id, -32602, f"Invalid tool arguments: {exc}")
+            prefix = "Invalid tool arguments: "
+            return error(request_id, -32602, f"{prefix}{exc}",
+                         max_message_chars=MAX_SCHEMA_ERROR_BYTES + len(prefix))
         try:
             publication = self.publications[name]
             if publication.handler == LIFECYCLE_HANDLER:

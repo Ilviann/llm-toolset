@@ -6,7 +6,8 @@ import unreal_editor_mcp
 from unreal_editor_mcp.errors import BridgeError, ErrorCode
 from unreal_editor_mcp.project import ProjectIdentity
 from unreal_editor_mcp.server import MCPServer
-from unreal_editor_mcp.stdio import MAX_MCP_MESSAGE_CHARS, serve
+from unreal_editor_mcp.schema_validation import MAX_SCHEMA_ERROR_BYTES
+from unreal_editor_mcp.stdio import MAX_MCP_MESSAGE_CHARS, error, serve
 from unreal_editor_mcp.tool_catalog import TOOLS_WITH_LIFECYCLE
 
 
@@ -56,6 +57,39 @@ class FakeLifecycle:
 
 
 class ServerStdioTests(unittest.TestCase):
+    def test_shape_errors_reach_stdio_without_bridge_dispatch(self):
+        bridge = FakeBridge()
+        server = MCPServer(bridge)
+        messages = [
+            {"jsonrpc": "2.0", "id": index, "method": "tools/call", "params": {
+                "name": name, "arguments": arguments,
+            }}
+            for index, (name, arguments) in enumerate((
+                ("asset_references", {"asset_path": "/Game/Example.Example", "page_size": 101}),
+                ("level_inspect", {"mode": "actor", "map_id": "a" * 40,
+                                   "expected_snapshot": "b" * 40}),
+                ("asset_references", {"asset_path": "/Game/Example.Example", "Ж" * 2000: 1}),
+            ), start=1)
+        ]
+        output = io.StringIO()
+        serve(server, input_stream=io.StringIO("".join(json.dumps(message) + "\n" for message in messages)),
+              output_stream=output, error_stream=io.StringIO())
+        replies = [json.loads(line) for line in output.getvalue().splitlines()]
+        self.assertEqual([reply["id"] for reply in replies], [1, 2, 3])
+        for reply in replies:
+            self.assertEqual(reply["error"]["code"], -32602)
+            self.assertIn("Invalid tool arguments: arguments must match exactly one allowed shape",
+                          reply["error"]["message"])
+        self.assertIn("arguments.page_size exceeds the maximum 100", replies[0]["error"]["message"])
+        self.assertIn("missing required field 'actor_id'", replies[1]["error"]["message"])
+        long_message = replies[2]["error"]["message"]
+        self.assertGreater(len(long_message), 512)
+        self.assertIn("shape 2: arguments is missing required field 'cursor'", long_message)
+        self.assertLessEqual(len(long_message.encode("utf-8")),
+                             MAX_SCHEMA_ERROR_BYTES + len("Invalid tool arguments: "))
+        self.assertEqual(len(error(1, -32600, "x" * 1000)["error"]["message"]), 512)
+        self.assertEqual(bridge.calls, [])
+
     def test_initialize_list_and_call(self):
         bridge = FakeBridge()
         server = MCPServer(bridge, project_identity=ProjectIdentity("Example Project", "a" * 40))

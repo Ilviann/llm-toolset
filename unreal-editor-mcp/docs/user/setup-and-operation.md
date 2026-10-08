@@ -130,3 +130,23 @@ The tool accepts only:
 Shutdown refuses while PIE/simulation, saving, garbage collection, an editor transaction, asset compilation, or any dirty package is present. Dirty refusal includes only a bounded package summary. It never saves, discards, prompts, force-kills, or retargets another process. Once shutdown is accepted, cancellation cannot interrupt it; restart can still cancel at the safe point after the old process exits and before the new launch.
 
 Lifecycle progress is stored separately from Blueprint mutations at `Saved/UnrealMCP/lifecycle.json`, with at most 16 records retained for 24 hours. A server restart marks interrupted records `outcome_unknown`; inspect the configured editor state before choosing a new operation ID. Cancelling a launch wait does not terminate the editor, which may still become ready.
+
+## Argument validation errors
+
+`Invalid tool arguments` is a JSON-RPC `-32602` rejection by the Python server before the request reaches Unreal. The arguments must match the tool's current `tools/list` schema. Tools with several request formats require exactly one format to match.
+
+For example, calling `asset_references` with:
+
+```json
+{"asset_path":"/Game/Example.Example","page_size":101}
+```
+
+returns:
+
+```text
+Invalid tool arguments: arguments must match exactly one allowed shape; no shapes matched. Closest failures (first error per shape): shape 1: arguments.page_size exceeds the maximum 100; shape 2: arguments is missing required field 'cursor'
+```
+
+Here the asset-path request needs `page_size` reduced to at most 100. The cursor failure describes the alternative continuation format; do not add a cursor to the asset-path request. For operation/mode tools, failures for formats matching the supplied discriminator appear first. Nested paths such as `arguments.operations[0].value` identify the exact array item and field to correct.
+
+Messages report one failure per displayed shape, up to four shapes, and count omitted formats. They distinguish missing/unknown fields, wrong types, expected constant/enum values, required patterns, and numeric or collection bounds. Multiple matching formats are reported as ambiguity with their count and shape numbers. Error text is bounded and supplied field values are not echoed. Correct the reported fields and retry; another field error may then become visible.

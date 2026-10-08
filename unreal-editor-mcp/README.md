@@ -1,6 +1,6 @@
 # Unreal Editor MCP
 
-Unreal Editor MCP 0.60.0 is an offline-first MCP bridge for Unreal Engine 5.8+. It pairs a dependency-free Python 3.10+ stdio server with an editor-only C++ plugin.
+Unreal Editor MCP 0.61.0 is an offline-first MCP bridge for Unreal Engine 5.8+. It pairs a dependency-free Python 3.10+ stdio server with an editor-only C++ plugin.
 
 Internal Blueprint inspection separates its 4,096 emitted-record budget from 262,144 internal work units and 262,144 fingerprint entries. Small selections in large assets retain whole-asset snapshots; public semantic paging and graph output limits are unchanged.
 
@@ -48,7 +48,7 @@ Set `UE58` to the engine installation root first. This CMD script immediately re
 
 1. Copy [`plugin/UnrealMCP`](plugin/UnrealMCP) to `<YourProject>/Plugins/UnrealMCP`, or add this repository's `plugin/` directory to `AdditionalPluginDirectories` in a disposable development `.uproject`.
 2. Enable `UnrealMCP` and compile the project's Editor target with Unreal Engine 5.8 or newer.
-3. Open the project and wait for `Unreal MCP 0.60.0 ready on 127.0.0.1:15485` in the editor log.
+3. Open the project and wait for `Unreal MCP 0.61.0 ready on 127.0.0.1:15485` in the editor log.
 4. Create a virtual environment and install the Python package offline:
 
    ```sh
@@ -134,6 +134,7 @@ The executable schemas, runtime `capabilities` response, source, plugin metadata
 
 - The plugin listens only on `127.0.0.1` and authenticates every request with a durable per-project token stored under `Saved/UnrealMCP`. Discovery never exposes the token or absolute project path.
 - Model input is bounded and validated. Filesystem paths, force flags, arbitrary reflection, console commands, unrestricted serialization, and code execution are not exposed.
+- Invalid tool arguments return JSON-RPC `-32602` before editor dispatch, with field paths and expected types, patterns, or limits. When no request shape matches, the message shows the first failure for up to four closest shapes, prioritizing matching operation/mode fields. Ambiguous requests report the matching shape numbers. See [argument error examples](docs/user/setup-and-operation.md#argument-validation-errors).
 - Read operations return bounded pages tied to exact queries and snapshots. Continuation cursors are short-lived and single-use.
 - Writable tools use stale-state preconditions and a retained operation ledger. Reusing an operation ID with different arguments is rejected; unknown or partial outcomes require `operation_status` reconciliation before another mutation, while safe cancellation uses `operation_cancel`.
 - Blueprint compilation and saving are explicit. A completed compile can return `compile_succeeded: false` with bounded diagnostics.

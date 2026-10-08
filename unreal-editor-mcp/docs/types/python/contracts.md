@@ -16,7 +16,9 @@ Every mutation uses one caller-generated 32-lowercase-hex `operation_id`. Existi
 
 `operation_status` and `operation_cancel` both require exactly one 32-lowercase-hex `operation_id` and one 32-lowercase-hex `bridge_instance_id`. Status lookup is readonly and cannot cancel; cancellation is a separate writable-only MCP tool.
 
-Every model-facing error is `{code,message,details,retryable}`. Codes are defined by `ErrorCode`; messages are limited to 512 characters and details to 16 primitive fields. Stable schema/row codes include `invalid_schema`, `referenced_schema`, `invalid_row`, and `data_limit_exceeded`. Unknown native codes become `internal_error`.
+Domain tool errors are `{code,message,details,retryable}`. Codes are defined by `ErrorCode`; messages are limited to 512 characters and details to 16 primitive fields. Stable schema/row codes include `invalid_schema`, `referenced_schema`, `invalid_row`, and `data_limit_exceeded`. Unknown native codes become `internal_error`.
+
+Invalid MCP arguments instead return a JSON-RPC error with `code: -32602` and `message: "Invalid tool arguments: ..."`, before editor dispatch. `SchemaValidationError` limits its diagnostic to 4,096 UTF-8 bytes, excluding that fixed prefix. A failed `oneOf` lists at most four closest shapes with one failure per shape and at most 768 bytes per branch reason, preserving nested field/array paths and expected types, patterns, and limits. Supplied constant discriminator matches and mismatches rank formats first; remaining ties use unknown-field counts and schema order. Multiple matches are reported as ambiguity with their count and up to four one-based schema shape numbers. Supplied field values are not echoed; field names are escaped and bounded.
 
 ## Platform adapter
 
